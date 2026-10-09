@@ -3,7 +3,8 @@ import { addToQueue, ANA, BIA, createRoom, hostPatch, roomState, SONGS } from '.
 
 const hostPost = (request, room, path, data) =>
   request.post(`/api/rooms/${room.code}${path}`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data });
-const playing = (page) => page.evaluate(() => window.tv.engine.playing);
+// tocando de verdade: o áudio já carregou (duração conhecida) e o relógio andou; só `playing` vale assim que o play() é chamado
+const playing = (page) => page.evaluate(() => window.tv.engine.playing && window.tv.engine.duration > 0 && window.tv.engine.currentTime > 0);
 
 test('sem sala na URL a TV avisa', async ({ page }) => {
   await page.goto('/tv.html');

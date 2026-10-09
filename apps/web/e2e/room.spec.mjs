@@ -192,7 +192,7 @@ test('adicionar música: buscar no YouTube, escolher o vídeo e colocar na fila'
   await page.getByLabel('Seu nome').fill('Carla');
   // sem artista e nome não busca
   await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
-  await expect(page.getByText('Informe o artista e o nome da música')).toBeVisible();
+  await expect(page.getByText('Informe o artista ou o nome da música')).toBeVisible();
 
   await page.getByLabel('Artista').fill('Billie Eilish');
   await page.getByLabel('Nome da música').fill('Bad Guy');

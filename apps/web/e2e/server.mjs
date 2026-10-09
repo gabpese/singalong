@@ -57,7 +57,7 @@ app.post('/__test/search-results', async (request) => {
   jobs.searchResults = request.body;
   return { ok: true };
 });
-app.get('/__test/state', async () => ({ queue: jobs.queue, exportQueue: jobs.exportQueue }));
+app.get('/__test/state', async () => ({ queue: jobs.queue, exportQueue: jobs.exportQueue, searchQueries: jobs.searchQueries }));
 
 app.rooms.start({ tickMs: 300 });
 await app.listen({ port: PORT, host: '127.0.0.1' });

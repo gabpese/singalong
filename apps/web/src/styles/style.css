@@ -410,3 +410,9 @@ h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .1
 
 .library li .info { min-width: 110px; }
 .jukebox-option .video-title { font-style: italic; overflow-wrap: anywhere; }
+
+/* confirmação do artista e do nome depois de escolher o vídeo */
+.confirm-box { display: grid; gap: 8px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.confirm-box h3 { margin: 0; font-size: 1rem; }
+.confirm-box .hint { margin: 0; }
+.confirm-box .row { align-items: end; }

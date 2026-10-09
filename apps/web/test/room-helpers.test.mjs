@@ -145,8 +145,9 @@ test('findJukeboxMatches: acha as versões prontas pelas palavras de artista e n
   assert.deepEqual(ids('Faouzia', 'Unethical Acoustic'), ['b']);
   assert.deepEqual(ids('Faouz', 'Unethical'), []); // palavra pela metade não vale
   assert.deepEqual(ids('Billie Eilish', 'Bad Guy'), []);
-  assert.deepEqual(ids('', 'Unethical'), []); // sem artista: não adivinha
-  assert.deepEqual(ids('Faouzia', '  '), []);
+  assert.deepEqual(ids('', 'Unethical'), ['a', 'b', 'e']); // só o nome da música
+  assert.deepEqual(ids('Faouzia', '  '), ['a', 'b']); // só o artista
+  assert.deepEqual(ids('  ', ''), []); // sem nenhum dos dois: não sugere nada
 });
 
 test('findJukeboxMatches e filterSongs também olham o título original do vídeo do YouTube', async () => {

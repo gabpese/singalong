@@ -101,11 +101,11 @@ function words(value) {
  * Músicas já prontas (o "Jukebox") que são a que a pessoa está pedindo: TODAS as palavras do artista e do nome digitados
  * aparecem, inteiras, no artista, no título ou no TÍTULO ORIGINAL DO VÍDEO do YouTube (`video_title`): quem deu outro nome à
  * música ao pedi-la ainda a encontra pelo que o vídeo se chama ("Faouzia - Unethical (MAPHRA Vocal Cover)" é achada por
- * Maphra + Unethical). Sem artista ou sem nome, não sugere nada (seria só palpite).
+ * Maphra + Unethical). Basta um dos dois campos (só o artista ou só o nome); sem nenhum, não sugere nada.
  */
 export function findJukeboxMatches(songs, artist, title) {
   const wanted = [...new Set([...words(artist), ...words(title)])];
-  if (!words(artist).length || !words(title).length) return [];
+  if (!wanted.length) return [];
   return sortSongs(
     songs.filter((song) => {
       const have = new Set([...words(song.artist), ...words(song.title), ...words(song.video_title)]);

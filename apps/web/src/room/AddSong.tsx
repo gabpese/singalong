@@ -1,18 +1,20 @@
-// Painel "Adicionar música". A pessoa informa Artista e Nome da música (obrigatórios): eles pesquisam o vídeo no YouTube
-// ("Artista - Nome") e depois buscam a letra. O link do vídeo é uma alternativa para quem já o tem.
+// Painel "Adicionar música". A pessoa procura o vídeo como no YouTube: pelo artista, pelo nome da música ou pelos dois
+// (basta um). Antes de ir ao YouTube, confere se a música já está pronta no Jukebox. Depois de escolher o vídeo, confirma
+// o artista e o nome da música (os dois são obrigatórios: alimentam a busca da letra e o que aparece na fila).
+// O link do vídeo é uma alternativa para quem já o tem.
 // Não sabe nada de salas: quem usa passa as funções que enviam o pedido (submitNew) e que trocam a letra de um item
 // que a pede (submitLyrics).
 import { forwardRef, type FormEvent, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../lib/identity.js';
 import { findJukeboxMatches, formatDuration, thumbnailUrl } from '../lib/queue-view.js';
-import { buildSearchQuery, embedUrl, extractVideoId, watchUrl } from '../lib/youtube.js';
+import { buildSearchQuery, embedUrl, extractVideoId, guessArtistTitle, watchUrl } from '../lib/youtube.js';
 import type { ApiError, LibrarySong } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { JukeboxDialog } from './JukeboxDialog';
 
 const SOURCE_HINTS: Record<string, string> = {
   lrclib:
-    'Procura a letra com o artista e o nome da música que você informou. Se achar uma versão com os tempos certos, usa; senão, a IA sincroniza a letra com a voz da música (cerca de 1 minuto).',
+    'Procura a letra com o artista e o nome da música que você confirmou. Se achar uma versão com os tempos certos, usa; senão, a IA sincroniza a letra com a voz da música (cerca de 1 minuto).',
   auto: 'Usa a legenda do vídeo, se ele tiver uma. Se não tiver, a música entra na fila e eu aviso para você escolher outra opção.',
   align:
     'Cole a letra, uma linha por verso. A IA ouve a voz da música e descobre quando cada linha é cantada. Leva cerca de 1 minuto e funciona bem em covers.',
@@ -52,7 +54,7 @@ interface Props {
   submitLyrics: (videoId: string, body: Record<string, unknown>) => Promise<string>;
   /** O painel precisa aparecer (ex.: abrir a aba "Adicionar"). */
   onShow: () => void;
-  /** Músicas já prontas (o Jukebox): se o artista e o nome batem com alguma, a pessoa pode usá-la em vez de buscar no YouTube. */
+  /** Músicas já prontas (o Jukebox): se o que foi digitado bate com alguma, a pessoa pode usá-la em vez de buscar no YouTube. */
   jukebox: LibrarySong[];
   /** Coloca uma música pronta do Jukebox na fila e devolve a mensagem de sucesso. */
   onPickJukebox: (song: LibrarySong) => Promise<string>;
@@ -78,9 +80,16 @@ function VideoFrame({ videoId }: { videoId: string }) {
 
 type Preview = { id: string; where: 'selection' | 'result' } | null;
 
-export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userName, onUserName, submitNew, submitLyrics, onShow, jukebox, onPickJukebox }, ref) {
+export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
+  { userName, onUserName, submitNew, submitLyrics, onShow, jukebox, onPickJukebox },
+  ref,
+) {
+  // o que a pessoa digita para PROCURAR (basta um dos dois)
   const [artist, setArtist] = useState('');
   const [title, setTitle] = useState('');
+  // o que ela CONFIRMA depois de escolher o vídeo (os dois são obrigatórios)
+  const [confirmArtist, setConfirmArtist] = useState('');
+  const [confirmTitle, setConfirmTitle] = useState('');
   const [url, setUrl] = useState('');
   const [source, setSource] = useState('lrclib');
   const [text, setText] = useState('');
@@ -93,20 +102,28 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [matches, setMatches] = useState<LibrarySong[] | null>(null); // versões prontas encontradas (abre o aviso)
-  const [declinedFor, setDeclinedFor] = useState(''); // pedido (artista|nome) em que a pessoa preferiu buscar no YouTube
+  const [declinedFor, setDeclinedFor] = useState(''); // busca em que a pessoa preferiu o YouTube ao Jukebox
   const artistRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   const setStatus = (message: string, isError = false) => setStatusState({ text: message, isError });
   const needsText = TEXT_SOURCES.includes(source);
-  // Artista e nome são obrigatórios; só não precisam de novo ao trocar a letra de um item já na fila (a menos que a busca online precise)
-  const namesRequired = !lyricsFor || source === 'lrclib';
-  const names = () => ({ artist: artist.replace(/\s+/g, ' ').trim(), title: title.replace(/\s+/g, ' ').trim() });
+  // Confirmar artista e nome é obrigatório; só não precisa ao trocar a letra de um item já na fila (a menos que a busca online precise)
+  const confirmRequired = !lyricsFor || source === 'lrclib';
+  const showConfirm = Boolean(selected) || Boolean(lyricsFor);
+  const names = () => ({ artist: confirmArtist.replace(/\s+/g, ' ').trim(), title: confirmTitle.replace(/\s+/g, ' ').trim() });
   const lyricsPayload = () => ({ source, ...(needsText ? { text } : {}) });
 
   function select(videoId: string | null, label: string | null = null) {
     setSelected(videoId ? { id: videoId, label } : null);
     setUrl(videoId ? watchUrl(videoId) : '');
+  }
+
+  /** Pré-preenche a confirmação: o que a pessoa digitou na busca vale mais; o que faltar vem de um palpite do título do vídeo. */
+  function fillConfirm(videoTitle: string | null) {
+    const guess: { artist: string; title: string } = guessArtistTitle(videoTitle);
+    setConfirmArtist(artist.trim() || guess.artist);
+    setConfirmTitle(title.trim() || guess.title);
   }
 
   function clearResults() {
@@ -118,6 +135,8 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
     // o nome da pessoa fica (ele não é um campo deste formulário)
     setArtist('');
     setTitle('');
+    setConfirmArtist('');
+    setConfirmTitle('');
     setUrl('');
     setSource('lrclib');
     setText('');
@@ -134,9 +153,9 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
   }
 
   async function runSearch({ skipJukebox = false } = {}) {
-    const query = buildSearchQuery(artist, title);
+    const query: string | null = buildSearchQuery(artist, title);
     if (!query) {
-      setStatus('Informe o artista e o nome da música para buscar o vídeo.', true);
+      setStatus('Informe o artista ou o nome da música para buscar o vídeo.', true);
       (artist.trim() ? titleRef : artistRef).current?.focus();
       return;
     }
@@ -157,7 +176,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
       const found: SearchResult[] = await api('GET', `/api/search?q=${encodeURIComponent(query)}`);
       if (!found.length) {
         clearResults();
-        return setStatus('Nada encontrado. Confira o artista e o nome, ou use “Já tenho o link do vídeo”.', true);
+        return setStatus('Nada encontrado. Confira o que você digitou, ou use “Já tenho o link do vídeo”.', true);
       }
       setPreview(null);
       setResults(found);
@@ -174,13 +193,14 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
     // link colado à mão: vale como seleção (se não for um link do YouTube, não há seleção)
     setUrl(value);
     const id: string | null = extractVideoId(value);
+    if (id && !selected) fillConfirm(null); // sem título do vídeo para adivinhar: usa o que foi digitado na busca
     setSelected(id ? { id, label: null } : null);
     if (preview && preview.id !== id) setPreview(null);
   }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    // Enter nos campos de artista/nome, sem vídeo escolhido ainda: busca o vídeo
+    // Enter nos campos de busca, sem vídeo escolhido ainda: busca o vídeo
     if (!lyricsFor && !selected) return runSearch();
     setSubmitting(true);
     try {
@@ -196,7 +216,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
           lyrics: lyricsPayload(),
           artist: cleanArtist,
           title: cleanTitle,
-          display_title: cleanTitle, // na fila aparece o nome que a pessoa informou, não o título (às vezes bagunçado) do vídeo
+          display_title: cleanTitle, // na fila aparece o nome que a pessoa confirmou, não o título (às vezes bagunçado) do vídeo
         });
       }
       clearResults();
@@ -225,7 +245,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
     }
   }
 
-  /** "Buscar outra versão no YouTube": segue a busca e não pergunta de novo para este mesmo artista e nome. */
+  /** "Buscar outra versão no YouTube": segue a busca e não pergunta de novo para esta mesma busca. */
   function searchYoutubeAnyway() {
     setDeclinedFor(buildSearchQuery(artist, title) ?? '');
     setMatches(null);
@@ -234,11 +254,11 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
 
   useImperativeHandle(ref, () => ({
     chooseLyrics(videoId, reason, found = {}) {
-      if (found.artist) setArtist(found.artist);
-      if (found.title) setTitle(found.title);
+      setConfirmArtist(found.artist ?? '');
+      setConfirmTitle(found.title ?? '');
       setLyricsFor(videoId);
       onShow();
-      setStatus(`${reason ?? 'Preciso que você escolha a letra.'} Escolha uma opção acima e toque em “Aplicar letra”.`, true);
+      setStatus(`${reason ?? 'Preciso que você escolha a letra.'} Escolha uma opção abaixo e toque em “Aplicar letra”.`, true);
     },
   }));
 
@@ -260,79 +280,79 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
           />
         </label>
 
-        <div className="row">
-          <label className="field">
-            Artista
-            <input
-              ref={artistRef}
-              type="text"
-              required={namesRequired}
-              maxLength={200}
-              placeholder="ex.: Faouzia"
-              autoComplete="off"
-              enterKeyHint="next"
-              value={artist}
-              onChange={(event) => setArtist(event.target.value)}
-            />
-          </label>
-          <label className="field">
-            Nome da música
-            <input
-              ref={titleRef}
-              type="text"
-              required={namesRequired}
-              maxLength={200}
-              placeholder="ex.: Unethical"
-              autoComplete="off"
-              enterKeyHint="search"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </label>
-        </div>
-        <button type="button" className="wide has-icon" disabled={searching || Boolean(lyricsFor)} onClick={() => void runSearch()}>
-          <Icon name="search" />
-          Buscar no YouTube
-        </button>
-        <ul className="results" hidden={!results}>
-          {(results ?? []).map((result) => {
-            const open = preview?.id === result.video_id && preview.where === 'result';
-            return (
-              <li key={result.video_id}>
-                <div className="result-row">
-                  <button
-                    type="button"
-                    className="result"
-                    onClick={() => {
-                      select(result.video_id, result.title);
-                      clearResults();
-                      setStatus('');
-                    }}
-                  >
-                    <img src={result.thumbnail ?? thumbnailUrl(result.video_id)} alt="" loading="lazy" />
-                    <span className="meta">
-                      <strong>{result.title}</strong>
-                      <small>{[result.channel, result.duration ? formatDuration(result.duration) : null].filter(Boolean).join(' · ')}</small>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="preview-toggle"
-                    aria-label={`Ouvir uma prévia de ${result.title}`}
-                    onClick={() => setPreview(open ? null : { id: result.video_id, where: 'result' })}
-                  >
-                    {open ? 'Fechar' : 'Prévia'}
-                  </button>
-                </div>
-                {open && (
-                  <div className="inline-preview">
-                    <VideoFrame videoId={result.video_id} />
+        {/* a busca some quando a pessoa só está trocando a letra de uma música que já está na fila */}
+        <div className="search-block" hidden={Boolean(lyricsFor)}>
+          <div className="row">
+            <label className="field">
+              Artista
+              <input
+                ref={artistRef}
+                type="text"
+                maxLength={200}
+                autoComplete="off"
+                enterKeyHint="next"
+                value={artist}
+                onChange={(event) => setArtist(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              Nome da música
+              <input
+                ref={titleRef}
+                type="text"
+                maxLength={200}
+                autoComplete="off"
+                enterKeyHint="search"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </label>
+          </div>
+          <button type="button" className="wide has-icon" disabled={searching} onClick={() => void runSearch()}>
+            <Icon name="search" />
+            Buscar no YouTube
+          </button>
+          <ul className="results" hidden={!results}>
+            {(results ?? []).map((result) => {
+              const open = preview?.id === result.video_id && preview.where === 'result';
+              return (
+                <li key={result.video_id}>
+                  <div className="result-row">
+                    <button
+                      type="button"
+                      className="result"
+                      onClick={() => {
+                        select(result.video_id, result.title);
+                        fillConfirm(result.title);
+                        clearResults();
+                        setStatus('');
+                      }}
+                    >
+                      <img src={result.thumbnail ?? thumbnailUrl(result.video_id)} alt="" loading="lazy" />
+                      <span className="meta">
+                        <strong>{result.title}</strong>
+                        <small>{[result.channel, result.duration ? formatDuration(result.duration) : null].filter(Boolean).join(' · ')}</small>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="preview-toggle"
+                      aria-label={`Ouvir uma prévia de ${result.title}`}
+                      onClick={() => setPreview(open ? null : { id: result.video_id, where: 'result' })}
+                    >
+                      {open ? 'Fechar' : 'Prévia'}
+                    </button>
                   </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                  {open && (
+                    <div className="inline-preview">
+                      <VideoFrame videoId={result.video_id} />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
         <div className="picked-box" hidden={!selected}>
           <p className="picked">{selected ? (selected.label ? `Selecionado: ${selected.label}` : `Link reconhecido: ${selected.id}`) : ''}</p>
           <button type="button" onClick={togglePreviewOfSelection}>
@@ -342,17 +362,47 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
         <div className="video-preview" hidden={!selectionPreview}>
           {selectionPreview && <VideoFrame videoId={selectionPreview.id} />}
         </div>
-        <details className="link-box" open={linkOpen} onToggle={(event) => setLinkOpen(event.currentTarget.open)}>
+        <details className="link-box" hidden={Boolean(lyricsFor)} open={linkOpen} onToggle={(event) => setLinkOpen(event.currentTarget.open)}>
           <summary>Já tenho o link do vídeo</summary>
           <input
             type="text"
             placeholder="https://www.youtube.com/watch?v=…"
             aria-label="Link do vídeo do YouTube"
-            disabled={Boolean(lyricsFor)}
             value={url}
             onChange={(event) => onUrlChange(event.target.value)}
           />
         </details>
+
+        {showConfirm && (
+          <div className="confirm-box">
+            <h3>Confirme a música</h3>
+            <p className="hint">O artista e o nome são usados para buscar a letra e aparecem na fila. Corrija o que estiver errado.</p>
+            <div className="row">
+              <label className="field">
+                Confirme o artista
+                <input
+                  type="text"
+                  required={confirmRequired}
+                  maxLength={200}
+                  autoComplete="off"
+                  value={confirmArtist}
+                  onChange={(event) => setConfirmArtist(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                Confirme o nome da música
+                <input
+                  type="text"
+                  required={confirmRequired}
+                  maxLength={200}
+                  autoComplete="off"
+                  value={confirmTitle}
+                  onChange={(event) => setConfirmTitle(event.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         <label className="field">
           Letra
