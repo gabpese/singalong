@@ -61,7 +61,7 @@ test('createScorer: o tom escolhido desloca a melodia e um quadro não conta dua
   assert.equal(createScorer(melody).score(), null);
 });
 
-test('createScorer: tolera o atraso do microfone (a nota certa chega até 500 ms depois)', () => {
+test('createScorer: tolera o atraso do microfone (a nota certa chega até 100 ms depois)', () => {
   const s = createScorer({ hop: 0.05, midi: [60, 60, 60, 60, 67, 67, 67, 67] });
   s.tick(0.01, 60);
   s.tick(0.21, 60); // a referência já mudou para 67, mas o cantor ainda termina a nota anterior
@@ -92,8 +92,28 @@ test('createScorer: pontua por trechos de 2 s, então errar um instante no meio 
   assert.equal(s.score(), 100);
 });
 
-test('createScorer: tolera até 1,5 semitom de erro (voz humana oscila)', () => {
-  const s = createScorer({ hop: 0.05, midi: Array(6).fill(60) });
-  for (let i = 0; i < 6; i++) s.tick(i * 0.05 + 0.01, 61.4);
+test('createScorer: falhas do detector (quadros sem tom) não viram erro de quem canta certo', () => {
+  const s = createScorer({ hop: 0.05, midi: Array(80).fill(60) });
+  for (let i = 0; i < 80; i++) s.tick(i * 0.05 + 0.01, i % 2 === 0 ? 60 : null); // detecta só metade dos quadros
   assert.equal(s.score(), 100);
+  const quiet = createScorer({ hop: 0.05, midi: Array(80).fill(60) });
+  for (let i = 0; i < 80; i++) quiet.tick(i * 0.05 + 0.01, i % 40 === 0 ? 60 : null); // quase mudo: só 10% dos quadros (com a nota segurada)
+  assert.ok(quiet.score() < 40);
+});
+
+test('createScorer: tolera 1 semitom de erro (voz humana oscila) e dá meio ponto até 2', () => {
+  const s = createScorer({ hop: 0.05, midi: Array(6).fill(60) });
+  for (let i = 0; i < 6; i++) s.tick(i * 0.05 + 0.01, 60.9);
+  assert.equal(s.score(), 100);
+  const off = createScorer({ hop: 0.05, midi: Array(6).fill(60) });
+  for (let i = 0; i < 6; i++) off.tick(i * 0.05 + 0.01, 61.7);
+  assert.equal(off.score(), 50);
+});
+
+test('createScorer: cantar uma nota fixa por cima de uma melodia que varia não rende nota alta', () => {
+  const notes = [60, 64, 67, 71, 62, 66, 69, 73];
+  const midi = Array.from({ length: 160 }, (_, i) => notes[Math.floor(i / 3) % notes.length]); // troca a cada 150 ms
+  const s = createScorer({ hop: 0.05, midi });
+  for (let i = 0; i < 160; i++) s.tick(i * 0.05 + 0.01, 60);
+  assert.ok(s.score() < 50, `nota ${s.score()}`);
 });

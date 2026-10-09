@@ -53,14 +53,18 @@ export function pitchClassDistance(a, b) {
   return Math.min(d, 12 - d);
 }
 
-const FULL = 1.5; // semitones de tolerância para o acerto inteiro (voz humana oscila: vibrato, escorregadas)
-const HALF = 2.5; // ...e para meio acerto
+const FULL = 1; // semitones de tolerância para o acerto inteiro (voz humana oscila: vibrato, escorregadas)
+const HALF = 2; // ...e para meio acerto
 const WINDOW_FRAMES = 40; // a nota vale por trechos de 2 s: a melodia original muda várias vezes por segundo e ninguém acompanha cada troca
-const WINDOW_FULL = 0.6; // trecho com 60% ou mais de acertos conta inteiro
+const WINDOW_FULL = 0.6; // trecho em que 60% ou mais das notas detectadas estão certas conta inteiro
 const WINDOW_HALF = 0.3; // ...com 30% ou mais, conta metade
+// O detector de tom falha em muitos quadros de uma voz real (consoantes, respiração, voz fraca). Por isso a nota separa
+// "estava cantando?" (quadros com tom detectado) de "estava no tom?" (acertos entre os detectados): detectar em 40% dos
+// quadros com voz já é participação total, e a falha do detector não vira erro do cantor.
+const PARTICIPATION_FULL = 0.4
 const HOLD_SECONDS = 0.15; // o detector falha em consoantes e respirações: vale a última nota captada há menos de 150 ms
-const LAG_FRAMES = 10; // a nota cantada pode vir até 500 ms depois da de referência (ouvir, cantar, captar) ...
-const LEAD_FRAMES = 10; // ...ou até 500 ms antes (quem conhece a música canta adiantado)
+const LAG_FRAMES = 2; // a nota cantada pode vir até 100 ms depois da de referência (ouvir, cantar, captar) ...
+const LEAD_FRAMES = 2; // ...ou 100 ms antes. Folga maior faz qualquer nota acertar alguma da melodia, que varia várias vezes por segundo
 
 /**
  * Acompanha a música quadro a quadro (50 ms). `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
@@ -75,7 +79,7 @@ export function createScorer(melody, { transpose = 0 } = {}) {
   let heldNote = null;
   let heldAt = -Infinity;
   let reference = null; // nota de referência do quadro atual, já no tom escolhido
-  const windows = new Map(); // trecho -> { n: quadros com voz avaliados, hit: pontos de acerto }
+  const windows = new Map(); // trecho -> { n: quadros com voz no original, heard: quadros com tom detectado, hit: pontos de acerto }
 
   return {
     /** t = posição da música (s); sung = nota MIDI captada no microfone (ou null: silêncio). Devolve a nota ao vivo (0..100) ou null. */
@@ -91,10 +95,11 @@ export function createScorer(melody, { transpose = 0 } = {}) {
       seen[idx] = 1;
       if (midi[idx] < 0) return this.score(); // sem voz no original: nada a avaliar
       counted++;
-      const win = windows.get(Math.floor(idx / WINDOW_FRAMES)) ?? { n: 0, hit: 0 };
+      const win = windows.get(Math.floor(idx / WINDOW_FRAMES)) ?? { n: 0, heard: 0, hit: 0 };
       windows.set(Math.floor(idx / WINDOW_FRAMES), win);
       win.n++;
       if (sung != null) {
+        win.heard++;
         let best = Infinity;
         for (let j = idx - LAG_FRAMES; j <= idx + LEAD_FRAMES; j++) {
           if (midi[j] >= 0) best = Math.min(best, pitchClassDistance(sung, midi[j] + shift));
@@ -109,9 +114,11 @@ export function createScorer(melody, { transpose = 0 } = {}) {
     score() {
       if (!counted) return null;
       let points = 0;
-      for (const { n, hit } of windows.values()) {
-        const ratio = hit / n;
-        points += n * (ratio >= WINDOW_FULL ? 1 : ratio >= WINDOW_HALF ? 0.5 : 0);
+      for (const { n, heard, hit } of windows.values()) {
+        if (!heard) continue;
+        const accuracy = hit / heard;
+        const participation = Math.min(1, heard / n / PARTICIPATION_FULL);
+        points += n * participation * (accuracy >= WINDOW_FULL ? 1 : accuracy >= WINDOW_HALF ? 0.5 : 0);
       }
       return Math.round((100 * points) / counted);
     },
@@ -136,7 +143,7 @@ export async function openMic() {
     read() {
       analyser.getFloatTimeDomainData(buf);
       const level = rms(buf);
-      if (level < 0.01) return { midi: null, level }; // silêncio
+      if (level < 0.005) return { midi: null, level }; // silêncio
       const hz = detectPitch(buf, ctx.sampleRate);
       return { midi: hz ? hzToMidi(hz) : null, level };
     },
