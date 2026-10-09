@@ -87,6 +87,22 @@ export async function songRoutes(app, { songs, jobs, limiters }) {
     return song ?? reply.code(404).send({ error: 'not_found' });
   });
 
+  // MP4 de karaokê (instrumental + letra) para usar offline. POST pede (e devolve o estado); GET consulta.
+  const PITCH = { type: 'integer', minimum: -6, maximum: 6 };
+  app.post('/songs/:id/export', {
+    preHandler: rateLimited(limiters.addToQueue),
+    schema: { params: ID_PARAM, body: { type: 'object', additionalProperties: false, properties: { pitch: PITCH } } },
+  }, async (request, reply) => {
+    const result = await songs.requestExport(request.params.id, request.body?.pitch ?? 0);
+    if (result.error === 'not_found') return reply.code(404).send({ error: 'not_found' });
+    if (result.error === 'not_ready') return reply.code(409).send({ error: 'not_ready', message: 'A música ainda está sendo preparada.' });
+    return reply.code(result.export.status === 'ready' ? 200 : 202).send(result.export);
+  });
+
+  app.get('/songs/:id/export', {
+    schema: { params: ID_PARAM, querystring: { type: 'object', properties: { pitch: PITCH } } },
+  }, async (request) => songs.exportInfo(request.params.id, request.query.pitch ?? 0));
+
   // Escolha/troca da fonte da letra (reaproveita o instrumental do cache; só refaz a letra).
   app.put('/songs/:id/lyrics', {
     schema: { params: ID_PARAM, body: PUT_LYRICS_SCHEMA },

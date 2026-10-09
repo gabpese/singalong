@@ -371,3 +371,6 @@ h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .1
 .scoreboard .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scoreboard .points { color: var(--accent); font-variant-numeric: tabular-nums; }
 .score-hud small b { color: var(--fg); }
+.export-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.export-row button { min-height: 0; padding: 4px 10px; font-size: .85rem; }
+.export-pitch { min-height: 0; padding: 2px 4px; }

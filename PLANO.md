@@ -287,6 +287,7 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 | 4 — Robustez | ✅ | Erros traduzidos, retentativas, limites, limpeza LRU, health checks, logs JSON. |
 | 5a/5b — Palavra a palavra | ✅ | Tempo real de cada palavra (`words` no `lyrics.json`), também para letras do LRCLIB/legenda; `refresh_words.py` completa o cache antigo. |
 | 5c — Pontuação por microfone | ✅ | Anfitrião liga na sala. Ver decisões abaixo. |
+| 5d — Exportar MP4 | ✅ | Botão "Baixar MP4" (com escolha de tom) em cada música da biblioteca. Ver decisões abaixo. |
 
 ### Decisões e aprendizados da Fase 2
 - **Sem SQLite ainda.** A biblioteca é o próprio cache (`meta.json`); o estado dos jobs vive no Redis (`job:<id>`). O SQLite entra com salas e fila (Fase 3).
@@ -330,6 +331,14 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **Servidor:** a sala ganha `scoring` (só o anfitrião muda, `PATCH /rooms/:code`); a TV manda `{type:'score'}` ao fim natural da música (só para o item tocando e com a pontuação ligada) e a nota vai para `queue_items.score` e para o `scoreboard` do estado (10 maiores). O celular mostra o **Placar**; a TV mostra a nota ao vivo e o resultado final por 9 s.
 - **Melodia suavizada:** a melodia crua oscila de 4 a 6 vezes por segundo (vibrato, escorregadas, erros do detector), e ninguém canta cada pulo. O player a transforma em notas estáveis (mediana, fusão de trechos a até 1 semitom e absorção dos trechos de menos de 0,3 s): ~0,5 troca por segundo. A TV mostra e compara com essa nota estável.
 - **Limite conhecido:** é afinação, não ritmo nem letra; barulho forte ou o instrumental vazando para o microfone pode render pontos indevidos.
+
+### Fase 5d: exportar MP4 de karaokê
+- **O que sai:** um vídeo 1280×720 (fundo liso) com o instrumental e a letra: o título e o artista no começo, a linha atual em destaque que se **preenche palavra a palavra** (com os tempos reais de `words`; sem eles, estimados pelo tamanho) e a próxima linha em cinza embaixo. Toca em qualquer aparelho, sem a internet e sem o Singalong.
+- **Como é feito:** o worker transforma a letra numa legenda **ASS** (efeito `\kf` do karaokê) e o ffmpeg a queima sobre o fundo (`libx264`, `tune stillimage`, ~7 MB por música de 4 min; ~15 s para gerar). A linha aparece 1,5 s antes de ser cantada. Linhas com mais de 70 caracteres usam fonte menor.
+- **Tom:** de -6 a +6, trocado com o filtro `rubberband` do ffmpeg (a duração não muda, então a letra continua no tempo). Um arquivo por tom: `cache/<id>/karaoke.mp4` (tom original) e `karaoke_p+2.mp4`, `karaoke_p-3.mp4`...
+- **Pedido:** `POST /api/songs/:id/export` `{pitch}` (404 se a música não existe, 409 se ainda não está pronta, 202 gerando, 200 pronta) e `GET /api/songs/:id/export?pitch=` para consultar. O pedido vai por Redis (`export:req`, estado em `export:<id>:<pitch>`) para uma **thread própria do worker**, como a busca: não espera atrás de um job longo de Demucs. O **arquivo existir** é a verdade (o estado no Redis expira em 1 h); pedidos repetidos não duplicam.
+- **Limpeza:** os MP4 ficam na pasta da música e saem junto com ela na limpeza do cache por uso.
+- **Limites:** fundo liso (vídeo de fundo continua fora do escopo); o MP4 usa a letra e o tom que a música tem no cache no momento do pedido; o ajuste de letra da sala (`lyric_offset`) não entra no vídeo.
 
 ### Fase 3b: tom, prévias, próximo cantor e novo layout
 - **Detecção do tom** (`worker/key.py`): perfil de croma do **instrumental** (librosa: HPSS + `chroma_cqt` com a afinação do arquivo compensada) correlacionado com os 24 perfis de Krumhansl-Kessler. Gravado em `meta.json` (`key: {tonic, mode, score, margin, alt}`); músicas antigas ganham o tom em segundo plano na subida do worker (~10 s cada). Validação: áudio sintético **24/24** tonalidades; em músicas reais, a coerência ao transpor foi **19/24** no método atual (empatado com STFT e melhor que CENS e CQT sem HPSS). Os erros se concentram nas músicas ambíguas (maior × relativa menor), e a **margem entre a 1ª e a 2ª tonalidade** prevê isso: abaixo de **0,08** a tela diz "Tom provável: X ou Y" em vez de fingir certeza. É uma estimativa, não uma verdade musical.

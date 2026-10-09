@@ -200,3 +200,40 @@ test('serve o player e 404 JSON para /api desconhecida', async () => {
   assert.equal((await app.inject('/api/nada')).statusCode, 404);
   assert.ok((await app.inject('/%2e%2e/src/app.js')).statusCode >= 400);
 });
+
+test('exportar MP4: só de música pronta, por tom, sem pedido duplicado, e o arquivo pronto é servido', async () => {
+  const ask = (id, payload = {}) => app.inject({ method: 'POST', url: `/api/songs/${id}/export`, payload });
+  assert.equal((await ask('naoexiste00')).statusCode, 404);
+  assert.equal((await ask('parcial0000')).statusCode, 404); // nunca foi pedida
+  jobs.update('parcial0000', { status: 'processing' });
+  assert.equal((await ask('parcial0000')).statusCode, 409); // em preparação: ainda não está pronta
+  assert.equal((await ask(READY, { pitch: 9 })).statusCode, 400); // tom fora de -6..+6
+  assert.equal((await ask(READY, { pitch: 1.5 })).statusCode, 400);
+
+  const first = await ask(READY); // tom 0
+  assert.equal(first.statusCode, 202);
+  assert.equal(first.json().status, 'pending');
+  await ask(READY, {}); // repetido: não duplica
+  await ask(READY, { pitch: 2 }); // outro tom: outro pedido
+  assert.deepEqual(jobs.exportQueue, [{ video_id: READY, pitch: 0 }, { video_id: READY, pitch: 2 }]);
+
+  const status = async (pitch = 0) => (await app.inject({ method: 'GET', url: `/api/songs/${READY}/export?pitch=${pitch}` })).json();
+  assert.equal((await status()).status, 'pending');
+  jobs.updateExport(READY, 0, { status: 'processing' });
+  assert.equal((await status()).status, 'processing');
+  jobs.updateExport(READY, 0, { status: 'failed', error: 'ffmpeg falhou' });
+  assert.deepEqual(await status(), { status: 'failed', error: 'ffmpeg falhou', url: null });
+  await ask(READY); // falhou: pode pedir de novo
+  assert.equal(jobs.exportQueue.length, 3);
+
+  // o arquivo existir é a verdade: pronto, com a URL do tom certo, e o pedido seguinte já responde 200
+  await writeFile(join(root, 'cache', READY, 'karaoke.mp4'), 'video');
+  await writeFile(join(root, 'cache', READY, 'karaoke_p-3.mp4'), 'video');
+  assert.equal((await status()).url, `/media/cache/${READY}/karaoke.mp4`);
+  assert.equal((await status(-3)).url, `/media/cache/${READY}/karaoke_p-3.mp4`);
+  assert.equal((await ask(READY)).statusCode, 200);
+  assert.equal(jobs.exportQueue.length, 3);
+  const file = await app.inject({ method: 'GET', url: `/media/cache/${READY}/karaoke.mp4` });
+  assert.equal(file.headers['content-type'], 'video/mp4');
+  assert.equal((await status(5)).status, 'none'); // nunca pedido
+});

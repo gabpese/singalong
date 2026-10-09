@@ -12,6 +12,7 @@ import time
 
 import redis
 
+from .export import serve as export_serve
 from .key import backfill as key_backfill
 from .logsetup import setup_logging
 from .runner import GROUP, STREAM, Settings, handle
@@ -77,6 +78,8 @@ def run() -> None:
     stop_threads = threading.Event()
     # a busca no YouTube roda numa thread própria: não pode esperar atrás de um job longo (Demucs)
     threading.Thread(target=search_serve, args=(settings.redis_url, settings.cookies, stop_threads), name="search", daemon=True).start()
+    # a exportação em MP4 também tem thread própria: leva um minuto e não pode esperar atrás do Demucs
+    threading.Thread(target=export_serve, args=(settings.redis_url, storage, stop_threads), name="export", daemon=True).start()
     # músicas processadas antes do recurso de tom ganham o tom em segundo plano (uma vez cada)
     threading.Thread(target=lambda: key_backfill(storage), name="key-backfill", daemon=True).start()
     threading.Thread(target=_heartbeat, args=(settings.heartbeat_file, stop_threads), name="heartbeat", daemon=True).start()

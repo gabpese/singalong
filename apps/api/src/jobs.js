@@ -5,6 +5,10 @@
 //   hash    "job:<id>"    estado: status (pending|processing|needs_lyrics|ready|failed), stage, error,
 //                         lyrics_source, updated_at. A API cria como "pending"; o worker atualiza o resto.
 //
+// Exportação em MP4 (karaokê offline; também atendida por uma thread própria do worker):
+//   lista  "export:req"            a API faz LPUSH de {video_id, pitch}
+//   hash   "export:<id>:<pitch>"   o worker grava status (processing | ready | failed) e error; a API cria como "pending"
+//
 // A API nunca chama o worker; o worker sempre puxa trabalho (funciona atrás de NAT, ex.: GPU remota).
 
 //
@@ -30,6 +34,23 @@ redis.call('XADD', KEYS[2], '*', 'video_id', ARGV[5], 'payload', ARGV[4])
 return 1
 `;
 
+// pedido de exportação: só enfileira se não há um pendente/em andamento (dedupe). A API só pede quando o arquivo não
+// existe, então um "ready" antigo (arquivo apagado pela limpeza do cache) não pode impedir de gerar de novo.
+const REQUEST_EXPORT = `
+local status = redis.call('HGET', KEYS[1], 'status')
+if status == 'pending' or status == 'processing' then return 0 end
+redis.call('DEL', KEYS[1])
+redis.call('HSET', KEYS[1], 'status', 'pending', 'error', '', 'updated_at', ARGV[1])
+redis.call('EXPIRE', KEYS[1], 3600)
+redis.call('LPUSH', KEYS[2], ARGV[2])
+return 1
+`;
+const exportKey = (id, pitch) => `export:${id}:${pitch}`;
+
+function toExport(hash) {
+  return hash?.status ? { status: hash.status, error: hash.error || null } : null;
+}
+
 function toJob(hash) {
   if (!hash || !hash.status) return null;
   return {
@@ -46,6 +67,7 @@ function toJob(hash) {
 /** Enfileira de forma atômica: devolve {created:false} se já há job pendente/em processamento (dedupe). */
 export function createRedisJobStore(redis) {
   redis.defineCommand('enqueueJob', { numberOfKeys: 2, lua: ENQUEUE });
+  redis.defineCommand('requestExport', { numberOfKeys: 2, lua: REQUEST_EXPORT });
   return {
     async get(id) {
       return toJob(await redis.hgetall(jobKey(id)));
@@ -55,6 +77,13 @@ export function createRedisJobStore(redis) {
         jobKey(id), STREAM, replace ? '1' : '0', String(Date.now()), payload.lyrics_source ?? 'auto', JSON.stringify(payload), id,
       );
       return { created: created === 1, job: toJob(await redis.hgetall(jobKey(id))) };
+    },
+    async requestExport(id, pitch) {
+      await redis.requestExport(exportKey(id, pitch), 'export:req', String(Date.now()), JSON.stringify({ video_id: id, pitch }));
+      return toExport(await redis.hgetall(exportKey(id, pitch)));
+    },
+    async exportState(id, pitch) {
+      return toExport(await redis.hgetall(exportKey(id, pitch)));
     },
     async search(query, { timeoutSec = 20 } = {}) {
       const q = query.trim();
@@ -94,8 +123,10 @@ export function createRedisJobStore(redis) {
 export function createMemoryJobStore() {
   const jobs = new Map();
   const queue = [];
+  const exports = new Map();
   return {
     queue,
+    exportQueue: [],
     /** Resultados que a busca devolve (ou um Error para simular falha) e as consultas recebidas. */
     searchResults: [],
     searchQueries: [],
@@ -115,6 +146,21 @@ export function createMemoryJobStore() {
       jobs.set(id, job);
       queue.push({ video_id: id, payload });
       return { created: true, job: { ...job } };
+    },
+    async requestExport(id, pitch) {
+      const key = exportKey(id, pitch);
+      if (!['pending', 'processing'].includes(exports.get(key)?.status)) {
+        exports.set(key, { status: 'pending', error: null });
+        this.exportQueue.push({ video_id: id, pitch });
+      }
+      return { ...exports.get(key) };
+    },
+    async exportState(id, pitch) {
+      return exports.get(exportKey(id, pitch)) ? { ...exports.get(exportKey(id, pitch)) } : null;
+    },
+    /** Simula o worker atualizando o estado de uma exportação. */
+    updateExport(id, pitch, fields) {
+      exports.set(exportKey(id, pitch), { ...exports.get(exportKey(id, pitch)), ...fields });
     },
     /** Simula o worker atualizando o estado. */
     update(id, fields) {

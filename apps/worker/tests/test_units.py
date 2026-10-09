@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from singalong_worker.align import attach_words, clean_lines, group_words
+from singalong_worker.export import ass_time, build_ass, ffmpeg_command, karaoke_text, output_key, pitch_filter
 from singalong_worker.ids import extract_video_id
 from singalong_worker.melody import lyric_spans, melody_from_f0
 from singalong_worker.key import MAJOR_PROFILE, MINOR_PROFILE, NOTES, best_key
@@ -12,6 +13,54 @@ from singalong_worker.pipeline import NeedsAlignment, NeedsLyrics, guess_artist_
 from singalong_worker.storage import LocalStorage
 
 VID = "dQw4w9WgXcQ"
+
+
+class ExportTests(unittest.TestCase):
+    CUE = {"start": 10.0, "end": 12.0, "text": "Hello brave world", "words": [[10.0, 10.5], [10.6, 11.2], [11.2, 12.0]]}
+
+    def test_ass_time(self):
+        self.assertEqual(ass_time(0), "0:00:00.00")
+        self.assertEqual(ass_time(62.22), "0:01:02.22")
+        self.assertEqual(ass_time(3725.5), "1:02:05.50")
+
+    def test_karaoke_uses_real_word_times(self):
+        text = karaoke_text(self.CUE, 10.0)
+        # cada palavra se preenche até o início da seguinte: 60 cs (0,5 s + a pausa), 60 cs e 80 cs
+        self.assertEqual(text, "{\\kf60}Hello {\\kf60}brave {\\kf80}world")
+
+    def test_karaoke_lead_in_and_estimate(self):
+        self.assertTrue(karaoke_text(self.CUE, 8.5).startswith("{\\k150}{\\kf60}Hello"))  # aparece 1,5 s antes
+        estimated = karaoke_text({"start": 0.0, "end": 2.0, "text": "aa bbbb"}, 0.0)  # sem tempos: pelo tamanho das palavras
+        self.assertEqual(estimated, "{\\kf67}aa {\\kf133}bbbb")
+
+    def test_build_ass(self):
+        cues = [
+            self.CUE,
+            {"start": 12.5, "end": 14.0, "text": "Second {line}"},
+        ]
+        ass = build_ass(cues, "Título", "Artista", 200)
+        self.assertIn("Style: Current", ass)
+        self.assertIn("Dialogue: 0,0:00:00.00,0:00:06.00,Title,,0,0,0,,Título\\N{\\fs38\\1c&H00C8C8D2&}Artista", ass)  # cartão de 6 s com o artista
+        self.assertIn("Dialogue: 1,0:00:08.50,0:00:12.00,Current", ass)  # a linha 2 só aparece quando a 1ª termina
+        self.assertIn("Second (line)", ass)  # chaves viram parênteses: não são tags do ASS
+        self.assertIn(",Next,,0,0,0,,{\\pos(640,490)}Second (line)", ass)  # a próxima linha aparece em cinza embaixo
+
+    def test_build_ass_without_lyrics_keeps_the_title(self):
+        ass = build_ass([], "Título", None, 180)
+        self.assertIn("0:03:00.00,Title", ass)
+
+    def test_output_key_and_pitch_filter(self):
+        self.assertEqual(output_key("abcdefghijk", 0), "cache/abcdefghijk/karaoke.mp4")
+        self.assertEqual(output_key("abcdefghijk", 2), "cache/abcdefghijk/karaoke_p+2.mp4")
+        self.assertEqual(output_key("abcdefghijk", -3), "cache/abcdefghijk/karaoke_p-3.mp4")
+        self.assertEqual(pitch_filter(0), [])
+        self.assertEqual(pitch_filter(12), ["-af", "rubberband=pitch=2.000000"])
+
+    def test_ffmpeg_command_escapes_the_subtitle_path(self):
+        cmd = ffmpeg_command(Path("C:\\tmp\\lyrics.ass"), Path("a.mp3"), Path("o.mp4"), 0, "T", "A")
+        self.assertIn("ass=C\\:/tmp/lyrics.ass", cmd)
+        self.assertEqual(cmd[-1], "o.mp4")
+        self.assertIn("artist=A", cmd)
 
 
 class MelodyTests(unittest.TestCase):

@@ -8,6 +8,9 @@ const keys = (id) => ({
   melody: `cache/${id}/melody.json`, // opcional: a melodia da voz original, para a pontuação
 });
 
+/** Chave do MP4 exportado: o mesmo nome que o worker usa (karaoke.mp4, karaoke_p+2.mp4, karaoke_p-3.mp4). */
+export const exportKey = (id, pitch) => `cache/${id}/karaoke${pitch === 0 ? '' : `_p${pitch > 0 ? '+' : '-'}${Math.abs(pitch)}`}.mp4`;
+
 export function createSongService({ storage, jobs }) {
   /** "Pronto" = os três artefatos existem (uma pasta parcial de job interrompido não conta). */
   async function isReady(id) {
@@ -60,9 +63,27 @@ export function createSongService({ storage, jobs }) {
     };
   }
 
+  /** Estado do MP4 de uma música num tom: o arquivo existir é a verdade (o estado no Redis expira). */
+  async function exportInfo(id, pitch) {
+    const key = exportKey(id, pitch);
+    if (await storage.exists(key)) return { status: 'ready', url: storage.getUrl(key), error: null };
+    const state = await jobs.exportState(id, pitch);
+    // "ready" sem arquivo = limpeza do cache: é como se nunca tivesse sido pedido
+    return state && state.status !== 'ready' ? { ...state, url: null } : { status: 'none', url: null, error: null };
+  }
+
   return {
     isReady,
     describe,
+    exportInfo,
+
+    /** Pede o MP4 (instrumental + letra) no tom escolhido. error: 'not_found' (música não existe) | 'not_ready'. */
+    async requestExport(id, pitch) {
+      if (!(await describe(id))) return { error: 'not_found' };
+      if (!(await isReady(id))) return { error: 'not_ready' };
+      if ((await exportInfo(id, pitch)).status !== 'ready') await jobs.requestExport(id, pitch);
+      return { export: await exportInfo(id, pitch) };
+    },
 
     /** Músicas prontas (metadados do meta.json). */
     async list() {

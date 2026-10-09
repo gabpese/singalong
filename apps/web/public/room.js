@@ -1,5 +1,6 @@
 // Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
 import { initAddPanel } from './add-song.js';
+import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from './export-mp4.js';
 import { icon } from './icons.js';
 import {
   api, connectRoom, hostToken, parseHostHash, parseRoomCode, setHostToken, setUserName, userName,
@@ -369,13 +370,39 @@ function render() {
 // --- biblioteca (músicas já processadas), com filtro por artista e nome ---
 let librarySongs = [];
 
+/** Gera o MP4 da música no tom escolhido e baixa quando estiver pronto (o worker leva alguns segundos). */
+async function exportSong(song, pitch, button) {
+  const label = button.textContent;
+  button.disabled = true;
+  try {
+    toast('Gerando o vídeo… pode levar alguns segundos.');
+    const url = await requestExport(api, song.video_id, pitch, { onWaiting: () => { button.textContent = 'Gerando…'; } });
+    downloadFile(url, exportFileName(song, pitch));
+    toast('Vídeo pronto! O download começou.');
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    button.textContent = label;
+    button.disabled = false;
+  }
+}
+
 function librarySong(song) {
+  const pitchSelect = h('select', { 'aria-label': 'Tom do vídeo MP4', class: 'export-pitch' },
+    EXPORT_PITCHES.map((value) => h('option', { value: String(value), selected: value === 0 }, formatPitch(value))));
+  const exportButton = h('button', {
+    type: 'button',
+    class: 'ghost',
+    title: 'Baixa um vídeo MP4 com o instrumental e a letra, para cantar offline',
+    onclick: () => exportSong(song, Number(pitchSelect.value), exportButton),
+  }, 'Baixar MP4');
   return h('li', {},
     h('img', { src: thumbnailUrl(song.video_id), alt: '', class: 'thumb', loading: 'lazy' }),
     h('div', { class: 'info' },
       h('strong', {}, song.title ?? song.video_id),
       h('span', { class: 'muted' }, [song.artist, song.duration ? formatDuration(song.duration) : null].filter(Boolean).join(' · ')),
-      song.key ? h('span', { class: 'muted small' }, keySummary(song.key)) : null),
+      song.key ? h('span', { class: 'muted small' }, keySummary(song.key)) : null,
+      h('span', { class: 'export-row' }, exportButton, h('label', { class: 'muted small' }, 'tom ', pitchSelect))),
     h('button', {
       type: 'button',
       class: 'primary',
