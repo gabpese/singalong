@@ -135,14 +135,14 @@ async function prepareScoring(state, current) {
   els.scoreHint.textContent = micFailed ? 'microfone indisponível (permita o acesso e abra a TV por http://localhost:3000)' : '';
 }
 
-// ~20 leituras por segundo: compara o tom cantado com a melodia no instante atual da música
+// ~10 leituras por segundo: compara o tom cantado com a melodia no instante atual da música
 setInterval(() => {
   if (!scorer || !mic || !engine.playing || engine.loadedId !== scorerFor) return;
   const { midi } = mic.read();
   const live = scorer.tick(engine.currentTime, midi);
   els.scoreNow.textContent = live ?? 0;
   els.scoreHint.textContent = `você ${noteName(midi)} · original ${noteName(scorer.reference)}`; // para ver onde a nota se perde
-}, 50);
+}, 100);
 
 /** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */
 function reportScore(itemId) {
