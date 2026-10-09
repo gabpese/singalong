@@ -1,5 +1,6 @@
-# Contexto de build: raiz do repositório (a primeira etapa constrói o front-end de apps/web; a API serve o resultado)
-FROM node:24-slim AS web
+# Contexto de build: raiz do repositório. A primeira etapa constrói o front-end (JS estático, igual para qualquer arquitetura) sempre na
+# máquina que está construindo; a API serve o resultado. Assim a imagem sai para amd64 e arm64 sem compilar o front-end sob emulação.
+FROM --platform=$BUILDPLATFORM node:24-slim AS web
 WORKDIR /web
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci

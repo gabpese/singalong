@@ -1,0 +1,84 @@
+name: Deploy
+
+# Depois que o CI passa na main: publica a imagem da API no GitHub Container Registry (amd64 e arm64) e, se o deploy estiver
+# ligado (variável DEPLOY_ENABLED = true), atualiza a VM por SSH. Também pode ser disparado à mão na aba Actions.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# uma entrega por vez: duas ao mesmo tempo pisariam uma na outra
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publicar a imagem da API
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      sha: ${{ steps.vars.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # a versão exata que o CI aprovou (e não o que estiver na ponta da main agora)
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - id: vars
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # o front-end é construído uma vez, na arquitetura do runner; só as dependências do servidor são montadas por arquitetura
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.vars.outputs.owner }}/singalong-api:latest
+            ghcr.io/${{ steps.vars.outputs.owner }}/singalong-api:${{ steps.vars.outputs.sha }}
+          cache-from: type=gha,scope=api-publish
+          cache-to: type=gha,scope=api-publish,mode=max
+
+  deploy:
+    name: Atualizar a VM
+    needs: publish
+    # só depois que a VM existir e os segredos estiverem cadastrados (deploy/README.md): ligue a variável DEPLOY_ENABLED
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Configurar o SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+      - name: Enviar os arquivos de produção e publicar
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key deploy/docker-compose.prod.yml deploy/Caddyfile deploy/deploy.sh "$DEPLOY_USER@$DEPLOY_HOST:/opt/singalong/"
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "chmod +x /opt/singalong/deploy.sh && /opt/singalong/deploy.sh"
