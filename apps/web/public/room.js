@@ -1,11 +1,13 @@
-// Controle da sala (celular): fila, o que está tocando, adicionar músicas e ações de anfitrião.
+// Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
 import { initAddPanel } from './add-song.js';
 import {
   api, connectRoom, hostToken, parseHostHash, parseRoomCode, setHostToken, setUserName, userName,
 } from './identity.js';
 import { describeLyricsSource } from './lyrics-sync.js';
+import { keySummary } from './music.js';
+import { createPreviewPlayer } from './preview.js';
 import {
-  formatDuration, formatPitch, progressPercent, songChip, splitQueue, thumbnailUrl,
+  filterSongs, formatDuration, formatPitch, nextUp, progressPercent, songChip, sortSongs, splitQueue, thumbnailUrl,
 } from './queue-view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +43,7 @@ if (fromLink) {
 const els = {
   roomCode: $('room-code'),
   tvStatus: $('tv-status'),
+  menu: $('menu'),
   openTv: $('open-tv'),
   copyLink: $('copy-link'),
   copyHost: $('copy-host'),
@@ -49,12 +52,23 @@ const els = {
   queue: $('queue'),
   queueCount: $('queue-count'),
   queueEmpty: $('queue-empty'),
+  tabCount: $('tab-count'),
   libraryList: $('library-list'),
   libraryEmpty: $('library-empty'),
-  library: $('library'),
+  libraryEmptyText: $('library-empty-text'),
+  libraryClear: $('library-clear'),
+  libraryFilter: $('library-filter'),
+  libraryCount: $('library-count'),
   hostSettings: $('host-settings'),
   fair: $('fair'),
   toast: $('toast'),
+  previewBar: $('preview-bar'),
+  previewTitle: $('preview-title'),
+  previewKey: $('preview-key'),
+  previewPlay: $('preview-play'),
+  previewSeek: $('preview-seek'),
+  previewPitch: $('preview-pitch'),
+  previewHint: $('preview-hint'),
 };
 
 els.roomCode.textContent = code;
@@ -104,6 +118,91 @@ async function act(method, path, body) {
   }
 }
 
+// --- abas (celular) ---
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((section) => { section.hidden = section.dataset.tab !== name; });
+  document.querySelectorAll('.tabbar [data-go]').forEach((button) => button.classList.toggle('active', button.dataset.go === name));
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll('.tabbar [data-go]').forEach((button) => button.addEventListener('click', () => showTab(button.dataset.go)));
+
+// --- prévia do instrumental (com tom) ---
+const preview = createPreviewPlayer({ onEnded: () => syncPreviewUi() });
+let previewItem = null; // { id, video_id, can_edit, key }
+let previewPitch = 0;
+
+function syncPreviewUi() {
+  els.previewPlay.textContent = preview.playing ? '⏸' : '▶';
+  els.previewPitch.textContent = `Tom ${formatPitch(previewPitch)}`;
+  els.previewKey.textContent = previewItem ? keySummary(previewItem.key, previewPitch) : '';
+  if (preview.duration && !els.previewSeek.matches(':active')) {
+    els.previewSeek.value = String(Math.round((preview.position / preview.duration) * 1000));
+  }
+}
+
+function closePreview() {
+  preview.unload();
+  previewItem = null;
+  els.previewBar.hidden = true;
+  document.body.classList.remove('has-preview');
+}
+
+async function openPreview(item) {
+  previewItem = { id: item.id, video_id: item.video_id, can_edit: item.can_edit, key: item.song.key };
+  previewPitch = item.pitch;
+  preview.setPitch(previewPitch);
+  els.previewTitle.textContent = item.title ?? item.video_id;
+  els.previewHint.textContent = 'Carregando a música…';
+  els.previewSeek.value = '0';
+  els.previewBar.hidden = false;
+  document.body.classList.add('has-preview');
+  syncPreviewUi();
+  try {
+    if (!(await preview.load(item.song.media.instrumental))) return; // outra prévia foi pedida
+    await preview.play();
+    els.previewHint.textContent = item.can_edit
+      ? 'Mudar o tom aqui muda o tom da sua música na fila.'
+      : 'Esta música é de outra pessoa: o tom aqui vale só para a sua prévia.';
+  } catch (err) {
+    els.previewHint.textContent = `Não consegui tocar a prévia: ${err.message}`;
+  }
+  syncPreviewUi();
+}
+
+function stepPreviewPitch(delta) {
+  if (!previewItem) return;
+  previewPitch = Math.max(-6, Math.min(6, previewPitch + delta));
+  preview.setPitch(previewPitch);
+  syncPreviewUi();
+  if (previewItem.can_edit) act('PATCH', `/queue/${previewItem.id}`, { pitch: previewPitch }).catch(() => {});
+}
+
+$('preview-play').addEventListener('click', async () => {
+  if (!preview.loaded) return;
+  if (preview.playing) preview.pause();
+  else await preview.play();
+  syncPreviewUi();
+});
+$('preview-seek').addEventListener('input', (e) => preview.seek(Number(e.target.value) / 1000));
+$('preview-up').addEventListener('click', () => stepPreviewPitch(1));
+$('preview-down').addEventListener('click', () => stepPreviewPitch(-1));
+$('preview-close').addEventListener('click', closePreview);
+setInterval(() => previewItem && syncPreviewUi(), 400);
+
+/** Mantém a prévia coerente com a fila: fecha se o item saiu ou começou a tocar na TV; acompanha o tom. */
+function reconcilePreview() {
+  if (!previewItem) return;
+  const item = state.queue.find((i) => i.id === previewItem.id);
+  if (!item || item.id === state.current_item_id) return closePreview();
+  previewItem.can_edit = item.can_edit;
+  previewItem.key = item.song.key;
+  if (item.can_edit && item.pitch !== previewPitch) {
+    previewPitch = item.pitch; // o tom foi mudado por outro controle (ex.: o botão do item)
+    preview.setPitch(previewPitch);
+  }
+  syncPreviewUi();
+}
+
 // --- desenho ---
 function pitchControl(item) {
   const set = (value) => act('PATCH', `/queue/${item.id}`, { pitch: Math.max(-6, Math.min(6, value)) }).catch(() => {});
@@ -114,14 +213,25 @@ function pitchControl(item) {
     h('button', { type: 'button', 'aria-label': 'Tom mais agudo', onclick: () => set(item.pitch + 1), disabled: item.pitch >= 6 }, '+'));
 }
 
+function nextSingerLine() {
+  const next = nextUp(state);
+  if (!next) return null;
+  return h('p', { class: 'next-singer' },
+    'Próximo: ',
+    h('strong', {}, next.item.added_by),
+    h('span', { class: 'muted' }, ` — ${next.item.title ?? next.item.video_id}${next.preparing ? ' (preparando…)' : ''}`));
+}
+
 function renderNow(current) {
   els.nowBody.textContent = '';
   nowRefs = null;
   if (!current) {
-    const waiting = state.queue.length;
-    els.nowBody.append(h('p', { class: 'hint' }, waiting
-      ? 'Preparando a próxima música… ela começa sozinha quando estiver pronta.'
-      : 'Nada tocando. Adicione uma música abaixo.'));
+    const next = nextSingerLine();
+    els.nowBody.append(h('div', { class: 'now-content' },
+      h('p', { class: 'hint' }, state.queue.length
+        ? 'Preparando a próxima música… ela começa sozinha quando estiver pronta.'
+        : 'Nada tocando. Toque em Adicionar para escolher uma música.'),
+      next));
     return;
   }
   const bar = h('div', { class: 'bar' });
@@ -135,9 +245,11 @@ function renderNow(current) {
       h('div', { class: 'now-info' },
         h('strong', {}, current.title ?? current.video_id),
         current.artist ? h('span', { class: 'muted' }, current.artist) : null,
-        h('span', { class: 'singer' }, `Cantando: ${current.added_by}`),
+        h('span', { class: 'singer' }, `🎤 ${current.added_by} está cantando`),
+        current.song.key ? h('span', { class: 'muted small' }, keySummary(current.song.key, current.pitch)) : null,
         h('span', { class: 'muted small' }, `Letra: ${describeLyricsSource(current.song.lyrics_source)}`))),
     h('div', { class: 'progress' }, h('div', { class: 'track' }, bar), time),
+    nextSingerLine(),
     h('div', { class: 'controls-row' },
       isHost() ? [
         h('button', { type: 'button', onclick: () => act('POST', `/player/${state.playback === 'paused' ? 'resume' : 'pause'}`).catch(() => {}) },
@@ -153,7 +265,7 @@ function renderNow(current) {
           onclick: () => act('PUT', `/songs/${current.video_id}/offset`, { offset: Math.round((current.lyric_offset + step) * 100) / 100 }).catch(() => {}),
         }, `${step > 0 ? '+' : '−'}${Math.abs(step)} s`)),
       h('span', { class: 'offset-value' }, `${current.lyric_offset.toFixed(1).replace('.', ',')} s`)) : null,
-    !state.tv_connected ? h('p', { class: 'hint error' }, 'A TV não está conectada: clique em “Abrir TV” (ou abra o link da TV) para a música tocar.') : null,
+    !state.tv_connected ? h('p', { class: 'hint error' }, 'A TV não está conectada: abra o menu (⋯) e toque em “Abrir TV” para a música tocar.') : null,
   ));
   updateProgress();
 }
@@ -171,14 +283,19 @@ function queueItem(item, index, waiting) {
   const chip = songChip(item.song);
   const info = h('div', { class: 'info' },
     h('strong', {}, item.title ?? item.video_id),
-    h('span', { class: 'muted' }, [item.artist, `por ${item.added_by}`].filter(Boolean).join(' · ')),
-    h('span', { class: `chip ${chip.kind}` }, chip.label),
+    h('span', { class: 'muted' }, [item.artist, `🎤 ${item.added_by}`].filter(Boolean).join(' · ')),
+    item.song.key ? h('span', { class: 'muted small' }, keySummary(item.song.key, item.pitch)) : null,
+    h('span', { class: 'chips' },
+      h('span', { class: `chip ${chip.kind}` }, chip.label),
+      item.id === state.next_item_id ? h('span', { class: 'chip next' }, 'Próximo') : null),
     item.song.status === 'needs_lyrics' || item.song.status === 'failed'
       ? h('span', { class: 'muted small' }, item.song.error ?? '') : null);
 
   const actions = h('div', { class: 'actions' },
+    item.song.ready
+      ? h('button', { type: 'button', class: 'ghost', onclick: () => openPreview(item) }, '▶ Prévia') : null,
     item.song.status === 'needs_lyrics' && item.can_edit
-      ? h('button', { type: 'button', onclick: () => panel.chooseLyrics(item.video_id, item.song.error) }, 'Escolher letra') : null,
+      ? h('button', { type: 'button', onclick: () => panel.chooseLyrics(item.video_id, item.song.error, { artist: item.artist, title: item.title }) }, 'Escolher letra') : null,
     item.song.status === 'failed' && item.can_edit
       ? h('button', {
         type: 'button',
@@ -195,7 +312,16 @@ function queueItem(item, index, waiting) {
     isHost() ? [
       h('button', { type: 'button', 'aria-label': 'Subir na fila', disabled: index === 0, onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'up' }).catch(() => {}) }, '▲'),
       h('button', { type: 'button', 'aria-label': 'Descer na fila', disabled: index === waiting.length - 1, onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'down' }).catch(() => {}) }, '▼'),
-    ] : null,
+    ] : item.mine
+      // quem não é anfitrião pode adiar a PRÓPRIA música em uma posição (foi ao banheiro, quer esperar mais um pouco)
+      ? h('button', {
+        type: 'button',
+        class: 'ghost',
+        title: 'Passa a sua música uma posição para trás: a pessoa de trás canta antes',
+        disabled: index === waiting.length - 1,
+        onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'down' })
+          .then(() => toast('Você cedeu a vez: sua música desceu uma posição.')).catch(() => {}),
+      }, '⇩ Ceder a vez') : null,
     item.can_edit
       ? h('button', { type: 'button', class: 'danger', 'aria-label': 'Remover da fila', onclick: () => act('DELETE', `/queue/${item.id}`).catch(() => {}) }, '✕') : null);
 
@@ -210,7 +336,7 @@ function render() {
   if (!state) return;
   const { current, waiting } = splitQueue(state);
 
-  els.tvStatus.textContent = !connected ? 'Reconectando à sala…' : state.tv_connected ? '📺 TV conectada' : 'TV desconectada — clique em “Abrir TV”';
+  els.tvStatus.textContent = !connected ? 'Reconectando à sala…' : state.tv_connected ? '📺 TV conectada' : '📺 TV desconectada';
   els.tvStatus.classList.toggle('on', connected && state.tv_connected);
   els.copyHost.hidden = !isHost();
   els.hostSettings.hidden = !isHost();
@@ -221,38 +347,63 @@ function render() {
   els.queue.textContent = '';
   waiting.forEach((item, i) => els.queue.append(queueItem(item, i, waiting)));
   els.queueCount.textContent = waiting.length ? `(${waiting.length})` : '';
+  els.tabCount.textContent = state.queue.length ? `(${state.queue.length})` : '';
   els.queueEmpty.hidden = waiting.length > 0;
+  reconcilePreview();
 }
 
-// --- biblioteca (músicas já processadas) ---
+// --- biblioteca (músicas já processadas), com filtro por artista e nome ---
+let librarySongs = [];
+
+function librarySong(song) {
+  return h('li', {},
+    h('img', { src: thumbnailUrl(song.video_id), alt: '', class: 'thumb', loading: 'lazy' }),
+    h('div', { class: 'info' },
+      h('strong', {}, song.title ?? song.video_id),
+      h('span', { class: 'muted' }, [song.artist, song.duration ? formatDuration(song.duration) : null].filter(Boolean).join(' · ')),
+      song.key ? h('span', { class: 'muted small' }, keySummary(song.key)) : null),
+    h('button', {
+      type: 'button',
+      class: 'primary',
+      onclick: async () => {
+        try {
+          await act('POST', '/queue', { video_id: song.video_id, name: myName(), display_title: song.title ?? undefined });
+          toast('Adicionada à fila!');
+        } catch {
+          // o erro já apareceu no aviso
+        }
+      },
+    }, 'Adicionar'));
+}
+
+/** Desenha a lista aplicando o filtro digitado (o filtro sobrevive às atualizações da lista). */
+function renderLibrary() {
+  const all = sortSongs(librarySongs);
+  const query = els.libraryFilter.value.trim();
+  const shown = filterSongs(all, query);
+  els.libraryList.textContent = '';
+  for (const song of shown) els.libraryList.append(librarySong(song));
+  els.libraryCount.textContent = !all.length ? '' : query ? `(${shown.length} de ${all.length})` : `(${all.length})`;
+  els.libraryEmpty.hidden = shown.length > 0;
+  els.libraryEmptyText.textContent = !all.length ? 'Nenhuma música processada ainda.' : `Nenhuma música encontrada para “${query}”.`;
+  els.libraryClear.hidden = !(query && !shown.length);
+}
+
 async function loadLibrary() {
-  let songs = [];
   try {
-    songs = await api('GET', '/api/songs');
+    librarySongs = await api('GET', '/api/songs');
   } catch {
     return;
   }
-  els.libraryList.textContent = '';
-  els.libraryEmpty.hidden = songs.length > 0;
-  for (const song of songs) {
-    els.libraryList.append(h('li', {},
-      h('img', { src: thumbnailUrl(song.video_id), alt: '', class: 'thumb', loading: 'lazy' }),
-      h('div', { class: 'info' },
-        h('strong', {}, song.title ?? song.video_id),
-        h('span', { class: 'muted' }, [song.artist, song.duration ? formatDuration(song.duration) : null].filter(Boolean).join(' · '))),
-      h('button', {
-        type: 'button',
-        onclick: async () => {
-          try {
-            await act('POST', '/queue', { video_id: song.video_id, name: myName(), display_title: song.title ?? undefined });
-            toast('Adicionada à fila!');
-          } catch {
-            // o erro já apareceu no aviso
-          }
-        },
-      }, 'Adicionar à fila')));
-  }
+  renderLibrary();
 }
+
+els.libraryFilter.addEventListener('input', renderLibrary);
+els.libraryClear.addEventListener('click', () => {
+  els.libraryFilter.value = '';
+  renderLibrary();
+  els.libraryFilter.focus();
+});
 
 /** Recarrega a biblioteca quando alguma música da fila termina de processar. */
 function refreshLibraryIfNeeded() {
@@ -265,26 +416,36 @@ function refreshLibraryIfNeeded() {
 
 // --- painel de adicionar ---
 const panel = initAddPanel({
+  onShow: () => showTab('add'),
   async submitNew(body) {
     const result = await act('POST', '/queue', { ...body, name: myName() });
     loadLibrary();
+    showTab('queue');
     if (result.cached) return 'Adicionada à fila (essa música já estava pronta).';
     if (result.deduped) return 'Adicionada à fila (essa música já estava sendo preparada).';
     return 'Adicionada à fila! Ela está sendo preparada e toca quando chegar a vez.';
   },
   async submitLyrics(videoId, body) {
     await api('PUT', `/api/songs/${videoId}/lyrics`, body, code);
+    showTab('queue');
     return 'Letra enviada. A música volta a ser preparada.';
   },
 });
 
-// --- botões do topo e do anfitrião ---
-els.openTv.addEventListener('click', () => window.open(`tv.html?room=${code}`, '_blank'));
-els.copyLink.addEventListener('click', () => copyText(`${location.origin}/room.html?room=${code}`, 'Link da sala copiado!'));
-els.copyHost.addEventListener('click', () =>
-  copyText(`${location.origin}/room.html?room=${code}#host=${hostToken(code)}`, 'Link de anfitrião copiado! Quem abrir controla a sala.'));
+// --- menu e ações do anfitrião ---
+els.openTv.addEventListener('click', () => {
+  els.menu.open = false;
+  window.open(`tv.html?room=${code}`, '_blank');
+});
+els.copyLink.addEventListener('click', () => {
+  els.menu.open = false;
+  copyText(`${location.origin}/room.html?room=${code}`, 'Link da sala copiado!');
+});
+els.copyHost.addEventListener('click', () => {
+  els.menu.open = false;
+  copyText(`${location.origin}/room.html?room=${code}#host=${hostToken(code)}`, 'Link de anfitrião copiado! Quem abrir controla a sala.');
+});
 els.fair.addEventListener('change', () => act('PATCH', '', { fair: els.fair.checked }).catch(() => { els.fair.checked = !els.fair.checked; }));
-els.library.addEventListener('toggle', () => els.library.open && loadLibrary());
 
 // --- tempo real ---
 connectRoom(code, 'controller', {
@@ -309,6 +470,7 @@ connectRoom(code, 'controller', {
       h('h1', {}, 'Sala não encontrada'),
       h('p', {}, `A sala ${code} não existe mais (salas paradas há 24 horas são apagadas).`),
       h('a', { href: '/', class: 'button primary' }, 'Criar uma nova sala'));
+    document.querySelector('.tabbar').hidden = true;
   },
 });
 
@@ -316,4 +478,8 @@ setInterval(updateProgress, 500);
 loadLibrary();
 
 // gancho de diagnóstico (testes no navegador)
-window.room = { get state() { return state; } };
+window.room = {
+  get state() { return state; },
+  preview,
+  get previewPitch() { return previewPitch; },
+};

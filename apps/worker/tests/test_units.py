@@ -4,6 +4,7 @@ from pathlib import Path
 
 from singalong_worker.align import clean_lines, group_words
 from singalong_worker.ids import extract_video_id
+from singalong_worker.key import MAJOR_PROFILE, MINOR_PROFILE, NOTES, best_key
 from singalong_worker.lyrics import apply_text, parse_cues, parse_lrc, parse_lyrics_file, pick_candidate
 from singalong_worker.search import parse_entries
 from singalong_worker.pipeline import NeedsAlignment, NeedsLyrics, guess_artist_title, manual_subtitle_langs, resolve_lyrics
@@ -269,6 +270,71 @@ class AlignTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             align_lyrics(Path("x.mp3"), "  \n ")
+
+
+class KeyTests(unittest.TestCase):
+    @staticmethod
+    def rotate(profile, tonic):
+        """Perfil de uma tonalidade com a tônica em `tonic` (o inverso da rotação que best_key faz)."""
+        return profile[-tonic:] + profile[:-tonic] if tonic else list(profile)
+
+    def test_reconhece_as_24_tonalidades_a_partir_dos_proprios_perfis(self):
+        for tonic in range(12):
+            major = best_key(self.rotate(MAJOR_PROFILE, tonic))
+            self.assertEqual((major["tonic"], major["mode"]), (tonic, "major"), f"maior {tonic}")
+            minor = best_key(self.rotate(MINOR_PROFILE, tonic))
+            self.assertEqual((minor["tonic"], minor["mode"]), (tonic, "minor"), f"menor {tonic}")
+
+    def test_transpor_o_perfil_move_o_tom_na_mesma_medida(self):
+        base = [5, 0, 3, 0, 4, 3, 0, 5, 0, 3, 0, 2]  # tríade e escala de Dó maior, grosseiramente
+        for shift in (1, 2, 5, 7, 11):
+            moved = base[-shift:] + base[:-shift]
+            self.assertEqual(best_key(moved)["tonic"], (best_key(base)["tonic"] + shift) % 12)
+            self.assertEqual(best_key(moved)["mode"], best_key(base)["mode"])
+
+    def test_resultado_tem_nome_confianca_e_alternativa(self):
+        key = best_key(self.rotate(MINOR_PROFILE, 9))  # Lá menor
+        self.assertEqual((key["name"], key["mode"]), ("A", "minor"))
+        self.assertGreater(key["score"], 0.99)
+        self.assertGreater(key["margin"], 0)
+        self.assertIn(key["alt"]["mode"], ("major", "minor"))
+        self.assertIn(key["alt"]["name"], NOTES)
+
+    def test_perfil_ambiguo_tem_margem_pequena(self):
+        # as notas de Dó maior e de Lá menor são as mesmas: um perfil "chato" deixa as duas próximas
+        flat = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1]
+        self.assertLess(best_key(flat)["margin"], 0.1)
+
+    def test_entradas_invalidas(self):
+        with self.assertRaises(ValueError):
+            best_key([0.0] * 12)  # silêncio
+        with self.assertRaises(ValueError):
+            best_key([1.0] * 11)
+
+    def test_music_key_reaproveita_o_calculado_e_nunca_derruba_o_job(self):
+        import json
+        import tempfile
+        from unittest import mock
+
+        from singalong_worker import pipeline
+
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as work:
+            storage = LocalStorage(root)
+            k = pipeline.keys("abcdefghijk")
+            meta = Path(work) / "meta.json"
+            meta.write_text(json.dumps({"key": {"tonic": 9, "mode": "minor"}}), encoding="utf-8")
+            storage.put(k["meta"], meta)
+            with mock.patch.object(pipeline, "detect_key", side_effect=AssertionError("não deveria recalcular")):
+                self.assertEqual(pipeline.music_key(storage, k, Path(work), None)["tonic"], 9)
+
+            storage.delete("cache")  # sem meta anterior e sem instrumental: a análise falha, o job segue sem tom
+            self.assertIsNone(pipeline.music_key(storage, k, Path(work), None))
+
+            audio = Path(work) / "instrumental.mp3"
+            audio.write_bytes(b"x")
+            with mock.patch.object(pipeline, "detect_key", return_value={"tonic": 2, "mode": "major"}) as detect:
+                self.assertEqual(pipeline.music_key(storage, k, Path(work), audio)["tonic"], 2)
+            detect.assert_called_once_with(audio)
 
 
 class SearchTests(unittest.TestCase):

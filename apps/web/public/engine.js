@@ -1,6 +1,6 @@
 // Motor da TV: toca o instrumental com troca de tom em tempo real e desenha a letra sincronizada.
 import { SoundTouchNode } from './vendor/soundtouch/SoundTouchNode.js';
-import { clampPitch, lineProgress, locate, wordProgress, wordSpans } from './lyrics-sync.js';
+import { clampPitch, gapDisplay, lineProgress, locate, wordProgress, wordSpans } from './lyrics-sync.js';
 
 /**
  * @param lyricsEls elementos { prev, current, next, next2 } onde a letra é desenhada
@@ -22,6 +22,8 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
   let pitchAvailable = true;
   let lastKey = '';
   let words = []; // [{el, span, p}] da linha atual
+  let gapEl = null; // o aviso de pausa longa, quando está na tela
+  let lastDashes = -1;
   let loadToken = 0;
 
   // --- áudio: <audio> -> SoundTouch (tom) -> saída; sem AudioWorklet (página http fora de localhost) toca sem tom ---
@@ -81,21 +83,44 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
     }
   }
 
+  /** Pausa longa na letra: no lugar da linha atual, "--------------" que some nos últimos 8 s (prepare-se!). */
+  function buildGapLine() {
+    lyricsEls.current.textContent = '';
+    gapEl = document.createElement('span');
+    gapEl.className = 'gap-dashes';
+    lyricsEls.current.append(gapEl);
+    words = [];
+    lastDashes = -1;
+  }
+
+  function paintGap(dashes) {
+    if (dashes === lastDashes) return;
+    lastDashes = dashes;
+    gapEl.textContent = '-'.repeat(dashes);
+  }
+
   function render() {
     if (itemId === null) return;
     const t = audio.currentTime + offset;
-    const { current, next } = locate(cues, t);
+    const gap = gapDisplay(cues, t);
+    let { current, next } = locate(cues, t);
+    if (gap) {
+      current = -1; // dentro de uma pausa longa nenhuma linha está sendo cantada, mesmo que o `end` da anterior diga o contrário
+      next = gap.next;
+    }
     const text = (i) => cues[i]?.text ?? '';
     const anchor = current >= 0 ? current : next;
-    const key = `${current}|${anchor}`;
+    const key = `${current}|${anchor}|${gap ? 'gap' : ''}`;
     if (key !== lastKey) {
       lastKey = key;
       lyricsEls.prev.textContent = text(anchor - 1);
-      buildCurrentLine(current >= 0 ? text(current) : cues.length ? '' : '♪ Sem letra para esta música');
+      if (gap) buildGapLine();
+      else buildCurrentLine(current >= 0 ? text(current) : cues.length ? '' : '♪ Sem letra para esta música');
       lyricsEls.next.textContent = text(current >= 0 ? current + 1 : next);
       lyricsEls.next2.textContent = text(current >= 0 ? current + 2 : next + 1);
     }
-    paintCurrentLine(current >= 0 ? lineProgress(cues[current], t) : 0);
+    if (gap) paintGap(gap.dashes);
+    else paintCurrentLine(current >= 0 ? lineProgress(cues[current], t) : 0);
   }
 
   function loop() {

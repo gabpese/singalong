@@ -12,6 +12,7 @@ from pathlib import Path
 from . import lyrics as lyr
 from .align import align_lyrics
 from .ids import extract_video_id
+from .key import detect_key
 from .storage import LocalStorage
 
 PIPELINE_VERSION = 1
@@ -212,6 +213,26 @@ def resolve_lyrics(
     raise NeedsLyrics("Este vídeo não tem legenda. Escolha como você quer a letra.")
 
 
+def music_key(storage: LocalStorage, k: dict[str, str], work: Path, instrumental: Path | None) -> dict | None:
+    """Tom da música: reaproveita o já calculado; senão estima a partir do instrumental.
+
+    É um extra: qualquer falha na análise vira "sem tom" e nunca derruba o job.
+    """
+    try:
+        if storage.exists(k["meta"]):
+            previous = json.loads(storage.read(k["meta"])).get("key")
+            if previous:
+                return previous
+        audio = instrumental
+        if audio is None:
+            audio = work / "instrumental.mp3"
+            audio.write_bytes(storage.read(k["instrumental"]))
+        return detect_key(audio)
+    except Exception as exc:  # noqa: BLE001
+        print(f"aviso: não consegui calcular o tom ({type(exc).__name__}: {exc})")
+        return None
+
+
 def _write_json(path: Path, data, **kwargs) -> Path:
     path.write_text(json.dumps(data, ensure_ascii=False, **kwargs), encoding="utf-8")
     return path
@@ -251,6 +272,7 @@ def process(
     with tempfile.TemporaryDirectory(prefix=f"singalong-{video_id}-") as tmp:
         work = Path(tmp)
         audio = None
+        instrumental_file: Path | None = None
         vocals_file: Path | None = None
 
         need_separation = not storage.exists(k["instrumental"])  # a voz, se faltar, é obtida só quando a IA precisar
@@ -321,6 +343,11 @@ def process(
             timings["align"] = round(time.monotonic() - t, 1)
         storage.put(k["lyrics"], _write_json(work / "lyrics.json", cues))
 
+        t = time.monotonic()
+        key = music_key(storage, k, work, instrumental_file)
+        if key and "key" not in timings:
+            timings["key"] = round(time.monotonic() - t, 1)
+
         meta = {
             "video_id": video_id,
             "title": info["title"],
@@ -328,6 +355,7 @@ def process(
             "duration": info["duration"],
             "lyrics_source": source,
             "lyrics_lines": len(cues),
+            **({"key": key} if key else {}),
             "pipeline_version": PIPELINE_VERSION,
             "timings_s": timings,
         }

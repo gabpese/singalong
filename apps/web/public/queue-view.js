@@ -36,8 +36,58 @@ export function formatPitch(semitones) {
   return semitones > 0 ? `+${semitones}` : String(semitones);
 }
 
+/**
+ * Quem canta a seguir: o item que o servidor escolheu (pronto, respeitando o rodízio justo); se nenhum está pronto,
+ * o primeiro da fila de espera, marcado como "ainda preparando".
+ */
+export function nextUp(state) {
+  const { waiting } = splitQueue(state);
+  const chosen = waiting.find((item) => item.id === state?.next_item_id);
+  if (chosen) return { item: chosen, preparing: false };
+  return waiting.length ? { item: waiting[0], preparing: true } : null;
+}
+
+/**
+ * O que toca e o que vem depois, na ORDEM EM QUE VAI TOCAR: o próximo que o servidor escolheu (pronto, respeitando o
+ * rodízio justo) vem na frente; o resto segue a ordem da fila.
+ */
+export function playOrder(state) {
+  const { current, waiting } = splitQueue(state);
+  const next = waiting.find((item) => item.id === state?.next_item_id);
+  return { current, upcoming: next ? [next, ...waiting.filter((item) => item !== next)] : waiting };
+}
+
 /** Item que está tocando e os que aguardam, a partir do estado da sala. */
 export function splitQueue(state) {
   const current = state?.queue?.find((item) => item.id === state.current_item_id) ?? null;
   return { current, waiting: (state?.queue ?? []).filter((item) => item.id !== current?.id) };
+}
+
+/** Minúsculas e sem acentos: "Ré", "RE" e "re" são a mesma coisa para quem está procurando. */
+export function normalizeText(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Filtra as músicas já processadas por artista e nome. Cada palavra digitada precisa aparecer em algum dos dois, em
+ * qualquer ordem ("elfman jack" acha "Jack's Lament — Danny Elfman"). Consulta vazia devolve tudo.
+ */
+export function filterSongs(songs, query) {
+  const terms = normalizeText(query).split(' ').filter(Boolean);
+  if (!terms.length) return songs;
+  return songs.filter((song) => {
+    const haystack = normalizeText(`${song.artist ?? ''} ${song.title ?? ''}`);
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
+/** Ordem alfabética por artista e depois por nome; as sem artista vão para o fim (também em ordem alfabética). */
+export function sortSongs(songs) {
+  const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+  return [...songs].sort((a, b) => {
+    const artistA = normalizeText(a.artist);
+    const artistB = normalizeText(b.artist);
+    if (artistA !== artistB && (!artistA || !artistB)) return artistA ? -1 : 1; // quem não tem artista fica por último
+    return collator.compare(artistA, artistB) || collator.compare(normalizeText(a.title), normalizeText(b.title));
+  });
 }

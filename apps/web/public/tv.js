@@ -1,15 +1,24 @@
 // TV: toca o que a sala manda (fila no servidor), mostra a letra e avisa quando a música termina.
 import { createEngine } from './engine.js';
 import { api, connectRoom, parseRoomCode } from './identity.js';
-import { songChip, splitQueue } from './queue-view.js';
+import { keySummary } from './music.js';
+import { nextUp, playOrder, songChip, splitQueue } from './queue-view.js';
 import qrcode from './vendor/qrcode/qrcode.mjs';
 
 const $ = (id) => document.getElementById(id);
 const els = {
   stage: $('stage'),
   roomCode: $('room-code'),
-  nowLabel: $('now-label'),
-  upNext: $('up-next'),
+  singerNow: $('singer-now'),
+  whoNow: $('who-now'),
+  whatNow: $('what-now'),
+  keyNow: $('key-now'),
+  singerNext: $('singer-next'),
+  whoNext: $('who-next'),
+  whatNext: $('what-next'),
+  bar: $('tv-bar'),
+  queueBox: $('tv-queue-box'),
+  queueList: $('tv-queue'),
   notice: $('notice'),
   idle: $('idle'),
   idleCode: $('idle-code'),
@@ -94,19 +103,76 @@ async function syncPlayback(playback) {
   }
 }
 
+const trackName = (item) => [item.title ?? item.video_id, item.artist].filter(Boolean).join(' — ');
+const UPCOMING_SHOWN = 5;
+
+function queueRow(item, badge, isCurrent = false) {
+  const row = document.createElement('li');
+  row.className = isCurrent ? 'is-current' : '';
+  const mark = document.createElement('span');
+  mark.className = 'mark';
+  mark.textContent = badge;
+  const text = document.createElement('span');
+  text.className = 'text';
+  const who = document.createElement('strong');
+  who.textContent = item.added_by; // textContent: nomes e títulos vêm de terceiros
+  const what = document.createElement('small');
+  what.textContent = `${item.title ?? item.video_id}${item.song.ready ? '' : ` · ${songChip(item.song).label.toLowerCase()}`}`;
+  text.append(who, what);
+  row.append(mark, text);
+  return row;
+}
+
+/** Lista lateral: a música atual e as próximas 5, na ordem em que vão tocar (para ceder a vez com conhecimento de causa). */
+function renderQueue(state) {
+  const { current, upcoming } = playOrder(state);
+  els.queueList.textContent = '';
+  if (current) els.queueList.append(queueRow(current, '▶', true));
+  upcoming.slice(0, UPCOMING_SHOWN).forEach((item, i) => els.queueList.append(queueRow(item, String(i + 1))));
+  if (upcoming.length > UPCOMING_SHOWN) {
+    const more = document.createElement('li');
+    more.className = 'more';
+    more.textContent = `+ ${upcoming.length - UPCOMING_SHOWN} na fila`;
+    els.queueList.append(more);
+  }
+  const visible = Boolean(current) || upcoming.length > 0;
+  els.queueBox.hidden = !visible;
+  els.stage.classList.toggle('has-queue', visible);
+}
+
+/** Cabeçalho: quem canta agora → próximo cantor; o tom; a fila que vem depois. */
 function renderChrome(state) {
-  const { current, waiting } = splitQueue(state);
-  els.nowLabel.textContent = current ? `${current.added_by} · ${current.title ?? current.video_id}` : '';
-  els.upNext.textContent = waiting.length
-    ? `A seguir: ${waiting.slice(0, 3).map((i) => `${i.added_by} — ${i.title ?? i.video_id}${i.song.ready ? '' : ` (${songChip(i.song).label.toLowerCase()})`}`).join('  •  ')}`
-    : '';
+  const { current } = splitQueue(state);
+  const next = nextUp(state);
+
+  els.singerNow.hidden = !current;
+  if (current) {
+    els.whoNow.textContent = `🎤 ${current.added_by}`;
+    els.whatNow.textContent = trackName(current);
+    els.keyNow.textContent = keySummary(current.song.key, current.pitch);
+  }
+
+  els.singerNext.hidden = !next;
+  if (next) {
+    els.whoNext.textContent = `🎤 ${next.item.added_by}`;
+    els.whatNext.textContent = `${next.item.title ?? next.item.video_id}${next.preparing ? ' (preparando…)' : ''}`;
+  }
+
+  renderQueue(state);
+
   els.idle.hidden = Boolean(current);
   if (!current) {
-    els.idleMsg.textContent = waiting.length
-      ? `Preparando a próxima música: ${waiting[0].title ?? waiting[0].video_id}…`
+    els.idleMsg.textContent = next
+      ? `Próximo: ${next.item.added_by} — ${next.item.title ?? next.item.video_id}${next.preparing ? ' (preparando…)' : ''}`
       : 'Adicione músicas pelo celular para começar.';
   }
 }
+
+// barra de progresso da música
+setInterval(() => {
+  const duration = engine.duration;
+  els.bar.style.width = engine.loadedId !== null && duration ? `${Math.min(100, (engine.currentTime / duration) * 100)}%` : '0%';
+}, 250);
 
 /** Aplica o estado mais recente da sala; se chegar outro enquanto carrega, repete até alcançá-lo. */
 async function apply() {

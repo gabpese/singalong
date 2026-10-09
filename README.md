@@ -31,13 +31,24 @@ Abra **http://localhost:3000** (para usar outra porta: `$env:API_PORT=3001` ante
 | Qualquer pessoa na sala | adicionar músicas, remover e mudar o tom **das próprias** músicas, ver a fila |
 | Anfitrião | tudo isso **em qualquer música**, mais pular, pausar/retomar, reordenar (▲▼), ajustar a letra e ligar o **rodízio justo** (a mesma pessoa não canta duas seguidas quando há outra esperando) |
 
-- O **link de anfitrião** (botão no topo da sala) deixa outro aparelho controlar a sala. Quem tem o link manda.
-- O **tom** (−6 a +6 semitons) é por música na fila e muda ao vivo. O **ajuste da letra** vale para a música em qualquer sala.
+- O **link de anfitrião** (menu ⋯ da sala) deixa outro aparelho controlar a sala. Quem tem o link manda.
+- A **TV** mostra, no alto, **quem está cantando agora → o próximo cantor** (o mesmo que o servidor vai tocar: pronto e respeitando o rodízio justo), e, ao lado, a **lista com a música atual e as 5 próximas** ("+ N na fila" para o resto), mais uma barra de progresso.
+- **Aviso de pausa:** em pausas da letra de **8 s ou mais** (introdução, solo, ponte) a TV mostra `--------------` no lugar da linha atual, com a próxima letra já embaixo. Nos **últimos 8 s** os traços vão sumindo, para o cantor ver quando a linha começa. Em letras com tempo só no início de cada linha (LRC), um solo fica "dentro" da linha anterior; o app estima quanto a linha leva para ser cantada (~0,12 s por letra + 2 s) e trata o resto como pausa.
+- **Ceder a vez:** quem precisa se ausentar (ir ao banheiro, por exemplo) toca em **⇩ Ceder a vez** na própria música e ela **desce uma posição**: a pessoa de trás canta antes. Pode repetir. Só o anfitrião pode *subir* uma música (senão qualquer um furaria a fila).
+- O **tom da música** é detectado sozinho e aparece só como a **nota**, sem maior/menor (o modo não muda ao transpor): "Lá (A)", "Dó♯ / Ré♭ (C#/Db)". Ao subir ou descer o tom de canto, mostra qual nota você vai cantar: "Lá (A) → Si (B) com +2". É uma **estimativa**: quando o app não tem certeza, mostra as duas candidatas ("Tom provável: Fá (F) ou Ré (D)").
+- O **tom de canto** (−6 a +6 semitons) é por música na fila e muda ao vivo. O **ajuste da letra** vale para a música em qualquer sala.
+- **Prévias no celular:** ao pesquisar, o botão **▶ Prévia** (ou **Ouvir no YouTube**, para um link colado) toca o vídeo original para você conferir se é a música certa. Com a música já preparada, **▶ Prévia** na fila toca o **instrumental com o tom escolhido**, e mexer no tom ali muda o tom da sua música na fila. (A prévia do instrumental funciona em http pelo IP da rede.)
+- O celular tem três abas: **Fila**, **Adicionar** e **Músicas** (já processadas). Na aba **Músicas** há um **filtro por artista e nome**: ignora maiúsculas e acentos, aceita várias palavras em qualquer ordem ("elfman jack" acha "Jack's Lament", de Danny Elfman) e mostra "3 de 12". A lista fica em ordem alfabética por artista; as sem artista vão para o fim.
 - Salas paradas há 24 horas são apagadas. Recarregar a TV no meio de uma música retoma de onde estava.
 
 ### Adicionar uma música
 
-Digite o nome (pesquisa no YouTube) ou cole um link, e escolha a letra:
+Informe **Artista** e **Nome da música** (os dois são obrigatórios). Com eles o app:
+
+1. **pesquisa o vídeo no YouTube** com `Artista - Nome da música`: toque em **🔎 Buscar no YouTube**, use **▶ Prévia** para ouvir e escolha o vídeo certo (quem já tem o link usa **Já tenho o link do vídeo**);
+2. **busca a letra** com os mesmos dois campos (opção "Buscar a letra na internet", a padrão).
+
+A letra pode vir de:
 
 | Opção na tela | O que faz |
 |---|---|
@@ -49,13 +60,15 @@ Digite o nome (pesquisa no YouTube) ou cole um link, e escolha a letra:
 
 - Sem letra utilizável, a música fica na fila com **"Precisa de letra"** e um botão **Escolher letra**; o instrumental já
   processado é reaproveitado (só a letra é refeita).
-- Em covers, informe **Artista** e **Nome da música** para a busca online. A letra de uma versão de duração diferente
-  não serve de tempo, então a IA a sincroniza com a voz do vídeo (cerca de 1 minuto na primeira vez).
-- **Por que não buscamos no Google?** O Google bloqueia acesso automatizado (captcha "unusual traffic"), então a letra é
-  buscada no LRCLIB, que tem o texto das músicas testadas. O texto é só o ponto de partida: quem marca os tempos é a IA.
+- Em covers e vídeos produzidos (com créditos, por exemplo) a duração difere da versão original, que não serve de tempo:
+  a IA sincroniza o texto com a voz do vídeo (cerca de 1 minuto na primeira vez).
+- Músicas já processadas (aba **Músicas**) entram na fila sem pedir artista e nome.
+- **Por que a letra não vem do Google/Musixmatch?** O Google bloqueia acesso automatizado (captcha "unusual traffic") e a
+  API oficial da Musixmatch, no plano gratuito, devolve só **30% da letra** (a inteira exige licença paga). Por isso o texto
+  vem do LRCLIB (API aberta, que tem as músicas testadas). O texto é só o ponto de partida: quem marca os tempos é a IA.
 - A legenda do vídeo depende do YouTube liberar o download dela; quando ele limita (HTTP 429), o job segue sem ela.
 
-Tudo fica em `storage/cache/<video_id>/` (`instrumental.mp3`, `vocals.mp3`, `lyrics.json`, `meta.json`, `source.json`).
+Tudo fica em `storage/cache/<video_id>/` (`instrumental.mp3`, `vocals.mp3`, `lyrics.json`, `meta.json` com o tom, `source.json`).
 Salas e fila ficam num SQLite no volume `api-data` do Docker.
 
 ### API
@@ -65,7 +78,7 @@ Salas e fila ficam num SQLite no volume `api-data` do Docker.
 | `POST /api/rooms` | cria a sala: `{code, host_token}` |
 | `GET /api/rooms/:code` | estado: fila, o que toca, `tv_connected`, `me.is_host` |
 | `POST /api/rooms/:code/queue` `{url \| video_id, lyrics?, artist?, title?, name?, pitch?}` | adiciona à fila (e já pede o processamento) |
-| `DELETE /api/rooms/:code/queue/:item` · `POST …/move {direction}` · `PATCH …/queue/:item {pitch}` | remover · reordenar (anfitrião) · tom |
+| `DELETE /api/rooms/:code/queue/:item` · `POST …/move {direction}` · `PATCH …/queue/:item {pitch}` | remover · mover (`down` = ceder a vez, o dono pode; `up` só o anfitrião) · tom |
 | `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair}` | controle (anfitrião) |
 | `PUT /api/rooms/:code/songs/:id/offset {offset}` | ajuste da letra, em segundos (anfitrião) |
 | `WS /api/rooms/:code/ws?role=tv\|controller` | estado em tempo real; a TV envia `ended` e `position` |

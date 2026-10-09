@@ -183,11 +183,18 @@ export function createRoomService({
     const ids = [...new Set(items.map((i) => i.video_id))];
     const described = new Map(await Promise.all(ids.map(async (id) => [id, await songs.describe(id)])));
     const position = positions.get(room.code);
+    // quem toca a seguir: a mesma regra do avanço da fila (só músicas prontas; rodízio justo, se ligado)
+    const ready = new Set(ids.filter((id) => described.get(id)?.media));
+    const upNext = nextPlayable(items.filter((i) => i.status === 'queued'), ready, {
+      fair: Boolean(room.fair),
+      lastClientId: room.last_client_id,
+    });
     return {
       code: room.code,
       fair: Boolean(room.fair),
       playback: room.playback,
       current_item_id: room.current_item_id,
+      next_item_id: upNext?.id ?? null,
       position_ms: position?.item_id === room.current_item_id ? position.ms : 0,
       tv_connected: hub.count(room.code, 'tv') > 0,
       queue: items.map((item) => {
@@ -209,6 +216,7 @@ export function createRoomService({
             ready: Boolean(song?.media),
             duration: song?.meta?.duration ?? null,
             lyrics_source: song?.meta?.lyrics_source ?? null,
+            key: song?.meta?.key ?? null,
             media: song?.media ?? null,
           },
         };
@@ -266,16 +274,23 @@ export function createRoomService({
         if (['text', 'file', 'align'].includes(params.lyrics?.source) && !params.lyrics.text?.trim()) {
           throw new HttpError(400, 'lyrics_text_required', 'Informe o texto da letra.');
         }
+        // música ainda não processada: artista e nome são obrigatórios (a busca da letra e a fila dependem deles);
+        // as já prontas (biblioteca) têm esses dados no meta.json
+        const artist = params.artist?.trim();
+        const title = params.title?.trim();
+        if (!(await songs.isReady(videoId)) && !(artist && title)) {
+          throw new HttpError(400, 'artist_title_required', 'Informe o artista e o nome da música.');
+        }
         if (db.countQueued(room.code) >= MAX_QUEUE) throw new HttpError(409, 'queue_full', 'A fila está cheia.');
         if (db.countQueuedBy(room.code, actor.clientId) >= MAX_PER_CLIENT) {
           throw new HttpError(409, 'too_many', `Cada pessoa pode ter até ${MAX_PER_CLIENT} músicas na fila.`);
         }
-        const song = await songs.request(videoId, { lyrics: params.lyrics, artist: params.artist, title: params.title });
+        const song = await songs.request(videoId, { lyrics: params.lyrics, artist, title });
         const itemId = db.addItem({
           roomCode: room.code,
           videoId,
-          title: params.display_title ?? song.song?.meta?.title ?? params.title ?? null,
-          artist: params.artist ?? song.song?.meta?.artist ?? null,
+          title: params.display_title ?? song.song?.meta?.title ?? title ?? null,
+          artist: artist ?? song.song?.meta?.artist ?? null,
           addedBy: (params.name ?? '').trim().slice(0, 30) || 'Alguém',
           clientId: actor.clientId,
           pitch: clampPitch(params.pitch ?? 0),
@@ -294,10 +309,15 @@ export function createRoomService({
       });
     },
 
+    /**
+     * Troca de lugar com o vizinho. Descer ("ceder a vez": adiar a própria música em uma posição, ex.: foi ao banheiro)
+     * o dono também pode; subir só o anfitrião, senão qualquer um furaria a fila.
+     */
     move(code, itemId, direction, actor) {
       return mutate(code, actor, (room) => {
-        requireHost(room, actor);
         const item = requireItem(room, itemId);
+        if (direction === 'up') requireHost(room, actor);
+        else requireEditable(room, item, actor);
         if (item.status !== 'queued') throw new HttpError(409, 'not_queued', 'Só dá para mover músicas que aguardam.');
         const queued = db.listActive(room.code).filter((i) => i.status === 'queued').map((i) => i.id);
         const target = swapTarget(queued, item.id, direction);

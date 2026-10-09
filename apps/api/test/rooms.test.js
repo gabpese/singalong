@@ -65,7 +65,7 @@ function fakeConn(code, { role = 'controller', client = ANA, host } = {}) {
   return { session, sent, lastState };
 }
 
-const add = (code, videoId, opts = {}) => call('POST', `/rooms/${code}/queue`, { ...opts, body: { video_id: videoId, name: opts.name ?? 'Ana', ...(opts.extra ?? {}) } });
+const add = (code, videoId, opts = {}) => call('POST', `/rooms/${code}/queue`, { ...opts, body: { video_id: videoId, name: opts.name ?? 'Ana', artist: 'Artista', title: 'Título', ...(opts.extra ?? {}) } });
 const queueIds = (state) => state.queue.map((i) => i.video_id);
 
 test('criar sala: código curto e fácil de digitar, token de anfitrião, sala inexistente = 404', async () => {
@@ -166,7 +166,7 @@ test('permissões: anfitrião controla tudo; os demais só as próprias músicas
   // quem não é anfitrião não pula, pausa nem reordena
   assert.equal((await call('POST', `/rooms/${code}/player/skip`, { client: BIA })).status, 403);
   assert.equal((await call('POST', `/rooms/${code}/player/pause`, { client: BIA })).status, 403);
-  assert.equal((await call('POST', `/rooms/${code}/queue/${bia1.item_id}/move`, { client: BIA, body: { direction: 'up' } })).status, 403);
+  assert.equal((await call('POST', `/rooms/${code}/queue/${bia1.item_id}/move`, { client: BIA, body: { direction: 'up' } })).status, 403); // furar a fila: só o anfitrião
   assert.equal((await call('PATCH', `/rooms/${code}`, { client: BIA, body: { fair: true } })).status, 403);
   // token errado também não vale
   assert.equal((await call('POST', `/rooms/${code}/player/skip`, { client: BIA, host: 'x'.repeat(32) })).status, 403);
@@ -209,6 +209,33 @@ test('reordenar: troca com o vizinho; o que está tocando não se move', async (
   assert.deepEqual(queueIds((await move(c.item_id, 'down')).body), [READY_A, READY_B, READY_C]); // última: sem efeito
   assert.equal((await move(a.item_id, 'down')).status, 409); // tocando
   assert.equal((await move(99999, 'up')).status, 404);
+});
+
+test('ceder a vez: o dono adia a própria música em uma posição; subir continua só com o anfitrião', async () => {
+  const { code, host } = await newRoom();
+  await add(code, READY_A, { client: ANA, name: 'Ana' }); // toca
+  const ana = (await add(code, READY_B, { client: ANA, name: 'Ana' })).body;
+  const bia = (await add(code, READY_C, { client: BIA, name: 'Bia' })).body;
+  const order = async () => queueIds((await call('GET', `/rooms/${code}`)).body);
+  const move = (client, itemId, direction, h) => call('POST', `/rooms/${code}/queue/${itemId}/move`, { client, host: h, body: { direction } });
+
+  assert.deepEqual(await order(), [READY_A, READY_B, READY_C]);
+  // a Bia não mexe na música da Ana, nem a Ana na da Bia
+  assert.equal((await move(BIA, ana.item_id, 'down')).status, 403);
+  assert.equal((await move(ANA, bia.item_id, 'down')).status, 403);
+  // a Ana cede a vez: a música dela desce uma posição, a da Bia sobe
+  assert.deepEqual(queueIds((await move(ANA, ana.item_id, 'down')).body), [READY_A, READY_C, READY_B]);
+  // cada ceder adia só uma posição; na última não há para quem ceder (sem efeito)
+  assert.deepEqual(queueIds((await move(ANA, ana.item_id, 'down')).body), [READY_A, READY_C, READY_B]);
+  // o dono não fura a fila: subir é do anfitrião
+  assert.equal((await move(ANA, ana.item_id, 'up')).status, 403);
+  assert.deepEqual(queueIds((await move(ANA, ana.item_id, 'up', host)).body), [READY_A, READY_B, READY_C]);
+  // o que já está tocando não cede a vez
+  assert.equal((await move(ANA, (await call('GET', `/rooms/${code}`)).body.current_item_id, 'down')).status, 409);
+  // quem ficou como próximo mudou junto
+  await move(ANA, ana.item_id, 'down');
+  const state = (await call('GET', `/rooms/${code}`)).body;
+  assert.equal(state.queue.find((i) => i.id === state.next_item_id).added_by, 'Bia');
 });
 
 test('pular, pausar/retomar e remover o que está tocando', async () => {
@@ -272,6 +299,29 @@ test('rodízio justo (opcional): a mesma pessoa não canta duas seguidas', async
   assert.equal(await run(true), READY_C); // a Bia antes da 2ª da Ana
 });
 
+test('próximo cantor: segue a regra da fila (pronta, rodízio justo) e some quando não há quem espere', async () => {
+  const { code, host } = await newRoom();
+  const nextOf = async () => {
+    const state = (await call('GET', `/rooms/${code}`)).body;
+    return state.queue.find((i) => i.id === state.next_item_id)?.added_by ?? null;
+  };
+  assert.equal(await nextOf(), null); // sala vazia
+
+  const a1 = (await add(code, READY_A, { client: ANA, name: 'Ana' })).body;
+  assert.equal(await nextOf(), null); // só há o que está tocando
+
+  await add(code, 'slowSong002', { client: ANA, name: 'Ana' }); // ainda processando: não conta como "próxima"
+  assert.equal(await nextOf(), null);
+
+  await add(code, READY_B, { client: ANA, name: 'Ana' });
+  await add(code, READY_C, { client: BIA, name: 'Bia' });
+  assert.equal(await nextOf(), 'Ana'); // ordem de chegada: a 2ª da Ana (a lenta é pulada)
+
+  await call('PATCH', `/rooms/${code}`, { host, body: { fair: true } });
+  assert.equal(await nextOf(), 'Bia'); // rodízio justo: a Bia antes da 2ª música da Ana
+  assert.equal((await call('GET', `/rooms/${code}`)).body.next_item_id !== a1.item_id, true); // nunca o que toca
+});
+
 test('validações: link, letra, identificação e limites', async () => {
   const { code } = await newRoom();
   assert.equal((await call('POST', `/rooms/${code}/queue`, { body: { url: 'https://example.com/x' } })).status, 400);
@@ -289,6 +339,21 @@ test('validações: link, letra, identificação e limites', async () => {
   assert.equal(over.status, 409);
   assert.equal(over.body.error, 'too_many');
   assert.equal((await add(other.code, READY_B, { client: BIA })).status, 201); // outra pessoa pode
+});
+
+test('artista e nome são obrigatórios para música nova; as já prontas (biblioteca) dispensam', async () => {
+  const { code } = await newRoom();
+  const raw = (body) => call('POST', `/rooms/${code}/queue`, { body });
+  const refused = await raw({ video_id: 'novaMusica1', name: 'Ana' });
+  assert.equal(refused.status, 400);
+  assert.equal(refused.body.error, 'artist_title_required');
+  assert.equal((await raw({ video_id: 'novaMusica1', artist: 'Só o artista' })).status, 400);
+  assert.equal((await raw({ video_id: 'novaMusica1', artist: '   ', title: 'x' })).status, 400); // espaços não valem
+  assert.equal((await raw({ url: 'https://youtu.be/novaMusica1' })).status, 400); // nem por link
+  assert.equal((await raw({ video_id: 'novaMusica1', artist: ' Faouzia ', title: ' Unethical ' })).status, 201);
+  const job = jobs.queue.findLast((j) => j.video_id === 'novaMusica1');
+  assert.deepEqual([job.payload.artist, job.payload.title], ['Faouzia', 'Unethical']); // sem os espaços das pontas
+  assert.equal((await raw({ video_id: READY_A })).status, 201); // biblioteca: já pronta, sem artista/nome
 });
 
 test('adicionar com letra escolhida cria o job com a escolha (e música em cache só troca a letra)', async () => {

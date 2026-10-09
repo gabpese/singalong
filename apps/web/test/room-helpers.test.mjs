@@ -54,3 +54,49 @@ test('splitQueue: o atual vem separado dos que aguardam', () => {
   assert.deepEqual(splitQueue({ current_item_id: null, queue: [{ id: 1 }] }), { current: null, waiting: [{ id: 1 }] });
   assert.deepEqual(splitQueue(null), { current: null, waiting: [] });
 });
+
+test('normalizeText: sem acentos, minúsculas e espaços normalizados', async () => {
+  const { normalizeText } = await import('../public/queue-view.js');
+  assert.equal(normalizeText('  Dó♯  RÉ  Fá '), 'do♯ re fa');
+  assert.equal(normalizeText('Ação'), 'acao');
+  assert.equal(normalizeText(null), '');
+});
+
+const library = [
+  { video_id: 'a', title: "Jack's Lament", artist: 'Danny Elfman' },
+  { video_id: 'b', title: 'Unethical', artist: 'Faouzia' },
+  { video_id: 'c', title: 'LosT', artist: 'Bring Me The Horizon' },
+  { video_id: 'd', title: 'O Cantor e o Taxista', artist: null }, // sem artista
+  { video_id: 'e', title: 'Ré menor', artist: 'Alguém' },
+];
+
+test('filterSongs: artista ou nome, sem acento nem maiúsculas, várias palavras em qualquer ordem', async () => {
+  const { filterSongs } = await import('../public/queue-view.js');
+  const ids = (q) => filterSongs(library, q).map((s) => s.video_id);
+  assert.deepEqual(ids(''), ['a', 'b', 'c', 'd', 'e']); // vazio: tudo
+  assert.deepEqual(ids('   '), ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(ids('faouzia'), ['b']); // por artista
+  assert.deepEqual(ids('UNETHICAL'), ['b']); // por nome, maiúsculas
+  assert.deepEqual(ids('jack'), ['a']);
+  assert.deepEqual(ids('elfman jack'), ['a']); // palavras em qualquer ordem
+  assert.deepEqual(ids('bring horizon'), ['c']);
+  assert.deepEqual(ids('re menor'), ['e']); // "Ré" sem acento
+  assert.deepEqual(ids('alguem'), ['e']); // "Alguém" sem acento
+  assert.deepEqual(ids('taxista'), ['d']); // música sem artista continua achável
+  assert.deepEqual(ids('lost'), ['c']);
+  assert.deepEqual(ids('xyz'), []); // nada
+  assert.deepEqual(ids('faouzia jack'), []); // todas as palavras precisam casar
+  assert.equal(filterSongs(library, '') , library); // sem filtro devolve a própria lista
+});
+
+test('sortSongs: por artista e depois por nome, sem alterar a lista original', async () => {
+  const { sortSongs } = await import('../public/queue-view.js');
+  const sorted = sortSongs(library).map((s) => s.video_id);
+  assert.deepEqual(sorted, ['e', 'c', 'a', 'b', 'd']); // Alguém, Bring, Danny, Faouzia e, por último, a sem artista
+  assert.deepEqual(library.map((s) => s.video_id), ['a', 'b', 'c', 'd', 'e']);
+  // mesmo artista: desempata pelo nome (sem diferenciar maiúsculas nem acentos)
+  const sameArtist = [{ video_id: '1', artist: 'X', title: 'Zebra' }, { video_id: '2', artist: 'x', title: 'Água' }, { video_id: '3', artist: 'X', title: 'Beta' }];
+  assert.deepEqual(sortSongs(sameArtist).map((s) => s.video_id), ['2', '3', '1']);
+  // duas sem artista: ordem pelo nome
+  assert.deepEqual(sortSongs([{ video_id: 'q', title: 'B' }, { video_id: 'w', title: 'A' }]).map((s) => s.video_id), ['w', 'q']);
+});

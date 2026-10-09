@@ -4,3 +4,4 @@ soundfile
 redis>=5
 stable-ts
 langdetect
+librosa

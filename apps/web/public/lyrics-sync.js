@@ -19,11 +19,50 @@ export function locate(cues, t) {
   return { current: -1, next: lo };
 }
 
+/**
+ * Quando a linha termina de ser CANTADA. Letras com tempo só no início (LRC) marcam o fim de uma linha no começo da
+ * seguinte, o que esconde solos e pausas dentro da linha anterior. Uma linha claramente longa demais para o seu texto
+ * (mais de 1,5× a estimativa de ~0,12 s por letra + 2 s) é tratada como cantada na estimativa, seguida de silêncio.
+ * Linhas com duração plausível mantêm o `end` original.
+ */
+export function sungEnd(cue) {
+  const estimate = Math.max(3, 0.12 * (cue.text ?? '').length + 2);
+  return cue.end - cue.start > estimate * 1.5 ? cue.start + estimate : cue.end;
+}
+
 /** Progresso (0..1) dentro da linha, para o preenchimento gradual do texto. */
 export function lineProgress(cue, t) {
-  const span = cue.end - cue.start;
+  const span = sungEnd(cue) - cue.start;
   if (span <= 0) return t >= cue.start ? 1 : 0;
   return Math.min(Math.max((t - cue.start) / span, 0), 1);
+}
+
+export const MIN_GAP_SECONDS = 8; // pausa a partir da qual o cantor recebe o aviso "prepare-se"
+export const GAP_DASHES = 14; // tamanho do aviso: "--------------"
+export const COUNTDOWN_SECONDS = 8; // os traços somem durante os últimos 8 s antes da próxima linha
+
+/**
+ * Se `t` está numa pausa de letra de 8 s ou mais (introdução, solo, ponte), devolve o aviso a mostrar:
+ * { next: índice da próxima linha, remaining: segundos até ela, dashes: quantos traços mostrar }.
+ * Os traços ficam completos e, nos últimos 8 s, vão sumindo: o cantor vê QUANDO a linha vai começar.
+ * Devolve null fora de pausas longas, após a última linha (não há "próxima") e com letra vazia.
+ */
+export function gapDisplay(cues, t) {
+  if (!cues.length) return null;
+  let lo = 0;
+  let hi = cues.length; // primeiro índice com start > t: a próxima linha
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cues[mid].start <= t) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo >= cues.length) return null;
+  const gapStart = lo === 0 ? 0 : sungEnd(cues[lo - 1]); // a introdução conta desde o início da música
+  const gapEnd = cues[lo].start;
+  if (t < gapStart || gapEnd - gapStart < MIN_GAP_SECONDS) return null;
+  const remaining = gapEnd - t;
+  const dashes = remaining >= COUNTDOWN_SECONDS ? GAP_DASHES : Math.max(1, Math.ceil((GAP_DASHES * remaining) / COUNTDOWN_SECONDS));
+  return { next: lo, remaining, dashes };
 }
 
 /**
@@ -46,15 +85,6 @@ export function wordProgress(span, lineP) {
   const width = span.to - span.from;
   if (width <= 0) return lineP >= span.to ? 1 : 0;
   return Math.min(Math.max((lineP - span.from) / width, 0), 1);
-}
-
-/**
- * Parece um link do YouTube (ou um ID de 11 caracteres)? Qualquer outra coisa é tratada como pesquisa.
- * Uma palavra de 11 letras (ex.: "Bohemian...") também casa com o ID: o servidor valida de verdade.
- */
-export function looksLikeLink(value) {
-  const v = String(value ?? '').trim();
-  return /^[\w-]{11}$/.test(v) || /^(https?:\/\/)?([\w-]+\.)?(youtube\.com|youtu\.be)\//i.test(v);
 }
 
 const LYRICS_SOURCES = {

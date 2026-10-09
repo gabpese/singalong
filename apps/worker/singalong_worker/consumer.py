@@ -15,6 +15,7 @@ from pathlib import Path
 
 import redis
 
+from .key import backfill as key_backfill
 from .pipeline import NeedsLyrics, process
 from .search import serve as search_serve
 from .storage import LocalStorage
@@ -139,6 +140,9 @@ def run() -> None:
     threading.Thread(
         target=search_serve, args=(settings.redis_url, settings.cookies, stop_search), name="search", daemon=True
     ).start()
+
+    # músicas processadas antes do recurso de tom ganham o tom em segundo plano (uma vez cada)
+    threading.Thread(target=lambda: key_backfill(storage), name="key-backfill", daemon=True).start()
 
     log.info("worker %s consumindo '%s' (device=%s)", consumer, STREAM, settings.device or "auto")
 
