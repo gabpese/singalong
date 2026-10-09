@@ -7,26 +7,7 @@
   <link rel="icon" href="data:,">
 </head>
 <body class="landing">
-  <main class="landing-page">
-    <h1><span class="icon i-singing" aria-hidden="true"></span>Singalong</h1>
-    <p class="lead">Karaokê de qualquer vídeo do YouTube: o instrumental, a letra sincronizada e a fila da festa.</p>
-
-    <section class="card">
-      <h2>Criar uma sala</h2>
-      <p class="hint">Você será o anfitrião: escolhe a ordem, pula e pausa. A TV abre em outra aba.</p>
-      <button id="create" type="button" class="primary big">Criar sala e abrir a TV</button>
-    </section>
-
-    <section class="card">
-      <h2>Entrar numa sala</h2>
-      <form id="join-form" class="row" autocomplete="off">
-        <input id="join-code" type="text" inputmode="text" maxlength="8" placeholder="Código (ex.: K7QM)" aria-label="Código da sala" required>
-        <button type="submit">Entrar</button>
-      </form>
-    </section>
-
-    <p class="hint" id="status" role="status"></p>
-  </main>
-  <script type="module" src="/src/legacy/landing.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/landing/main.tsx"></script>
 </body>
 </html>
