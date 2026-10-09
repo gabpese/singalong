@@ -4,7 +4,7 @@ from pathlib import Path
 
 from singalong_worker.align import attach_words, clean_lines, group_words
 from singalong_worker.ids import extract_video_id
-from singalong_worker.melody import melody_from_f0
+from singalong_worker.melody import lyric_spans, melody_from_f0
 from singalong_worker.key import MAJOR_PROFILE, MINOR_PROFILE, NOTES, best_key
 from singalong_worker.lyrics import apply_text, parse_cues, parse_lrc, parse_lyrics_file, pick_candidate
 from singalong_worker.search import parse_entries
@@ -19,6 +19,20 @@ class MelodyTests(unittest.TestCase):
         out = melody_from_f0([440.0, 440.0, None, float("nan"), 261.63, 261.63, 0])
         self.assertEqual(out["midi"], [69, 69, -1, -1, 60, 60, -1])
         self.assertEqual(out["hop"], 0.05)
+
+    def test_ignores_leak_and_pauses(self):
+        f0 = [440.0] * 100  # 5 s de "voz" o tempo todo, como o detector enxerga o vazamento
+        energy = [1.0] * 40 + [0.01] * 20 + [1.0] * 40  # 2 s a 3 s: só vazamento (muito baixo)
+        out = melody_from_f0(f0, energy, [(0.0, 1.0), (3.0, 5.0)])  # a letra só canta de 0 a 1 s e de 3 s em diante
+        voiced = [i for i, m in enumerate(out["midi"]) if m >= 0]
+        self.assertEqual(voiced[0], 0)
+        self.assertTrue(all(i <= 20 or i >= 60 for i in voiced))  # nada entre 1 s e 3 s
+        self.assertEqual(out["midi"][25], -1)
+        self.assertEqual(out["midi"][70], 69)
+
+    def test_lyric_spans(self):
+        self.assertIsNone(lyric_spans([]))
+        self.assertEqual(lyric_spans([{"start": 10, "end": 12}]), [(9.75, 12.25)])
 
     def test_drops_isolated_blips(self):
         out = melody_from_f0([None, 440.0, None, 440.0, 440.0, 440.0])

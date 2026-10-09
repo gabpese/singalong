@@ -435,7 +435,7 @@ def process(
             try:
                 t = time.monotonic()
                 log.info("%s: extraindo a melodia da voz", video_id)
-                storage.put(k["melody"], _write_json(work / "melody.json", extract_melody(get_vocals())))
+                storage.put(k["melody"], _write_json(work / "melody.json", extract_melody(get_vocals(), cues)))
                 timings["melody"] = round(time.monotonic() - t, 1)
             except Exception as exc:  # noqa: BLE001 - é um extra: sem ele a música só não pontua
                 log.warning("%s: não consegui extrair a melodia (%s); a música não terá pontuação", video_id, exc)

@@ -55,6 +55,7 @@ export function pitchClassDistance(a, b) {
 
 const FULL = 1; // semitones de tolerância para o acerto inteiro
 const HALF = 2; // ...e para meio acerto
+const HOLD_SECONDS = 0.15; // o detector falha em consoantes e respirações: vale a última nota captada há menos de 150 ms
 const LAG_FRAMES = 4; // o som do microfone chega até 200 ms depois da nota de referência (ouvir, cantar, captar)
 
 /**
@@ -66,12 +67,19 @@ export function createScorer(melody, { transpose = 0 } = {}) {
   let shift = transpose;
   const seen = new Uint8Array(midi.length);
   let counted = 0;
+  let heldNote = null;
+  let heldAt = -Infinity;
   let reference = null; // nota de referência do quadro atual, já no tom escolhido
   let points = 0;
 
   return {
     /** t = posição da música (s); sung = nota MIDI captada no microfone (ou null: silêncio). Devolve a nota ao vivo (0..100) ou null. */
-    tick(t, sung) {
+    tick(t, captured) {
+      if (captured != null) {
+        heldNote = captured;
+        heldAt = t;
+      }
+      const sung = captured ?? (t - heldAt <= HOLD_SECONDS && t >= heldAt ? heldNote : null);
       const idx = Math.floor(t / hop);
       reference = midi[idx] >= 0 ? midi[idx] + shift : null;
       if (idx < 0 || idx >= midi.length || seen[idx]) return this.score();

@@ -65,3 +65,13 @@ test('noteName: nome da nota com a oitava', () => {
   assert.equal(noteName(null), '—');
   assert.equal(noteName(-1), '—');
 });
+
+test('createScorer: segura a última nota por 150 ms (consoantes e respirações não contam como silêncio)', () => {
+  const s = createScorer({ hop: 0.05, midi: [60, 60, 60, 60, 60, 60, 60, 60] });
+  s.tick(0.0, 60);
+  s.tick(0.05, null); // 50 ms: ainda vale a nota segurada
+  s.tick(0.1, null);
+  assert.equal(s.score(), 100);
+  s.tick(0.3, null); // 300 ms depois: silêncio de verdade
+  assert.equal(s.score(), 75);
+});
