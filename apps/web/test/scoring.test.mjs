@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classNameOf, createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../public/scoring.js';
+import { createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../public/scoring.js';
 
 const sine = (hz, sampleRate = 48000, n = 2048, amp = 0.5) => Float32Array.from({ length: n }, (_, i) => amp * Math.sin((2 * Math.PI * hz * i) / sampleRate));
 
@@ -85,7 +85,7 @@ test('createScorer: segura a última nota por 150 ms (consoantes e respirações
   s.tick(0.05, null);
   s.tick(0.1, null);
   assert.equal(s.score(), 100);
-  assert.equal(s.sung, 0); // dó
+  assert.equal(s.sung, 60); // C4
   s.tick(2.5, null); // outro bloco, 2,5 s depois: silêncio de verdade
   assert.equal(s.score(), 75);
 });
@@ -116,14 +116,22 @@ test('createScorer: onBlock e report descrevem a comparação (trecho, nota orig
   const s = createScorer({ hop: 0.05, midi }, { onBlock: (row) => logged.push(row) });
   for (let i = 0; i < midi.length; i += 2) s.tick(i * 0.05 + 0.01, i < FRAMES ? 60 : 62); // acerta o 1º bloco, erra o 2º
   assert.equal(logged.length, 1); // o 2º bloco ainda não terminou
-  assert.deepEqual(logged[0], { trecho: '00:00–00:02', original: 'C4', principais: 'C', cantada: 'C', distancia: 0, acerto: 1, leituras: '20/20', participacao: 1 });
+  assert.deepEqual(logged[0], { trecho: '00:00–00:02', original: 'C4', principais: 'C', cantada: 'C4', distancia: 0, acerto: 1, leituras: '20/20', participacao: 1 });
   const [first, second] = s.report();
   assert.equal(first.trecho, '00:00–00:02');
-  assert.deepEqual([second.trecho, second.original, second.cantada, second.distancia, second.acerto], ['00:02–00:04', 'G4', 'D', 5, 0]);
+  assert.deepEqual([second.trecho, second.original, second.cantada, second.distancia, second.acerto], ['00:02–00:04', 'G4', 'D4', 5, 0]);
 });
 
 test('createScorer: se a original passa por várias notas no bloco, vale a mais frequente (não zero)', () => {
   const wandering = [...hold(60, 14), ...hold(63, 13), ...hold(66, 13)]; // nenhuma chega a 40% do bloco
   assert.equal(run(wandering, () => 60).score(), 100);
   assert.equal(run(wandering, () => 60).report()[0].principais, 'C');
+});
+
+test('createScorer: a nota cantada mostrada tem a oitava de quem canta', () => {
+  const s = createScorer({ hop: 0.05, midi: hold(57, FRAMES) }); // original: A3
+  for (let i = 0; i < FRAMES; i += 2) s.tick(i * 0.05 + 0.01, i < 10 ? 57 : 69); // a pessoa canta A4 na maior parte
+  assert.equal(noteName(s.reference), 'A3');
+  assert.equal(noteName(s.sung), 'A4');
+  assert.equal(s.score(), 100); // a oitava não muda a pontuação
 });

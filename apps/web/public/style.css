@@ -370,3 +370,4 @@ h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .1
 .scoreboard li { display: flex; gap: 6px; align-items: baseline; }
 .scoreboard .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scoreboard .points { color: var(--accent); font-variant-numeric: tabular-nums; }
+.score-hud small b { color: var(--fg); }

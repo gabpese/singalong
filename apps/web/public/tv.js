@@ -4,7 +4,7 @@ import { icon } from './icons.js';
 import { api, connectRoom, parseRoomCode } from './identity.js';
 import { keySummary } from './music.js';
 import { nextUp, playOrder, songChip, splitQueue } from './queue-view.js';
-import { classNameOf, createScorer, noteName, openMic } from './scoring.js';
+import { createScorer, noteName, openMic } from './scoring.js';
 import { finalMessage, MIN_SCORED_FRAMES } from './score-view.js';
 import qrcode from './vendor/qrcode/qrcode.mjs';
 
@@ -102,6 +102,7 @@ async function prepareScoring(state, current) {
   if (!state.scoring) return stopScoring();
   els.hud.hidden = !current;
   if (!current) return;
+  shownNotes = '';
   els.scoreHint.textContent = melodyUrl ? '' : 'sem melodia de referência para esta música';
   if (!melodyUrl) {
     scorer = null;
@@ -129,6 +130,7 @@ async function prepareScoring(state, current) {
       ),
     });
   } catch {
+    shownNotes = '';
     els.scoreHint.textContent = 'não consegui carregar a melodia';
     return;
   }
@@ -139,7 +141,19 @@ async function prepareScoring(state, current) {
       micFailed = true;
     }
   }
+  shownNotes = '';
   els.scoreHint.textContent = micFailed ? 'microfone indisponível (permita o acesso e abra a TV por http://localhost:3000)' : '';
+}
+
+let shownNotes = '';
+
+/** "Original: <b>F#3</b> / Você: <b>F#4</b>" (só mexe no DOM quando uma das notas muda). */
+function showNotes(original, sung) {
+  const key = `${original}|${sung}`;
+  if (key === shownNotes) return;
+  shownNotes = key;
+  const bold = (text) => Object.assign(document.createElement('b'), { textContent: text });
+  els.scoreHint.replaceChildren('Original: ', bold(original), document.createElement('br'), 'Você: ', bold(sung));
 }
 
 // ~10 leituras por segundo: compara o tom cantado com a melodia no instante atual da música
@@ -148,7 +162,7 @@ setInterval(() => {
   const { midi } = mic.read();
   const live = scorer.tick(engine.currentTime, midi);
   els.scoreNow.textContent = live ?? 0;
-  els.scoreHint.textContent = `original ${noteName(scorer.reference)} (a cada 2 s) · você ${classNameOf(scorer.sung)}`; // a nota que vale: a mais cantada no bloco
+  showNotes(noteName(scorer.reference), noteName(scorer.sung));
 }, 100);
 
 /** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */
