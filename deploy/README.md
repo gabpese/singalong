@@ -15,6 +15,20 @@ Um próximo passo (não feito) seria um armazenamento compartilhado (S3) para o 
 > **Direitos autorais.** O repositório é **público**: as músicas (`storage/`) nunca entram nele nem na imagem. Elas vão por SSH direto
 > para a **sua** VM. Mantenha o endereço da VM só com quem você quer.
 
+## Como não gastar nada (leia antes de clicar)
+
+A conta nova da Oracle começa em **Free Trial** (créditos por 30 dias) e **não é atualizada sozinha** para paga: segundo a
+[documentação oficial](https://docs.oracle.com/iaas/Content/FreeTier/freetier.htm), o cartão só é cobrado se **você** fizer o *Upgrade*.
+Depois do período de teste, o que é **Always Free** continua funcionando; o resto é desativado. Regras:
+
+1. **Nunca clique em "Upgrade"** (o aviso amarelo no topo do painel).
+2. **Só crie recursos com o selo "Always Free-eligible"** (a tela de criação mostra). Se não tem o selo, não crie.
+3. **VM de no máximo 2 OCPU e 12 GB** (Ampere A1). Acima do limite gratuito, as VMs são **desativadas** e apagadas depois de 30 dias.
+4. **Não crie:** NAT Gateway, Load Balancer, volumes extras (o disco da VM e mais os extras somam no máximo 200 GB), banco de dados, nem **IP reservado**.
+5. **Orçamento de alerta (recomendado):** *Billing & Cost Management → Budgets → Create budget*, valor US$ 1, alerta em 1%. Ele só **avisa** por e-mail (não bloqueia),
+   mas denuncia qualquer cobrança no primeiro centavo.
+6. **Entre no painel pelo menos uma vez a cada 60 dias**: contas gratuitas sem uso podem ser desativadas, e VMs ociosas por muito tempo, reclamadas.
+
 ## Passo a passo
 
 ### 1. Conta e VM na Oracle (você faz; leva ~20 min)
@@ -25,7 +39,8 @@ Um próximo passo (não feito) seria um armazenamento compartilhado (S3) para o 
    - **Forma (shape):** `VM.Standard.A1.Flex` (ARM) com **2 OCPU e 12 GB** (o limite gratuito atual). Se aparecer *Out of capacity*, tente de novo mais tarde ou outra
      zona de disponibilidade; como alternativa, `VM.Standard.E2.1.Micro` (AMD, 1 GB), que também serve para a API.
    - **Chave SSH:** deixe a Oracle gerar e **baixe a chave privada** (`.key`/`.pem`). Guarde bem.
-4. Depois de criada, anote o **IP público**. Em *Networking → Reserved public IPs* reserve um IP e associe à VM, para ele **não mudar**.
+4. Depois de criada, anote o **IP público** (o que a VM recebe sozinha, o "efêmero": é grátis e dura enquanto a VM existir, mesmo ao desligar e ligar).
+   **Não reserve um IP** (*Reserved public IPs*): as fontes indicam que o IP reservado pode ser cobrado. Se você recriar a VM, o IP muda e basta atualizar o DuckDNS.
 5. Libere as portas: *Networking → Virtual cloud networks → sua VCN → Subnet → Security List → Add Ingress Rules*:
    origem `0.0.0.0/0`, protocolo TCP, portas **80** e **443**.
 
