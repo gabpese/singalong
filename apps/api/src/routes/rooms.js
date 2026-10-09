@@ -91,6 +91,13 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
     return result.state;
   });
 
+  app.post('/rooms/:code/player/seek', {
+    schema: {
+      params: { type: 'object', properties: { code: CODE_PARAM } },
+      body: { type: 'object', additionalProperties: false, properties: { seconds: { type: 'integer', minimum: -120, maximum: 120 } }, required: ['seconds'] },
+    },
+  }, async (request) => (await rooms.seek(request.params.code, request.body.seconds, actorOf(request))).state);
+
   app.put('/rooms/:code/songs/:videoId/offset', {
     schema: {
       params: {

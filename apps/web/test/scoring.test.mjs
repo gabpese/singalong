@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createScorer, detectPitch, hzToMidi, pitchClassDistance, rms } from '../public/scoring.js';
+import { createScorer, detectPitch, hzToMidi, noteName, pitchClassDistance, rms } from '../public/scoring.js';
 
 const sine = (hz, sampleRate = 48000, n = 2048, amp = 0.5) => Float32Array.from({ length: n }, (_, i) => amp * Math.sin((2 * Math.PI * hz * i) / sampleRate));
 
@@ -56,4 +56,12 @@ test('createScorer: tolera o atraso do microfone (a nota certa chega até 200 ms
   s.tick(0.01, 60);
   s.tick(0.21, 60); // a referência já mudou para 67, mas o cantor ainda termina a nota anterior
   assert.equal(s.score(), 100);
+});
+
+test('noteName: nome da nota com a oitava', () => {
+  assert.equal(noteName(69), 'A4');
+  assert.equal(noteName(60), 'C4');
+  assert.equal(noteName(61.4), 'C#4');
+  assert.equal(noteName(null), '—');
+  assert.equal(noteName(-1), '—');
 });

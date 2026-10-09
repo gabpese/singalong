@@ -1,5 +1,9 @@
 // Pontuação por afinação: compara o tom captado no microfone com a melodia da voz original (melody.json do worker).
 
+const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+/** "A4" para a nota MIDI 69 (ou "—" sem nota). */
+export const noteName = (midi) => (midi == null || midi < 0 ? '—' : `${NAMES[((Math.round(midi) % 12) + 12) % 12]}${Math.floor(Math.round(midi) / 12) - 1}`);
+
 export const hzToMidi = (hz) => 69 + 12 * Math.log2(hz / 440);
 
 /** Volume (RMS) de um bloco de áudio. */
@@ -62,12 +66,14 @@ export function createScorer(melody, { transpose = 0 } = {}) {
   let shift = transpose;
   const seen = new Uint8Array(midi.length);
   let counted = 0;
+  let reference = null; // nota de referência do quadro atual, já no tom escolhido
   let points = 0;
 
   return {
     /** t = posição da música (s); sung = nota MIDI captada no microfone (ou null: silêncio). Devolve a nota ao vivo (0..100) ou null. */
     tick(t, sung) {
       const idx = Math.floor(t / hop);
+      reference = midi[idx] >= 0 ? midi[idx] + shift : null;
       if (idx < 0 || idx >= midi.length || seen[idx]) return this.score();
       seen[idx] = 1;
       if (midi[idx] < 0) return this.score(); // sem voz no original: nada a avaliar
@@ -85,6 +91,7 @@ export function createScorer(melody, { transpose = 0 } = {}) {
     setTranspose(semitones) { shift = semitones; },
     /** Nota 0..100 (null enquanto não houve nenhum quadro avaliado). */
     score: () => (counted ? Math.round((100 * points) / counted) : null),
+    get reference() { return reference; },
     get evaluated() { return counted; },
   };
 }

@@ -475,3 +475,16 @@ test('a melodia de referência só aparece quando existe no cache', async () => 
   assert.match(queue.find((i) => i.video_id === READY_B).song.media.melody, /melody\.json$/);
   assert.ok(a.item_id);
 });
+
+test('avançar/voltar a música: só o anfitrião, só com música tocando, e quem executa é a TV', async () => {
+  const { code, host } = await newRoom();
+  const tv = fakeConn(code, { role: 'tv' });
+  const ctrl = fakeConn(code);
+  assert.equal((await call('POST', `/rooms/${code}/player/seek`, { host, body: { seconds: 10 } })).status, 200); // nada tocando: ignorado
+  const a = (await add(code, READY_A)).body;
+  assert.equal((await call('POST', `/rooms/${code}/player/seek`, { client: BIA, body: { seconds: 10 } })).status, 403);
+  assert.equal((await call('POST', `/rooms/${code}/player/seek`, { host, body: { seconds: 999 } })).status, 400);
+  assert.equal((await call('POST', `/rooms/${code}/player/seek`, { host, body: { seconds: -10 } })).status, 200);
+  assert.deepEqual(tv.sent.filter((m) => m.type === 'seek'), [{ type: 'seek', item_id: a.item_id, seconds: -10 }]);
+  assert.equal(ctrl.sent.filter((m) => m.type === 'seek').length, 0);
+});

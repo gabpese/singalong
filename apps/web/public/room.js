@@ -260,6 +260,8 @@ function renderNow(current) {
       isHost() ? [
         h('button', { type: 'button', onclick: () => act('POST', `/player/${state.playback === 'paused' ? 'resume' : 'pause'}`).catch(() => {}) },
           state.playback === 'paused' ? 'Retomar' : 'Pausar'),
+        h('button', { type: 'button', 'aria-label': 'Voltar 10 segundos', onclick: () => act('POST', '/player/seek', { seconds: -10 }).catch(() => {}) }, '⏪ 10s'),
+        h('button', { type: 'button', 'aria-label': 'Avançar 10 segundos', onclick: () => act('POST', '/player/seek', { seconds: 10 }).catch(() => {}) }, '10s ⏩'),
         h('button', { type: 'button', onclick: () => act('POST', '/player/skip').catch(() => {}) }, 'Pular'),
       ] : null,
       pitchControl(current)),

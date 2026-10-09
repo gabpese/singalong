@@ -4,7 +4,7 @@ import { icon } from './icons.js';
 import { api, connectRoom, parseRoomCode } from './identity.js';
 import { keySummary } from './music.js';
 import { nextUp, playOrder, songChip, splitQueue } from './queue-view.js';
-import { createScorer, openMic } from './scoring.js';
+import { createScorer, noteName, openMic } from './scoring.js';
 import { finalMessage, MIN_SCORED_FRAMES } from './score-view.js';
 import qrcode from './vendor/qrcode/qrcode.mjs';
 
@@ -138,8 +138,10 @@ async function prepareScoring(state, current) {
 // ~20 leituras por segundo: compara o tom cantado com a melodia no instante atual da música
 setInterval(() => {
   if (!scorer || !mic || !engine.playing || engine.loadedId !== scorerFor) return;
-  const live = scorer.tick(engine.currentTime, mic.read().midi);
+  const { midi } = mic.read();
+  const live = scorer.tick(engine.currentTime, midi);
   els.scoreNow.textContent = live ?? 0;
+  els.scoreHint.textContent = `você ${noteName(midi)} · original ${noteName(scorer.reference)}`; // para ver onde a nota se perde
 }, 50);
 
 /** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */
@@ -172,6 +174,12 @@ function showFinal(score, singer) {
 
 const connection = connectRoom(code, 'tv', {
   onMessage(message) {
+    if (message.type === 'seek') {
+      if (message.item_id !== engine.loadedId || !engine.duration) return;
+      engine.seek(Math.min(Math.max(engine.currentTime + message.seconds, 0), engine.duration - 0.5));
+      connection.send({ type: 'position', item_id: engine.loadedId, ms: Math.round(engine.currentTime * 1000) });
+      return;
+    }
     if (message.type !== 'state') return;
     latest = message.state;
     if (!els.final.hidden) renderFinalBoard();

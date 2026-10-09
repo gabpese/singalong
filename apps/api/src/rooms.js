@@ -347,6 +347,16 @@ export function createRoomService({
       });
     },
 
+    /** Avança ou volta a música que está tocando (só o anfitrião). Quem executa é a TV, dona da posição. */
+    seek(code, seconds, actor) {
+      return mutate(code, actor, (room) => {
+        requireHost(room, actor);
+        if (!room.current_item_id) return;
+        const itemId = room.current_item_id;
+        hub.broadcast(room.code, (conn) => (conn.role === 'tv' ? { type: 'seek', item_id: itemId, seconds } : null));
+      });
+    },
+
     setPlayback(code, playing, actor) {
       return mutate(code, actor, (room) => {
         requireHost(room, actor);
