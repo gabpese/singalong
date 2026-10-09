@@ -4,7 +4,7 @@ import { icon } from './icons.js';
 import { api, connectRoom, parseRoomCode } from './identity.js';
 import { keySummary } from './music.js';
 import { nextUp, playOrder, songChip, splitQueue } from './queue-view.js';
-import { createScorer, noteName, openMic } from './scoring.js';
+import { classNameOf, createScorer, noteName, openMic } from './scoring.js';
 import { finalMessage, MIN_SCORED_FRAMES } from './score-view.js';
 import qrcode from './vendor/qrcode/qrcode.mjs';
 
@@ -141,7 +141,7 @@ setInterval(() => {
   const { midi } = mic.read();
   const live = scorer.tick(engine.currentTime, midi);
   els.scoreNow.textContent = live ?? 0;
-  els.scoreHint.textContent = `você ${noteName(midi)} · original ${noteName(scorer.reference)}`; // para ver onde a nota se perde
+  els.scoreHint.textContent = `original ${noteName(scorer.reference)} (a cada 2 s) · você ${classNameOf(scorer.sung)}`; // a nota que vale: a mais cantada no bloco
 }, 100);
 
 /** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */

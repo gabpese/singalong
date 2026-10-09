@@ -55,16 +55,14 @@ export function pitchClassDistance(a, b) {
 
 const FULL = 1; // semitones de tolerância para o acerto inteiro (voz humana oscila: vibrato, escorregadas)
 const HALF = 2; // ...e para meio acerto
-const WINDOW_FRAMES = 40; // a nota vale por trechos de 2 s: a melodia original muda várias vezes por segundo e ninguém acompanha cada troca
-const WINDOW_FULL = 0.7; // trecho em que 70% ou mais das notas detectadas estão certas conta inteiro
-const WINDOW_HALF = 0.45; // ...com 45% ou mais, conta metade
+const BLOCK_SECONDS = 2; // a nota é conferida uma vez a cada 2 s: a melodia original muda várias vezes por segundo e ninguém acompanha cada troca
+const MAIN_SHARE = 0.4; // notas que a original sustenta por pelo menos 40% do bloco são as "principais" dele
+const MIN_REF_FRAMES = 10; // bloco com menos de 0,5 s de voz na original não é cobrado
 // O detector de tom falha em muitos quadros de uma voz real (consoantes, respiração, voz fraca). Por isso a nota separa
-// "estava cantando?" (quadros com tom detectado) de "estava no tom?" (acertos entre os detectados): detectar em 40% dos
+// "estava cantando?" (quadros com tom detectado) de "estava no tom?" (a nota mais cantada do bloco): detectar em 40% dos
 // quadros com voz já é participação total, e a falha do detector não vira erro do cantor.
-const PARTICIPATION_FULL = 0.4
+const PARTICIPATION_FULL = 0.4;
 const HOLD_SECONDS = 0.15; // o detector falha em consoantes e respirações: vale a última nota captada há menos de 150 ms
-const LAG_FRAMES = 2; // a nota cantada pode vir até 100 ms depois da de referência (ouvir, cantar, captar) ...
-const LEAD_FRAMES = 2; // ...ou 100 ms antes. Folga maior faz qualquer nota acertar alguma da melodia, que varia várias vezes por segundo
 
 const median = (values) => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -109,24 +107,52 @@ export function smoothMelody(midi, { minFrames = 6 } = {}) {
   return result;
 }
 
+const pitchClass = (midiNote) => ((Math.round(midiNote) % 12) + 12) % 12;
+const mostFrequent = (counts) => [...counts].reduce((best, entry) => (!best || entry[1] > best[1] ? entry : best), null)?.[0] ?? null;
+
+/** Nome da nota sem a oitava ("A" para 69, 57, 81...). */
+export const classNameOf = (pc) => (pc == null ? '—' : NAMES[pc]);
+
 /**
- * Acompanha a música quadro a quadro (50 ms). `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
- * Só contam os quadros em que a voz original canta; quadros já avaliados (seek para trás) não contam duas vezes.
- * Os quadros se agrupam em trechos de 2 s, e cada trecho vale pela fração de acertos dele (ver WINDOW_*).
+ * Pontua a música em blocos de 2 s. `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
+ * Em cada bloco confere UMA nota: a que o cantor mais cantou contra as notas principais que a original sustenta nele,
+ * ignorando a oitava. Só contam os quadros em que a voz original canta; quadros já avaliados (seek) não contam duas vezes.
  */
 export function createScorer(melody, { transpose = 0 } = {}) {
   const { hop } = melody;
   const midi = smoothMelody(melody.midi); // a referência é a melodia estável, não a crua
+  const blockFrames = Math.round(BLOCK_SECONDS / hop);
   let shift = transpose;
   const seen = new Uint8Array(midi.length);
+  const blocks = new Map(); // bloco -> { n: leituras com voz na original, heard: leituras com tom detectado, hist: nota (0..11) -> leituras }
+  const refCache = new Map(); // bloco -> { display: nota mais frequente, classes: [notas principais] } | null
   let counted = 0;
   let heldNote = null;
   let heldAt = -Infinity;
-  let reference = null; // nota de referência do quadro atual, já no tom escolhido
-  const windows = new Map(); // trecho -> { n: quadros com voz no original, heard: quadros com tom detectado, hit: pontos de acerto }
+  let reference = null; // nota de referência do bloco atual, já no tom escolhido
+  let sungNow = null; // nota que o cantor mais cantou no bloco atual
+
+  function refOf(block) {
+    if (refCache.has(block)) return refCache.get(block);
+    const notes = new Map();
+    const classes = new Map();
+    let voiced = 0;
+    for (let i = block * blockFrames; i < Math.min(midi.length, (block + 1) * blockFrames); i++) {
+      if (midi[i] < 0) continue;
+      voiced++;
+      notes.set(midi[i], (notes.get(midi[i]) ?? 0) + 1);
+      classes.set(pitchClass(midi[i]), (classes.get(pitchClass(midi[i])) ?? 0) + 1);
+    }
+    const info = voiced < MIN_REF_FRAMES ? null : {
+      display: mostFrequent(notes),
+      classes: [...classes].filter(([, count]) => count >= voiced * MAIN_SHARE).map(([pc]) => pc),
+    };
+    refCache.set(block, info);
+    return info;
+  }
 
   return {
-    /** t = posição da música (s); sung = nota MIDI captada no microfone (ou null: silêncio). Devolve a nota ao vivo (0..100) ou null. */
+    /** t = posição da música (s); captured = nota MIDI captada no microfone (ou null: silêncio). Devolve a nota ao vivo (0..100) ou null. */
     tick(t, captured) {
       if (captured != null) {
         heldNote = captured;
@@ -134,21 +160,20 @@ export function createScorer(melody, { transpose = 0 } = {}) {
       }
       const sung = captured ?? (t - heldAt <= HOLD_SECONDS && t >= heldAt ? heldNote : null);
       const idx = Math.floor(t / hop);
-      reference = midi[idx] >= 0 ? midi[idx] + shift : null;
-      if (idx < 0 || idx >= midi.length || seen[idx]) return this.score();
+      const block = Math.floor(idx / blockFrames);
+      const ref = idx >= 0 && idx < midi.length ? refOf(block) : null;
+      reference = ref ? ref.display + shift : null;
+      sungNow = mostFrequent(blocks.get(block)?.hist ?? new Map());
+      if (!ref || midi[idx] < 0 || seen[idx]) return this.score();
       seen[idx] = 1;
-      if (midi[idx] < 0) return this.score(); // sem voz no original: nada a avaliar
       counted++;
-      const win = windows.get(Math.floor(idx / WINDOW_FRAMES)) ?? { n: 0, heard: 0, hit: 0 };
-      windows.set(Math.floor(idx / WINDOW_FRAMES), win);
-      win.n++;
+      const blk = blocks.get(block) ?? { n: 0, heard: 0, hist: new Map() };
+      blocks.set(block, blk);
+      blk.n++;
       if (sung != null) {
-        win.heard++;
-        let best = Infinity;
-        for (let j = idx - LAG_FRAMES; j <= idx + LEAD_FRAMES; j++) {
-          if (midi[j] >= 0) best = Math.min(best, pitchClassDistance(sung, midi[j] + shift));
-        }
-        win.hit += best <= FULL ? 1 : best <= HALF ? 0.5 : 0;
+        blk.heard++;
+        blk.hist.set(pitchClass(sung), (blk.hist.get(pitchClass(sung)) ?? 0) + 1);
+        sungNow = mostFrequent(blk.hist);
       }
       return this.score();
     },
@@ -156,17 +181,21 @@ export function createScorer(melody, { transpose = 0 } = {}) {
     setTranspose(semitones) { shift = semitones; },
     /** Nota 0..100 (null enquanto não houve nenhum quadro avaliado). */
     score() {
-      if (!counted) return null;
+      let total = 0;
       let points = 0;
-      for (const { n, heard, hit } of windows.values()) {
-        if (!heard) continue;
-        const accuracy = hit / heard;
-        const participation = Math.min(1, heard / n / PARTICIPATION_FULL);
-        points += n * participation * (accuracy >= WINDOW_FULL ? 1 : accuracy >= WINDOW_HALF ? 0.5 : 0);
+      for (const [block, { n, heard, hist }] of blocks) {
+        total += n;
+        const ref = refOf(block);
+        if (!heard || !ref) continue;
+        const sungClass = mostFrequent(hist);
+        const dist = Math.min(...ref.classes.map((pc) => pitchClassDistance(sungClass, pc + shift)));
+        const accuracy = dist <= FULL ? 1 : dist <= HALF ? 0.5 : 0;
+        points += n * Math.min(1, heard / n / PARTICIPATION_FULL) * accuracy;
       }
-      return Math.round((100 * points) / counted);
+      return total ? Math.round((100 * points) / total) : null;
     },
     get reference() { return reference; },
+    get sung() { return sungNow; },
     get evaluated() { return counted; },
   };
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../public/scoring.js';
+import { classNameOf, createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../public/scoring.js';
 
 const sine = (hz, sampleRate = 48000, n = 2048, amp = 0.5) => Float32Array.from({ length: n }, (_, i) => amp * Math.sin((2 * Math.PI * hz * i) / sampleRate));
 
@@ -27,47 +27,66 @@ test('pitchClassDistance ignora a oitava e é circular', () => {
 });
 
 const hold = (note, frames) => Array(frames).fill(note);
-const melody = { hop: 0.05, midi: [...hold(60, 8), ...hold(-1, 2), ...hold(64, 8), ...hold(-1, 2), ...hold(67, 8)] }; // notas de 0,4 s e pausas
+const FRAMES = 40; // um bloco de 2 s tem 40 quadros de 50 ms
 
-test('createScorer: acertar tudo = 100, silêncio = 0, só contam os quadros com voz', () => {
-  const sing = (fn, opts) => {
-    const s = createScorer(melody, opts);
-    melody.midi.forEach((_, i) => s.tick(i * 0.05 + 0.01, fn(melody.midi[i])));
-    return s;
-  };
-  assert.equal(sing((m) => (m < 0 ? null : m)).score(), 100);
-  assert.equal(sing(() => null).score(), 0);
-  assert.equal(sing((m) => (m < 0 ? null : m)).evaluated, 24);
-  assert.equal(sing((m) => (m < 0 ? null : m + 12)).score(), 100); // uma oitava acima também vale
+/** Roda o cantor `sing(quadro, notaDaOriginal)` pela música inteira lendo o microfone a cada 100 ms. */
+function run(midi, sing, opts) {
+  const s = createScorer({ hop: 0.05, midi }, opts);
+  for (let i = 0; i < midi.length; i += 2) s.tick(i * 0.05 + 0.01, sing(i, midi[i]));
+  return s;
+}
+const steady = [...hold(60, FRAMES), ...hold(67, FRAMES), ...hold(-1, 10), ...hold(64, FRAMES)]; // 3 notas e uma pausa
+
+test('createScorer: acertar tudo = 100, silêncio = 0, só contam os quadros com voz na original', () => {
+  assert.equal(run(steady, (i, m) => (m < 0 ? null : m)).score(), 100);
+  assert.equal(run(steady, () => null).score(), 0);
+  assert.equal(run(steady, (i, m) => (m < 0 ? null : m)).evaluated, 60); // 120 quadros com voz, lidos de 2 em 2
+  assert.equal(run(steady, (i, m) => (m < 0 ? null : m + 12)).score(), 100); // uma oitava acima também vale
 });
 
-test('createScorer: nota errada não pontua, quase certa vale metade', () => {
-  const long = { hop: 0.05, midi: Array(40).fill(60) };
-  const sing = (offset) => {
-    const s = createScorer(long);
-    for (let i = 0; i < 40; i++) s.tick(i * 0.05 + 0.01, 60 + offset);
-    return s.score();
-  };
+test('createScorer: confere UMA nota por bloco de 2 s e ignora as trocas dentro dele', () => {
+  // a original varia dentro do bloco (60 por 60% do tempo, 62 pelo resto); quem canta a nota principal acerta
+  const wobbling = [...hold(60, 24), ...hold(62, 16)];
+  const s = run(wobbling, (i, m) => m);
+  assert.equal(s.score(), 100);
+  assert.equal(s.reference, 60); // a "original" mostrada é uma só durante o bloco
+});
+
+test('createScorer: nota errada não pontua, quase certa vale metade, falhas do detector não punem', () => {
+  const sing = (offset, every = 1) => run(hold(60, FRAMES * 2), (i) => (i % (2 * every) === 0 ? 60 + offset : null)).score();
   assert.equal(sing(5), 0); // quinta errada
   assert.equal(sing(2), 50); // quase: meio ponto
   assert.equal(sing(1), 100);
+  assert.equal(sing(0, 2), 100); // o detector só pega metade das leituras
+  assert.ok(sing(0, 20) < 40); // quase mudo: 1 leitura em 20 (com a nota segurada, ~10% dos quadros)
 });
 
 test('createScorer: o tom escolhido desloca a melodia e um quadro não conta duas vezes', () => {
-  const s = createScorer(melody, { transpose: 2 });
+  const s = createScorer({ hop: 0.05, midi: hold(60, FRAMES) }, { transpose: 2 });
   s.tick(0.01, 62);
   s.tick(0.02, 40); // mesmo quadro: ignorado
   assert.equal(s.score(), 100);
   assert.equal(s.evaluated, 1);
   assert.equal(s.reference, 62);
-  assert.equal(createScorer(melody).score(), null);
+  assert.equal(createScorer({ hop: 0.05, midi: hold(60, FRAMES) }).score(), null);
 });
 
-test('createScorer: tolera o atraso do microfone (a nota certa chega até 100 ms depois)', () => {
-  const s = createScorer({ hop: 0.05, midi: [...hold(60, 10), ...hold(67, 10)] });
-  s.tick(0.01, 60);
-  s.tick(0.51, 60); // a referência já mudou para 67, mas o cantor ainda termina a nota anterior
+test('createScorer: cantar uma nota fixa por cima de uma melodia que varia não rende nota alta', () => {
+  const notes = [60, 67, 64, 69, 62, 66, 65, 70];
+  const midi = Array.from({ length: 320 }, (_, i) => notes[Math.floor(i / FRAMES) % notes.length]); // uma nota por bloco
+  assert.ok(run(midi, () => 60).score() < 40);
+  assert.equal(run(midi, (i, m) => m).score(), 100);
+});
+
+test('createScorer: segura a última nota por 150 ms (consoantes e respirações não contam como silêncio)', () => {
+  const s = createScorer({ hop: 0.05, midi: hold(60, FRAMES * 2) });
+  s.tick(0.0, 60);
+  s.tick(0.05, null);
+  s.tick(0.1, null);
   assert.equal(s.score(), 100);
+  assert.equal(s.sung, 0); // dó
+  s.tick(2.5, null); // outro bloco, 2,5 s depois: silêncio de verdade
+  assert.equal(s.score(), 75);
 });
 
 test('noteName: nome da nota com a oitava', () => {
@@ -76,53 +95,6 @@ test('noteName: nome da nota com a oitava', () => {
   assert.equal(noteName(61.4), 'C#4');
   assert.equal(noteName(null), '—');
   assert.equal(noteName(-1), '—');
-});
-
-test('createScorer: segura a última nota por 150 ms (consoantes e respirações não contam como silêncio)', () => {
-  const s = createScorer({ hop: 0.05, midi: Array(60).fill(60) });
-  s.tick(0.0, 60);
-  s.tick(0.05, null); // 50 ms: ainda vale a nota segurada
-  s.tick(0.1, null);
-  assert.equal(s.score(), 100);
-  s.tick(2.5, null); // 2,5 s depois, em outro trecho: silêncio de verdade
-  assert.equal(s.score(), 75);
-});
-
-test('createScorer: pontua por trechos de 2 s, então errar um instante no meio de um trecho não derruba a nota', () => {
-  const s = createScorer({ hop: 0.05, midi: Array(12).fill(60) });
-  for (let i = 0; i < 12; i++) s.tick(i * 0.05 + 0.01, i === 2 || i === 8 ? 90 : 60); // um deslize em cada trecho
-  assert.equal(s.score(), 100);
-});
-
-test('createScorer: falhas do detector (quadros sem tom) não viram erro de quem canta certo', () => {
-  const s = createScorer({ hop: 0.05, midi: Array(80).fill(60) });
-  for (let i = 0; i < 80; i++) s.tick(i * 0.05 + 0.01, i % 2 === 0 ? 60 : null); // detecta só metade dos quadros
-  assert.equal(s.score(), 100);
-  const quiet = createScorer({ hop: 0.05, midi: Array(80).fill(60) });
-  for (let i = 0; i < 80; i++) quiet.tick(i * 0.05 + 0.01, i % 40 === 0 ? 60 : null); // quase mudo: só 10% dos quadros (com a nota segurada)
-  assert.ok(quiet.score() < 40);
-});
-
-test('createScorer: tolera 1 semitom de erro (voz humana oscila) e dá meio ponto até 2', () => {
-  const s = createScorer({ hop: 0.05, midi: Array(6).fill(60) });
-  for (let i = 0; i < 6; i++) s.tick(i * 0.05 + 0.01, 60.9);
-  assert.equal(s.score(), 100);
-  const off = createScorer({ hop: 0.05, midi: Array(6).fill(60) });
-  for (let i = 0; i < 6; i++) off.tick(i * 0.05 + 0.01, 61.7);
-  assert.equal(off.score(), 50);
-});
-
-test('createScorer: cantar uma nota fixa por cima de uma melodia que varia não rende nota alta', () => {
-  const notes = [60, 67, 62, 69, 64, 71, 65, 72];
-  const midi = Array.from({ length: 320 }, (_, i) => notes[Math.floor(i / 20) % notes.length]); // cada nota dura 1 s
-  const drone = createScorer({ hop: 0.05, midi });
-  const singer = createScorer({ hop: 0.05, midi });
-  for (let i = 0; i < 320; i++) {
-    drone.tick(i * 0.05 + 0.01, 60);
-    singer.tick(i * 0.05 + 0.01, midi[i]);
-  }
-  assert.ok(drone.score() < 40, `nota fixa: ${drone.score()}`);
-  assert.equal(singer.score(), 100);
 });
 
 test('smoothMelody: vibrato, picos do detector e trechos curtos viram notas estáveis', () => {
