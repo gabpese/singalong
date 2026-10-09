@@ -111,9 +111,14 @@ test('createScorer: tolera 1 semitom de erro (voz humana oscila) e dá meio pont
 });
 
 test('createScorer: cantar uma nota fixa por cima de uma melodia que varia não rende nota alta', () => {
-  const notes = [60, 64, 67, 71, 62, 66, 69, 73];
-  const midi = Array.from({ length: 160 }, (_, i) => notes[Math.floor(i / 3) % notes.length]); // troca a cada 150 ms
-  const s = createScorer({ hop: 0.05, midi });
-  for (let i = 0; i < 160; i++) s.tick(i * 0.05 + 0.01, 60);
-  assert.ok(s.score() < 50, `nota ${s.score()}`);
+  const notes = [60, 67, 62, 69, 64, 71, 65, 72];
+  const midi = Array.from({ length: 320 }, (_, i) => notes[Math.floor(i / 20) % notes.length]); // cada nota dura 1 s
+  const drone = createScorer({ hop: 0.05, midi });
+  const singer = createScorer({ hop: 0.05, midi });
+  for (let i = 0; i < 320; i++) {
+    drone.tick(i * 0.05 + 0.01, 60);
+    singer.tick(i * 0.05 + 0.01, midi[i]);
+  }
+  assert.ok(drone.score() < 40, `nota fixa: ${drone.score()}`);
+  assert.equal(singer.score(), 100);
 });

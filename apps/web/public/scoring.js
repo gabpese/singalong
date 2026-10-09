@@ -56,8 +56,8 @@ export function pitchClassDistance(a, b) {
 const FULL = 1; // semitones de tolerância para o acerto inteiro (voz humana oscila: vibrato, escorregadas)
 const HALF = 2; // ...e para meio acerto
 const WINDOW_FRAMES = 40; // a nota vale por trechos de 2 s: a melodia original muda várias vezes por segundo e ninguém acompanha cada troca
-const WINDOW_FULL = 0.6; // trecho em que 60% ou mais das notas detectadas estão certas conta inteiro
-const WINDOW_HALF = 0.3; // ...com 30% ou mais, conta metade
+const WINDOW_FULL = 0.7; // trecho em que 70% ou mais das notas detectadas estão certas conta inteiro
+const WINDOW_HALF = 0.45; // ...com 45% ou mais, conta metade
 // O detector de tom falha em muitos quadros de uma voz real (consoantes, respiração, voz fraca). Por isso a nota separa
 // "estava cantando?" (quadros com tom detectado) de "estava no tom?" (acertos entre os detectados): detectar em 40% dos
 // quadros com voz já é participação total, e a falha do detector não vira erro do cantor.
