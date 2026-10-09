@@ -22,4 +22,5 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
   });
 }
 
+app.rooms.start(); // relógio das salas: avança a fila quando uma música fica pronta e difunde o progresso
 await app.listen({ port: config.port, host: config.host });

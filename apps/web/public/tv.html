@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Singalong — TV</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="tv">
+  <main class="tv-stage" id="stage">
+    <header class="tv-top">
+      <div class="tv-room">Sala <strong id="room-code"></strong></div>
+      <div class="tv-now" id="now-label"></div>
+      <button id="fullscreen" type="button" title="Tela cheia (F)">⛶</button>
+    </header>
+
+    <section class="lyrics" id="lyrics" aria-live="off">
+      <p class="line prev" id="l-prev"></p>
+      <p class="line current" id="l-current"></p>
+      <p class="line next" id="l-next"></p>
+      <p class="line next2" id="l-next2"></p>
+    </section>
+
+    <footer class="tv-bottom">
+      <p class="up-next" id="up-next"></p>
+      <p class="hint" id="notice" role="status"></p>
+    </footer>
+
+    <section class="idle" id="idle" hidden>
+      <h1>Singalong</h1>
+      <p class="idle-lead">Entre na sala <strong id="idle-code"></strong> pelo celular</p>
+      <div class="qr" id="qr" aria-label="QR code para entrar na sala"></div>
+      <p class="hint" id="join-url"></p>
+      <p class="idle-msg" id="idle-msg"></p>
+    </section>
+
+    <button id="unlock" class="unlock" type="button" hidden>🔊 Toque aqui para ativar o som</button>
+  </main>
+  <script type="module" src="tv.js"></script>
+</body>
+</html>

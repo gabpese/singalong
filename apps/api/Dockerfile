@@ -13,6 +13,9 @@ ENV NODE_ENV=production \
     STORAGE_ROOT=/storage \
     PUBLIC_DIR=/app/public
 
+# pasta do SQLite com o dono certo: um volume novo herda o dono desta pasta
+RUN mkdir -p /data && chown node:node /data
+
 USER node
 EXPOSE 3000
 CMD ["node", "src/server.js"]

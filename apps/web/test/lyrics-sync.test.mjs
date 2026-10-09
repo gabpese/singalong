@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  clampPitch, describeLyricsSource, formatTime, isTypingTarget, lineProgress, locate, looksLikeLink, wordProgress, wordSpans,
+  clampPitch, describeLyricsSource, lineProgress, locate, looksLikeLink, wordProgress, wordSpans,
 } from '../public/lyrics-sync.js';
 
 const cues = [
@@ -46,12 +46,6 @@ test('clampPitch', () => {
   assert.equal(clampPitch('abc'), 0);
 });
 
-test('formatTime', () => {
-  assert.equal(formatTime(0), '0:00');
-  assert.equal(formatTime(222.3), '3:42');
-  assert.equal(formatTime(undefined), '0:00');
-});
-
 test('wordSpans: frações crescentes e cobrindo a frase', () => {
   const spans = wordSpans('Lock me up');
   assert.deepEqual(spans.map((s) => s.word), ['Lock', 'me', 'up']);
@@ -71,19 +65,6 @@ test('wordProgress: preenche na ordem de leitura, sem depender de quebra de linh
   for (let i = 1; i < half.length; i++) assert.ok(half[i] <= half[i - 1], `palavra ${i}`);
   assert.equal(half[0], 1); // início cheio
   assert.equal(half.at(-1), 0); // última ainda vazia ("rains" não enche junto com o começo)
-});
-
-test('isTypingTarget: campos de texto não perdem a digitação para os atalhos', () => {
-  assert.equal(isTypingTarget({ tagName: 'INPUT', type: 'text' }), true);
-  assert.equal(isTypingTarget({ tagName: 'INPUT' }), true);
-  assert.equal(isTypingTarget({ tagName: 'TEXTAREA' }), true);
-  assert.equal(isTypingTarget({ tagName: 'SELECT' }), true);
-  assert.equal(isTypingTarget({ tagName: 'BUTTON' }), true);
-  assert.equal(isTypingTarget({ tagName: 'DIV', isContentEditable: true }), true);
-  // sliders e o corpo da página continuam recebendo os atalhos
-  assert.equal(isTypingTarget({ tagName: 'INPUT', type: 'range' }), false);
-  assert.equal(isTypingTarget({ tagName: 'BODY' }), false);
-  assert.equal(isTypingTarget(null), false);
 });
 
 test('looksLikeLink: link vs pesquisa por nome', () => {

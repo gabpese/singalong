@@ -49,19 +49,6 @@ export function wordProgress(span, lineP) {
 }
 
 /**
- * O foco está num controle que usa essas teclas por conta própria (campo de texto, lista, botão)?
- * Os atalhos globais (Espaço, setas, F) não devem roubar a digitação nem o clique nativo.
- * `target` só precisa de tagName/type/isContentEditable (aceita um objeto simples nos testes).
- */
-export function isTypingTarget(target) {
-  if (!target) return false;
-  const tag = String(target.tagName ?? '').toUpperCase();
-  if (tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || target.isContentEditable) return true;
-  if (tag === 'INPUT') return !['range', 'checkbox', 'radio'].includes(String(target.type ?? 'text').toLowerCase());
-  return false;
-}
-
-/**
  * Parece um link do YouTube (ou um ID de 11 caracteres)? Qualquer outra coisa é tratada como pesquisa.
  * Uma palavra de 11 letras (ex.: "Bohemian...") também casa com o ID: o servidor valida de verdade.
  */
@@ -97,9 +84,4 @@ export function clampPitch(semitones) {
   const n = Math.round(Number(semitones));
   if (!Number.isFinite(n)) return 0;
   return Math.min(Math.max(n, PITCH_MIN), PITCH_MAX);
-}
-
-export function formatTime(seconds) {
-  const s = Math.max(0, Math.floor(seconds || 0));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }

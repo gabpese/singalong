@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Singalong — Sala</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="room">
+  <main class="room-page">
+    <header class="room-head">
+      <div>
+        <h1>Sala <span id="room-code"></span></h1>
+        <p class="tv-status" id="tv-status">TV desconectada</p>
+      </div>
+      <div class="head-actions">
+        <button id="open-tv" type="button">Abrir TV</button>
+        <button id="copy-link" type="button">Copiar link da sala</button>
+        <button id="copy-host" type="button" hidden>Copiar link de anfitrião</button>
+      </div>
+    </header>
+
+    <label class="field name-field">Seu nome
+      <input id="user-name" type="text" maxlength="30" placeholder="Como você quer aparecer na fila?" autocomplete="nickname">
+    </label>
+
+    <section class="card now" id="now">
+      <h2>Tocando agora</h2>
+      <div id="now-body"></div>
+    </section>
+
+    <section class="card">
+      <h2>Na fila <span class="count" id="queue-count"></span></h2>
+      <ol class="queue" id="queue"></ol>
+      <p class="hint" id="queue-empty">Ninguém na fila. Adicione uma música abaixo.</p>
+    </section>
+
+    <details class="card add" id="add" open>
+      <summary>Adicionar música</summary>
+      <form id="add-form" autocomplete="off">
+        <label class="field">Música
+          <span class="row find">
+            <input id="add-url" type="text" placeholder="Digite o nome da música ou cole um link do YouTube">
+            <button id="add-search" type="button">Buscar</button>
+          </span>
+        </label>
+        <ul class="results" id="add-results" hidden></ul>
+        <p class="picked" id="add-picked" hidden></p>
+
+        <label class="field">Letra
+          <select id="add-source">
+            <option value="auto">Usar a legenda do vídeo, se ele tiver</option>
+            <option value="lrclib">Buscar a letra na internet</option>
+            <option value="align">Colar a letra e sincronizar com a voz (IA)</option>
+            <option value="none">Cantar sem letra (só o instrumental)</option>
+            <optgroup label="Avançado">
+              <option value="file">Colar uma letra que já tem tempos (.lrc ou .srt)</option>
+            </optgroup>
+          </select>
+        </label>
+        <p class="hint" id="add-source-hint"></p>
+        <textarea id="add-text" rows="6" placeholder="Cole a letra aqui" aria-label="Letra" hidden></textarea>
+        <div class="row" id="add-names" hidden>
+          <label class="field">Artista
+            <input id="add-artist" type="text" placeholder="ajuda a achar a letra">
+          </label>
+          <label class="field">Nome da música
+            <input id="add-title" type="text" placeholder="ajuda a achar a letra">
+          </label>
+        </div>
+
+        <div class="row actions">
+          <button id="add-submit" type="submit" class="primary">Adicionar à fila</button>
+          <button id="add-cancel" type="button" hidden>Cancelar</button>
+        </div>
+        <p class="hint" id="add-status" role="status"></p>
+      </form>
+    </details>
+
+    <details class="card" id="library">
+      <summary>Músicas já processadas</summary>
+      <ul class="library" id="library-list"></ul>
+      <p class="hint" id="library-empty" hidden>Nenhuma música processada ainda.</p>
+    </details>
+
+    <section class="card" id="host-settings" hidden>
+      <h2>Anfitrião</h2>
+      <label class="check">
+        <input id="fair" type="checkbox">
+        Rodízio justo: a mesma pessoa não canta duas músicas seguidas quando há outra esperando
+      </label>
+    </section>
+  </main>
+  <p class="toast" id="toast" role="status"></p>
+  <script type="module" src="room.js"></script>
+</body>
+</html>

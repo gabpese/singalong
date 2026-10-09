@@ -3,88 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Singalong — Player</title>
+  <title>Singalong</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <main class="stage" id="stage">
-    <header class="top">
-      <select id="song" aria-label="Música"></select>
-      <button id="fullscreen" type="button" title="Tela cheia (F)">⛶</button>
-    </header>
+<body class="landing">
+  <main class="landing-page">
+    <h1>🎤 Singalong</h1>
+    <p class="lead">Karaokê de qualquer vídeo do YouTube: o instrumental, a letra sincronizada e a fila da festa.</p>
 
-    <section class="lyrics" id="lyrics" aria-live="off">
-      <p class="line prev" id="l-prev"></p>
-      <p class="line current" id="l-current"></p>
-      <p class="line next" id="l-next"></p>
-      <p class="line next2" id="l-next2"></p>
+    <section class="card">
+      <h2>Criar uma sala</h2>
+      <p class="hint">Você será o anfitrião: escolhe a ordem, pula e pausa. A TV abre em outra aba.</p>
+      <button id="create" type="button" class="primary big">Criar sala e abrir a TV</button>
     </section>
 
-    <footer class="controls">
-      <div class="transport">
-        <button id="play" type="button" disabled>▶ Tocar</button>
-        <span id="time">0:00</span>
-        <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Posição" disabled>
-        <span id="duration">0:00</span>
-      </div>
-      <div class="knobs">
-        <label>Tom
-          <input id="pitch" type="range" min="-6" max="6" value="0" step="1">
-          <output id="pitch-out">0</output>
-          <button id="pitch-reset" type="button" title="Voltar ao tom original">0</button>
-        </label>
-        <label>Ajuste da letra
-          <input id="offset" type="range" min="-2" max="2" value="0" step="0.05">
-          <output id="offset-out">0,00 s</output>
-        </label>
-      </div>
-      <p class="hint" id="status">Carregando músicas…</p>
-    </footer>
-
-    <details class="add" id="add">
-      <summary>Adicionar música</summary>
-      <form id="add-form" autocomplete="off">
-        <label class="field">Música
-          <span class="row find">
-            <input id="add-url" type="text" placeholder="Digite o nome da música ou cole um link do YouTube">
-            <button id="add-search" type="button">Buscar</button>
-          </span>
-        </label>
-        <ul class="results" id="add-results" hidden></ul>
-        <p class="picked" id="add-picked" hidden></p>
-
-        <label class="field">Letra
-          <select id="add-source">
-            <option value="auto">Usar a legenda do vídeo, se ele tiver</option>
-            <option value="lrclib">Buscar a letra na internet</option>
-            <option value="align">Colar a letra e sincronizar com a voz (IA)</option>
-            <option value="none">Cantar sem letra (só o instrumental)</option>
-            <optgroup label="Avançado">
-              <option value="file">Colar uma letra que já tem tempos (.lrc ou .srt)</option>
-            </optgroup>
-          </select>
-        </label>
-        <p class="hint" id="add-source-hint"></p>
-        <textarea id="add-text" rows="6" placeholder="Cole a letra aqui" aria-label="Letra" hidden></textarea>
-        <div class="row" id="add-names" hidden>
-          <label class="field">Artista
-            <input id="add-artist" type="text" placeholder="ajuda a achar a letra">
-          </label>
-          <label class="field">Nome da música
-            <input id="add-title" type="text" placeholder="ajuda a achar a letra">
-          </label>
-        </div>
-
-        <div class="row actions">
-          <button id="add-submit" type="submit">Adicionar</button>
-          <button id="add-cancel" type="button" hidden>Cancelar</button>
-        </div>
-        <p class="hint" id="add-status" role="status"></p>
+    <section class="card">
+      <h2>Entrar numa sala</h2>
+      <form id="join-form" class="row" autocomplete="off">
+        <input id="join-code" type="text" inputmode="text" maxlength="8" placeholder="Código (ex.: K7QM)" aria-label="Código da sala" required>
+        <button type="submit">Entrar</button>
       </form>
-    </details>
+    </section>
+
+    <p class="hint" id="status" role="status"></p>
   </main>
-  <script type="module" src="player.js"></script>
-  <script type="module" src="add-song.js"></script>
+  <script type="module" src="landing.js"></script>
 </body>
 </html>

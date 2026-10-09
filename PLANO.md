@@ -277,7 +277,7 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 | 0 — Pipeline (CLI) | ✅ | yt-dlp + Demucs + letra (vídeo/LRCLIB/texto/LRC). Faixa de 3:42 separada em ~8 s numa RTX 3060. |
 | 1 — Player isolado | ✅ | Letra sincronizada (preenchimento por palavra), pitch ±6 via AudioWorklet (SoundTouch), ajuste da letra. |
 | 2 — API + worker integrados | ✅ | Fastify + Redis Streams + worker consumidor; `docker compose up` sobe tudo. |
-| 3 — Salas e fila | pendente | WebSocket, SQLite (rooms, queue_items), pré-carregamento dos próximos. |
+| 3 — Salas e fila | ✅ | Salas com código/QR, fila por sala (SQLite), WebSocket, TV + controle + anfitrião, pré-carregamento, rodízio justo. |
 
 ### Decisões e aprendizados da Fase 2
 - **Sem SQLite ainda.** A biblioteca é o próprio cache (`meta.json`); o estado dos jobs vive no Redis (`job:<id>`). O SQLite entra com salas e fila (Fase 3).
@@ -299,3 +299,14 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **Busca de letra pelo Google: não é viável.** Testado: por HTTP simples o Google devolve a página "ative o JavaScript" (sem o painel de letras, `data-attrid="kc:/music/recording_cluster:lyrics"`); com Chrome headless cai em `/sorry` ("unusual traffic", captcha). Além de violar os termos do Google, é frágil. O painel é alimentado pela Musixmatch; o mesmo texto existe no LRCLIB, que é uma API aberta.
 - **"Buscar a letra na internet" agora = LRCLIB + IA.** Versão com tempos e mesma duração (±5 s) → usa os tempos prontos (`lrclib`); senão, usa o **texto** do candidato de duração mais próxima e a IA alinha com a voz (`lrclib+align`). A opção "colar texto com tempos de outra fonte" saiu da interface (a API `text` continua e cai para a IA quando não há referência). Músicas antigas, sem `vocals.mp3`, são baixadas e separadas de novo só quando a IA precisa (~30 s a mais, uma vez).
 - Indicações de seção como `[Chorus]` são descartadas antes do alinhamento (não são cantadas).
+
+### Decisões e aprendizados da Fase 3
+- **Papéis:** a **TV** é o navegador que toca (dona da posição e do evento "terminou"); os **controles** (celulares) adicionam e gerenciam; o **anfitrião** (quem criou a sala, com `host_token`) pula, pausa, reordena e remove de qualquer um. Os demais mexem só nas próprias músicas (identificadas por um `client_id` do navegador, que **nunca** vai nos estados difundidos: cada conexão recebe `mine`/`can_edit` calculados para ela).
+- **Comandos por REST, estado por WebSocket.** O WS só empurra o estado e recebe `ended`/`position` da TV (conexões de controle não têm esse poder). REST é idempotente e fácil de testar; o WS reconecta sozinho com recuo exponencial.
+- **O servidor decide o que toca.** `tryAdvance` escolhe o próximo item **pronto** (com rodízio justo, se ligado); item ainda em processamento é **pulado e mantém a posição**; um relógio (`tick`, 1,5 s) avança a fila quando o processamento termina e difunde o progresso. Operações de uma sala são serializadas (lock por sala).
+- **Pré-carregamento:** o job de processamento começa **na hora em que a música entra na fila** (não quando chega a vez), então a próxima costuma estar pronta quando a atual termina.
+- **SQLite embutido (`node:sqlite`)**, sem dependência nativa, num **volume nomeado** (`api-data`): bind mounts do Windows não combinam com arquivos SQLite. O diretório `/data` precisa pertencer ao usuário `node` na imagem.
+- **Contexto seguro:** o AudioWorklet (troca de tom) só existe em https ou `localhost`. Por isso a TV deve abrir em `http://localhost:3000`; em http por IP ela toca **sem** troca de tom e avisa. Celulares (só controle) funcionam em http por IP. `crypto.randomUUID` também exige contexto seguro, então o id do navegador usa `crypto.getRandomValues`.
+- **QR code** da TV usa `PUBLIC_URL` (endereço do computador na rede); sem ele, usa a origem da página e avisa se for localhost.
+- **Bugs que os testes pegaram:** o item que toca vinha depois dos que aguardam (rodízio justo dá posição maior); `append` do DOM imprimia "null" nas partes opcionais; letra da música anterior ficava na tela ao trocar de música.
+- **Fora desta fase:** múltiplas réplicas da API (o hub de WebSocket é em memória; passaria a Redis pub/sub), prioridade do worker pela ordem da fila (hoje é FIFO de chegada), HTTPS local para a TV por IP.
