@@ -1,141 +1,139 @@
 # singalong
-A project viewing help you sing your favorite songs, being them a cover or no.
 
-Plano completo e decisões: [PLANO.md](PLANO.md).
+**English** · [Português (Brasil)](README.pt-BR.md)
 
-## Como rodar
+A self-hosted, collaborative karaoke system: search for a song on YouTube and Singalong builds the karaoke version (instrumental, word-by-word synced lyrics, key change, backing vocals, microphone pitch scoring and MP4 export), with a shared queue on everyone's phone and a TV as the player.
 
-Pré-requisitos: Docker (com NVIDIA Container Toolkit para GPU) e `secrets/youtube_cookies.txt` com os cookies
-do YouTube (o YouTube bloqueia downloads sem login; a pasta `secrets/` está no `.gitignore`).
+Full plan and design decisions: [PLAN.md](PLAN.md) ([Português](PLAN.pt-BR.md)).
+
+> The app's interface is in Brazilian Portuguese. Where this README quotes a button or label, the Portuguese text follows in parentheses.
+
+## Running it
+
+Requirements: Docker (with the NVIDIA Container Toolkit for GPU) and `secrets/youtube_cookies.txt` with your YouTube cookies
+(YouTube blocks downloads without a login; the `secrets/` folder is in `.gitignore`).
 
 ```powershell
-docker compose --profile gpu up -d --build     # API + Redis + worker com GPU
-# sem GPU:  docker compose --profile cpu up -d --build
+docker compose --profile gpu up -d --build     # API + Redis + GPU worker
+# no GPU:  docker compose --profile cpu up -d --build
 ```
 
-Abra **http://localhost:3000** (para usar outra porta: `$env:API_PORT=3001` antes do comando).
+Open **http://localhost:3000** (to use another port, set `$env:API_PORT=3001` before the command).
 
-## Como funciona uma festa
+## How a party works
 
-1. **Criar a sala** (na página inicial). Você vira o **anfitrião** e a **TV** abre em outra aba.
-2. **A TV** (`tv.html`) é o navegador que toca: abra-a no computador ligado à TV, **por `http://localhost:3000`** (a troca de
-   tom precisa de contexto seguro: localhost ou https). Enquanto não há música, ela mostra o código da sala e um **QR code**.
-   Se o navegador pedir, clique em "Toque aqui para ativar o som" (uma vez).
-3. **Os celulares** entram pelo QR code ou digitando o código, e cada pessoa adiciona suas músicas. Para o QR funcionar nos
-   celulares, informe o endereço do computador na rede: `$env:PUBLIC_URL="http://192.168.0.10:3000"` antes do `docker compose up`.
-4. A fila toca sozinha. **Enquanto uma música toca, a próxima já está sendo preparada** (baixar, separar a voz, achar/alinhar
-   a letra). Se a próxima ainda não ficou pronta, toca a seguinte que já esteja pronta, e a atrasada mantém o lugar.
+1. **Create the room** (on the home page). You become the **host** and the **TV** opens in another tab.
+2. **The TV** (`tv.html`) is the browser that plays the music: open it on the computer connected to the TV, **through `http://localhost:3000`** (key change needs a secure context: localhost or https). While nothing is playing it shows the room code and a **QR code**.
+   If the browser asks, click "Toque aqui para ativar o som" (tap here to enable sound) once.
+3. **Phones** join through the QR code or by typing the code, and each person adds their own songs. For the QR code to work on phones, give the computer's network address: `$env:PUBLIC_URL="http://192.168.0.10:3000"` before `docker compose up`.
+4. The queue plays by itself. **While one song plays, the next one is already being prepared** (download, vocal separation, finding and aligning the lyrics). If the next song is not ready yet, the following ready one plays and the delayed one keeps its place.
 
-| Quem | O que pode |
+| Who | What they can do |
 |---|---|
-| Qualquer pessoa na sala | adicionar músicas, remover e mudar o tom **das próprias** músicas, ver a fila |
-| Anfitrião | tudo isso **em qualquer música**, mais pular, pausar/retomar, reordenar (▲▼), ajustar a letra e ligar o **rodízio justo** (a mesma pessoa não canta duas seguidas quando há outra esperando) |
+| Anyone in the room | add songs, remove songs and change the key **of their own** songs, see the queue |
+| Host | all of that **on any song**, plus skip, pause/resume, reorder (▲▼), adjust the lyrics and turn on **fair rotation** (the same person never sings twice in a row while someone else is waiting) |
 
-- O **link de anfitrião** (menu ⋯ da sala) deixa outro aparelho controlar a sala. Quem tem o link manda.
-- A **TV** mostra, no alto, **quem está cantando agora → o próximo cantor** (o mesmo que o servidor vai tocar: pronto e respeitando o rodízio justo), e, ao lado, a **lista com a música atual e as 5 próximas** ("+ N na fila" para o resto), mais uma barra de progresso.
-- **Aviso de pausa:** em pausas da letra de **8 s ou mais** (introdução, solo, ponte) a TV mostra `--------------` no lugar da linha atual, com a próxima letra já embaixo. Nos **últimos 8 s** os traços vão sumindo, para o cantor ver quando a linha começa. Em letras com tempo só no início de cada linha (LRC), um solo fica "dentro" da linha anterior; o app estima quanto a linha leva para ser cantada (~0,12 s por letra + 2 s) e trata o resto como pausa.
-- **Ceder a vez:** quem precisa se ausentar (ir ao banheiro, por exemplo) toca em **⇩ Ceder a vez** na própria música e ela **desce uma posição**: a pessoa de trás canta antes. Pode repetir. Só o anfitrião pode *subir* uma música (senão qualquer um furaria a fila).
-- O **tom da música** é detectado sozinho e aparece só como a **nota**, sem maior/menor (o modo não muda ao transpor): "Lá (A)", "Dó♯ / Ré♭ (C#/Db)". Ao subir ou descer o tom de canto, mostra qual nota você vai cantar: "Lá (A) → Si (B) com +2". É uma **estimativa**: quando o app não tem certeza, mostra as duas candidatas ("Tom provável: Fá (F) ou Ré (D)").
-- O **tom de canto** (−6 a +6 semitons) é por música na fila e muda ao vivo. O **ajuste da letra** vale para a música em qualquer sala.
-- **Prévias no celular:** ao pesquisar, o botão **▶ Prévia** (ou **Ouvir no YouTube**, para um link colado) toca o vídeo original para você conferir se é a música certa. Com a música já preparada, **▶ Prévia** na fila toca o **instrumental com o tom escolhido**, e mexer no tom ali muda o tom da sua música na fila. (A prévia do instrumental funciona em http pelo IP da rede.)
-- O celular tem três abas: **Fila**, **Adicionar** e **Músicas** (já processadas). Na aba **Músicas** há um **filtro por artista e nome**: ignora maiúsculas e acentos, aceita várias palavras em qualquer ordem ("elfman jack" acha "Jack's Lament", de Danny Elfman) e mostra "3 de 12". A lista fica em ordem alfabética por artista; as sem artista vão para o fim.
-- Salas paradas há 24 horas são apagadas. Recarregar a TV no meio de uma música retoma de onde estava.
+- The **host link** (room's ⋯ menu) lets another device control the room. Whoever has the link is in charge.
+- The **TV** shows, at the top, **who is singing now → the next singer** (the same one the server will play: ready and honoring fair rotation), and next to it the **list with the current song and the next 5** ("+ N na fila" for the rest), plus a progress bar.
+- **Gap warning:** in lyric gaps of **8 s or more** (intro, solo, bridge) the TV shows `--------------` in place of the current line, with the next lyric already below. In the **last 8 s** the dashes fade away, so the singer can see when the line starts. For lyrics timed only at the start of each line (LRC), a solo sits "inside" the previous line; the app estimates how long the line takes to sing (~0.12 s per letter + 2 s) and treats the rest as a gap.
+- **Yield your turn** ("⇩ Ceder a vez"): someone who has to step away (to the bathroom, say) taps it on their own song and it **moves down one position**: the person behind sings first. It can be repeated. Only the host can move a song *up* (otherwise anyone could cut the line).
+- The **song's key** is detected automatically and shown only as the **note**, without major/minor (the mode does not change when transposing): "Lá (A)", "Dó♯ / Ré♭ (C#/Db)". When you raise or lower the singing key it shows which note you will sing: "Lá (A) → Si (B) with +2". It is an **estimate**: when the app is not sure it shows both candidates ("Tom provável: Fá (F) ou Ré (D)", meaning "Likely key: F or D").
+- The **singing key** (−6 to +6 semitones) is per song in the queue and changes live. The **lyrics offset** applies to the song in any room.
+- **Previews on the phone:** when searching, the **▶ Prévia** button (or **Ouvir no YouTube** for a pasted link) plays the original video so you can check it is the right song. With the song already prepared, **▶ Prévia** in the queue plays the **instrumental in the chosen key**, and changing the key there changes the key of your song in the queue. (The instrumental preview works over http through the network IP.)
+- The phone has three tabs: **Fila** (queue), **Adicionar** (add) and **Músicas** (already processed songs). The **Músicas** tab has an **artist and title filter**: it ignores case and accents, accepts several words in any order ("elfman jack" finds "Jack's Lament" by Danny Elfman) and shows "3 de 12" (3 of 12). The list is sorted alphabetically by artist; songs without an artist go last.
+- Rooms idle for 24 hours are deleted. Reloading the TV in the middle of a song resumes where it was.
 
-### Adicionar uma música
+### Adding a song
 
-Informe **Artista** e **Nome da música** (os dois são obrigatórios). Com eles o app:
+Enter the **Artist** and the **Song title** (both are required). With them the app:
 
-1. **pesquisa o vídeo no YouTube** com `Artista - Nome da música`: toque em **🔎 Buscar no YouTube**, use **▶ Prévia** para ouvir e escolha o vídeo certo (quem já tem o link usa **Já tenho o link do vídeo**);
-2. **busca a letra** com os mesmos dois campos (opção "Buscar a letra na internet", a padrão).
+1. **searches YouTube** for `Artist - Song title`: tap **🔎 Buscar no YouTube**, use **▶ Prévia** to listen and pick the right video (if you already have a link, use **Já tenho o link do vídeo**);
+2. **looks up the lyrics** with the same two fields (the "Buscar a letra na internet" option, the default).
 
-A letra pode vir de:
+The lyrics can come from:
 
-| Opção na tela | O que faz |
+| Option on screen | What it does |
 |---|---|
-| Usar a legenda do vídeo, se ele tiver | usa a legenda **manual** do YouTube (auto-legendas são ignoradas de propósito) |
-| Buscar a letra na internet | procura a letra no [LRCLIB](https://lrclib.net) por artista + nome da música. Se existe uma versão **com tempos e de mesma duração**, usa; senão (comum em covers) pega o **texto** e a IA o sincroniza com a voz |
-| Colar a letra e sincronizar com a voz (IA) | **a saída para covers e vídeos sem referência de tempo**: você cola a letra (uma linha por verso) e a IA (Whisper, em modo "alinhar texto") descobre quando cada linha é cantada, ouvindo a voz isolada. Não gera letra |
-| Cantar sem letra | só o instrumental: **sempre** funciona, mesmo quando nada acima serve |
-| Avançado: letra que já tem tempos | conteúdo de um arquivo `.lrc` ou `.srt` |
+| Use the video's subtitles, if it has any | uses YouTube's **manual** subtitles (auto-captions are deliberately ignored) |
+| Search the lyrics on the internet | looks the lyrics up on [LRCLIB](https://lrclib.net) by artist + title. If there is a version **with timings and the same duration**, it uses it; otherwise (common for covers) it takes the **text** and the AI syncs it with the voice |
+| Paste the lyrics and sync them with the voice (AI) | **the way out for covers and videos with no timing reference**: you paste the lyrics (one line per verse) and the AI (Whisper, in "align text" mode) finds when each line is sung by listening to the isolated vocals. It does not write lyrics |
+| Sing without lyrics | instrumental only: **always** works, even when nothing above fits |
+| Advanced: lyrics that already have timings | contents of a `.lrc` or `.srt` file |
 
-- Sem letra utilizável, a música fica na fila com **"Precisa de letra"** e um botão **Escolher letra**; o instrumental já
-  processado é reaproveitado (só a letra é refeita).
-- Em covers e vídeos produzidos (com créditos, por exemplo) a duração difere da versão original, que não serve de tempo:
-  a IA sincroniza o texto com a voz do vídeo (cerca de 1 minuto na primeira vez).
-- Músicas já processadas (aba **Músicas**) entram na fila sem pedir artista e nome.
-- **Por que a letra não vem do Google/Musixmatch?** O Google bloqueia acesso automatizado (captcha "unusual traffic") e a
-  API oficial da Musixmatch, no plano gratuito, devolve só **30% da letra** (a inteira exige licença paga). Por isso o texto
-  vem do LRCLIB (API aberta, que tem as músicas testadas). O texto é só o ponto de partida: quem marca os tempos é a IA.
-- A legenda do vídeo depende do YouTube liberar o download dela; quando ele limita (HTTP 429), o job segue sem ela.
+- Without usable lyrics, the song stays in the queue as **"Precisa de letra"** (needs lyrics) with a **Escolher letra** (choose lyrics) button; the instrumental already processed is reused (only the lyrics are redone).
+- For covers and produced videos (with credits, for example) the duration differs from the original version, which is useless as a timing reference: the AI syncs the text with the video's voice (about 1 minute the first time).
+- Songs already processed (**Músicas** tab) go into the queue without asking for artist and title.
+- **Why don't the lyrics come from Google/Musixmatch?** Google blocks automated access ("unusual traffic" captcha) and Musixmatch's official free API returns only **30% of the lyrics** (the full text needs a paid license). So the text comes from LRCLIB (an open API that has the songs we tested). The text is only the starting point: the AI marks the timings.
+- The video's subtitles depend on YouTube allowing their download; when it rate-limits (HTTP 429), the job goes on without them.
 
-Tudo fica em `storage/cache/<video_id>/` (`instrumental.mp3`, `vocals.mp3`, `lyrics.json`, `meta.json` com o tom, `source.json`).
-Salas e fila ficam num SQLite no volume `api-data` do Docker.
+Everything is stored in `storage/cache/<video_id>/` (`instrumental.mp3`, `vocals.mp3`, `lyrics.json`, `meta.json` with the key, `source.json`).
+Rooms and the queue live in a SQLite database in the Docker volume `api-data`.
 
 ### API
 
-| Rota | Função |
+| Route | Purpose |
 |---|---|
-| `POST /api/rooms` | cria a sala: `{code, host_token}` |
-| `GET /api/rooms/:code` | estado: fila, o que toca, `tv_connected`, `me.is_host` |
-| `POST /api/rooms/:code/queue` `{url \| video_id, lyrics?, artist?, title?, name?, pitch?}` | adiciona à fila (e já pede o processamento) |
-| `DELETE /api/rooms/:code/queue/:item` · `POST …/move {direction}` · `PATCH …/queue/:item {pitch}` | remover · mover (`down` = ceder a vez, o dono pode; `up` só o anfitrião) · tom |
-| `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair}` | controle (anfitrião) |
-| `PUT /api/rooms/:code/songs/:id/offset {offset}` | ajuste da letra, em segundos (anfitrião) |
-| `WS /api/rooms/:code/ws?role=tv\|controller` | estado em tempo real; a TV envia `ended` e `position` |
-| `GET /api/search?q=` | pesquisa vídeos no YouTube (atendida pelo worker; cache de 10 min) |
-| `POST /api/songs` · `GET /api/songs` · `GET /api/songs/:id` · `PUT /api/songs/:id/lyrics` | músicas e processamento (usados pela sala) |
-| `GET /media/cache/<id>/...` | arquivos, com `Range` |
-| `GET /healthz`, `GET /readyz` | liveness / readiness (checa o Redis) |
+| `POST /api/rooms` | creates the room: `{code, host_token}` |
+| `GET /api/rooms/:code` | state: queue, what is playing, `tv_connected`, `me.is_host` |
+| `POST /api/rooms/:code/queue` `{url \| video_id, lyrics?, artist?, title?, name?, pitch?}` | adds to the queue (and requests processing right away) |
+| `DELETE /api/rooms/:code/queue/:item` · `POST …/move {direction}` · `PATCH …/queue/:item {pitch}` | remove · move (`down` = yield the turn, the owner may; `up` host only) · key |
+| `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair}` | control (host) |
+| `PUT /api/rooms/:code/songs/:id/offset {offset}` | lyrics offset, in seconds (host) |
+| `WS /api/rooms/:code/ws?role=tv\|controller` | real-time state; the TV sends `ended` and `position` |
+| `GET /api/search?q=` | searches YouTube videos (served by the worker; 10-minute cache) |
+| `POST /api/songs` · `GET /api/songs` · `GET /api/songs/:id` · `PUT /api/songs/:id/lyrics` | songs and processing (used by the room) |
+| `GET /media/cache/<id>/...` | files, with `Range` support |
+| `GET /healthz`, `GET /readyz` | liveness / readiness (checks Redis) |
 
-Os pedidos levam `X-Client-Id` (id do navegador) e, para o anfitrião, `X-Host-Token`.
-O contrato entre a API e o worker (Redis Streams) está documentado em [apps/api/src/jobs.js](apps/api/src/jobs.js).
+Requests carry `X-Client-Id` (the browser's id) and, for the host, `X-Host-Token`.
+The contract between the API and the worker (Redis Streams) is documented in [apps/api/src/jobs.js](apps/api/src/jobs.js).
 
-### CLI do worker (sem API, para testes)
+### Worker CLI (no API, for testing)
 
 ```powershell
 docker compose --profile gpu run --rm worker-gpu "<link>" --lyrics lrclib
 docker compose --profile gpu run --rm worker-gpu "<link>" --lyrics align --lyrics-file /storage/inputs/letra.txt
 ```
 
-## Robustez (configuração)
+## Robustness (configuration)
 
-Variáveis opcionais (no `.env` ou no ambiente; `0` desliga o limite):
+Optional variables (in `.env` or the environment; `0` turns the limit off):
 
-| Variável | Padrão | O que faz |
+| Variable | Default | What it does |
 |---|---|---|
-| `MAX_DURATION_SECONDS` | 900 | recusa vídeos mais longos (antes de baixar) |
-| `MIN_FREE_GB` | 2 | recusa processar com pouco disco livre |
-| `SEPARATE_TIMEOUT_SECONDS` | 900 | tempo máximo da separação (Demucs) |
-| `WORKER_MAX_ATTEMPTS` | 3 | tentativas automáticas só para falhas passageiras (rede, 429) |
-| `CACHE_MAX_GB` | 20 | acima disso apaga as músicas cantadas há mais tempo (nunca as da fila) |
-| `LOG_LEVEL` | info | nível dos logs (JSON no Docker) |
+| `MAX_DURATION_SECONDS` | 900 | rejects longer videos (before downloading) |
+| `MIN_FREE_GB` | 2 | refuses to process when disk space is low |
+| `SEPARATE_TIMEOUT_SECONDS` | 900 | maximum time for separation (Demucs) |
+| `WORKER_MAX_ATTEMPTS` | 3 | automatic retries, only for transient failures (network, 429) |
+| `CACHE_MAX_GB` | 20 | above this, deletes the songs sung longest ago (never those in the queue) |
+| `LOG_LEVEL` | info | log level (JSON in Docker) |
 
-Erros do YouTube viram mensagens em português; "Tentar de novo" só aparece quando vale a pena (não para vídeo privado, bloqueado ou longo demais). Há limite de pedidos por pessoa (busca, fila, criar sala), `/readyz` detalha Redis, banco e armazenamento, e o worker tem healthcheck por heartbeat.
+YouTube errors become messages in Portuguese; "Tentar de novo" (try again) only shows up when it is worth it (not for a private, blocked or too-long video). There is a per-person request limit (search, queue, create room), `/readyz` details Redis, database and storage, and the worker has a heartbeat healthcheck.
 
-## CI/CD e hospedagem
+## CI/CD and hosting
 
-- **CI** (`.github/workflows/ci.yml`): a cada push e pull request roda os testes da API, do front-end (TypeScript, unitários, build e ponta a ponta com Playwright) e do worker, e confere que as imagens constroem.
-- **CD** (`.github/workflows/deploy.yml`): depois do CI verde na `main`, publica a imagem da API no GitHub Container Registry (amd64 e arm64) e, se ligado, atualiza a VM por SSH.
-- **Hospedagem gratuita com HTTPS** para acessar de qualquer computador, sem o seu PC ligado: veja [`deploy/README.md`](deploy/README.md).
+- **CI** (`.github/workflows/ci.yml`): on every push and pull request it runs the API tests, the front-end tests (TypeScript, unit, build and end-to-end with Playwright) and the worker tests, and checks that the images build.
+- **CD** (`.github/workflows/deploy.yml`): after a green CI on `main`, it publishes the API image to the GitHub Container Registry (amd64 and arm64) and, if enabled, updates the VM over SSH.
+- **Free hosting with HTTPS** to open the app from any computer without your PC being on: see [`deploy/README.md`](deploy/README.md) (in Portuguese).
 
-## Testes
+## Tests
 
 ```powershell
 cd apps/worker; python -I -m unittest discover -s tests -t .
 cd apps/api;    npm test
-cd apps/web;    npm test            # lógica pura (node:test)
+cd apps/web;    npm test            # pure logic (node:test)
 cd apps/web;    npm run typecheck   # TypeScript
-cd apps/web;    npm run build; npm run e2e   # testes de ponta a ponta (Playwright, contra o build em dist/)
+cd apps/web;    npm run build; npm run e2e   # end-to-end tests (Playwright, against the build in dist/)
 ```
 
-Os testes de ponta a ponta sobem sozinhos uma API de teste (`apps/web/e2e/server.mjs`, com músicas prontas e fila de jobs em memória) e abrem um Chromium de verdade, com microfone falso. Na primeira vez: `npx playwright install chromium`.
+The end-to-end tests start a test API on their own (`apps/web/e2e/server.mjs`, with ready-made songs and an in-memory job queue) and open a real Chromium with a fake microphone. The first time: `npx playwright install chromium`.
 
-## Desenvolvimento do front-end
+## Front-end development
 
-O front-end é React + TypeScript com Vite, em `apps/web` (páginas `index.html`, `room.html` e `tv.html`; código em `src/`). Com a API rodando em `localhost:3000`:
+The front-end is React + TypeScript with Vite, in `apps/web` (pages `index.html`, `room.html` and `tv.html`; code in `src/`). With the API running on `localhost:3000`:
 
 ```powershell
-cd apps/web; npm install; npm run dev     # http://localhost:5173, com recarga rápida; /api e /media vão para a API
+cd apps/web; npm install; npm run dev     # http://localhost:5173, with fast reload; /api and /media go to the API
 ```
 
-A imagem da API constrói o front-end (`vite build`) e serve o resultado; fora do Docker, rode `npm run build` e a API serve `apps/web/dist`.
+The API image builds the front-end (`vite build`) and serves the result; outside Docker, run `npm run build` and the API serves `apps/web/dist`.
