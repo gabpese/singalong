@@ -1,4 +1,4 @@
-"""Driver de storage local. Contrato: exists/put/get_url/read/delete/list (PLANO.md, seção 14).
+"""Driver de storage local. Contrato: exists/put/get_url/read/delete/list (PLAN.md, seção 14).
 
 O restante do código só conhece chaves lógicas ("cache/<video_id>/instrumental.mp3").
 """

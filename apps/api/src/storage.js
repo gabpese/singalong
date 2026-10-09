@@ -1,4 +1,4 @@
-// Driver de storage local. Mesmo contrato do worker (PLANO.md, seção 14):
+// Driver de storage local. Mesmo contrato do worker (PLAN.md, seção 14):
 // exists / read / getUrl / list / delete. O resto do código só conhece chaves lógicas
 // ("cache/<video_id>/instrumental.mp3"). O driver S3/R2 futuro implementa esta mesma interface.
 import { readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';

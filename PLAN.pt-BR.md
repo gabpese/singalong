@@ -1,5 +1,7 @@
 # Singalong — Plano de Desenvolvimento
 
+[English](PLAN.md) · **Português (Brasil)**
+
 Sistema próprio de karaokê: cola-se um link do YouTube e o sistema gera a versão karaokê (instrumental + letra sincronizada), com troca de tom e fila colaborativa com pré-processamento em segundo plano.
 
 ## 1. Requisitos
@@ -380,6 +382,7 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **Desenho (pasta `deploy/`):** uma VM Ubuntu com Docker Compose: **Caddy** (HTTPS automático com um subdomínio grátis do DuckDNS, obrigatório para a troca de tom e o microfone) → **API** → **Redis**; só 80 e 443 ficam expostas. A imagem da API é construída pelo CI para **amd64 e arm64** (o front-end é compilado uma vez, na máquina do CI, com `--platform=$BUILDPLATFORM`; só as dependências do servidor são montadas por arquitetura) e publicada no GHCR. O deploy é por SSH (`deploy.sh`), ligado pela variável `DEPLOY_ENABLED`; sem ela o workflow só publica a imagem.
 - **Direitos autorais:** o repositório é **público**, então as músicas (`storage/`) nunca vão para o GitHub nem para a imagem: `deploy/sync-library.sh` as copia por SSH, só o que a nuvem precisa para tocar (sem a voz isolada e o `source.json`), para a VM privada. A limpeza do cache fica desligada na nuvem (`CACHE_MAX_GB=0`), porque não há worker para refazer o que fosse apagado.
 - **Cookie do YouTube:** hoje o worker o envia em **toda** busca e download. "Entrar com o YouTube" não resolve (o OAuth do Google dá um token de API, não o cookie de sessão que o `yt-dlp` usa) e pedir o cookie de outras pessoas é arriscado (dá acesso à conta inteira): descartado. Melhorias possíveis: usar o cookie só como último recurso (tentar sem ele primeiro) e usar uma conta secundária.
+- **Medido na VM gratuita (out/2026):** com o yt-dlp mais recente, sem cookie, pelo IP da Oracle, a busca funciona mas os downloads são quase todos bloqueados (0 de 8 vídeos com o cliente padrão, 1 de 8 com `tv_embedded`): trocar o cliente do yt-dlp não resolve um bloqueio por IP.
 - **Próximo passo possível:** armazenamento compartilhado (S3/R2) para o worker de casa abastecer a nuvem sozinho, sem copiar a biblioteca à mão (hoje o driver de armazenamento da API é só o local).
 
 ### Fase 3b: tom, prévias, próximo cantor e novo layout
