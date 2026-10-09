@@ -66,13 +66,57 @@ const HOLD_SECONDS = 0.15; // o detector falha em consoantes e respirações: va
 const LAG_FRAMES = 2; // a nota cantada pode vir até 100 ms depois da de referência (ouvir, cantar, captar) ...
 const LEAD_FRAMES = 2; // ...ou 100 ms antes. Folga maior faz qualquer nota acertar alguma da melodia, que varia várias vezes por segundo
 
+const median = (values) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[sorted.length >> 1];
+};
+
+/**
+ * Transforma a melodia crua (que oscila vários quadros por segundo: vibrato, escorregadas, erros do detector) em notas
+ * estáveis: mediana de ±2 quadros, depois trechos contínuos de notas a até 1 semitom uns dos outros viram uma nota só
+ * (a mediana deles), e trechos com menos de `minFrames` quadros (0,3 s) são absorvidos pelo vizinho mais próximo.
+ */
+export function smoothMelody(midi, { minFrames = 6 } = {}) {
+  const n = midi.length;
+  const filtered = midi.map((m, i) => {
+    if (m < 0) return -1;
+    const near = [];
+    for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) if (midi[j] >= 0) near.push(midi[j]);
+    return median(near);
+  });
+  // trechos de voz contínua, divididos quando a nota se afasta mais de 1 semitom da mediana do trecho
+  const segments = []; // { from, to (exclusivo), note }
+  let i = 0;
+  while (i < n) {
+    if (filtered[i] < 0) { i++; continue; }
+    let j = i;
+    const seen = [filtered[i]];
+    while (j + 1 < n && filtered[j + 1] >= 0 && Math.abs(filtered[j + 1] - median(seen)) <= 1) seen.push(filtered[++j]);
+    segments.push({ from: i, to: j + 1, note: median(seen) });
+    i = j + 1;
+  }
+  // trechos curtos demais viram parte do vizinho colado de nota mais próxima (ou somem se estão isolados)
+  const result = Array(n).fill(-1);
+  segments.forEach((seg, k) => {
+    let note = seg.note;
+    if (seg.to - seg.from < minFrames) {
+      const near = [segments[k - 1], segments[k + 1]].filter((o) => o && (o.to === seg.from || o.from === seg.to) && o.to - o.from >= minFrames);
+      if (!near.length) return;
+      note = near.reduce((a, b) => (Math.abs(a.note - seg.note) <= Math.abs(b.note - seg.note) ? a : b)).note;
+    }
+    result.fill(note, seg.from, seg.to);
+  });
+  return result;
+}
+
 /**
  * Acompanha a música quadro a quadro (50 ms). `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
  * Só contam os quadros em que a voz original canta; quadros já avaliados (seek para trás) não contam duas vezes.
  * Os quadros se agrupam em trechos de 2 s, e cada trecho vale pela fração de acertos dele (ver WINDOW_*).
  */
 export function createScorer(melody, { transpose = 0 } = {}) {
-  const { hop, midi } = melody;
+  const { hop } = melody;
+  const midi = smoothMelody(melody.midi); // a referência é a melodia estável, não a crua
   let shift = transpose;
   const seen = new Uint8Array(midi.length);
   let counted = 0;
