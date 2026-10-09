@@ -2,8 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from singalong_worker.align import clean_lines, group_words
 from singalong_worker.ids import extract_video_id
-from singalong_worker.lyrics import apply_text, parse_cues, parse_lrc, parse_lyrics_file
+from singalong_worker.lyrics import apply_text, parse_cues, parse_lrc, parse_lyrics_file, pick_candidate
+from singalong_worker.search import parse_entries
+from singalong_worker.pipeline import NeedsAlignment, NeedsLyrics, guess_artist_title, manual_subtitle_langs, resolve_lyrics
 from singalong_worker.storage import LocalStorage
 
 VID = "dQw4w9WgXcQ"
@@ -64,6 +67,222 @@ class ApplyTextTests(unittest.TestCase):
     def test_line_count_mismatch(self):
         with self.assertRaises(ValueError):
             apply_text("só uma", self.TIMED)
+
+
+class PipelineTests(unittest.TestCase):
+    SUBS = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nUm\n\n00:00:03.000 --> 00:00:04.000\nDois\n"
+
+    def info(self, **kw):
+        return {"subtitle_text": None, "artist": None, "title": None, "duration": 10, **kw}
+
+    def test_guess_artist_title(self):
+        self.assertEqual(guess_artist_title("Faouzia - Unethical (MAPHRA Vocal Cover)"), ("Faouzia", "Unethical"))
+        self.assertEqual(guess_artist_title("Sem hifen aqui"), (None, None))
+
+    def test_manual_subtitle_langs(self):
+        available = {"en-US": [], "pt-BR": [], "live_chat": [], "fr": []}
+        self.assertEqual(manual_subtitle_langs(available, ["pt", "en"]), ["pt-BR", "en-US"])
+        self.assertEqual(manual_subtitle_langs({}, ["pt", "en"]), [])  # sem legenda manual: nem tenta baixar
+        self.assertEqual(manual_subtitle_langs({"live_chat": []}, ["pt", "en"]), [])
+
+    def test_auto_usa_legenda_do_video(self):
+        cues, source = resolve_lyrics("auto", self.info(subtitle_text=self.SUBS), None)
+        self.assertEqual((source, [c["text"] for c in cues]), ("video", ["Um", "Dois"]))
+
+    def test_auto_sem_legenda_pede_letra(self):
+        with self.assertRaises(NeedsLyrics):
+            resolve_lyrics("auto", self.info(), None)
+
+    def test_legenda_com_erro_de_download_tem_mensagem_propria(self):
+        with self.assertRaisesRegex(NeedsLyrics, "bloqueou o download"):
+            resolve_lyrics("auto", self.info(subtitle_error="HTTP Error 429"), None)
+
+    def test_sem_letra_e_sempre_possivel(self):
+        self.assertEqual(resolve_lyrics("none", self.info(), None), ([], "none"))
+
+    def test_pick_candidate_respeita_a_duracao(self):
+        cands = [{"duration": 194.0, "name": "a", "syncedLyrics": "x"}, {"duration": 180.0, "name": "b", "syncedLyrics": "x"}]
+        self.assertEqual(pick_candidate(cands, 195, loose=False)[0]["name"], "a")  # dentro de ±5 s
+        chosen, closest = pick_candidate(cands, 265, loose=False)  # cover bem mais longo
+        self.assertIsNone(chosen)
+        self.assertEqual(closest["name"], "a")  # serve para explicar a recusa
+        self.assertEqual(pick_candidate(cands, 265, loose=True)[0]["name"], "a")  # aceito mesmo assim
+        self.assertEqual(pick_candidate([], 265), (None, None))
+        self.assertIsNotNone(pick_candidate(cands, None)[0])  # sem duração conhecida, não há como recusar
+
+    def test_video_sem_legenda(self):
+        with self.assertRaises(NeedsLyrics):
+            resolve_lyrics("video", self.info(), None)
+
+    def test_text_usa_tempos_da_legenda_do_video(self):
+        cues, source = resolve_lyrics("text", self.info(subtitle_text=self.SUBS), "Eu\nTu")
+        self.assertEqual(source, "text+video")
+        self.assertEqual([(c["start"], c["text"]) for c in cues], [(1.0, "Eu"), (3.0, "Tu")])
+
+    def test_servico_de_letras_fora_do_ar_nao_vira_falha(self):
+        from unittest import mock
+
+        from singalong_worker import lyrics as lyr
+
+        info = self.info(artist="A", title="B")
+        with mock.patch.object(lyr, "search_lrclib", side_effect=lyr.LyricsServiceError("503")):
+            with self.assertRaisesRegex(NeedsLyrics, "não respondeu"):
+                resolve_lyrics("lrclib", info, None)
+
+    def test_fetch_json_repete_em_5xx_mas_nao_em_4xx(self):
+        import io
+        import urllib.error
+        from unittest import mock
+
+        from singalong_worker import lyrics as lyr
+
+        def http_error(code):
+            return urllib.error.HTTPError("u", code, "x", {}, io.BytesIO(b""))
+
+        ok = mock.MagicMock()
+        ok.__enter__.return_value = io.BytesIO(b'[{"a": 1}]')
+        with mock.patch("urllib.request.urlopen", side_effect=[http_error(503), http_error(502), ok]) as m:
+            self.assertEqual(lyr._fetch_json("req", pause=0), [{"a": 1}])
+            self.assertEqual(m.call_count, 3)
+        with mock.patch("urllib.request.urlopen", side_effect=[http_error(404)]) as m:
+            with self.assertRaises(lyr.LyricsServiceError):
+                lyr._fetch_json("req", pause=0)
+            self.assertEqual(m.call_count, 1)  # 4xx: não adianta repetir
+
+    def test_text_sem_referencia_de_tempo_vai_para_a_ia(self):
+        # letra colada, sem legenda no vídeo e sem artista/título para buscar online: a IA sincroniza
+        with self.assertRaises(NeedsAlignment) as ctx:
+            resolve_lyrics("text", self.info(), "uma linha\noutra linha")
+        self.assertEqual((ctx.exception.text, ctx.exception.origin), ("uma linha\noutra linha", "text"))
+
+    def test_text_com_numero_de_linhas_diferente_vai_para_a_ia(self):
+        with self.assertRaises(NeedsAlignment):
+            resolve_lyrics("text", self.info(subtitle_text=self.SUBS), "só uma")
+
+    def test_align_sempre_pede_alinhamento_e_exige_texto(self):
+        with self.assertRaises(NeedsAlignment) as ctx:
+            resolve_lyrics("align", self.info(), "a\nb")
+        self.assertEqual(ctx.exception.origin, "align")
+        with self.assertRaises(ValueError):
+            resolve_lyrics("align", self.info(), "  ")
+
+    def test_busca_online_usa_os_tempos_quando_a_duracao_bate(self):
+        from unittest import mock
+
+        from singalong_worker import lyrics as lyr
+
+        cands = [{"duration": 205, "syncedLyrics": "[00:01.00]um\n[00:03.00]dois", "plainLyrics": "um\ndois"}]
+        with mock.patch.object(lyr, "search_lrclib", return_value=cands):
+            cues, source = resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=206), None)
+        self.assertEqual((source, [c["text"] for c in cues]), ("lrclib", ["um", "dois"]))
+
+    def test_busca_online_com_duracao_diferente_entrega_o_texto_para_a_ia(self):
+        from unittest import mock
+
+        from singalong_worker import lyrics as lyr
+
+        cands = [{"duration": 194, "syncedLyrics": "[00:01.00]um\n[00:03.00]dois", "plainLyrics": "um\ndois"}]
+        with mock.patch.object(lyr, "search_lrclib", return_value=cands):
+            with self.assertRaises(NeedsAlignment) as ctx:  # cover de 265 s: os tempos de 194 s não servem
+                resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=265), None)
+        self.assertEqual((ctx.exception.text, ctx.exception.origin), ("um\ndois", "lrclib"))
+        # com 'loose' usa os tempos dela mesmo assim, sem IA
+        with mock.patch.object(lyr, "search_lrclib", return_value=cands):
+            cues, source = resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=265), None, loose=True)
+        self.assertEqual(source, "lrclib")
+
+    def test_busca_online_so_com_texto_vai_para_a_ia(self):
+        from unittest import mock
+
+        from singalong_worker import lyrics as lyr
+
+        cands = [{"duration": 200, "syncedLyrics": None, "plainLyrics": "linha a\nlinha b"}]
+        with mock.patch.object(lyr, "search_lrclib", return_value=cands):
+            with self.assertRaises(NeedsAlignment) as ctx:
+                resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=200), None)
+        self.assertEqual(ctx.exception.text, "linha a\nlinha b")
+
+    def test_busca_online_sem_resultados_pede_outra_opcao(self):
+        from unittest import mock
+
+        from singalong_worker import lyrics as lyr
+
+        with mock.patch.object(lyr, "search_lrclib", return_value=[]):
+            with self.assertRaisesRegex(NeedsLyrics, "Não achei essa letra"):
+                resolve_lyrics("lrclib", self.info(artist="A", title="B"), None)
+
+    def test_candidate_text(self):
+        from singalong_worker.lyrics import best_text_candidate, candidate_text
+
+        self.assertEqual(candidate_text({"plainLyrics": " a\nb "}), "a\nb")
+        self.assertEqual(candidate_text({"syncedLyrics": "[00:01.00]a\n[00:02.50] \n[01:03.4]b"}), "a\nb")
+        self.assertEqual(candidate_text({}), "")
+        cands = [{"duration": 180, "plainLyrics": "x"}, {"duration": 196, "plainLyrics": "y"}, {"duration": 195}]
+        self.assertEqual(best_text_candidate(cands, 197)["plainLyrics"], "y")  # o mais próximo que TEM texto
+        self.assertIsNone(best_text_candidate([{"duration": 1}], 1))
+
+    def test_file_com_tempos_e_sem_conteudo(self):
+        cues, source = resolve_lyrics("file", self.info(), "[00:01.00]a\n[00:03.00]b")
+        self.assertEqual((source, len(cues)), ("file", 2))
+        with self.assertRaises(ValueError):
+            resolve_lyrics("file", self.info(), None)
+
+    def test_lrclib_sem_artista_e_titulo(self):
+        with self.assertRaises(NeedsLyrics):
+            resolve_lyrics("lrclib", self.info(), None)
+
+
+class AlignTests(unittest.TestCase):
+    class W:
+        def __init__(self, start, end):
+            self.start, self.end = start, end
+
+    def test_clean_lines(self):
+        self.assertEqual(clean_lines("  a \n\n b\n   \nc"), ["a", "b", "c"])
+        # indicações de seção não são cantadas; "(whoa, oh)" é cantado e fica
+        self.assertEqual(clean_lines("[Chorus]\nline one\n[Verse 2]\n(whoa, oh)\n[x] texto"), ["line one", "(whoa, oh)", "[x] texto"])
+
+    def test_group_words_por_contagem_de_palavras(self):
+        words = [self.W(1.0, 1.4), self.W(1.5, 2.0), self.W(2.1, 2.5), self.W(5.0, 5.5)]
+        cues = group_words(["Lock me", "up", "again"], words)
+        self.assertEqual(
+            cues,
+            [
+                {"start": 1.0, "end": 2.0, "text": "Lock me"},
+                {"start": 2.1, "end": 2.5, "text": "up"},
+                {"start": 5.0, "end": 5.5, "text": "again"},
+            ],
+        )
+
+    def test_group_words_nunca_volta_no_tempo_e_da_duracao_minima(self):
+        words = [self.W(10.0, 10.0), self.W(4.0, 4.0)]  # palavra não alinhada com tempo anterior ao da linha passada
+        cues = group_words(["a", "b"], words)
+        self.assertEqual(cues[1]["start"], 10.0)
+        self.assertTrue(all(c["end"] - c["start"] >= 0.3 for c in cues))
+
+    def test_group_words_recusa_quando_a_contagem_nao_bate(self):
+        with self.assertRaisesRegex(ValueError, "Não consegui sincronizar"):
+            group_words(["duas palavras", "mais uma"], [self.W(0, 1)] * 2)
+
+    def test_align_exige_letra(self):
+        from singalong_worker.align import align_lyrics
+
+        with self.assertRaises(ValueError):
+            align_lyrics(Path("x.mp3"), "  \n ")
+
+
+class SearchTests(unittest.TestCase):
+    def test_parse_entries(self):
+        entries = [
+            {"id": "TLvtw4nXou0", "title": "Jack's Lament", "channel": "Geoff", "duration": 265},
+            {"id": "PLxxxxxxxxxxxxxxxxxx", "title": "playlist"},  # não é vídeo (ID longo)
+            None,
+            {"id": "dQw4w9WgXcQ", "uploader": "Rick"},
+        ]
+        out = parse_entries(entries)
+        self.assertEqual([r["video_id"] for r in out], ["TLvtw4nXou0", "dQw4w9WgXcQ"])
+        self.assertEqual(out[0], {"video_id": "TLvtw4nXou0", "title": "Jack's Lament", "channel": "Geoff", "duration": 265})
+        self.assertEqual((out[1]["title"], out[1]["channel"]), ("dQw4w9WgXcQ", "Rick"))
 
 
 class StorageTests(unittest.TestCase):

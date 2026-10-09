@@ -269,3 +269,33 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **Fase 2** entrega `docker compose up` subindo api + worker + redis funcionando de ponta a ponta.
 - **Fase 4** inclui health checks, shutdown limpo, logs JSON e Postgres opcional.
 - **Fase 6 (nova, opcional): Kubernetes** — manifests com kustomize, adaptador Redis do Socket.io, driver S3 ativado, KEDA para o worker.
+
+## 16. Estado da implementação
+
+| Fase | Estado | Notas |
+|---|---|---|
+| 0 — Pipeline (CLI) | ✅ | yt-dlp + Demucs + letra (vídeo/LRCLIB/texto/LRC). Faixa de 3:42 separada em ~8 s numa RTX 3060. |
+| 1 — Player isolado | ✅ | Letra sincronizada (preenchimento por palavra), pitch ±6 via AudioWorklet (SoundTouch), ajuste da letra. |
+| 2 — API + worker integrados | ✅ | Fastify + Redis Streams + worker consumidor; `docker compose up` sobe tudo. |
+| 3 — Salas e fila | pendente | WebSocket, SQLite (rooms, queue_items), pré-carregamento dos próximos. |
+
+### Decisões e aprendizados da Fase 2
+- **Sem SQLite ainda.** A biblioteca é o próprio cache (`meta.json`); o estado dos jobs vive no Redis (`job:<id>`). O SQLite entra com salas e fila (Fase 3).
+- **A API serve o player e o `/media`** (um único servidor, mesma origem). O servidor de teste do `apps/web` foi removido. Não usamos `@fastify/static` (versões 8.x tinham falhas de path traversal); o servidor de arquivos próprio tem Range e testes de traversal.
+- **A API monta sempre a URL canônica** do YouTube a partir do ID; o usuário nunca escolhe o alvo do yt-dlp.
+- **Dedupe** de jobs no Redis por script Lua atômico: `pending`/`processing` não reenfileiram; `needs_lyrics` só reenfileira com letra nova (`PUT`); `failed` reenfileira com um novo `POST`.
+- **`source.json`** guarda os metadados e a legenda do vídeo no cache: trocar a letra não baixa o vídeo de novo.
+- **Recuperação de falhas:** o worker lê primeiro suas mensagens pendentes ao subir e reivindica (`XAUTOCLAIM`) as abandonadas há mais de `WORKER_STALE_SECONDS`. Testado com `SIGKILL` no meio da separação: o job terminou ao reiniciar o worker.
+- **Armadilha do redis-py:** o `socket_timeout` padrão (5 s) é igual ao `block` do `XREADGROUP`, o que derrubava o worker a cada ciclo ocioso; o worker agora usa `socket_timeout=30`.
+- **yt-dlp no container** exige um runtime JS (Deno) e `yt-dlp[default]` para resolver os desafios do YouTube, além de cookies de uma sessão logada.
+- **Legenda é opcional, áudio é essencial.** O download do áudio e o da legenda são chamadas separadas do yt-dlp: o YouTube responde `429` ao endpoint de legendas com frequência, e isso não pode derrubar o job. A legenda só é tentada se o vídeo tiver legenda **manual** nos idiomas pedidos; se falhar, o job termina em `needs_lyrics` com uma mensagem própria.
+- **Artista/título** valem também no `PUT /api/songs/:id/lyrics`: vídeos sem "Artista - Música" no título precisam deles para a busca no LRCLIB.
+- **Pesquisa de vídeos no YouTube** (fora do plano original; adicionada na Fase 2): `GET /api/search?q=`. A API não tem yt-dlp, então o pedido vai por Redis (`search:req` / `search:res:<id>`) para uma **thread própria do worker** (a busca não pode esperar atrás de um job longo de Demucs). Resultados em cache na API por 10 min.
+- **"Cantar sem letra"** (`source: none`) garante que qualquer vídeo entra na biblioteca, mesmo sem legenda e sem letra online.
+- **Duração da letra online:** o LRCLIB só serve se a duração bater (±5 s). Em covers isso falha com frequência (ex.: cover de 265 s contra versões de 180–213 s). A opção `loose` aceita a versão mais próxima, mas os tempos podem não bater; a solução de fundo é o alinhamento forçado com IA (Fase 5).
+- **Legenda do YouTube e HTTP 429:** testado com PO Token (`bgutil-ytdlp-pot-provider`) e impersonation (`curl_cffi`): não resolveu, e a falha também ocorre em outros vídeos, então é limite do YouTube para o IP/conta, não do vídeo. Não adicionamos esses componentes. A legenda segue como fonte oportunista.
+- **Alinhamento automático por IA** (antecipado da Fase 5, com aprovação): `lyrics.source = align`. O texto é do usuário; o Whisper (`small`, via `stable-ts`) só marca *quando* cada linha é cantada, ouvindo `vocals.mp3` (a voz isolada pelo Demucs, que passou a ficar no cache). O idioma vem da própria letra (`langdetect`). Medido em "Unethical" contra os tempos do LRCLIB: erro mediano 0,29 s, 49/55 linhas dentro de 1 s, pior caso 1,74 s (vozes de apoio). Custo: primeira vez ~45 s (baixa o modelo, ~460 MB, para o volume `models`); depois ~7 s com a voz em cache. Músicas processadas antes dessa mudança não têm `vocals.mp3`: o worker baixa e separa de novo na primeira vez que alinhar.
+- **Serviços externos fora do ar não viram falha do job:** o LRCLIB responde 503 de vez em quando; o worker tenta 3 vezes e, se persistir, o job para em `needs_lyrics` com "tente de novo".
+- **Busca de letra pelo Google: não é viável.** Testado: por HTTP simples o Google devolve a página "ative o JavaScript" (sem o painel de letras, `data-attrid="kc:/music/recording_cluster:lyrics"`); com Chrome headless cai em `/sorry` ("unusual traffic", captcha). Além de violar os termos do Google, é frágil. O painel é alimentado pela Musixmatch; o mesmo texto existe no LRCLIB, que é uma API aberta.
+- **"Buscar a letra na internet" agora = LRCLIB + IA.** Versão com tempos e mesma duração (±5 s) → usa os tempos prontos (`lrclib`); senão, usa o **texto** do candidato de duração mais próxima e a IA alinha com a voz (`lrclib+align`). A opção "colar texto com tempos de outra fonte" saiu da interface (a API `text` continua e cai para a IA quando não há referência). Músicas antigas, sem `vocals.mp3`, são baixadas e separadas de novo só quando a IA precisa (~30 s a mais, uma vez).
+- Indicações de seção como `[Chorus]` são descartadas antes do alinhamento (não são cantadas).

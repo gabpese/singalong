@@ -1,0 +1,6 @@
+storage/
+secrets/
+.git/
+**/node_modules/
+apps/worker/
+**/__pycache__/

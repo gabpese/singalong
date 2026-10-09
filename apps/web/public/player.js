@@ -1,5 +1,7 @@
 import { SoundTouchNode } from './vendor/soundtouch/SoundTouchNode.js';
-import { clampPitch, formatTime, lineProgress, locate, wordProgress, wordSpans } from './lyrics-sync.js';
+import {
+  clampPitch, describeLyricsSource, formatTime, isTypingTarget, lineProgress, locate, wordProgress, wordSpans,
+} from './lyrics-sync.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -87,6 +89,10 @@ async function loadSong(meta) {
   audio.pause();
   song = meta;
   cues = [];
+  // a tela só é redesenhada quando a posição da letra muda; ao trocar de música ela precisa ser refeita
+  // mesmo que a posição seja a mesma (ex.: as duas ainda "antes da 1ª linha"), senão fica o texto da anterior
+  lastKey = '';
+  clearLyricsDisplay();
   els.play.disabled = true;
   els.seek.disabled = true;
   setStatus('Carregando…');
@@ -108,13 +114,18 @@ async function loadSong(meta) {
   els.play.disabled = false;
   els.seek.disabled = false;
   els.duration.textContent = formatTime(meta.duration);
-  setStatus(`${meta.artist ?? ''} — ${meta.title ?? meta.video_id} · letra: ${meta.lyrics_source} (${cues.length} linhas)`);
+  setStatus(`${meta.artist ?? ''} — ${meta.title ?? meta.video_id} · letra: ${describeLyricsSource(meta.lyrics_source)}`);
   render();
 }
 
 // --- desenho da letra ---
 let lastKey = '';
 let words = []; // [{el, span, p}] da linha atual
+
+function clearLyricsDisplay() {
+  for (const el of [els.prev, els.current, els.next, els.next2]) el.textContent = '';
+  words = [];
+}
 
 /** Monta a linha atual com um <span> por palavra (cada um com seu próprio preenchimento). */
 function buildCurrentLine(text) {
@@ -150,7 +161,7 @@ function render() {
   if (key !== lastKey) {
     lastKey = key;
     els.prev.textContent = text(anchor - 1);
-    buildCurrentLine(current >= 0 ? text(current) : '');
+    buildCurrentLine(current >= 0 ? text(current) : cues.length ? '' : '♪ Sem letra para esta música');
     els.next.textContent = text(current >= 0 ? current + 1 : next);
     els.next2.textContent = text(current >= 0 ? current + 2 : next + 1);
   }
@@ -222,7 +233,7 @@ function toggleFullscreen() {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLSelectElement) return;
+  if (isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
   else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
     e.preventDefault();
@@ -232,17 +243,20 @@ document.addEventListener('keydown', (e) => {
 });
 
 // --- lista de músicas ---
-async function init() {
-  let songs = [];
+let songs = [];
+
+/** Recarrega a lista; `selectId` escolhe (e carrega) uma música específica, senão mantém/usa a primeira. */
+async function reloadSongs(selectId) {
   try {
     songs = await (await fetch('/api/songs')).json();
   } catch (err) {
     setStatus(`Erro ao listar músicas: ${err.message}`, true);
     return;
   }
+  els.song.textContent = '';
   if (!songs.length) {
-    els.song.innerHTML = '<option>Nenhuma música no cache</option>';
-    setStatus('Processe uma música com o worker (veja o README) e recarregue.', true);
+    els.song.innerHTML = '<option>Nenhuma música ainda</option>';
+    setStatus('Adicione uma música pelo painel “Adicionar música” abaixo.');
     return;
   }
   for (const s of songs) {
@@ -251,15 +265,27 @@ async function init() {
     opt.textContent = `${s.artist ?? '?'} — ${s.title ?? s.video_id}`;
     els.song.append(opt);
   }
-  els.song.addEventListener('change', () => loadSong(songs.find((s) => s.video_id === els.song.value)));
-  await loadSong(songs[0]);
+  // se há uma música tocando, uma música recém-adicionada NÃO a interrompe: só entra na lista
+  const keepCurrent = !audio.paused && song && selectId && selectId !== song.video_id;
+  const wanted = songs.find((s) => s.video_id === (keepCurrent ? song.video_id : selectId ?? song?.video_id)) ?? songs[0];
+  els.song.value = wanted.video_id;
+  // não recarrega se a música tocando é a mesma e não foi pedida (evita cortar o áudio)
+  if (!keepCurrent && (selectId || wanted.video_id !== song?.video_id)) await loadSong(wanted);
 }
+
+els.song.addEventListener('change', () => {
+  const next = songs.find((s) => s.video_id === els.song.value);
+  if (next) loadSong(next);
+});
+document.addEventListener('songs-changed', (e) => reloadSongs(e.detail?.video_id));
 
 // gancho de diagnóstico (testes no navegador)
 window.singalong = {
   get pitchSemitones() { return stNode?.pitchSemitones.value ?? null; },
   get metrics() { return stNode?.metrics ?? null; },
   get contextState() { return ctx?.state ?? null; },
+  get playing() { return !audio.paused; },
+  get currentSongId() { return song?.video_id ?? null; },
 };
 
-init();
+reloadSongs();

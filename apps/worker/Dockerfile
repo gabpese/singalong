@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY singalong_worker ./singalong_worker
 
 ENV TORCH_HOME=/models \
+    WHISPER_CACHE=/models/whisper \
     STORAGE_ROOT=/storage \
     PYTHONUNBUFFERED=1
 

@@ -41,7 +41,50 @@
       </div>
       <p class="hint" id="status">Carregando músicas…</p>
     </footer>
+
+    <details class="add" id="add">
+      <summary>Adicionar música</summary>
+      <form id="add-form" autocomplete="off">
+        <label class="field">Música
+          <span class="row find">
+            <input id="add-url" type="text" placeholder="Digite o nome da música ou cole um link do YouTube">
+            <button id="add-search" type="button">Buscar</button>
+          </span>
+        </label>
+        <ul class="results" id="add-results" hidden></ul>
+        <p class="picked" id="add-picked" hidden></p>
+
+        <label class="field">Letra
+          <select id="add-source">
+            <option value="auto">Usar a legenda do vídeo, se ele tiver</option>
+            <option value="lrclib">Buscar a letra na internet</option>
+            <option value="align">Colar a letra e sincronizar com a voz (IA)</option>
+            <option value="none">Cantar sem letra (só o instrumental)</option>
+            <optgroup label="Avançado">
+              <option value="file">Colar uma letra que já tem tempos (.lrc ou .srt)</option>
+            </optgroup>
+          </select>
+        </label>
+        <p class="hint" id="add-source-hint"></p>
+        <textarea id="add-text" rows="6" placeholder="Cole a letra aqui" aria-label="Letra" hidden></textarea>
+        <div class="row" id="add-names" hidden>
+          <label class="field">Artista
+            <input id="add-artist" type="text" placeholder="ajuda a achar a letra">
+          </label>
+          <label class="field">Nome da música
+            <input id="add-title" type="text" placeholder="ajuda a achar a letra">
+          </label>
+        </div>
+
+        <div class="row actions">
+          <button id="add-submit" type="submit">Adicionar</button>
+          <button id="add-cancel" type="button" hidden>Cancelar</button>
+        </div>
+        <p class="hint" id="add-status" role="status"></p>
+      </form>
+    </details>
   </main>
   <script type="module" src="player.js"></script>
+  <script type="module" src="add-song.js"></script>
 </body>
 </html>

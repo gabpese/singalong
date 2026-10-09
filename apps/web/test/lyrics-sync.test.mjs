@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clampPitch, formatTime, lineProgress, locate, wordProgress, wordSpans } from '../public/lyrics-sync.js';
+import {
+  clampPitch, describeLyricsSource, formatTime, isTypingTarget, lineProgress, locate, looksLikeLink, wordProgress, wordSpans,
+} from '../public/lyrics-sync.js';
 
 const cues = [
   { start: 10, end: 12, text: 'a' },
@@ -69,4 +71,37 @@ test('wordProgress: preenche na ordem de leitura, sem depender de quebra de linh
   for (let i = 1; i < half.length; i++) assert.ok(half[i] <= half[i - 1], `palavra ${i}`);
   assert.equal(half[0], 1); // início cheio
   assert.equal(half.at(-1), 0); // última ainda vazia ("rains" não enche junto com o começo)
+});
+
+test('isTypingTarget: campos de texto não perdem a digitação para os atalhos', () => {
+  assert.equal(isTypingTarget({ tagName: 'INPUT', type: 'text' }), true);
+  assert.equal(isTypingTarget({ tagName: 'INPUT' }), true);
+  assert.equal(isTypingTarget({ tagName: 'TEXTAREA' }), true);
+  assert.equal(isTypingTarget({ tagName: 'SELECT' }), true);
+  assert.equal(isTypingTarget({ tagName: 'BUTTON' }), true);
+  assert.equal(isTypingTarget({ tagName: 'DIV', isContentEditable: true }), true);
+  // sliders e o corpo da página continuam recebendo os atalhos
+  assert.equal(isTypingTarget({ tagName: 'INPUT', type: 'range' }), false);
+  assert.equal(isTypingTarget({ tagName: 'BODY' }), false);
+  assert.equal(isTypingTarget(null), false);
+});
+
+test('looksLikeLink: link vs pesquisa por nome', () => {
+  for (const v of ['https://www.youtube.com/watch?v=TLvtw4nXou0', 'youtu.be/TLvtw4nXou0', 'http://m.youtube.com/shorts/abc', 'TLvtw4nXou0', '  https://youtu.be/x  ']) {
+    assert.equal(looksLikeLink(v), true, v);
+  }
+  for (const v of ["jack's lament", 'Faouzia Unethical', 'a', '', undefined]) {
+    assert.equal(looksLikeLink(v), false, String(v));
+  }
+});
+
+test('describeLyricsSource: nada de jargão na tela', () => {
+  assert.equal(describeLyricsSource('none'), 'sem letra (só o instrumental)');
+  assert.equal(describeLyricsSource('lrclib'), 'buscada na internet');
+  assert.equal(describeLyricsSource('video'), 'legenda do vídeo');
+  assert.equal(describeLyricsSource('align'), 'seu texto, sincronizado com a voz por IA');
+  assert.equal(describeLyricsSource('lrclib+align'), 'buscada na internet, sincronizada com a voz por IA');
+  assert.equal(describeLyricsSource('text+lrclib'), 'seu texto, com os tempos da busca na internet');
+  assert.equal(describeLyricsSource('text+video'), 'seu texto, com os tempos da legenda do vídeo');
+  assert.equal(describeLyricsSource(undefined), 'desconhecida');
 });

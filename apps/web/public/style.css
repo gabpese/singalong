@@ -106,3 +106,48 @@ button:hover:not(:disabled) { border-color: var(--accent); }
 @media (max-width: 600px) {
   .knobs input[type=range] { width: 120px; }
 }
+
+/* painel "Adicionar música" */
+.add { background: var(--panel); border-radius: 12px; padding: 12px 16px; }
+.add summary { cursor: pointer; color: var(--dim); }
+.add[open] summary { margin-bottom: 12px; color: var(--fg); }
+.add form { display: grid; gap: 10px; }
+.add .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.add .row > * { flex: 1; min-width: 160px; }
+.add input[type=text], .add textarea {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid #2c2c44;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  width: 100%;
+}
+.add textarea { resize: vertical; }
+.add input:disabled { opacity: .5; }
+.add .row button { flex: 0 0 auto; }
+
+/* painel: pesquisa, rótulos e opções de letra */
+.add .field { display: grid; gap: 6px; color: var(--dim); font-size: .9rem; flex: 1; min-width: 160px; }
+.add .field.row, .add .find { display: flex; gap: 10px; }
+.add .find input { flex: 1; min-width: 0; }
+.add .find button { flex: 0 0 auto; }
+.add select { width: 100%; }
+.add .check { display: flex; gap: 10px; align-items: flex-start; color: var(--fg); font-size: .9rem; }
+.add .check input { margin-top: 3px; }
+.add .actions { align-items: center; }
+
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 340px; overflow-y: auto; }
+.result {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+}
+.result img { width: 96px; height: 54px; object-fit: cover; border-radius: 6px; flex: 0 0 auto; background: var(--bg); }
+.result .meta { display: grid; gap: 2px; min-width: 0; }
+.result strong { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-weight: 600; }
+.result small { color: var(--dim); }
+.picked { margin: 0; padding: 8px 12px; border-radius: 8px; background: var(--bg); color: var(--accent); font-size: .9rem; }

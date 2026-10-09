@@ -48,6 +48,47 @@ export function wordProgress(span, lineP) {
   return Math.min(Math.max((lineP - span.from) / width, 0), 1);
 }
 
+/**
+ * O foco está num controle que usa essas teclas por conta própria (campo de texto, lista, botão)?
+ * Os atalhos globais (Espaço, setas, F) não devem roubar a digitação nem o clique nativo.
+ * `target` só precisa de tagName/type/isContentEditable (aceita um objeto simples nos testes).
+ */
+export function isTypingTarget(target) {
+  if (!target) return false;
+  const tag = String(target.tagName ?? '').toUpperCase();
+  if (tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || target.isContentEditable) return true;
+  if (tag === 'INPUT') return !['range', 'checkbox', 'radio'].includes(String(target.type ?? 'text').toLowerCase());
+  return false;
+}
+
+/**
+ * Parece um link do YouTube (ou um ID de 11 caracteres)? Qualquer outra coisa é tratada como pesquisa.
+ * Uma palavra de 11 letras (ex.: "Bohemian...") também casa com o ID: o servidor valida de verdade.
+ */
+export function looksLikeLink(value) {
+  const v = String(value ?? '').trim();
+  return /^[\w-]{11}$/.test(v) || /^(https?:\/\/)?([\w-]+\.)?(youtube\.com|youtu\.be)\//i.test(v);
+}
+
+const LYRICS_SOURCES = {
+  video: 'legenda do vídeo',
+  lrclib: 'buscada na internet',
+  file: 'colada, com tempos',
+  align: 'seu texto, sincronizado com a voz por IA',
+  'lrclib+align': 'buscada na internet, sincronizada com a voz por IA',
+  none: 'sem letra (só o instrumental)',
+};
+
+/** Texto amigável para o `lyrics_source` do meta.json (ex.: "text+lrclib"). */
+export function describeLyricsSource(source) {
+  if (!source) return 'desconhecida';
+  if (source.startsWith('text+')) {
+    const donor = source.slice('text+'.length);
+    return `seu texto, com os tempos ${donor === 'video' ? 'da legenda do vídeo' : 'da busca na internet'}`;
+  }
+  return LYRICS_SOURCES[source] ?? source;
+}
+
 export const PITCH_MIN = -6;
 export const PITCH_MAX = 6;
 

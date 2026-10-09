@@ -6,11 +6,11 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 
-import yt_dlp
-
 from . import lyrics as lyr
+from .align import align_lyrics
 from .ids import extract_video_id
 from .storage import LocalStorage
 
@@ -40,8 +40,10 @@ def keys(video_id: str) -> dict[str, str]:
     base = f"cache/{video_id}"
     return {
         "instrumental": f"{base}/instrumental.mp3",
+        "vocals": f"{base}/vocals.mp3",  # só a voz: usada para alinhar a letra colada pelo usuário
         "lyrics": f"{base}/lyrics.json",
         "meta": f"{base}/meta.json",
+        "source": f"{base}/source.json",  # metadados do vídeo: evita baixar de novo só para trocar a letra
     }
 
 
@@ -52,14 +54,10 @@ def is_ready(storage: LocalStorage, video_id: str) -> bool:
 
 def download(url: str, workdir: Path, langs: list[str], cookies: Path | None = None) -> dict:
     """Baixa o áudio e as legendas MANUAIS (auto-legendas ficam de fora de propósito)."""
-    opts = {
-        "format": "bestaudio/best",
+    import yt_dlp  # import tardio: só quem baixa precisa dele (testes e consumo do cache não)
+
+    base = {
         "outtmpl": str(workdir / "source.%(ext)s"),
-        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-        "writesubtitles": True,
-        "writeautomaticsub": False,
-        "subtitleslangs": langs,
-        "subtitlesformat": "vtt/srt",
         "noplaylist": True,
         "quiet": True,
         "noprogress": True,
@@ -69,79 +67,175 @@ def download(url: str, workdir: Path, langs: list[str], cookies: Path | None = N
         # yt-dlp regrava o arquivo ao fechar; usa uma cópia para o original poder ser somente leitura
         cookie_copy = workdir / "cookies.txt"
         shutil.copyfile(cookies, cookie_copy)
-        opts["cookiefile"] = str(cookie_copy)
-    with yt_dlp.YoutubeDL(opts) as ydl:
+        base["cookiefile"] = str(cookie_copy)
+
+    # 1) o áudio é essencial: se falhar, o job falha
+    audio_opts = {**base, "format": "bestaudio/best", "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}]}
+    with yt_dlp.YoutubeDL(audio_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-    subs = sorted(workdir.glob("source.*.vtt")) + sorted(workdir.glob("source.*.srt"))
+
+    # 2) a legenda é opcional (há outras fontes de letra): só tenta se o vídeo TEM legenda manual e
+    #    nunca derruba o job (o YouTube responde 429 ao endpoint de legendas com frequência)
+    subtitle_text = None
+    subtitle_error = None
+    wanted =manual_subtitle_langs(info.get("subtitles") or {}, langs)
+    if wanted:
+        sub_opts = {**base, "skip_download": True, "writesubtitles": True, "writeautomaticsub": False,
+                    "subtitleslangs": wanted, "subtitlesformat": "vtt/srt"}
+        try:
+            with yt_dlp.YoutubeDL(sub_opts) as ydl:
+                ydl.extract_info(url, download=True)
+            subs = sorted(workdir.glob("source.*.vtt")) + sorted(workdir.glob("source.*.srt"))
+            subtitle_text = subs[0].read_text(encoding="utf-8", errors="replace") if subs else None
+        except yt_dlp.utils.DownloadError as exc:
+            print(f"aviso: legenda do vídeo indisponível ({exc}); seguindo sem ela")
+            subtitle_error = str(exc)
+
     return {
         "video_title": info.get("title"),
         "track": info.get("track"),
         "artist": info.get("artist") or info.get("creator"),  # sem fallback para o canal: costuma errar em covers
         "duration": info.get("duration"),
+        "subtitle_text": subtitle_text,
+        "subtitle_error": subtitle_error,  # o vídeo TEM legenda manual, mas o download falhou (ex.: 429)
         "audio": workdir / "source.wav",
-        "subtitle_file": subs[0] if subs else None,
     }
 
 
-def separate(audio: Path, workdir: Path, device: str | None) -> Path:
-    """Demucs (htdemucs, 2 stems) -> no_vocals.wav -> instrumental.mp3."""
+def manual_subtitle_langs(available: dict, langs: list[str]) -> list[str]:
+    """Idiomas de legenda MANUAL disponíveis que casam com os pedidos ('en' casa com 'en' e 'en-US'), na ordem pedida."""
+    chosen: list[str] = []
+    for want in langs:
+        for lang in available:
+            if (lang == want or lang.startswith(want + "-")) and lang not in chosen:
+                chosen.append(lang)
+    return chosen
+
+
+def separate(audio: Path, workdir: Path, device: str | None) -> tuple[Path, Path]:
+    """Demucs (htdemucs, 2 stems) -> (instrumental.mp3, vocals.mp3). A voz fica no cache: serve ao alinhamento da letra."""
     out = workdir / "demucs"
     cmd = [sys.executable, "-m", "demucs", "--two-stems=vocals", "-n", "htdemucs", "-o", str(out), str(audio)]
     if device:
         cmd += ["-d", device]
     subprocess.run(cmd, check=True)
-    no_vocals = next(out.rglob("no_vocals.wav"))
-    mp3 = workdir / "instrumental.mp3"
-    subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(no_vocals), "-codec:a", "libmp3lame", "-q:a", "2", str(mp3)],
-        check=True,
-    )
-    return mp3
+    paths = []
+    for stem, name in (("no_vocals.wav", "instrumental.mp3"), ("vocals.wav", "vocals.mp3")):
+        mp3 = workdir / name
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(next(out.rglob(stem))), "-codec:a", "libmp3lame", "-q:a", "2", str(mp3)],
+            check=True,
+        )
+        paths.append(mp3)
+    return paths[0], paths[1]
 
 
-def timing_donor(info: dict) -> tuple[list[dict], str]:
-    """Letra com tempos para servir de base: legenda do vídeo, senão LRCLIB."""
-    if info["subtitle_file"]:
-        text = info["subtitle_file"].read_text(encoding="utf-8", errors="replace")
-        return lyr.parse_cues(text), "video"
+class NeedsAlignment(Exception):
+    """Há o TEXTO da letra mas não os tempos: a IA precisa sincronizá-lo com a voz.
+
+    origin: 'align' (o usuário pediu), 'text' (o usuário colou, sem referência de tempo) ou 'lrclib' (texto achado online).
+    """
+
+    def __init__(self, text: str, origin: str):
+        super().__init__(origin)
+        self.text = text
+        self.origin = origin
+
+
+def _search_online(info: dict) -> list[dict]:
     if not (info["artist"] and info["title"]):
-        raise NeedsLyrics("sem artista/título para buscar no LRCLIB (use --artist e --title)")
-    results = lyr.search_lrclib(info["artist"], info["title"], info["duration"])
-    if not results:
-        raise NeedsLyrics("nenhuma letra sincronizada compatível no LRCLIB")
-    return lyr.parse_lrc(results[0]["syncedLyrics"]), "lrclib"
+        raise NeedsLyrics("Não consegui descobrir o artista e o nome da música pelo título do vídeo. Preencha os campos Artista e Título.")
+    try:
+        return lyr.search_lrclib(info["artist"], info["title"], info["duration"])
+    except lyr.LyricsServiceError as exc:
+        # serviço externo fora do ar não é falha do job: o usuário pode tentar de novo ou escolher outra opção
+        raise NeedsLyrics("O serviço de busca de letras na internet não respondeu agora. Tente de novo em instantes.") from exc
 
 
-def resolve_lyrics(source: str, info: dict, lyrics_file: Path | None) -> tuple[list[dict], str]:
-    """source: auto | video | lrclib | file | text. Devolve (cues, fonte_usada)."""
-    if source in ("auto", "video") and info["subtitle_file"]:
-        return timing_donor(info)
+def timing_donor(info: dict, loose: bool = False) -> tuple[list[dict], str]:
+    """Letra com tempos para servir de base: legenda do vídeo, senão a versão online de mesma duração."""
+    if info.get("subtitle_text"):
+        return lyr.parse_cues(info["subtitle_text"]), "video"
+    chosen, _closest = lyr.pick_candidate(_search_online(info), info["duration"], loose=loose)
+    if not chosen:
+        raise NeedsLyrics("Não achei essa letra com tempos, na duração deste vídeo.")
+    return lyr.parse_lrc(chosen["syncedLyrics"]), "lrclib"
+
+
+def online_lyrics(info: dict, loose: bool = False) -> tuple[list[dict], str]:
+    """Busca na internet: usa os tempos prontos quando a duração bate; senão devolve o TEXTO para a IA sincronizar."""
+    candidates = _search_online(info)
+    chosen, _closest = lyr.pick_candidate(candidates, info["duration"], loose=loose)
+    if chosen:
+        return lyr.parse_lrc(chosen["syncedLyrics"]), "lrclib"
+    best = lyr.best_text_candidate(candidates, info["duration"])
+    if best:
+        raise NeedsAlignment(lyr.candidate_text(best), "lrclib")
+    raise NeedsLyrics("Não achei essa letra na internet. Confira o artista e o nome da música, ou cole a letra.")
+
+
+def resolve_lyrics(
+    source: str, info: dict, lyrics_text: str | None, loose: bool = False
+) -> tuple[list[dict], str]:
+    """source: auto | video | lrclib | file | text | align | none. Devolve (cues, fonte_usada).
+
+    Levanta NeedsAlignment quando só há o texto (a IA sincroniza depois) e NeedsLyrics quando falta uma decisão do usuário.
+    lyrics_text: com 'file', letra COM tempos (LRC/SRT/VTT); com 'text'/'align', letra pura.
+    loose: usa letra online de versão com duração diferente, com os tempos dela (sem IA).
+    """
+    if source == "none":
+        return [], "none"
+    if source in ("auto", "video") and info.get("subtitle_text"):
+        return timing_donor(info, loose)
     if source == "video":
-        raise NeedsLyrics("o vídeo não tem legenda manual")
-    if source in ("file", "text") and not lyrics_file:
-        raise ValueError(f"--lyrics {source} exige --lyrics-file")
+        raise NeedsLyrics("Este vídeo não tem legenda que eu consiga usar.")
+    if source in ("file", "text", "align") and not (lyrics_text or "").strip():
+        raise ValueError("Cole a letra no campo de texto.")
     if source == "file":
-        return lyr.parse_lyrics_file(lyrics_file.read_text(encoding="utf-8")), "file"
+        return lyr.parse_lyrics_file(lyrics_text), "file"
+    if source == "align":
+        raise NeedsAlignment(lyrics_text, "align")
     if source == "text":
-        timed, donor = timing_donor(info)
-        return lyr.apply_text(lyrics_file.read_text(encoding="utf-8"), timed), f"text+{donor}"
+        # tenta os tempos de outra fonte; sem referência (ou com número de linhas diferente), a IA sincroniza
+        try:
+            timed, donor = timing_donor(info, loose)
+            return lyr.apply_text(lyrics_text, timed), f"text+{donor}"
+        except (NeedsLyrics, ValueError):
+            raise NeedsAlignment(lyrics_text, "text") from None
     if source == "lrclib":
-        return timing_donor(info)
-    raise NeedsLyrics("sem legenda no vídeo: escolha --lyrics lrclib, file ou text")
+        return online_lyrics(info, loose)
+    if info.get("subtitle_error"):
+        raise NeedsLyrics(
+            "O vídeo tem legenda, mas o YouTube bloqueou o download dela por excesso de pedidos. "
+            "Escolha outra opção de letra (ou tente de novo mais tarde)."
+        )
+    raise NeedsLyrics("Este vídeo não tem legenda. Escolha como você quer a letra.")
+
+
+def _write_json(path: Path, data, **kwargs) -> Path:
+    path.write_text(json.dumps(data, ensure_ascii=False, **kwargs), encoding="utf-8")
+    return path
 
 
 def process(
     url: str,
     storage: LocalStorage,
     lyrics_source: str = "auto",
-    lyrics_file: Path | None = None,
+    lyrics_text: str | None = None,
     device: str | None = None,
     langs: list[str] | None = None,
     force: bool = False,
     cookies: Path | None = None,
     artist: str | None = None,
     title: str | None = None,
+    on_stage: Callable[[str], None] | None = None,
+    lyrics_loose: bool = False,
 ) -> dict:
+    """Etapas informadas em on_stage: downloading, separating, lyrics, aligning.
+
+    lyrics_source: auto | video | lrclib | file | text | align | none ('align' sincroniza `lyrics_text` com a voz, por IA).
+    """
+    notify = on_stage or (lambda stage: None)
     video_id = extract_video_id(url)
     if not video_id:
         raise ValueError(f"URL do YouTube inválida: {url!r}")
@@ -156,29 +250,76 @@ def process(
     timings: dict[str, float] = {}
     with tempfile.TemporaryDirectory(prefix=f"singalong-{video_id}-") as tmp:
         work = Path(tmp)
+        audio = None
+        vocals_file: Path | None = None
 
-        t = time.monotonic()
-        print(f"[1/3] baixando {video_id}...")
-        info = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies)
-        timings["download"] = round(time.monotonic() - t, 1)
-        # prioridade: --artist/--title > metadados do YouTube > "Artista - Música" do título do vídeo
+        need_separation = not storage.exists(k["instrumental"])  # a voz, se faltar, é obtida só quando a IA precisar
+
+        if storage.exists(k["source"]) and not need_separation:
+            print("[1/3] metadados do vídeo no cache, sem baixar")
+            info = json.loads(storage.read(k["source"]))
+        else:
+            notify("downloading")
+            t = time.monotonic()
+            print(f"[1/3] baixando {video_id}...")
+            info = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies)
+            audio = info.pop("audio")
+            timings["download"] = round(time.monotonic() - t, 1)
+
+        # prioridade: artista/título informados > metadados do YouTube > "Artista - Música" do título do vídeo
+        info["artist_override"] = artist or info.get("artist_override")
+        info["title_override"] = title or info.get("title_override")
+        _write_json(work / "source.json", info)
+        storage.put(k["source"], work / "source.json")
         g_artist, g_title = guess_artist_title(info["video_title"] or "")
-        info["artist"] = artist or info["artist"] or g_artist
-        info["title"] = title or info["track"] or g_title or info["video_title"]
+        info["artist"] = info["artist_override"] or info["artist"] or g_artist
+        info["title"] = info["title_override"] or info["track"] or g_title or info["video_title"]
 
-        if not storage.exists(k["instrumental"]):
+        if need_separation:
+            notify("separating")
             t = time.monotonic()
             print("[2/3] separando vocal (demucs)...")
-            storage.put(k["instrumental"], separate(info["audio"], work, device))
+            instrumental_file, vocals_file = separate(audio, work, device)
+            storage.put(k["instrumental"], instrumental_file)
+            storage.put(k["vocals"], vocals_file)
             timings["separate"] = round(time.monotonic() - t, 1)
         else:
             print("[2/3] instrumental já existe, pulando")
 
+        def get_vocals() -> Path:
+            """A voz isolada: do cache, ou (músicas antigas, sem vocals.mp3) baixa e separa de novo."""
+            nonlocal vocals_file
+            if vocals_file is not None:
+                return vocals_file
+            if storage.exists(k["vocals"]):
+                vocals_file = work / "vocals.mp3"
+                vocals_file.write_bytes(storage.read(k["vocals"]))
+                return vocals_file
+            notify("downloading")
+            fresh = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies)
+            notify("separating")
+            instrumental_file, vocals_file = separate(fresh["audio"], work, device)
+            if not storage.exists(k["instrumental"]):
+                storage.put(k["instrumental"], instrumental_file)
+            storage.put(k["vocals"], vocals_file)
+            return vocals_file
+
+        notify("lyrics")
         print("[3/3] resolvendo letra...")
-        cues, source = resolve_lyrics(lyrics_source, info, lyrics_file)
-        lyrics_json = work / "lyrics.json"
-        lyrics_json.write_text(json.dumps(cues, ensure_ascii=False), encoding="utf-8")
-        storage.put(k["lyrics"], lyrics_json)
+        try:
+            cues, source = resolve_lyrics(lyrics_source, info, lyrics_text, lyrics_loose)
+        except NeedsAlignment as need:
+            # há o texto, faltam os tempos: a IA descobre quando cada linha é cantada, ouvindo a voz
+            if not need.text.strip():
+                raise ValueError("Cole a letra no campo de texto.") from None
+            vocals = get_vocals()
+            notify("aligning")
+            t = time.monotonic()
+            print(f"[3/3] alinhando a letra com a voz (IA; texto: {need.origin})...")
+            cues = align_lyrics(vocals, need.text, device=device)
+            source = "lrclib+align" if need.origin == "lrclib" else "align"
+            timings["align"] = round(time.monotonic() - t, 1)
+        storage.put(k["lyrics"], _write_json(work / "lyrics.json", cues))
 
         meta = {
             "video_id": video_id,
@@ -190,7 +331,5 @@ def process(
             "pipeline_version": PIPELINE_VERSION,
             "timings_s": timings,
         }
-        meta_json = work / "meta.json"
-        meta_json.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-        storage.put(k["meta"], meta_json)  # meta por último: marca o item como "pronto"
+        storage.put(k["meta"], _write_json(work / "meta.json", meta, indent=2))  # por último: marca como "pronto"
     return meta

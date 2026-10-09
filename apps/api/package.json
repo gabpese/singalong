@@ -1,0 +1,16 @@
+{
+  "name": "@singalong/api",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "ioredis": "^5.4.0"
+  }
+}

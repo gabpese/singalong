@@ -1,6 +1,8 @@
 """Parsers de SRT/VTT/LRC e busca no LRCLIB. Saída normalizada: [{start, end, text}] em segundos."""
 import json
 import re
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -74,19 +76,75 @@ def parse_lyrics_file(text: str) -> list[dict]:
     return cues
 
 
-def search_lrclib(artist: str, title: str, duration: float | None, tolerance: float = 5.0) -> list[dict]:
-    """Candidatos com letra sincronizada. Filtra por duração quando conhecida."""
+class LyricsServiceError(Exception):
+    """O serviço de letras na internet não respondeu (fora do ar, lento ou resposta inválida)."""
+
+
+def _fetch_json(req, attempts: int = 3, pause: float = 1.0):
+    """GET com novas tentativas em falhas transitórias (5xx, rede, timeout); 4xx não adianta repetir."""
+    last: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as exc:
+            last = exc
+            if exc.code < 500:
+                break
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+            last = exc
+        if attempt + 1 < attempts:
+            time.sleep(pause * (attempt + 1))
+    raise LyricsServiceError(str(last)) from last
+
+
+def search_lrclib(artist: str, title: str, duration: float | None = None) -> list[dict]:
+    """Candidatos com letra sincronizada; com `duration`, os de duração mais próxima primeiro."""
     params = {"track_name": title, "artist_name": artist}
     req = urllib.request.Request(
         f"{LRCLIB_URL}/search?{urllib.parse.urlencode(params)}", headers={"User-Agent": USER_AGENT}
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        results = json.load(resp)
-    ok = [r for r in results if r.get("syncedLyrics")]
+    results = _fetch_json(req)
+    # qualquer candidato com letra (com tempos OU só texto): o texto serve ao alinhamento por IA
+    found = [r for r in results if (r.get("syncedLyrics") or r.get("plainLyrics")) and r.get("duration")]
     if duration:
-        ok = [r for r in ok if r.get("duration") and abs(r["duration"] - duration) <= tolerance]
-        ok.sort(key=lambda r: abs(r["duration"] - duration))
-    return ok
+        found.sort(key=lambda r: abs(r["duration"] - duration))
+    return found
+
+
+def pick_candidate(candidates: list[dict], duration: float | None, tolerance: float = 5.0, loose: bool = False):
+    """Escolhe, entre os candidatos COM TEMPOS, o que tem a duração do vídeo (±tolerance s).
+
+    Com `loose`, aceita o mais próximo mesmo fora da tolerância (a letra pode ficar fora do tempo).
+    Devolve (candidato | None, mais_proximo | None); o segundo serve para explicar a recusa.
+    """
+    synced = [c for c in candidates if c.get("syncedLyrics")]
+    if not synced:
+        return None, None
+    closest = min(synced, key=lambda r: abs(r["duration"] - duration)) if duration else synced[0]
+    if not duration or abs(closest["duration"] - duration) <= tolerance or loose:
+        return closest, closest
+    return None, closest
+
+
+_LRC_STAMP = re.compile(r"\[\d+:\d{2}(?:[.:]\d{1,3})?\]")
+
+
+def candidate_text(candidate: dict) -> str:
+    """Só o texto da letra de um candidato (sem tempos), uma linha por verso."""
+    plain = (candidate.get("plainLyrics") or "").strip()
+    if plain:
+        return plain
+    lines = (_LRC_STAMP.sub("", ln).strip() for ln in (candidate.get("syncedLyrics") or "").splitlines())
+    return "\n".join(ln for ln in lines if ln)
+
+
+def best_text_candidate(candidates: list[dict], duration: float | None) -> dict | None:
+    """O candidato com texto de duração mais próxima da do vídeo (a letra é a mesma; só os tempos diferem)."""
+    with_text = [c for c in candidates if candidate_text(c)]
+    if not with_text:
+        return None
+    return min(with_text, key=lambda r: abs(r["duration"] - duration)) if duration else with_text[0]
 
 
 def apply_text(text: str, timed: list[dict]) -> list[dict]:
@@ -97,7 +155,7 @@ def apply_text(text: str, timed: list[dict]) -> list[dict]:
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if len(lines) != len(timed):
         raise ValueError(
-            f"o texto tem {len(lines)} linhas e a fonte de tempos tem {len(timed)}; "
-            "ajuste o texto para ter o mesmo número de linhas"
+            f"Sua letra tem {len(lines)} linhas, mas a letra usada como referência de tempo tem {len(timed)}. "
+            "Ajuste para o mesmo número de linhas (uma linha por verso)."
         )
     return [{"start": c["start"], "end": c["end"], "text": line} for line, c in zip(lines, timed)]

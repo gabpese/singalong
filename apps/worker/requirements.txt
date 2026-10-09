@@ -1,3 +1,6 @@
 yt-dlp[default]
 demucs==4.0.1
 soundfile
+redis>=5
+stable-ts
+langdetect
