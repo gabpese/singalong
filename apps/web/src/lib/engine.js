@@ -71,8 +71,13 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
 
   function applyBacking() {
     const level = backingLevel / 100;
-    if (backingGain) backingGain.gain.value = level;
-    else backing.volume = level; // sem o grafo de áudio (http fora de localhost) o volume do próprio elemento faz o papel
+    if (backingGain) {
+      backingGain.gain.value = level;
+      // o volume do ELEMENTO vale antes do grafo de áudio: preso em 0 (como ficava, enquanto o grafo não existia) ele cala o apoio
+      backing.volume = 1;
+    } else {
+      backing.volume = level; // sem o grafo de áudio (http fora de localhost) o volume do próprio elemento faz o papel
+    }
     if (!backingWanted()) {
       backing.pause();
       return;
@@ -287,6 +292,14 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
     get hasBacking() { return Boolean(backingUrl); },
     get backingPlaying() { return !backing.paused; },
     get backingTime() { return backing.currentTime; },
+    /** Diagnóstico do apoio (elemento de áudio e grafo): para entender por que ele não soa. */
+    get backingDebug() {
+      return {
+        readyState: backing.readyState, networkState: backing.networkState, error: backing.error?.code ?? null, paused: backing.paused,
+        muted: backing.muted, volume: backing.volume, src: backing.currentSrc, duration: backing.duration,
+        gain: backingGain?.gain.value ?? null, ctx: ctx?.state ?? null, graph: Boolean(stNode),
+      };
+    },
     get offset() { return offset; },
   };
 }

@@ -36,7 +36,7 @@ async function seed(root) {
     const dir = join(root, 'cache', song.id);
     await mkdir(dir, { recursive: true });
     await copyFile(join(here, 'fixtures', 'tone.mp3'), join(dir, 'instrumental.mp3'));
-    if (song.backing) await copyFile(join(here, 'fixtures', 'tone.mp3'), join(dir, 'backing.mp3')); // só algumas músicas têm vozes de apoio
+    if (song.backing) await copyFile(join(here, 'fixtures', 'tone-440.mp3'), join(dir, 'backing.mp3')); // só algumas músicas têm vozes de apoio (num tom diferente do instrumental: a soma dos dois fica mensurável)
     await writeFile(join(dir, 'lyrics.json'), JSON.stringify(LYRICS));
     await writeFile(join(dir, 'melody.json'), JSON.stringify(MELODY));
     await writeFile(
@@ -49,8 +49,9 @@ async function seed(root) {
   }
 }
 
-const root = await mkdtemp(join(tmpdir(), 'singalong-e2e-'));
-await seed(root);
+// E2E_STORAGE: usa uma pasta de músicas de verdade (só leitura) em vez das de teste (diagnóstico com arquivos reais)
+const root = process.env.E2E_STORAGE ? resolve(process.env.E2E_STORAGE) : await mkdtemp(join(tmpdir(), 'singalong-e2e-'));
+if (!process.env.E2E_STORAGE) await seed(root);
 const jobs = createMemoryJobStore();
 const app = buildApp({ config: { publicDir, publicUrl: '', rateLimits: { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } } }, storage: new LocalStorage(root), jobs });
 
