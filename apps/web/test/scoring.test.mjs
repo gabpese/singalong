@@ -67,11 +67,23 @@ test('noteName: nome da nota com a oitava', () => {
 });
 
 test('createScorer: segura a última nota por 150 ms (consoantes e respirações não contam como silêncio)', () => {
-  const s = createScorer({ hop: 0.05, midi: [60, 60, 60, 60, 60, 60, 60, 60] });
+  const s = createScorer({ hop: 0.05, midi: Array(12).fill(60) });
   s.tick(0.0, 60);
   s.tick(0.05, null); // 50 ms: ainda vale a nota segurada
   s.tick(0.1, null);
   assert.equal(s.score(), 100);
-  s.tick(0.3, null); // 300 ms depois: silêncio de verdade
+  s.tick(0.5, null); // 500 ms depois, em outro trecho: silêncio de verdade
   assert.equal(s.score(), 75);
+});
+
+test('createScorer: pontua por trechos de 0,3 s, então errar um instante no meio de um trecho não derruba a nota', () => {
+  const s = createScorer({ hop: 0.05, midi: Array(12).fill(60) });
+  for (let i = 0; i < 12; i++) s.tick(i * 0.05 + 0.01, i === 2 || i === 8 ? 90 : 60); // um deslize em cada trecho
+  assert.equal(s.score(), 100);
+});
+
+test('createScorer: tolera até 1,5 semitom de erro (voz humana oscila)', () => {
+  const s = createScorer({ hop: 0.05, midi: Array(6).fill(60) });
+  for (let i = 0; i < 6; i++) s.tick(i * 0.05 + 0.01, 61.4);
+  assert.equal(s.score(), 100);
 });

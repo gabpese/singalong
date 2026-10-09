@@ -53,14 +53,18 @@ export function pitchClassDistance(a, b) {
   return Math.min(d, 12 - d);
 }
 
-const FULL = 1; // semitones de tolerância para o acerto inteiro
-const HALF = 2; // ...e para meio acerto
+const FULL = 1.5; // semitones de tolerância para o acerto inteiro (voz humana oscila: vibrato, escorregadas)
+const HALF = 2.5; // ...e para meio acerto
+const WINDOW_FRAMES = 6; // a nota vale por trechos de 0,3 s: ninguém canta com precisão de 50 ms
+const WINDOW_FULL = 0.6; // trecho com 60% ou mais de acertos conta inteiro
+const WINDOW_HALF = 0.3; // ...com 30% ou mais, conta metade
 const HOLD_SECONDS = 0.15; // o detector falha em consoantes e respirações: vale a última nota captada há menos de 150 ms
 const LAG_FRAMES = 4; // o som do microfone chega até 200 ms depois da nota de referência (ouvir, cantar, captar)
 
 /**
  * Acompanha a música quadro a quadro (50 ms). `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
  * Só contam os quadros em que a voz original canta; quadros já avaliados (seek para trás) não contam duas vezes.
+ * Os quadros se agrupam em trechos de 0,3 s, e cada trecho vale pela fração de acertos dele (ver WINDOW_*).
  */
 export function createScorer(melody, { transpose = 0 } = {}) {
   const { hop, midi } = melody;
@@ -70,7 +74,7 @@ export function createScorer(melody, { transpose = 0 } = {}) {
   let heldNote = null;
   let heldAt = -Infinity;
   let reference = null; // nota de referência do quadro atual, já no tom escolhido
-  let points = 0;
+  const windows = new Map(); // trecho -> { n: quadros com voz avaliados, hit: pontos de acerto }
 
   return {
     /** t = posição da música (s); sung = nota MIDI captada no microfone (ou null: silêncio). Devolve a nota ao vivo (0..100) ou null. */
@@ -86,19 +90,30 @@ export function createScorer(melody, { transpose = 0 } = {}) {
       seen[idx] = 1;
       if (midi[idx] < 0) return this.score(); // sem voz no original: nada a avaliar
       counted++;
+      const win = windows.get(Math.floor(idx / WINDOW_FRAMES)) ?? { n: 0, hit: 0 };
+      windows.set(Math.floor(idx / WINDOW_FRAMES), win);
+      win.n++;
       if (sung != null) {
         let best = Infinity;
         for (let j = idx - LAG_FRAMES; j <= idx + 1; j++) {
           if (midi[j] >= 0) best = Math.min(best, pitchClassDistance(sung, midi[j] + shift));
         }
-        points += best <= FULL ? 1 : best <= HALF ? 0.5 : 0;
+        win.hit += best <= FULL ? 1 : best <= HALF ? 0.5 : 0;
       }
       return this.score();
     },
     /** O tom pode mudar no meio da música: a melodia de referência acompanha. */
     setTranspose(semitones) { shift = semitones; },
     /** Nota 0..100 (null enquanto não houve nenhum quadro avaliado). */
-    score: () => (counted ? Math.round((100 * points) / counted) : null),
+    score() {
+      if (!counted) return null;
+      let points = 0;
+      for (const { n, hit } of windows.values()) {
+        const ratio = hit / n;
+        points += n * (ratio >= WINDOW_FULL ? 1 : ratio >= WINDOW_HALF ? 0.5 : 0);
+      }
+      return Math.round((100 * points) / counted);
+    },
     get reference() { return reference; },
     get evaluated() { return counted; },
   };
