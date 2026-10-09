@@ -1,5 +1,5 @@
 // Card "Tocando agora": a música, quem canta, a barra de progresso e os controles do anfitrião.
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { describeLyricsSource } from '../lib/lyrics-sync.js';
 import { keySummary } from '../lib/music.js';
 import { formatDuration, nextUp, progressPercent, splitQueue, thumbnailUrl } from '../lib/queue-view.js';
@@ -23,21 +23,72 @@ export function NextSinger({ state }: { state: RoomState }) {
   );
 }
 
+/**
+ * Barra de progresso da música. Para o anfitrião ela é um player: arrastar muda a posição (a TV vai para esse ponto ao
+ * soltar). Os demais só acompanham.
+ */
 function Progress({ state, current, position }: { state: RoomState; current: QueueItem; position: Position }) {
+  const { act, isHost } = useRoom();
   const [, tick] = useState(0);
+  const [drag, setDrag] = useState<number | null>(null); // segundo para onde a barra está sendo arrastada
+  const [hold, setHold] = useState<{ seconds: number; until: number } | null>(null); // mantém o destino até a TV informar a nova posição
+  const slider = useRef<HTMLInputElement>(null);
+  const commitRef = useRef<(seconds: number) => void>(() => {});
+
   useEffect(() => {
     const timer = setInterval(() => tick((n) => n + 1), 500); // a barra anda sozinha entre uma posição da TV e a outra
     return () => clearInterval(timer);
   }, []);
-  const elapsed = state.playback === 'playing' ? performance.now() - position.at : 0;
-  const ms = position.itemId === current.id ? position.ms + elapsed : 0;
+
   const duration = current.song.duration;
+  const elapsed = state.playback === 'playing' ? performance.now() - position.at : 0;
+  const playedMs = position.itemId === current.id ? position.ms + elapsed : 0;
+  const holding = hold && performance.now() < hold.until ? hold.seconds : null;
+  const shownSeconds = drag ?? holding ?? playedMs / 1000;
+
+  commitRef.current = (seconds: number) => {
+    setDrag(null);
+    setHold({ seconds, until: performance.now() + 1500 });
+    void act('POST', '/player/seek', { to: seconds }).catch(() => {});
+  };
+  // o "change" nativo só dispara ao SOLTAR a barra (ou ao confirmar pelo teclado): é aí que a TV muda de posição
+  useEffect(() => {
+    const element = slider.current;
+    if (!element) return;
+    const onChange = () => commitRef.current(Number(element.value));
+    element.addEventListener('change', onChange);
+    return () => element.removeEventListener('change', onChange);
+  }, [isHost, duration]);
+
+  const time = `${formatDuration(shownSeconds)}${duration ? ` / ${formatDuration(duration)}` : ''}`;
+  if (!isHost || !duration) {
+    return (
+      <div className="progress">
+        <div className="track">
+          <div className="bar" style={{ width: `${progressPercent(playedMs, duration)}%` }} />
+        </div>
+        <span className="time">{time}</span>
+      </div>
+    );
+  }
+  const max = Math.floor(duration);
+  const value = Math.min(Math.max(shownSeconds, 0), max);
   return (
     <div className="progress">
-      <div className="track">
-        <div className="bar" style={{ width: `${progressPercent(ms, duration)}%` }} />
-      </div>
-      <span className="time">{`${formatDuration(ms / 1000)}${duration ? ` / ${formatDuration(duration)}` : ''}`}</span>
+      <input
+        ref={slider}
+        type="range"
+        className="seek"
+        min={0}
+        max={max}
+        step={1}
+        value={value}
+        aria-label="Posição da música"
+        aria-valuetext={formatDuration(value)}
+        style={{ '--fill': `${(value / max) * 100}%` } as CSSProperties}
+        onChange={(event) => setDrag(Number(event.target.value))}
+      />
+      <span className="time">{time}</span>
     </div>
   );
 }
@@ -80,17 +131,17 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
             <div className="controls-row">
               {isHost && (
                 <>
-                  <button type="button" onClick={() => run('POST', `/player/${state.playback === 'paused' ? 'resume' : 'pause'}`)}>
-                    {state.playback === 'paused' ? 'Retomar' : 'Pausar'}
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={state.playback === 'paused' ? 'Retomar' : 'Pausar'}
+                    title={state.playback === 'paused' ? 'Retomar' : 'Pausar'}
+                    onClick={() => run('POST', `/player/${state.playback === 'paused' ? 'resume' : 'pause'}`)}
+                  >
+                    <Icon name={state.playback === 'paused' ? 'resume' : 'pause'} />
                   </button>
-                  <button type="button" aria-label="Voltar 10 segundos" onClick={() => run('POST', '/player/seek', { seconds: -10 })}>
-                    ⏪ 10s
-                  </button>
-                  <button type="button" aria-label="Avançar 10 segundos" onClick={() => run('POST', '/player/seek', { seconds: 10 })}>
-                    10s ⏩
-                  </button>
-                  <button type="button" onClick={() => run('POST', '/player/skip')}>
-                    Pular
+                  <button type="button" className="icon-btn" aria-label="Pular" title="Pular para a próxima música" onClick={() => run('POST', '/player/skip')}>
+                    <Icon name="next-song" />
                   </button>
                 </>
               )}

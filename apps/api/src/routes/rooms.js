@@ -94,9 +94,18 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
   app.post('/rooms/:code/player/seek', {
     schema: {
       params: { type: 'object', properties: { code: CODE_PARAM } },
-      body: { type: 'object', additionalProperties: false, properties: { seconds: { type: 'integer', minimum: -120, maximum: 120 } }, required: ['seconds'] },
+      // ou o ponto de destino (`to`, em segundos), ou quanto avançar/voltar (`seconds`)
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          seconds: { type: 'integer', minimum: -120, maximum: 120 },
+          to: { type: 'number', minimum: 0, maximum: 86_400 },
+        },
+        oneOf: [{ required: ['seconds'] }, { required: ['to'] }],
+      },
     },
-  }, async (request) => (await rooms.seek(request.params.code, request.body.seconds, actorOf(request))).state);
+  }, async (request) => (await rooms.seek(request.params.code, request.body, actorOf(request))).state);
 
   app.put('/rooms/:code/songs/:videoId/offset', {
     schema: {

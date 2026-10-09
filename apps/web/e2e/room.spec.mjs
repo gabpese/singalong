@@ -80,7 +80,7 @@ test('o que toca agora e a fila: quem canta, próximo e contagem', async ({ page
   await expect(page.getByText('A TV não está conectada')).toBeVisible();
 });
 
-test('anfitrião: pausar, retomar, avançar, voltar e pular', async ({ page, request }) => {
+test('anfitrião: pausar, retomar e pular, com os botões de ícone', async ({ page, request }) => {
   const room = await createRoom(request);
   await addToQueue(request, room.code, SONGS.alpha, { name: 'Ana' });
   await addToQueue(request, room.code, SONGS.bravo, { client: BIA, name: 'Bia' });
@@ -88,19 +88,56 @@ test('anfitrião: pausar, retomar, avançar, voltar e pular', async ({ page, req
   await page.getByRole('button', { name: 'Pausar' }).click();
   await expect(page.getByRole('button', { name: 'Retomar' })).toBeVisible();
   expect((await roomState(request, room.code, { host: room.host })).playback).toBe('paused');
+  await expect(page.getByRole('button', { name: 'Retomar' }).locator('.icon.i-resume')).toBeVisible(); // o ícone muda com o estado
   await page.getByRole('button', { name: 'Retomar' }).click();
-  await expect(page.getByRole('button', { name: 'Pausar' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Voltar 10 segundos' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Avançar 10 segundos' })).toBeVisible();
-  await page.getByRole('button', { name: 'Avançar 10 segundos' }).click(); // sem TV conectada: só não pode dar erro
-  await expect(toast(page)).not.toHaveClass(/error/);
+  await expect(page.getByRole('button', { name: 'Pausar' }).locator('.icon.i-pause')).toBeVisible();
+  // os botões de 10 s deram lugar à barra de posição
+  await expect(page.getByRole('button', { name: 'Voltar 10 segundos' })).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: 'Posição da música' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pular' }).locator('.icon.i-next-song')).toBeVisible();
   await page.getByRole('button', { name: 'Pular' }).click();
   await expect(page.getByText('Bia está cantando')).toBeVisible();
   await expect(page.getByText('Ninguém na fila.')).toBeVisible();
 });
 
+test('barra de posição: o anfitrião arrasta e a TV vai para esse ponto; os outros só acompanham', async ({ page, browser, context, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { name: 'Ana' });
+  const tv = await context.newPage();
+  await tv.goto(room.tvUrl);
+  await expect.poll(() => tv.evaluate(() => window.tv.engine.playing && window.tv.engine.currentTime > 0)).toBe(true);
+  await page.goto(room.hostUrl);
+
+  const slider = page.getByRole('slider', { name: 'Posição da música' });
+  await expect(slider).toHaveAttribute('max', '30'); // a duração da música de teste
+  await slider.fill('20'); // arrastar e soltar em 0:20
+  await expect(page.locator('.progress .time')).toContainText(/0:2\d \/ 0:30/); // o destino aparece na hora (e segue tocando daí)
+  await expect.poll(() => tv.evaluate(() => window.tv.engine.currentTime)).toBeGreaterThan(19);
+  await slider.fill('3'); // voltar também vale
+  await expect.poll(() => tv.evaluate(() => window.tv.engine.currentTime)).toBeLessThan(10);
+  // a barra volta a acompanhar a música, a partir do novo ponto
+  await expect.poll(async () => Number(await slider.inputValue())).toBeLessThan(15);
+
+  // quem não é anfitrião vê a barra, sem poder arrastar
+  const guest = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+  await guest.goto(room.guestUrl);
+  await expect(guest.locator('.progress .bar')).toBeVisible();
+  await expect(guest.getByRole('slider', { name: 'Posição da música' })).toHaveCount(0);
+});
+
+test('os botões de tom e a prévia usam ícones de mais e menos', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { name: 'Ana' });
+  await page.goto(room.hostUrl);
+  const pitch = page.locator('.now .pitch');
+  await expect(pitch.getByRole('button', { name: 'Tom mais grave' }).locator('.icon.i-minus')).toBeVisible();
+  await expect(pitch.getByRole('button', { name: 'Tom mais agudo' }).locator('.icon.i-plus')).toBeVisible();
+});
+
 test('anfitrião: ajuste da letra, tom, mover e remover na fila', async ({ page, request }) => {
   const room = await createRoom(request);
+  // o ajuste da letra é guardado por música (vale em qualquer sala): começa do zero, não do que outro teste deixou
+  await request.put(`/api/rooms/${room.code}/songs/${SONGS.alpha.id}/offset`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data: { offset: 0 } });
   await addToQueue(request, room.code, SONGS.alpha, { name: 'Ana' });
   await addToQueue(request, room.code, SONGS.bravo, { client: BIA, name: 'Bia' });
   await addToQueue(request, room.code, SONGS.charlie, { client: BIA, name: 'Bia' });

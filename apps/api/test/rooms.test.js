@@ -488,3 +488,21 @@ test('avançar/voltar a música: só o anfitrião, só com música tocando, e qu
   assert.deepEqual(tv.sent.filter((m) => m.type === 'seek'), [{ type: 'seek', item_id: a.item_id, seconds: -10 }]);
   assert.equal(ctrl.sent.filter((m) => m.type === 'seek').length, 0);
 });
+
+test('mudar a posição da música: a barra arrastada manda o ponto de destino (`to`), exclusivo com o salto relativo', async () => {
+  const { code, host } = await newRoom();
+  const tv = fakeConn(code, { role: 'tv' });
+  const a = (await add(code, READY_A)).body;
+  const seek = (body, opts = { host }) => call('POST', `/rooms/${code}/player/seek`, { ...opts, body });
+  assert.equal((await seek({ to: 95.5 })).status, 200);
+  assert.equal((await seek({ to: 0 })).status, 200); // voltar ao início
+  assert.equal((await seek({ to: -1 })).status, 400);
+  assert.equal((await seek({ to: 99_999 })).status, 400);
+  assert.equal((await seek({ to: 10, seconds: 5 })).status, 400); // um ou outro
+  assert.equal((await seek({})).status, 400);
+  assert.equal((await seek({ to: 30 }, { client: BIA })).status, 403); // só o anfitrião
+  assert.deepEqual(
+    tv.sent.filter((m) => m.type === 'seek'),
+    [{ type: 'seek', item_id: a.item_id, to: 95.5 }, { type: 'seek', item_id: a.item_id, to: 0 }],
+  );
+});

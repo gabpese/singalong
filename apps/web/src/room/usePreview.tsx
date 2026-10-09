@@ -4,6 +4,7 @@ import { keySummary } from '../lib/music.js';
 import { createPreviewPlayer } from '../lib/preview.js';
 import { formatPitch } from '../lib/queue-view.js';
 import type { QueueItem, RoomState, SongKey } from '../lib/types';
+import { Icon } from '../ui/Icon';
 import { clampPitch } from './PitchControl';
 
 interface PreviewItem {
@@ -135,9 +136,8 @@ export function PreviewBar({ preview }: { preview: PreviewControls }) {
         <span className="muted small">{item ? keySummary(item.key, pitch) : ''}</span>
       </div>
       <div className="preview-controls">
-        {/* U+FE0E força o símbolo em texto: sem ele alguns celulares desenham o emoji colorido */}
-        <button type="button" aria-label="Tocar ou pausar a prévia" onClick={() => void togglePlay()}>
-          {playing ? '⏸︎' : '▶︎'}
+        <button type="button" className="icon-btn" aria-label="Tocar ou pausar a prévia" onClick={() => void togglePlay()}>
+          <Icon name={playing ? 'pause' : 'resume'} />
         </button>
         <input
           type="range"
@@ -161,12 +161,12 @@ export function PreviewBar({ preview }: { preview: PreviewControls }) {
           }}
         />
         <span className="pitch">
-          <button type="button" aria-label="Tom mais grave" onClick={() => stepPitch(-1)}>
-            −
+          <button type="button" className="icon-btn" aria-label="Tom mais grave" onClick={() => stepPitch(-1)}>
+            <Icon name="minus" />
           </button>
           <span className="pitch-value">{`Tom ${formatPitch(pitch)}`}</span>
-          <button type="button" aria-label="Tom mais agudo" onClick={() => stepPitch(1)}>
-            +
+          <button type="button" className="icon-btn" aria-label="Tom mais agudo" onClick={() => stepPitch(1)}>
+            <Icon name="plus" />
           </button>
         </span>
         <button type="button" aria-label="Fechar a prévia" onClick={close}>

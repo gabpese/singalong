@@ -65,7 +65,7 @@ export interface RoomState {
 export type ServerMessage =
   | { type: 'state'; state: RoomState }
   | { type: 'position'; item_id: number; ms: number }
-  | { type: 'seek'; item_id: number; seconds: number };
+  | { type: 'seek'; item_id: number; seconds?: number; to?: number };
 
 /** Música da biblioteca (meta.json de uma música pronta). */
 export interface LibrarySong {

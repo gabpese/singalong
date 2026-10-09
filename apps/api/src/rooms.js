@@ -347,13 +347,16 @@ export function createRoomService({
       });
     },
 
-    /** Avança ou volta a música que está tocando (só o anfitrião). Quem executa é a TV, dona da posição. */
-    seek(code, seconds, actor) {
+    /**
+     * Muda a posição da música que está tocando (só o anfitrião): `{ to }` = vai para esse ponto (segundos, a barra de
+     * progresso arrastada); `{ seconds }` = avança ou volta esse tanto. Quem executa é a TV, dona da posição.
+     */
+    seek(code, { seconds, to }, actor) {
       return mutate(code, actor, (room) => {
         requireHost(room, actor);
         if (!room.current_item_id) return;
         const itemId = room.current_item_id;
-        hub.broadcast(room.code, (conn) => (conn.role === 'tv' ? { type: 'seek', item_id: itemId, seconds } : null));
+        hub.broadcast(room.code, (conn) => (conn.role === 'tv' ? { type: 'seek', item_id: itemId, ...(to === undefined ? { seconds } : { to }) } : null));
       });
     },
 

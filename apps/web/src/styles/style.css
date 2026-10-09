@@ -349,6 +349,15 @@ body.tv { overflow: hidden; height: 100vh; }
 .i-host { --icon: url('/icons/host.svg'); }
 .i-display { --icon: url('/icons/display.svg'); }
 .i-search { --icon: url('/icons/search.svg'); }
+.i-minus { --icon: url('/icons/minus.svg'); }
+.i-plus { --icon: url('/icons/plus.svg'); }
+.i-pause { --icon: url('/icons/pause.svg'); }
+.i-resume { --icon: url('/icons/resume.svg'); }
+.i-next-song { --icon: url('/icons/next-song.svg'); }
+/* botão só com ícone (o nome fica no aria-label e no title) */
+.icon-btn { display: inline-grid; place-items: center; padding: 4px 14px; min-width: var(--tap); }
+.icon-btn .icon { width: 1.25em; height: 1.25em; vertical-align: 0; }
+.pitch .icon-btn .icon, .preview-controls .pitch .icon { width: 1em; height: 1em; }
 /* botão com ícone + texto */
 .has-icon { display: inline-flex; align-items: center; justify-content: center; gap: .5em; }
 .has-icon .icon { width: 1.2em; height: 1.2em; vertical-align: 0; }
@@ -416,3 +425,10 @@ h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .1
 .confirm-box h3 { margin: 0; font-size: 1rem; }
 .confirm-box .hint { margin: 0; }
 .confirm-box .row { align-items: end; }
+
+/* barra de posição arrastável (só o anfitrião) */
+input[type=range].seek { flex: 1; min-width: 0; height: 28px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
+input[type=range].seek::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
+input[type=range].seek::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
+input[type=range].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--accent); }
+input[type=range].seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); }

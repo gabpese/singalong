@@ -180,7 +180,8 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
         if (message.item_id !== engine.loadedId) return;
         // sem a duração ainda (o áudio acabou de começar a carregar), não há limite para o salto para a frente
         const limit = engine.duration ? engine.duration - 0.5 : Infinity;
-        engine.seek(Math.min(Math.max(engine.currentTime + message.seconds, 0), limit));
+        const target = message.to ?? engine.currentTime + (message.seconds ?? 0); // ponto de destino ou salto relativo
+        engine.seek(Math.min(Math.max(target, 0), limit));
         connection.send({ type: 'position', item_id: engine.loadedId, ms: Math.round(engine.currentTime * 1000) });
         return;
       }
