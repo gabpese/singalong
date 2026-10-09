@@ -24,6 +24,9 @@ services:
       DB_PATH: /data/singalong.db
       # endereço que os celulares usam para chegar aqui (vai no QR code da TV), ex.: http://192.168.0.10:3000
       PUBLIC_URL: ${PUBLIC_URL:-}
+      # limite do cache de músicas em GB: acima disso apaga as menos cantadas (0 desliga)
+      CACHE_MAX_GB: ${CACHE_MAX_GB:-20}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./storage:/storage
       - api-data:/data
@@ -51,6 +54,13 @@ services:
       STORAGE_ROOT: /storage
       YTDLP_COOKIES: /secrets/youtube_cookies.txt
       DEMUCS_DEVICE: cpu
+      # limites e robustez (0 desliga o limite)
+      MAX_DURATION_SECONDS: ${MAX_DURATION_SECONDS:-900}
+      MIN_FREE_GB: ${MIN_FREE_GB:-2}
+      SEPARATE_TIMEOUT_SECONDS: ${SEPARATE_TIMEOUT_SECONDS:-900}
+      WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+      LOG_FORMAT: json
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./storage:/storage
       - ./secrets:/secrets:ro
@@ -58,6 +68,15 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # o worker toca /tmp/worker-heartbeat a cada 10 s; sem isso por 1 min ele está travado
+    healthcheck:
+      test: ["CMD-SHELL", "find /tmp/worker-heartbeat -mmin -1 | grep -q ."]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    # dá tempo de terminar a música em andamento antes de encerrar
+    stop_grace_period: 3m
     restart: unless-stopped
 
   # Worker com GPU NVIDIA:  docker compose --profile gpu up
@@ -74,6 +93,13 @@ services:
       STORAGE_ROOT: /storage
       YTDLP_COOKIES: /secrets/youtube_cookies.txt
       DEMUCS_DEVICE: cuda
+      # limites e robustez (0 desliga o limite)
+      MAX_DURATION_SECONDS: ${MAX_DURATION_SECONDS:-900}
+      MIN_FREE_GB: ${MIN_FREE_GB:-2}
+      SEPARATE_TIMEOUT_SECONDS: ${SEPARATE_TIMEOUT_SECONDS:-900}
+      WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+      LOG_FORMAT: json
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./storage:/storage
       - ./secrets:/secrets:ro
@@ -81,6 +107,15 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # o worker toca /tmp/worker-heartbeat a cada 10 s; sem isso por 1 min ele está travado
+    healthcheck:
+      test: ["CMD-SHELL", "find /tmp/worker-heartbeat -mmin -1 | grep -q ."]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    # dá tempo de terminar a música em andamento antes de encerrar
+    stop_grace_period: 3m
     restart: unless-stopped
     deploy:
       resources:

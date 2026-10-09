@@ -1,7 +1,7 @@
 // Driver de storage local. Mesmo contrato do worker (PLANO.md, seção 14):
 // exists / read / getUrl / list / delete. O resto do código só conhece chaves lógicas
 // ("cache/<video_id>/instrumental.mp3"). O driver S3/R2 futuro implementa esta mesma interface.
-import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { join, normalize, resolve, sep } from 'node:path';
 
 /** Resolve `rel` dentro de `root`; null se escapar da pasta (path traversal). */
@@ -64,6 +64,28 @@ export class LocalStorage {
     };
     await walk(base);
     return out.sort();
+  }
+
+  /** Como `list`, mas com o tamanho em bytes e a data de modificação (ms): base da limpeza do cache. */
+  async listDetailed(prefix = '') {
+    const out = [];
+    for (const key of await this.list(prefix)) {
+      try {
+        const info = await stat(this.#path(key));
+        out.push({ key, size: info.size, mtimeMs: info.mtimeMs });
+      } catch {
+        // sumiu entre a listagem e o stat (outro processo apagou): ignora
+      }
+    }
+    return out;
+  }
+
+  /** O armazenamento aceita escrita? (disco cheio, volume somente leitura...) Lança se não. */
+  async check() {
+    const probe = this.#path('.healthcheck');
+    await writeFile(probe, String(Date.now()));
+    await unlink(probe);
+    return true;
   }
 
   /** Específico do driver local: caminho absoluto, para a rota /media. */

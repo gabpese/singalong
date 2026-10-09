@@ -1,5 +1,6 @@
 // TV: toca o que a sala manda (fila no servidor), mostra a letra e avisa quando a música termina.
 import { createEngine } from './engine.js';
+import { icon } from './icons.js';
 import { api, connectRoom, parseRoomCode } from './identity.js';
 import { keySummary } from './music.js';
 import { nextUp, playOrder, songChip, splitQueue } from './queue-view.js';
@@ -147,14 +148,14 @@ function renderChrome(state) {
 
   els.singerNow.hidden = !current;
   if (current) {
-    els.whoNow.textContent = `🎤 ${current.added_by}`;
+    els.whoNow.replaceChildren(icon('singing'), ` ${current.added_by}`);
     els.whatNow.textContent = trackName(current);
     els.keyNow.textContent = keySummary(current.song.key, current.pitch);
   }
 
   els.singerNext.hidden = !next;
   if (next) {
-    els.whoNext.textContent = `🎤 ${next.item.added_by}`;
+    els.whoNext.replaceChildren(icon('singing'), ` ${next.item.added_by}`);
     els.whatNext.textContent = `${next.item.title ?? next.item.video_id}${next.preparing ? ' (preparando…)' : ''}`;
   }
 

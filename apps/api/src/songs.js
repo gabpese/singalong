@@ -23,6 +23,8 @@ export function createSongService({ storage, jobs }) {
   async function describe(id) {
     const [job, ready] = await Promise.all([jobs.get(id), isReady(id)]);
     if (!job && !ready) return null;
+    // sobrou só o registro "pronto" no Redis mas os arquivos foram apagados (limpeza do cache): é como se nunca tivesse existido
+    if (!ready && job?.status === 'ready') return null;
     // um job em andamento (ex.: trocando a letra) tem prioridade sobre o "pronto" anterior
     const jobActive = job && ['pending', 'processing', 'needs_lyrics', 'failed'].includes(job.status);
     const status = jobActive ? job.status : ready ? 'ready' : job.status;
@@ -32,6 +34,8 @@ export function createSongService({ storage, jobs }) {
       status,
       stage: jobActive ? job.stage : null,
       error: jobActive ? job.error : null,
+      error_code: jobActive ? job.error_code ?? null : null,
+      retry: jobActive ? job.retry ?? null : null,
       meta: ready ? await readMeta(id) : null,
       media: ready ? { instrumental: storage.getUrl(k.instrumental), lyrics: storage.getUrl(k.lyrics) } : null,
     };

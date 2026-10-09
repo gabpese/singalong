@@ -97,6 +97,21 @@ docker compose --profile gpu run --rm worker-gpu "<link>" --lyrics lrclib
 docker compose --profile gpu run --rm worker-gpu "<link>" --lyrics align --lyrics-file /storage/inputs/letra.txt
 ```
 
+## Robustez (configuração)
+
+Variáveis opcionais (no `.env` ou no ambiente; `0` desliga o limite):
+
+| Variável | Padrão | O que faz |
+|---|---|---|
+| `MAX_DURATION_SECONDS` | 900 | recusa vídeos mais longos (antes de baixar) |
+| `MIN_FREE_GB` | 2 | recusa processar com pouco disco livre |
+| `SEPARATE_TIMEOUT_SECONDS` | 900 | tempo máximo da separação (Demucs) |
+| `WORKER_MAX_ATTEMPTS` | 3 | tentativas automáticas só para falhas passageiras (rede, 429) |
+| `CACHE_MAX_GB` | 20 | acima disso apaga as músicas cantadas há mais tempo (nunca as da fila) |
+| `LOG_LEVEL` | info | nível dos logs (JSON no Docker) |
+
+Erros do YouTube viram mensagens em português; "Tentar de novo" só aparece quando vale a pena (não para vídeo privado, bloqueado ou longo demais). Há limite de pedidos por pessoa (busca, fila, criar sala), `/readyz` detalha Redis, banco e armazenamento, e o worker tem healthcheck por heartbeat.
+
 ## Testes
 
 ```powershell

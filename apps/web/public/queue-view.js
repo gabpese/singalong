@@ -5,7 +5,13 @@ const STAGES = {
   separating: 'Separando a voz…',
   lyrics: 'Buscando a letra…',
   aligning: 'Sincronizando a letra…',
+  retrying: 'Tentando de novo…',
 };
+
+/** Vale oferecer "Tentar de novo"? Não quando o erro é definitivo (vídeo privado, bloqueado, longo demais...). */
+export function canRetry(song) {
+  return song?.status === 'failed' && song.retry !== 'never';
+}
 
 /** Etiqueta do estado de uma música na fila: { label, kind } com kind = ok | busy | warn | error. */
 export function songChip(song) {

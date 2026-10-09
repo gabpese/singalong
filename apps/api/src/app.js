@@ -2,6 +2,7 @@ import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { openDb } from './db.js';
 import { sendFile } from './files.js';
+import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.js';
 import { createHub, createRoomService, HttpError } from './rooms.js';
 import { roomRoutes } from './routes/rooms.js';
 import { songRoutes } from './routes/songs.js';
@@ -16,9 +17,14 @@ export function buildApp({ config, storage, jobs, logger = false }) {
   const app = Fastify({ logger, bodyLimit: 256 * 1024 });
 
   const db = openDb(config.dbPath ?? ':memory:');
+  // limites de requisições por pessoa (config.rateLimits sobrescreve o padrão; os testes usam isso)
+  const limiters = Object.fromEntries(
+    Object.entries({ ...DEFAULT_LIMITS, ...(config.rateLimits ?? {}) }).map(([name, options]) => [name, createRateLimiter(options)]),
+  );
   const songs = createSongService({ storage, jobs });
   const rooms = createRoomService({ db, songs, hub: createHub() });
   app.decorate('rooms', rooms);
+  app.decorate('db', db);
   app.addHook('onClose', async () => {
     rooms.stop();
     db.close();
@@ -30,18 +36,27 @@ export function buildApp({ config, storage, jobs, logger = false }) {
   });
 
   app.get('/healthz', async () => ({ ok: true }));
+  // pronto = consegue falar com o Redis, abrir o banco e gravar no armazenamento. Cada verificação aparece no corpo.
   app.get('/readyz', async (request, reply) => {
-    try {
-      if (await jobs.ping()) return { ok: true };
-    } catch {
-      // cai no 503 abaixo
-    }
-    return reply.code(503).send({ ok: false, error: 'redis_unavailable' });
+    const attempt = async (fn) => {
+      try {
+        return Boolean(await fn());
+      } catch {
+        return false;
+      }
+    };
+    const checks = {
+      redis: await attempt(() => jobs.ping()),
+      db: await attempt(() => db.ping()),
+      storage: await attempt(() => (storage.check ? storage.check() : true)),
+    };
+    const ok = Object.values(checks).every(Boolean);
+    return reply.code(ok ? 200 : 503).send({ ok, checks });
   });
 
   app.register(websocket);
-  app.register(songRoutes, { prefix: '/api', songs, jobs });
-  app.register(roomRoutes, { prefix: '/api', rooms, config });
+  app.register(songRoutes, { prefix: '/api', songs, jobs, limiters });
+  app.register(roomRoutes, { prefix: '/api', rooms, config, limiters });
 
   if (storage.local) {
     app.get('/media/*', (request, reply) => {

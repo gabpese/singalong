@@ -1,5 +1,6 @@
 // Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
 import { initAddPanel } from './add-song.js';
+import { icon } from './icons.js';
 import {
   api, connectRoom, hostToken, parseHostHash, parseRoomCode, setHostToken, setUserName, userName,
 } from './identity.js';
@@ -7,7 +8,7 @@ import { describeLyricsSource } from './lyrics-sync.js';
 import { keySummary } from './music.js';
 import { createPreviewPlayer } from './preview.js';
 import {
-  filterSongs, formatDuration, formatPitch, nextUp, progressPercent, songChip, sortSongs, splitQueue, thumbnailUrl,
+  canRetry, filterSongs, formatDuration, formatPitch, nextUp, progressPercent, songChip, sortSongs, splitQueue, thumbnailUrl,
 } from './queue-view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -132,7 +133,8 @@ let previewItem = null; // { id, video_id, can_edit, key }
 let previewPitch = 0;
 
 function syncPreviewUi() {
-  els.previewPlay.textContent = preview.playing ? '⏸' : '▶';
+  // U+FE0E força o símbolo em texto: sem ele alguns celulares desenham o emoji colorido
+  els.previewPlay.textContent = preview.playing ? '⏸︎' : '▶︎';
   els.previewPitch.textContent = `Tom ${formatPitch(previewPitch)}`;
   els.previewKey.textContent = previewItem ? keySummary(previewItem.key, previewPitch) : '';
   if (preview.duration && !els.previewSeek.matches(':active')) {
@@ -245,7 +247,7 @@ function renderNow(current) {
       h('div', { class: 'now-info' },
         h('strong', {}, current.title ?? current.video_id),
         current.artist ? h('span', { class: 'muted' }, current.artist) : null,
-        h('span', { class: 'singer' }, `🎤 ${current.added_by} está cantando`),
+        h('span', { class: 'now-singer' }, icon('singing'), ` ${current.added_by} está cantando`),
         current.song.key ? h('span', { class: 'muted small' }, keySummary(current.song.key, current.pitch)) : null,
         h('span', { class: 'muted small' }, `Letra: ${describeLyricsSource(current.song.lyrics_source)}`))),
     h('div', { class: 'progress' }, h('div', { class: 'track' }, bar), time),
@@ -253,8 +255,8 @@ function renderNow(current) {
     h('div', { class: 'controls-row' },
       isHost() ? [
         h('button', { type: 'button', onclick: () => act('POST', `/player/${state.playback === 'paused' ? 'resume' : 'pause'}`).catch(() => {}) },
-          state.playback === 'paused' ? '▶ Retomar' : '⏸ Pausar'),
-        h('button', { type: 'button', onclick: () => act('POST', '/player/skip').catch(() => {}) }, '⏭ Pular'),
+          state.playback === 'paused' ? 'Retomar' : 'Pausar'),
+        h('button', { type: 'button', onclick: () => act('POST', '/player/skip').catch(() => {}) }, 'Pular'),
       ] : null,
       pitchControl(current)),
     isHost() ? h('div', { class: 'controls-row offset' },
@@ -283,20 +285,20 @@ function queueItem(item, index, waiting) {
   const chip = songChip(item.song);
   const info = h('div', { class: 'info' },
     h('strong', {}, item.title ?? item.video_id),
-    h('span', { class: 'muted' }, [item.artist, `🎤 ${item.added_by}`].filter(Boolean).join(' · ')),
+    h('span', { class: 'muted' }, item.artist ? `${item.artist} · ` : null, icon('singing'), ` ${item.added_by}`),
     item.song.key ? h('span', { class: 'muted small' }, keySummary(item.song.key, item.pitch)) : null,
     h('span', { class: 'chips' },
       h('span', { class: `chip ${chip.kind}` }, chip.label),
-      item.id === state.next_item_id ? h('span', { class: 'chip next' }, 'Próximo') : null),
-    item.song.status === 'needs_lyrics' || item.song.status === 'failed'
+      item.id === state.next_item_id ? h('span', { class: 'chip is-next' }, 'Próximo') : null),
+    item.song.status === 'needs_lyrics' || item.song.status === 'failed' || (item.song.stage === 'retrying' && item.song.error)
       ? h('span', { class: 'muted small' }, item.song.error ?? '') : null);
 
   const actions = h('div', { class: 'actions' },
     item.song.ready
-      ? h('button', { type: 'button', class: 'ghost', onclick: () => openPreview(item) }, '▶ Prévia') : null,
+      ? h('button', { type: 'button', class: 'ghost', onclick: () => openPreview(item) }, 'Prévia') : null,
     item.song.status === 'needs_lyrics' && item.can_edit
       ? h('button', { type: 'button', onclick: () => panel.chooseLyrics(item.video_id, item.song.error, { artist: item.artist, title: item.title }) }, 'Escolher letra') : null,
-    item.song.status === 'failed' && item.can_edit
+    canRetry(item.song) && item.can_edit
       ? h('button', {
         type: 'button',
         onclick: async () => {
@@ -321,7 +323,7 @@ function queueItem(item, index, waiting) {
         disabled: index === waiting.length - 1,
         onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'down' })
           .then(() => toast('Você cedeu a vez: sua música desceu uma posição.')).catch(() => {}),
-      }, '⇩ Ceder a vez') : null,
+      }, 'Ceder a vez') : null,
     item.can_edit
       ? h('button', { type: 'button', class: 'danger', 'aria-label': 'Remover da fila', onclick: () => act('DELETE', `/queue/${item.id}`).catch(() => {}) }, '✕') : null);
 
@@ -336,7 +338,8 @@ function render() {
   if (!state) return;
   const { current, waiting } = splitQueue(state);
 
-  els.tvStatus.textContent = !connected ? 'Reconectando à sala…' : state.tv_connected ? '📺 TV conectada' : '📺 TV desconectada';
+  if (!connected) els.tvStatus.textContent = 'Reconectando à sala…';
+  else els.tvStatus.replaceChildren(icon('display'), state.tv_connected ? ' TV conectada' : ' TV desconectada');
   els.tvStatus.classList.toggle('on', connected && state.tv_connected);
   els.copyHost.hidden = !isHost();
   els.hostSettings.hidden = !isHost();

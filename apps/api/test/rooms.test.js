@@ -9,6 +9,7 @@ import { openDb } from '../src/db.js';
 import { createMemoryJobStore } from '../src/jobs.js';
 import { LocalStorage } from '../src/storage.js';
 
+const NO_LIMITS = { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } };
 const READY_A = 'readySongA1'; // 11 caracteres, como os IDs do YouTube
 const READY_B = 'readySongB1';
 const READY_C = 'readySongC1';
@@ -35,7 +36,7 @@ before(async () => {
   await writeFile(join(publicDir, 'index.html'), 'ok');
   for (const id of [READY_A, READY_B, READY_C]) await seed(id);
   jobs = createMemoryJobStore();
-  app = buildApp({ config: { publicDir, publicUrl: 'http://192.168.0.10:3000' }, storage: new LocalStorage(root), jobs });
+  app = buildApp({ config: { publicDir, publicUrl: 'http://192.168.0.10:3000', rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs });
   await app.ready();
 });
 

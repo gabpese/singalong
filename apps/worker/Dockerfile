@@ -23,7 +23,8 @@ COPY singalong_worker ./singalong_worker
 ENV TORCH_HOME=/models \
     WHISPER_CACHE=/models/whisper \
     STORAGE_ROOT=/storage \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    LOG_FORMAT=json
 
 RUN useradd -m worker && mkdir -p /models /storage && chown worker /models /storage
 USER worker

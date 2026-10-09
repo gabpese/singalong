@@ -126,7 +126,7 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
 .now-main .thumb { width: 96px; height: 54px; border-radius: 8px; }
 .now-info { display: grid; gap: 2px; min-width: 0; }
 .now-info strong { overflow-wrap: anywhere; font-size: 1.05rem; }
-.singer { color: var(--accent); font-size: .95rem; font-weight: 600; }
+.now-singer { color: var(--accent); font-size: .95rem; font-weight: 600; }
 .next-singer { margin: 12px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--bg-2); font-size: .92rem; }
 .progress { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .progress .track { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
@@ -163,7 +163,7 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
 .chip.busy { color: var(--busy); }
 .chip.warn { color: var(--warn); }
 .chip.error { color: var(--bad); }
-.chip.next { color: var(--accent); }
+.chip.is-next { color: var(--accent); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* adicionar música */
@@ -210,7 +210,8 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
   flex: 1; display: grid; place-items: center; align-content: center; gap: 0; border: 0; border-radius: 0; background: transparent;
   font-size: 1.35rem; line-height: 1.1; color: var(--dim); min-height: var(--tabbar-h);
 }
-.tabbar button span { font-size: .72rem; }
+.tabbar button .label { font-size: .72rem; }
+.tabbar button .icon { width: 1.55rem; height: 1.55rem; }
 .tabbar button.active { color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
 .tabbar b { font-weight: 600; }
 
@@ -227,6 +228,7 @@ body.has-preview .toast { bottom: calc(var(--tabbar-h) + 150px + env(safe-area-i
 /* ---------- TV ---------- */
 body.tv { overflow: hidden; height: 100vh; }
 .tv-stage {
+  --queue-w: clamp(270px, 25vw, 440px); /* largura da lista de cantores ao lado da letra */
   position: relative; height: 100vh; display: grid; grid-template-rows: auto 1fr auto;
   padding: 20px 32px 14px; gap: 14px; background: radial-gradient(1200px 600px at 50% 0%, #17172a, var(--bg));
 }
@@ -249,7 +251,6 @@ body.tv { overflow: hidden; height: 100vh; }
 .tv-progress #tv-bar { height: 100%; width: 0; background: var(--accent); transition: width .3s linear; }
 
 /* corpo da TV: a letra e, ao lado, a fila (atual + próximas 5) */
-.tv-stage { --queue-w: clamp(270px, 25vw, 440px); }
 .tv-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--queue-w); gap: 28px; min-height: 0; }
 .tv-stage:not(.has-queue) .tv-body { grid-template-columns: minmax(0, 1fr); }
 .tv-queue { align-self: center; max-height: 100%; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
@@ -333,3 +334,25 @@ body.tv { overflow: hidden; height: 100vh; }
 /* filtro da biblioteca */
 .filter { margin: 4px 0 12px; }
 .empty-box { display: grid; gap: 8px; justify-items: start; padding: 8px 2px; }
+
+/* ---------- ícones (SVG em máscara: herdam a cor do texto) ---------- */
+.icon {
+  display: inline-block; flex: 0 0 auto; width: 1.15em; height: 1.15em; vertical-align: -0.2em;
+  background-color: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+.i-singing { --icon: url('icons/singing.svg'); }
+.i-add-song { --icon: url('icons/add-song.svg'); }
+.i-musics { --icon: url('icons/musics.svg'); }
+.i-link { --icon: url('icons/link.svg'); }
+.i-host { --icon: url('icons/host.svg'); }
+.i-display { --icon: url('icons/display.svg'); }
+.i-search { --icon: url('icons/search.svg'); }
+/* botão com ícone + texto */
+.has-icon { display: inline-flex; align-items: center; justify-content: center; gap: .5em; }
+.has-icon .icon { width: 1.2em; height: 1.2em; vertical-align: 0; }
+h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .15em; }
+.tv-status .icon { width: 1em; height: 1em; vertical-align: -.15em; }
+.singer .who .icon { width: .85em; height: .85em; vertical-align: -.05em; }
+.muted .icon, .now-singer .icon { width: 1em; height: 1em; vertical-align: -.17em; }

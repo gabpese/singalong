@@ -1,3 +1,4 @@
+import { rateLimited } from '../rate-limit.js';
 import { extractVideoId } from '../youtube.js';
 
 const ID_PARAM = { type: 'object', properties: { id: { type: 'string', pattern: '^[A-Za-z0-9_-]{11}$' } }, required: ['id'] };
@@ -32,9 +33,10 @@ export function missingLyricsText(lyrics) {
 }
 
 /** Plugin Fastify com as rotas de músicas (biblioteca, jobs de processamento e pesquisa). */
-export async function songRoutes(app, { songs, jobs }) {
+export async function songRoutes(app, { songs, jobs, limiters }) {
   // Pesquisa de vídeos no YouTube (atendida pelo worker); o link escolhido segue para POST /songs ou para a fila.
   app.get('/search', {
+    preHandler: rateLimited(limiters.search, { message: 'Muitas buscas seguidas. Espere alguns segundos e tente de novo.' }),
     schema: {
       querystring: {
         type: 'object',

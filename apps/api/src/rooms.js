@@ -159,6 +159,7 @@ export function createRoomService({
     }
     db.transaction(() => {
       db.updateItem(pick.id, { status: 'playing', played_at: now() });
+      db.touchPlayed(pick.video_id, now()); // base da limpeza do cache por uso (LRU)
       db.updateRoom(code, { current_item_id: pick.id, playback: 'playing', last_client_id: pick.client_id });
     });
     positions.delete(code);
@@ -213,6 +214,8 @@ export function createRoomService({
             status: song?.status ?? 'unknown',
             stage: song?.stage ?? null,
             error: song?.error ?? null,
+            error_code: song?.error_code ?? null,
+            retry: song?.retry ?? null,
             ready: Boolean(song?.media),
             duration: song?.meta?.duration ?? null,
             lyrics_source: song?.meta?.lyrics_source ?? null,

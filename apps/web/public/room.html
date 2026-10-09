@@ -11,15 +11,15 @@
 <body class="room">
   <header class="topbar">
     <div class="topbar-main">
-      <h1>🎤 Sala <span id="room-code"></span></h1>
+      <h1><span class="icon i-singing" aria-hidden="true"></span>Sala <span id="room-code"></span></h1>
       <p class="tv-status" id="tv-status">Conectando…</p>
     </div>
     <details class="menu" id="menu">
       <summary aria-label="Opções da sala">⋯</summary>
       <div class="menu-panel">
-        <button id="open-tv" type="button">📺 Abrir TV</button>
-        <button id="copy-link" type="button">🔗 Copiar link da sala</button>
-        <button id="copy-host" type="button" hidden>👑 Copiar link de anfitrião</button>
+        <button id="open-tv" type="button" class="has-icon"><span class="icon i-display" aria-hidden="true"></span>Abrir TV</button>
+        <button id="copy-link" type="button" class="has-icon"><span class="icon i-link" aria-hidden="true"></span>Copiar link da sala</button>
+        <button id="copy-host" type="button" class="has-icon" hidden><span class="icon i-host" aria-hidden="true"></span>Copiar link de anfitrião</button>
         <label class="check" id="host-settings" hidden>
           <input id="fair" type="checkbox">
           <span>Rodízio justo<br><small class="muted">a mesma pessoa não canta duas seguidas quando há outra esperando</small></span>
@@ -58,11 +58,11 @@
               <input id="add-title" type="text" required maxlength="200" placeholder="ex.: Unethical" autocomplete="off" enterkeyhint="search">
             </label>
           </div>
-          <button id="add-search" type="button" class="wide">🔎 Buscar no YouTube</button>
+          <button id="add-search" type="button" class="wide has-icon"><span class="icon i-search" aria-hidden="true"></span>Buscar no YouTube</button>
           <ul class="results" id="add-results" hidden></ul>
           <div class="picked-box" id="add-picked-box" hidden>
             <p class="picked" id="add-picked"></p>
-            <button id="add-preview-btn" type="button">▶ Ouvir no YouTube</button>
+            <button id="add-preview-btn" type="button">Ouvir no YouTube</button>
           </div>
           <div class="video-preview" id="add-preview" hidden></div>
           <details class="link-box" id="add-link-box">
@@ -115,7 +115,7 @@
       <span class="muted small" id="preview-key"></span>
     </div>
     <div class="preview-controls">
-      <button id="preview-play" type="button" aria-label="Tocar ou pausar a prévia">▶</button>
+      <button id="preview-play" type="button" aria-label="Tocar ou pausar a prévia">&#x25B6;&#xFE0E;</button>
       <input id="preview-seek" type="range" min="0" max="1000" value="0" aria-label="Posição da prévia">
       <span class="pitch">
         <button id="preview-down" type="button" aria-label="Tom mais grave">−</button>
@@ -128,9 +128,9 @@
   </aside>
 
   <nav class="tabbar" aria-label="Seções">
-    <button type="button" data-go="queue" class="active">🎤<span>Fila <b id="tab-count"></b></span></button>
-    <button type="button" data-go="add">➕<span>Adicionar</span></button>
-    <button type="button" data-go="library">📚<span>Músicas</span></button>
+    <button type="button" data-go="queue" class="active"><span class="icon i-singing" aria-hidden="true"></span><span class="label">Fila <b id="tab-count"></b></span></button>
+    <button type="button" data-go="add"><span class="icon i-add-song" aria-hidden="true"></span><span class="label">Adicionar</span></button>
+    <button type="button" data-go="library"><span class="icon i-musics" aria-hidden="true"></span><span class="label">Músicas</span></button>
   </nav>
 
   <p class="toast" id="toast" role="status"></p>

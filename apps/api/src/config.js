@@ -13,6 +13,9 @@ export function loadConfig(env = process.env) {
     redisUrl: env.REDIS_URL ?? 'redis://localhost:6379/0',
     // SQLite das salas e da fila (num volume próprio: arquivos SQLite não gostam de bind mounts do Windows)
     dbPath: resolve(env.DB_PATH ?? join(here, '..', '..', '..', 'storage', 'singalong.db')),
+    // limite do cache de músicas em GB (a limpeza apaga as menos tocadas); 0 desliga
+    cacheMaxBytes: Math.max(0, Number(env.CACHE_MAX_GB ?? 20)) * 1024 ** 3,
+    logLevel: env.LOG_LEVEL ?? 'info',
     // endereço que os celulares usam para chegar aqui (vai no QR code da TV); vazio = o da própria página
     publicUrl: (env.PUBLIC_URL ?? '').replace(/\/$/, ''),
     // URL pela qual o navegador alcança /media (vazio = mesma origem)

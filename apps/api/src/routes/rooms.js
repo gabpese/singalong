@@ -1,3 +1,4 @@
+import { rateLimited } from '../rate-limit.js';
 import { LYRICS_SCHEMA } from './songs.js';
 import { HttpError, normalizeCode } from '../rooms.js';
 
@@ -19,10 +20,11 @@ function actorOf(request, { optional = false } = {}) {
 }
 
 /** Plugin Fastify: salas, fila, controle de reprodução e o WebSocket de estado. */
-export async function roomRoutes(app, { rooms, config }) {
+export async function roomRoutes(app, { rooms, config, limiters }) {
   app.get('/config', async () => ({ public_url: config.publicUrl || null }));
 
-  app.post('/rooms', async (request, reply) => reply.code(201).send(rooms.createRoom()));
+  app.post('/rooms', { preHandler: rateLimited(limiters.createRoom, { message: 'Muitas salas criadas seguidas. Espere um pouco.' }) },
+    async (request, reply) => reply.code(201).send(rooms.createRoom()));
 
   app.get('/rooms/:code', { schema: { params: { type: 'object', properties: { code: CODE_PARAM } } } }, async (request) =>
     rooms.getState(request.params.code, actorOf(request, { optional: true })));
@@ -35,6 +37,7 @@ export async function roomRoutes(app, { rooms, config }) {
   }, async (request) => (await rooms.setFair(request.params.code, request.body.fair, actorOf(request))).state);
 
   app.post('/rooms/:code/queue', {
+    preHandler: rateLimited(limiters.addToQueue),
     schema: {
       params: { type: 'object', properties: { code: CODE_PARAM } },
       body: {

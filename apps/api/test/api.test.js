@@ -8,6 +8,7 @@ import { createMemoryJobStore } from '../src/jobs.js';
 import { LocalStorage } from '../src/storage.js';
 import { extractVideoId } from '../src/youtube.js';
 
+const NO_LIMITS = { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } };
 const VID = 'dQw4w9WgXcQ';
 const READY = 'abcdefghijk';
 let root;
@@ -31,7 +32,7 @@ before(async () => {
   await seed(READY);
   await seed('parcial0000', { complete: false });
   jobs = createMemoryJobStore();
-  app = buildApp({ config: { publicDir }, storage: new LocalStorage(root), jobs });
+  app = buildApp({ config: { publicDir, rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs });
   await app.ready();
 });
 

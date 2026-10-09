@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { newClientId, parseHostHash, parseRoomCode } from '../public/identity.js';
-import { formatDuration, formatPitch, progressPercent, songChip, splitQueue } from '../public/queue-view.js';
+import { canRetry, formatDuration, formatPitch, progressPercent, songChip, splitQueue } from '../public/queue-view.js';
 
 test('newClientId: formato aceito pela API e sem depender de crypto.randomUUID', () => {
   const id = newClientId((bytes) => bytes.map((_, i) => i * 7));
@@ -99,4 +99,12 @@ test('sortSongs: por artista e depois por nome, sem alterar a lista original', a
   assert.deepEqual(sortSongs(sameArtist).map((s) => s.video_id), ['2', '3', '1']);
   // duas sem artista: ordem pelo nome
   assert.deepEqual(sortSongs([{ video_id: 'q', title: 'B' }, { video_id: 'w', title: 'A' }]).map((s) => s.video_id), ['w', 'q']);
+});
+
+test('canRetry: só oferece "Tentar de novo" quando vale a pena', () => {
+  assert.equal(canRetry({ status: 'failed', retry: 'manual' }), true);
+  assert.equal(canRetry({ status: 'failed', retry: null }), true);
+  assert.equal(canRetry({ status: 'failed', retry: 'never' }), false); // privado, bloqueado, longo demais...
+  assert.equal(canRetry({ status: 'ready' }), false);
+  assert.equal(songChip({ status: 'processing', stage: 'retrying' }).label, 'Tentando de novo…');
 });

@@ -36,6 +36,8 @@ function toJob(hash) {
     status: hash.status,
     stage: hash.stage || null,
     error: hash.error || null,
+    error_code: hash.error_code || null, // código estável da falha (private, too_long, cookies...)
+    retry: hash.retry || null, // auto | manual | never: vale tentar de novo?
     lyrics_source: hash.lyrics_source || null,
     updated_at: hash.updated_at ? Number(hash.updated_at) : null,
   };
@@ -109,7 +111,7 @@ export function createMemoryJobStore() {
       const current = jobs.get(id);
       const busy = current && (current.status === 'pending' || current.status === 'processing');
       if (busy || (current?.status === 'needs_lyrics' && !replace)) return { created: false, job: { ...current } };
-      const job = { status: 'pending', stage: null, error: null, lyrics_source: payload.lyrics_source ?? 'auto', updated_at: Date.now() };
+      const job = { status: 'pending', stage: null, error: null, error_code: null, retry: null, lyrics_source: payload.lyrics_source ?? 'auto', updated_at: Date.now() };
       jobs.set(id, job);
       queue.push({ video_id: id, payload });
       return { created: true, job: { ...job } };

@@ -60,8 +60,8 @@ export function initAddPanel({ submitNew, submitLyrics, onShow }) {
     previewing = null;
     els.preview.hidden = true;
     els.preview.textContent = '';
-    els.previewBtn.textContent = '▶ Ouvir no YouTube';
-    document.querySelectorAll('.result-row .preview-toggle').forEach((b) => { b.textContent = '▶ Prévia'; });
+    els.previewBtn.textContent = 'Ouvir no YouTube';
+    document.querySelectorAll('.result-row .preview-toggle').forEach((b) => { b.textContent = 'Prévia'; });
     document.querySelectorAll('.result-row .inline-preview').forEach((el) => el.remove());
   }
 
@@ -89,7 +89,7 @@ export function initAddPanel({ submitNew, submitLyrics, onShow }) {
     closePreview();
     if (wasOpen) return;
     previewing = selectedId;
-    els.previewBtn.textContent = '■ Fechar prévia';
+    els.previewBtn.textContent = 'Fechar prévia';
     els.preview.hidden = false;
     els.preview.append(previewNode(selectedId));
   }
@@ -189,7 +189,7 @@ export function initAddPanel({ submitNew, submitLyrics, onShow }) {
       const toggle = document.createElement('button');
       toggle.type = 'button';
       toggle.className = 'preview-toggle';
-      toggle.textContent = '▶ Prévia';
+      toggle.textContent = 'Prévia';
       toggle.setAttribute('aria-label', `Ouvir uma prévia de ${result.title}`);
       const inline = document.createElement('div');
       inline.className = 'inline-preview';
@@ -198,7 +198,7 @@ export function initAddPanel({ submitNew, submitLyrics, onShow }) {
         closePreview();
         if (wasOpen) return;
         previewing = result.video_id;
-        toggle.textContent = '■ Fechar';
+        toggle.textContent = 'Fechar';
         inline.append(previewNode(result.video_id));
         row.after(inline);
       });

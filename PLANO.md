@@ -132,7 +132,9 @@ singalong/
 
 **Fase 3 — Salas e fila.** Controle pelo celular, WebSocket, pré-carregamento dos próximos, pular/remover/reordenar.
 
-**Fase 4 — Robustez.** Retentativas e erros visíveis (vídeo privado, sem áudio, letra não encontrada), limpeza LRU, Docker Compose, logs.
+**Fase 4 — Robustez (concluída).** Retentativas e erros visíveis (vídeo privado, sem áudio, letra não encontrada), limpeza LRU, Docker Compose, logs.
+
+**Fase 4 — Robustez (em andamento).** Escopo definido: erros do YouTube traduzidos para mensagens claras (vídeo privado, indisponível, cookies vencidos, ao vivo...), retentativas automáticas só para falhas transitórias, proteção contra job que derruba o worker em loop, limite de duração e de disco, limpeza do cache por uso (LRU), limite de requisições, health checks detalhados e logs em JSON. **Postgres opcional fica de fora**: com uma única instância da API o SQLite basta, e a troca só se justifica junto das várias réplicas (Fase 7).
 
 **Fase 5 — Extras (fora da v1).** Letra palavra a palavra, alinhamento forçado por IA, pontuação por pitch do microfone, export MP4, vídeo de fundo.
 
@@ -268,7 +270,7 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **Fase 0** (spike CLI) já roda dentro de um container do worker, para fixar dependências e medir recursos.
 - **Fase 2** entrega `docker compose up` subindo api + worker + redis funcionando de ponta a ponta.
 - **Fase 4** inclui health checks, shutdown limpo, logs JSON e Postgres opcional.
-- **Fase 6 (nova, opcional): Kubernetes** — manifests com kustomize, adaptador Redis do Socket.io, driver S3 ativado, KEDA para o worker.
+- **Fase 7 (opcional): Kubernetes** — manifests com kustomize, adaptador Redis do Socket.io, driver S3 ativado, KEDA para o worker.
 
 ## 16. Estado da implementação
 
@@ -339,3 +341,17 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **Filtro por artista e nome** na aba "Músicas já processadas" (`filterSongs`, `queue-view.js`): sem diferenciar maiúsculas nem acentos (`normalizeText`, NFD), várias palavras em **qualquer ordem** e **todas** precisam casar; contador "N de M"; mensagem e botão "Limpar filtro" quando nada combina. O filtro sobrevive às atualizações da lista. Feito no navegador (a biblioteca é pequena e já vem inteira de `GET /api/songs`); se passar de algumas centenas de músicas, vale mover para o servidor.
 - A lista passou a vir **em ordem alfabética** por artista e depois por nome (`sortSongs`), com as sem artista no fim. Um `\u0000` como separador na chave de ordenação era ignorado pela comparação por idioma e embaralhava a ordem: o teste pegou; agora é um comparador de verdade (`Intl.Collator`).
 - Armadilha do teste: uma verificação com `|| true` passava mesmo errada; foi reescrita para falhar se o filtro não ignorasse acentos.
+
+### Fase 3g: ícones SVG no lugar dos emojis
+- **Ícones próprios** (`public/icons/*.svg`, fornecidos pelo projeto): `singing` (cantor: topo da sala, abas, linhas da fila e cabeçalho da TV), `add-song` (aba Adicionar), `musics` (aba Músicas), `link` (Copiar link da sala), `host` (Copiar link de anfitrião), `display` (Abrir TV e o status "TV conectada"), `search` (Buscar no YouTube). Nenhum emoji colorido restante na interface.
+- **Como são desenhados:** como **máscara CSS** (`mask-image` + `background-color: currentColor`), então herdam a cor do texto (dourado na aba ativa, cinza nas outras) em vez de ficarem pretos. Helper `icons.js` (`icon(nome)`) para o JavaScript; `<span class="icon i-nome">` no HTML.
+- Símbolos de texto que não são emoji colorido seguem (▲ ▼ ✕ ⋯ ⛶). Os rótulos "Pausar", "Retomar", "Pular", "Prévia" e "Ceder a vez" perderam os glifos ⏸ ▶ ⏭ ⇩; o botão de tocar/pausar da prévia usa ▶/⏸ com U+FE0E, que força a versão em texto (sem ele alguns celulares desenham o emoji).
+- **Etiqueta "Próximo" gigante:** colisão de nome de classe: `.chip.next` herdava a fonte enorme de `.next` (a próxima linha da letra na TV). Virou `.chip.is-next`. No mesmo passe: `.singer` do celular herdava o `display:grid` do `.singer` da TV (o ícone ficava sozinho numa linha) e virou `.now-singer`.
+- **Guarda automática:** `test/css.test.mjs` falha se uma classe simples for definida duas vezes no CSS (a causa das três colisões da Fase 3: `.now`, `.next` e `.singer`); foi verificada reintroduzindo uma colisão de propósito. Também confere que cada ícone declarado aponta para um SVG existente e que `[hidden]` vence os `display`. O teste de ponta a ponta confere que não sobra `\p{Emoji_Presentation}` na tela e que cada ícone carrega a máscara e tem tamanho visível.
+
+### Roteiro futuro: migração do front-end para React
+Decidido com o dono do projeto: **seguir com HTML/CSS/JS puros até fechar a Fase 4 e migrar para React depois** (Fase 6). Motivos e cuidados:
+- **Por que React:** `room.js` e `tv.js` redesenham a tela à mão a partir do estado da sala; com React o estado vira a fonte da tela. O CSS global já causou três colisões de nome de classe; componentes (CSS Modules ou Tailwind) evitam isso por construção.
+- **O que se aproveita sem reescrever:** toda a lógica pura e testada (`lyrics-sync.js`, `queue-view.js`, `music.js`, `youtube.js`, `identity.js`), `engine.js` e `preview.js` (áudio), o CSS (tokens e telas) e **os 100+ testes de ponta a ponta**, que verificam o comportamento na tela e servem de rede de segurança.
+- **Plano de migração (sugerido):** Vite + React + TypeScript; `apps/web` ganha `src/` e build para `dist/`, que a API serve no lugar de `public/`; migrar uma tela por vez (entrada → controle → TV), mantendo o teste de ponta a ponta verde a cada passo; Tailwind opcional.
+- **Pré-requisito:** a API não muda (REST + WebSocket já são a fronteira).

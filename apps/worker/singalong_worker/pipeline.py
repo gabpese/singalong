@@ -1,5 +1,7 @@
 """Pipeline idempotente: cada etapa só roda se o artefato ainda não existe no storage."""
 import json
+import logging
+import os
 import re
 import shutil
 import subprocess
@@ -7,15 +9,24 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from . import lyrics as lyr
 from .align import align_lyrics
+from .errors import JobError, format_duration, NEVER, MANUAL
 from .ids import extract_video_id
 from .key import detect_key
 from .storage import LocalStorage
 
 PIPELINE_VERSION = 1
+
+log = logging.getLogger("worker.pipeline")
+
+# limites padrão (o worker os lê do ambiente: MAX_DURATION_SECONDS, MIN_FREE_GB, SEPARATE_TIMEOUT_SECONDS)
+DEFAULT_MAX_DURATION = 15 * 60
+DEFAULT_MIN_FREE_GB = 2.0
+DEFAULT_SEPARATE_TIMEOUT = 15 * 60
 
 _TITLE_NOISE = re.compile(r"\s*[\(\[][^\)\]]*\)?[\]\)]?\s*$")
 
@@ -53,7 +64,62 @@ def is_ready(storage: LocalStorage, video_id: str) -> bool:
     return all(storage.exists(k[name]) for name in ("instrumental", "lyrics", "meta"))
 
 
-def download(url: str, workdir: Path, langs: list[str], cookies: Path | None = None) -> dict:
+
+
+@dataclass(frozen=True)
+class Limits:
+    """Limites que protegem a máquina de vídeos enormes, disco cheio e travamentos."""
+
+    max_duration: float | None = DEFAULT_MAX_DURATION  # segundos; None = sem limite
+    min_free_gb: float = DEFAULT_MIN_FREE_GB
+    separate_timeout: float | None = DEFAULT_SEPARATE_TIMEOUT
+
+    @classmethod
+    def from_env(cls) -> "Limits":
+        """MAX_DURATION_SECONDS, MIN_FREE_GB e SEPARATE_TIMEOUT_SECONDS (0 desliga cada limite)."""
+
+        def number(name: str, default: float) -> float:
+            try:
+                return float(os.environ.get(name, default))
+            except ValueError:
+                return default
+
+        return cls(
+            max_duration=number("MAX_DURATION_SECONDS", DEFAULT_MAX_DURATION) or None,
+            min_free_gb=number("MIN_FREE_GB", DEFAULT_MIN_FREE_GB),
+            separate_timeout=number("SEPARATE_TIMEOUT_SECONDS", DEFAULT_SEPARATE_TIMEOUT) or None,
+        )
+
+
+def validate_video_info(info: dict, max_duration: float | None) -> None:
+    """Recusa cedo (antes de baixar) o que não dá certo ou não vale o custo: ao vivo, privado e longo demais."""
+    if info.get("is_live") or info.get("live_status") in ("is_live", "is_upcoming"):
+        raise JobError("live", "Este vídeo é uma transmissão ao vivo (ou uma estreia agendada) e ainda não pode ser baixado.", NEVER)
+    availability = info.get("availability")
+    if availability == "private":
+        raise JobError("private", "Este vídeo é privado. Escolha outro vídeo.", NEVER)
+    if availability == "subscriber_only":
+        raise JobError("members", "Este vídeo é só para membros do canal. Escolha outro vídeo.", NEVER)
+    duration = info.get("duration")
+    if max_duration and duration and duration > max_duration:
+        raise JobError(
+            "too_long",
+            f"O vídeo tem {format_duration(duration)} e o limite é {format_duration(max_duration)} "
+            "(vídeos assim costumam ser coletâneas ou álbuns inteiros). Escolha uma versão só da música.",
+            NEVER,
+        )
+
+
+def check_disk(path, min_free_gb: float) -> None:
+    """Não começa um processamento sem espaço: separar a voz gera centenas de MB de arquivos temporários."""
+    free = shutil.disk_usage(path).free / 1024**3
+    if min_free_gb and free < min_free_gb:
+        raise JobError("disk_full", f"Pouco espaço em disco ({free:.1f} GB livres; o mínimo é {min_free_gb:g} GB). Libere espaço e tente de novo.", MANUAL)
+
+
+def download(
+    url: str, workdir: Path, langs: list[str], cookies: Path | None = None, max_duration: float | None = None
+) -> dict:
     """Baixa o áudio e as legendas MANUAIS (auto-legendas ficam de fora de propósito)."""
     import yt_dlp  # import tardio: só quem baixa precisa dele (testes e consumo do cache não)
 
@@ -73,7 +139,9 @@ def download(url: str, workdir: Path, langs: list[str], cookies: Path | None = N
     # 1) o áudio é essencial: se falhar, o job falha
     audio_opts = {**base, "format": "bestaudio/best", "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}]}
     with yt_dlp.YoutubeDL(audio_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
+        info = ydl.extract_info(url, download=False)  # só os dados: dá para recusar antes de gastar banda
+        validate_video_info(info, max_duration)
+        info = ydl.process_ie_result(info, download=True)  # baixa sem extrair de novo
 
     # 2) a legenda é opcional (há outras fontes de letra): só tenta se o vídeo TEM legenda manual e
     #    nunca derruba o job (o YouTube responde 429 ao endpoint de legendas com frequência)
@@ -89,7 +157,7 @@ def download(url: str, workdir: Path, langs: list[str], cookies: Path | None = N
             subs = sorted(workdir.glob("source.*.vtt")) + sorted(workdir.glob("source.*.srt"))
             subtitle_text = subs[0].read_text(encoding="utf-8", errors="replace") if subs else None
         except yt_dlp.utils.DownloadError as exc:
-            print(f"aviso: legenda do vídeo indisponível ({exc}); seguindo sem ela")
+            log.warning("legenda do vídeo indisponível (%s); seguindo sem ela", exc)
             subtitle_error = str(exc)
 
     return {
@@ -113,13 +181,13 @@ def manual_subtitle_langs(available: dict, langs: list[str]) -> list[str]:
     return chosen
 
 
-def separate(audio: Path, workdir: Path, device: str | None) -> tuple[Path, Path]:
+def separate(audio: Path, workdir: Path, device: str | None, timeout: float | None = None) -> tuple[Path, Path]:
     """Demucs (htdemucs, 2 stems) -> (instrumental.mp3, vocals.mp3). A voz fica no cache: serve ao alinhamento da letra."""
     out = workdir / "demucs"
     cmd = [sys.executable, "-m", "demucs", "--two-stems=vocals", "-n", "htdemucs", "-o", str(out), str(audio)]
     if device:
         cmd += ["-d", device]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, timeout=timeout)  # TimeoutExpired vira "demorou demais"
     paths = []
     for stem, name in (("no_vocals.wav", "instrumental.mp3"), ("vocals.wav", "vocals.mp3")):
         mp3 = workdir / name
@@ -229,7 +297,7 @@ def music_key(storage: LocalStorage, k: dict[str, str], work: Path, instrumental
             audio.write_bytes(storage.read(k["instrumental"]))
         return detect_key(audio)
     except Exception as exc:  # noqa: BLE001
-        print(f"aviso: não consegui calcular o tom ({type(exc).__name__}: {exc})")
+        log.warning("não consegui calcular o tom (%s: %s)", type(exc).__name__, exc)
         return None
 
 
@@ -251,12 +319,14 @@ def process(
     title: str | None = None,
     on_stage: Callable[[str], None] | None = None,
     lyrics_loose: bool = False,
+    limits: Limits | None = None,
 ) -> dict:
     """Etapas informadas em on_stage: downloading, separating, lyrics, aligning.
 
     lyrics_source: auto | video | lrclib | file | text | align | none ('align' sincroniza `lyrics_text` com a voz, por IA).
     """
     notify = on_stage or (lambda stage: None)
+    limits = limits or Limits.from_env()
     video_id = extract_video_id(url)
     if not video_id:
         raise ValueError(f"URL do YouTube inválida: {url!r}")
@@ -265,8 +335,10 @@ def process(
         storage.delete(f"cache/{video_id}")
     # fonte de letra explícita refaz só a letra (o instrumental continua no cache)
     if lyrics_source == "auto" and is_ready(storage, video_id):
-        print(f"[cache] {video_id} já está pronto")
+        log.info("%s já está pronto (cache)", video_id)
         return json.loads(storage.read(k["meta"]))
+
+    check_disk(storage.root, limits.min_free_gb)
 
     timings: dict[str, float] = {}
     with tempfile.TemporaryDirectory(prefix=f"singalong-{video_id}-") as tmp:
@@ -278,13 +350,13 @@ def process(
         need_separation = not storage.exists(k["instrumental"])  # a voz, se faltar, é obtida só quando a IA precisar
 
         if storage.exists(k["source"]) and not need_separation:
-            print("[1/3] metadados do vídeo no cache, sem baixar")
+            log.info("%s: metadados do vídeo no cache, sem baixar", video_id)
             info = json.loads(storage.read(k["source"]))
         else:
             notify("downloading")
             t = time.monotonic()
-            print(f"[1/3] baixando {video_id}...")
-            info = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies)
+            log.info("%s: baixando", video_id)
+            info = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies, limits.max_duration)
             audio = info.pop("audio")
             timings["download"] = round(time.monotonic() - t, 1)
 
@@ -300,13 +372,13 @@ def process(
         if need_separation:
             notify("separating")
             t = time.monotonic()
-            print("[2/3] separando vocal (demucs)...")
-            instrumental_file, vocals_file = separate(audio, work, device)
+            log.info("%s: separando a voz (demucs)", video_id)
+            instrumental_file, vocals_file = separate(audio, work, device, limits.separate_timeout)
             storage.put(k["instrumental"], instrumental_file)
             storage.put(k["vocals"], vocals_file)
             timings["separate"] = round(time.monotonic() - t, 1)
         else:
-            print("[2/3] instrumental já existe, pulando")
+            log.info("%s: instrumental já existe, pulando a separação", video_id)
 
         def get_vocals() -> Path:
             """A voz isolada: do cache, ou (músicas antigas, sem vocals.mp3) baixa e separa de novo."""
@@ -318,16 +390,16 @@ def process(
                 vocals_file.write_bytes(storage.read(k["vocals"]))
                 return vocals_file
             notify("downloading")
-            fresh = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies)
+            fresh = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies, limits.max_duration)
             notify("separating")
-            instrumental_file, vocals_file = separate(fresh["audio"], work, device)
+            instrumental_file, vocals_file = separate(fresh["audio"], work, device, limits.separate_timeout)
             if not storage.exists(k["instrumental"]):
                 storage.put(k["instrumental"], instrumental_file)
             storage.put(k["vocals"], vocals_file)
             return vocals_file
 
         notify("lyrics")
-        print("[3/3] resolvendo letra...")
+        log.info("%s: resolvendo a letra", video_id)
         try:
             cues, source = resolve_lyrics(lyrics_source, info, lyrics_text, lyrics_loose)
         except NeedsAlignment as need:
@@ -337,7 +409,7 @@ def process(
             vocals = get_vocals()
             notify("aligning")
             t = time.monotonic()
-            print(f"[3/3] alinhando a letra com a voz (IA; texto: {need.origin})...")
+            log.info("%s: alinhando a letra com a voz (IA; texto: %s)", video_id, need.origin)
             cues = align_lyrics(vocals, need.text, device=device)
             source = "lrclib+align" if need.origin == "lrclib" else "align"
             timings["align"] = round(time.monotonic() - t, 1)

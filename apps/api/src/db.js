@@ -40,6 +40,10 @@ export function openDb(path = ':memory:') {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA);
+  // bancos criados antes da limpeza do cache não têm last_played_at
+  if (!db.prepare('PRAGMA table_info(song_settings)').all().some((c) => c.name === 'last_played_at')) {
+    db.exec('ALTER TABLE song_settings ADD COLUMN last_played_at INTEGER');
+  }
 
   const one = (sql, ...params) => db.prepare(sql).get(...params) ?? null;
   const all = (sql, ...params) => db.prepare(sql).all(...params);
@@ -106,6 +110,17 @@ export function openDb(path = ':memory:') {
       }),
 
     // --- ajustes por música (valem em qualquer sala) ---
+    ping: () => one('SELECT 1 AS ok').ok === 1,
+    /** Marca que a música foi (ou vai ser) tocada agora: a limpeza do cache apaga primeiro as mais antigas. */
+    touchPlayed: (videoId, now) =>
+      run(
+        `INSERT INTO song_settings (video_id, last_played_at) VALUES (?, ?)
+         ON CONFLICT(video_id) DO UPDATE SET last_played_at = excluded.last_played_at`,
+        videoId, now,
+      ),
+    lastPlayed: (videoId) => one('SELECT last_played_at FROM song_settings WHERE video_id = ?', videoId)?.last_played_at ?? null,
+    /** Músicas em uso (tocando ou na fila de alguma sala): nunca entram na limpeza. */
+    activeVideoIds: () => new Set(all("SELECT DISTINCT video_id FROM queue_items WHERE status IN ('queued', 'playing')").map((r) => r.video_id)),
     getOffset: (videoId) => one('SELECT lyric_offset FROM song_settings WHERE video_id = ?', videoId)?.lyric_offset ?? 0,
     setOffset: (videoId, offset) =>
       run(

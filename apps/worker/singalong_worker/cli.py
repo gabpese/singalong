@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 
+from .errors import classify
+from .logsetup import setup_logging
 from .pipeline import NeedsLyrics, process
 from .storage import LocalStorage
 
@@ -22,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--title", help="título da música para buscar a letra (sobrescreve a detecção)")
     p.add_argument("--force", action="store_true", help="ignora e refaz o cache")
     args = p.parse_args(argv)
+    setup_logging(level="INFO")
 
     if args.consume:
         from .consumer import run  # importa só aqui: o modo CLI não precisa do cliente Redis
@@ -44,5 +47,9 @@ def main(argv: list[str] | None = None) -> int:
     except NeedsLyrics as e:
         print(f"needs_lyrics: {e}")
         return 3
+    except Exception as e:  # noqa: BLE001 - na CLI toda falha vira uma mensagem clara, como no worker
+        err = classify(e)
+        print(f"erro ({err.code}): {err.message}")
+        return 4
     print(json.dumps(meta, ensure_ascii=False, indent=2))
     return 0
