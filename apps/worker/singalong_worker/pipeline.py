@@ -449,6 +449,7 @@ def process(
             "video_id": video_id,
             "title": info["title"],
             "artist": info["artist"],
+            "video_title": info.get("video_title"),  # o Jukebox também procura por ele
             "duration": info["duration"],
             "lyrics_source": source,
             "lyrics_lines": len(cues),

@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from singalong_worker.lyrics import apply_text, parse_cues, parse_lrc, parse_lyr
 from singalong_worker.search import parse_entries
 from singalong_worker.pipeline import NeedsAlignment, NeedsLyrics, guess_artist_title, manual_subtitle_langs, resolve_lyrics
 from singalong_worker.storage import LocalStorage
+from singalong_worker.titles import backfill as titles_backfill
 
 VID = "dQw4w9WgXcQ"
 
@@ -452,6 +454,29 @@ class SearchTests(unittest.TestCase):
         self.assertEqual([r["video_id"] for r in out], ["TLvtw4nXou0", "dQw4w9WgXcQ"])
         self.assertEqual(out[0], {"video_id": "TLvtw4nXou0", "title": "Jack's Lament", "channel": "Geoff", "duration": 265})
         self.assertEqual((out[1]["title"], out[1]["channel"]), ("dQw4w9WgXcQ", "Rick"))
+
+
+class TitlesBackfillTests(unittest.TestCase):
+    def test_copies_the_video_title_from_source_to_meta(self):
+        with tempfile.TemporaryDirectory() as d:
+            storage = LocalStorage(d)
+            root = Path(d) / "cache"
+            for vid, meta, source in [
+                ("aaaaaaaaaaa", {"title": "Unethical", "artist": "Faouzia"}, {"video_title": "Faouzia - Unethical (MAPHRA Vocal Cover)"}),
+                ("bbbbbbbbbbb", {"title": "X", "video_title": "já tem"}, {"video_title": "outro"}),  # não sobrescreve
+                ("ccccccccccc", {"title": "Y"}, None),  # sem source.json: pula
+                ("ddddddddddd", {"title": "Z"}, {"video_title": None}),  # source sem título: pula
+            ]:
+                (root / vid).mkdir(parents=True)
+                (root / vid / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+                if source is not None:
+                    (root / vid / "source.json").write_text(json.dumps(source), encoding="utf-8")
+            self.assertEqual(titles_backfill(storage), 1)
+            read = lambda vid: json.loads((root / vid / "meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(read("aaaaaaaaaaa"), {"title": "Unethical", "artist": "Faouzia", "video_title": "Faouzia - Unethical (MAPHRA Vocal Cover)"})
+            self.assertEqual(read("bbbbbbbbbbb")["video_title"], "já tem")
+            self.assertNotIn("video_title", read("ccccccccccc"))
+            self.assertEqual(titles_backfill(storage), 0)  # idempotente
 
 
 class StorageTests(unittest.TestCase):

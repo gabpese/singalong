@@ -14,6 +14,7 @@ import redis
 
 from .export import serve as export_serve
 from .key import backfill as key_backfill
+from .titles import backfill as titles_backfill
 from .logsetup import setup_logging
 from .runner import GROUP, STREAM, Settings, handle
 from .search import serve as search_serve
@@ -81,7 +82,8 @@ def run() -> None:
     # a exportação em MP4 também tem thread própria: leva um minuto e não pode esperar atrás do Demucs
     threading.Thread(target=export_serve, args=(settings.redis_url, storage, stop_threads), name="export", daemon=True).start()
     # músicas processadas antes do recurso de tom ganham o tom em segundo plano (uma vez cada)
-    threading.Thread(target=lambda: key_backfill(storage), name="key-backfill", daemon=True).start()
+    # (o título do vídeo vem primeiro: é instantâneo e as duas atualizações reescrevem o mesmo meta.json, então não rodam juntas)
+    threading.Thread(target=lambda: (titles_backfill(storage), key_backfill(storage)), name="backfill", daemon=True).start()
     threading.Thread(target=_heartbeat, args=(settings.heartbeat_file, stop_threads), name="heartbeat", daemon=True).start()
 
     log.info("worker consumindo", extra={"consumer": consumer, "stream": STREAM, "device": settings.device or "auto",

@@ -148,3 +148,21 @@ test('findJukeboxMatches: acha as versões prontas pelas palavras de artista e n
   assert.deepEqual(ids('', 'Unethical'), []); // sem artista: não adivinha
   assert.deepEqual(ids('Faouzia', '  '), []);
 });
+
+test('findJukeboxMatches e filterSongs também olham o título original do vídeo do YouTube', async () => {
+  const { filterSongs, findJukeboxMatches } = await import('../src/lib/queue-view.js');
+  const songs = [
+    // pedida como "Faouzia — Unethical", mas o vídeo se chama "... (MAPHRA Vocal Cover)"
+    { video_id: 'a', artist: 'Faouzia', title: 'Unethical', video_title: 'Faouzia - Unethical (MAPHRA Vocal Cover)' },
+    { video_id: 'b', artist: 'Faouzia', title: 'Unethical', video_title: 'Faouzia - UNETHICAL (Official Music Video)' },
+    { video_id: 'c', artist: 'Adele', title: 'Rolling in the Deep' }, // música antiga, sem video_title
+  ];
+  const ids = (artist, title) => findJukeboxMatches(songs, artist, title).map((s) => s.video_id);
+  assert.deepEqual(ids('Faouzia', 'Unethical'), ['a', 'b']);
+  assert.deepEqual(ids('Maphra', 'Unethical'), ['a']); // outro nome para a mesma música: ainda a encontra
+  assert.deepEqual(ids('Maphra', 'Vocal Cover'), ['a']);
+  assert.deepEqual(ids('Adele', 'Rolling in the Deep'), ['c']); // sem video_title continua funcionando
+  assert.deepEqual(ids('Official', 'Unethical').sort(), ['b']);
+  assert.deepEqual(filterSongs(songs, 'maphra').map((s) => s.video_id), ['a']);
+  assert.deepEqual(filterSongs(songs, 'official music').map((s) => s.video_id), ['b']);
+});

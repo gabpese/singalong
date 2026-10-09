@@ -409,3 +409,4 @@ h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .1
 }
 
 .library li .info { min-width: 110px; }
+.jukebox-option .video-title { font-style: italic; overflow-wrap: anywhere; }

@@ -288,7 +288,7 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 | 5a/5b — Palavra a palavra | ✅ | Tempo real de cada palavra (`words` no `lyrics.json`), também para letras do LRCLIB/legenda; `refresh_words.py` completa o cache antigo. |
 | 5c — Pontuação por microfone | ✅ | Anfitrião liga na sala. Ver decisões abaixo. |
 | 5d — Exportar MP4 | ✅ | Botão "Baixar MP4" (com escolha de tom) em cada música da biblioteca. Ver decisões abaixo. |
-| 6 — Front-end em React | ✅ | Vite + React + TypeScript; entrada, TV e sala migradas, com 39 testes de ponta a ponta. Ver decisões abaixo. |
+| 6 — Front-end em React | ✅ | Vite + React + TypeScript; entrada, TV e sala migradas, com 41 testes de ponta a ponta. Ver decisões abaixo. |
 
 ### Decisões e aprendizados da Fase 2
 - **Sem SQLite ainda.** A biblioteca é o próprio cache (`meta.json`); o estado dos jobs vive no Redis (`job:<id>`). O SQLite entra com salas e fila (Fase 3).
@@ -349,6 +349,7 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **Sala:** o estado vem de um hook (`useRoomConnection`: WebSocket com reconexão e a posição da música); as ações passam por um contexto (`act`, avisos, nome); a prévia é o hook `usePreview`; o painel de adicionar é um componente com estado próprio e uma função `chooseLyrics` exposta para a fila. Os ajustes do anfitrião (rodízio, pontuação) valem na hora e só voltam atrás se o servidor recusar.
 - **Build e Docker:** `vite build` gera `apps/web/dist`; a imagem da API tem uma etapa que constrói o front-end e copia o `dist` (a API serve esse diretório; `PUBLIC_DIR` o troca). `npm run dev` abre o Vite com proxy para a API.
 - **Jukebox ao adicionar:** ao buscar um vídeo, antes de ir ao YouTube o painel confere se o artista e o nome digitados batem com músicas **já prontas** (`findJukeboxMatches`: todas as palavras, inteiras, sem acento nem pontuação, no artista ou no título; sem artista ou sem nome não sugere nada). Se houver, abre um `<dialog>` ("Encontramos esta versão pronta no nosso Jukebox, quer selecioná-la?" ou, com várias, "...estas versões... quer selecionar uma destas?") com as opções e dois botões: usar a escolhida (entra na fila na hora, como na aba Músicas) ou "Buscar outra versão no YouTube" (segue a busca e não pergunta de novo para o mesmo artista e nome). Esc ou clique fora fecham sem fazer nada.
+- **Título original do vídeo:** o `meta.json` guarda também `video_title` (o nome do vídeo no YouTube, ex.: "Faouzia - Unethical (MAPHRA Vocal Cover)"), além do artista e da música que a pessoa informou. A busca do Jukebox e o filtro da biblioteca olham os três, então quem pede "Maphra + Unethical" acha uma música guardada como "Faouzia + Unethical", e o aviso mostra "No YouTube: ..." para distinguir as versões. Músicas antigas ganham o título por um backfill do worker (copia do `source.json` na subida, antes do backfill do tom; os dois reescrevem o mesmo `meta.json`, então rodam em sequência).
 - **Biblioteca no celular:** o item tem a música e o "Adicionar" na primeira linha e, abaixo, uma faixa "Vídeo MP4 para cantar offline" com o tom e o botão de baixar num controle só.
 - **Fora desta fase:** Tailwind e CSS por componente (o CSS global continua; o teste `css.test.mjs` impede nomes de classe repetidos), roteador e React StrictMode.
 

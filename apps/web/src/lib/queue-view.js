@@ -87,7 +87,7 @@ export function filterSongs(songs, query) {
   const terms = normalizeText(query).split(' ').filter(Boolean);
   if (!terms.length) return songs;
   return songs.filter((song) => {
-    const haystack = normalizeText(`${song.artist ?? ''} ${song.title ?? ''}`);
+    const haystack = normalizeText(`${song.artist ?? ''} ${song.title ?? ''} ${song.video_title ?? ''}`);
     return terms.every((term) => haystack.includes(term));
   });
 }
@@ -99,14 +99,16 @@ function words(value) {
 
 /**
  * Músicas já prontas (o "Jukebox") que são a que a pessoa está pedindo: TODAS as palavras do artista e do nome digitados
- * aparecem, inteiras, no artista ou no título da música. Sem artista ou sem nome, não sugere nada (seria só palpite).
+ * aparecem, inteiras, no artista, no título ou no TÍTULO ORIGINAL DO VÍDEO do YouTube (`video_title`): quem deu outro nome à
+ * música ao pedi-la ainda a encontra pelo que o vídeo se chama ("Faouzia - Unethical (MAPHRA Vocal Cover)" é achada por
+ * Maphra + Unethical). Sem artista ou sem nome, não sugere nada (seria só palpite).
  */
 export function findJukeboxMatches(songs, artist, title) {
   const wanted = [...new Set([...words(artist), ...words(title)])];
   if (!words(artist).length || !words(title).length) return [];
   return sortSongs(
     songs.filter((song) => {
-      const have = new Set([...words(song.artist), ...words(song.title)]);
+      const have = new Set([...words(song.artist), ...words(song.title), ...words(song.video_title)]);
       return wanted.every((word) => have.has(word));
     }),
   );

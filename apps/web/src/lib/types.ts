@@ -72,6 +72,8 @@ export interface LibrarySong {
   video_id: string;
   title: string | null;
   artist: string | null;
+  /** Título original do vídeo no YouTube (a pessoa pode ter dado outro nome à música). */
+  video_title?: string | null;
   duration: number | null;
   key?: SongKey | null;
 }

@@ -358,8 +358,8 @@ test('adicionar música: se a versão já está pronta no Jukebox, o aviso deixa
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading')).toHaveText('Encontramos esta versão pronta no nosso Jukebox, quer selecioná-la?');
-  await expect(dialog.getByText('Rolling in the Deep')).toBeVisible();
-  await expect(dialog.getByText(/Adele/)).toBeVisible();
+  await expect(dialog.getByText('Rolling in the Deep', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Adele · 0:30')).toBeVisible();
   await expect(dialog.getByRole('radio')).toBeHidden(); // uma só opção: não há o que escolher
   await dialog.getByRole('button', { name: 'Usar esta versão' }).click();
 
@@ -438,5 +438,29 @@ test('adicionar música: Enter nos campos também mostra o aviso do Jukebox', as
   await page.getByLabel('Artista').fill('Stone Sour');
   await page.getByLabel('Nome da música').fill('Wicked Game');
   await page.getByLabel('Nome da música').press('Enter');
-  await expect(page.getByRole('dialog').getByText('Wicked Game')).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('Wicked Game', { exact: true })).toBeVisible();
+});
+
+test('adicionar música: acha a versão também pelo título original do vídeo no YouTube', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.guestUrl);
+  await tab(page, 'Adicionar').click();
+  // a música foi guardada como "Faouzia — Unethical (Acoustic)", mas o vídeo se chama "Faouzia - Unethical (MAPHRA Vocal Cover)"
+  await page.getByLabel('Artista').fill('Maphra');
+  await page.getByLabel('Nome da música').fill('Unethical');
+  await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading')).toHaveText('Encontramos esta versão pronta no nosso Jukebox, quer selecioná-la?');
+  await expect(dialog.getByText('No YouTube: Faouzia - Unethical (MAPHRA Vocal Cover)')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Usar esta versão' }).click();
+  await expect.poll(async () => (await roomState(request, room.code)).queue.map((i) => i.video_id)).toEqual([SONGS.delta.id]);
+});
+
+test('a biblioteca também filtra pelo título original do vídeo', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.guestUrl);
+  await tab(page, 'Músicas').click();
+  await page.getByLabel('Filtrar as músicas já processadas').fill('maphra');
+  await expect(page.locator('.library li')).toHaveCount(1);
+  await expect(page.locator('.library li')).toContainText('Unethical (Acoustic)');
 });

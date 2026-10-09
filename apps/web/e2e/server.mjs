@@ -15,10 +15,11 @@ const publicDir = resolve(here, '..', process.env.E2E_PUBLIC ?? 'dist');
 
 /** Músicas prontas: o id (11 caracteres), o título, o artista e uma letra curta com o tempo de cada palavra. */
 export const SONGS = [
-  { id: 'songAlpha01', title: 'Wicked Game', artist: 'Stone Sour', tonic: 3 },
-  { id: 'songBravo02', title: 'Unethical', artist: 'Faouzia', tonic: 9 },
-  { id: 'songCharl03', title: 'Rolling in the Deep', artist: 'Adele', tonic: 0 },
-  { id: 'songDelta04', title: 'Unethical (Acoustic)', artist: 'Faouzia', tonic: 7 },
+  { id: 'songAlpha01', title: 'Wicked Game', artist: 'Stone Sour', tonic: 3, videoTitle: 'Stone Sour - Wicked Game Lyrics' },
+  { id: 'songBravo02', title: 'Unethical', artist: 'Faouzia', tonic: 9, videoTitle: 'Faouzia - UNETHICAL (Official Music Video)' },
+  { id: 'songCharl03', title: 'Rolling in the Deep', artist: 'Adele', tonic: 0, videoTitle: 'Adele - Rolling in the Deep (Official Music Video)' },
+  // pedida como Faouzia + "Unethical (Acoustic)", mas o vídeo se chama "... (MAPHRA Vocal Cover)"
+  { id: 'songDelta04', title: 'Unethical (Acoustic)', artist: 'Faouzia', tonic: 7, videoTitle: 'Faouzia - Unethical (MAPHRA Vocal Cover)' },
 ];
 
 const LYRICS = [
@@ -40,7 +41,7 @@ async function seed(root) {
     await writeFile(
       join(dir, 'meta.json'),
       JSON.stringify({
-        video_id: song.id, title: song.title, artist: song.artist, duration: 30, lyrics_source: 'lrclib',
+        video_id: song.id, title: song.title, artist: song.artist, video_title: song.videoTitle, duration: 30, lyrics_source: 'lrclib',
         key: { tonic: song.tonic, mode: 'major', name: 'X', score: 0.9, margin: 0.2 },
       }),
     );

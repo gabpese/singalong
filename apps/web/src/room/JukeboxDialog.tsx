@@ -57,6 +57,7 @@ export function JukeboxDialog({ songs, busy, onUse, onSearchYoutube, onClose }: 
                   <strong>{song.title ?? song.video_id}</strong>
                   <small>{[song.artist, song.duration ? formatDuration(song.duration) : null].filter(Boolean).join(' · ')}</small>
                   {song.key && <small>{keySummary(song.key)}</small>}
+                  {song.video_title && <small className="video-title">{`No YouTube: ${song.video_title}`}</small>}
                 </span>
               </label>
             </li>
