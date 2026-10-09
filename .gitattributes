@@ -1,0 +1,4 @@
+# scripts de shell e workflows sempre com quebra de linha Unix (um .sh com CRLF quebra na VM Linux)
+*.sh text eol=lf
+*.yml text eol=lf
+Caddyfile text eol=lf
