@@ -123,11 +123,11 @@ async function prepareScoring(state, current) {
     if (scorerFor !== current.id) return; // a sala já mudou de música
     scorer = createScorer(melody, {
       transpose: current.pitch,
-      // depuração: um log por bloco de 2 s (trecho, nota original, nota cantada e o resultado da comparação)
-      onBlock: (b) => console.log(
-        `[pontuação] ${b.trecho} | original ${b.original} (principais ${b.principais || '—'}) | cantada ${b.cantada} | `
-        + `distância ${b.distancia ?? '—'} → acerto ${b.acerto} | leituras ${b.leituras} (participação ${b.participacao})`,
-      ),
+      // depuração: descomente para um log por bloco de 2 s (trecho, nota original, nota cantada e o resultado da comparação)
+      // onBlock: (b) => console.log(
+      //   `[pontuação] ${b.trecho} | original ${b.original} (principais ${b.principais || '—'}) | cantada ${b.cantada} | `
+      //   + `distância ${b.distancia ?? '—'} → acerto ${b.acerto} | leituras ${b.leituras} (participação ${b.participacao})`,
+      // ),
     });
   } catch {
     shownNotes = '';
@@ -169,8 +169,9 @@ setInterval(() => {
 function reportScore(itemId) {
   if (!scorer || scorerFor !== itemId || scorer.evaluated < MIN_SCORED_FRAMES) return;
   const score = scorer.score();
-  console.log(`[pontuação] fim da música: ${score} pontos`);
-  console.table(scorer.report());
+  // depuração: descomente para ver a nota final e a tabela com todos os blocos
+  // console.log(`[pontuação] fim da música: ${score} pontos`);
+  // console.table(scorer.report());
   const singer = latest?.queue.find((item) => item.id === itemId)?.added_by ?? '';
   connection.send({ type: 'score', item_id: itemId, score });
   showFinal(score, singer);
