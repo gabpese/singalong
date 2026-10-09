@@ -1,0 +1,17 @@
+# Caddy: HTTPS automático (Let's Encrypt) na frente da API. SITE_ADDRESS vem do .env (ex.: meusingalong.duckdns.org).
+# O HTTPS é obrigatório: sem ele o navegador da TV não libera a troca de tom (AudioWorklet) nem o microfone da pontuação.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# WebSocket (a TV e os celulares da sala) passa pelo mesmo proxy, sem configuração extra
+	reverse_proxy api:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# a página não deve ser incorporada em outros sites; a prévia do YouTube é um iframe DENTRO dela (não é afetada)
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
+}

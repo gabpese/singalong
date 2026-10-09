@@ -112,6 +112,12 @@ Variáveis opcionais (no `.env` ou no ambiente; `0` desliga o limite):
 
 Erros do YouTube viram mensagens em português; "Tentar de novo" só aparece quando vale a pena (não para vídeo privado, bloqueado ou longo demais). Há limite de pedidos por pessoa (busca, fila, criar sala), `/readyz` detalha Redis, banco e armazenamento, e o worker tem healthcheck por heartbeat.
 
+## CI/CD e hospedagem
+
+- **CI** (`.github/workflows/ci.yml`): a cada push e pull request roda os testes da API, do front-end (TypeScript, unitários, build e ponta a ponta com Playwright) e do worker, e confere que as imagens constroem.
+- **CD** (`.github/workflows/deploy.yml`): depois do CI verde na `main`, publica a imagem da API no GitHub Container Registry (amd64 e arm64) e, se ligado, atualiza a VM por SSH.
+- **Hospedagem gratuita com HTTPS** para acessar de qualquer computador, sem o seu PC ligado: veja [`deploy/README.md`](deploy/README.md).
+
 ## Testes
 
 ```powershell

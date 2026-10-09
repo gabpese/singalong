@@ -1,0 +1,65 @@
+# Produção numa VM sempre ligada: API + Redis + Caddy (HTTPS automático). SEM worker: as músicas novas são processadas no PC de
+# casa; aqui só se toca a biblioteca que foi copiada para ./storage (veja deploy/README.md).
+#
+# Uso (na VM, em /opt/singalong):  docker compose -f docker-compose.prod.yml --env-file .env up -d
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: "${SITE_ADDRESS:?defina SITE_ADDRESS no .env}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # os certificados ficam aqui: não apague, senão o Let's Encrypt limita as emissões
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    # construída pelo GitHub Actions (.github/workflows/deploy.yml) para amd64 e arm64
+    image: ghcr.io/${GHCR_OWNER:-gabpese}/singalong-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "3000" # só o Caddy chega aqui; nada da API fica exposto direto na internet
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_ROOT: /storage
+      DB_PATH: /data/singalong.db
+      # o QR code da TV aponta para este endereço
+      PUBLIC_URL: https://${SITE_ADDRESS}
+      # sem worker para refazer músicas apagadas: a limpeza do cache fica desligada
+      CACHE_MAX_GB: "0"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./storage:/storage # precisa ser gravável pelo usuário 1000 (o /readyz grava um arquivo de teste); veja o README
+      - api-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/readyz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:
+  api-data:
+  caddy-data:
+  caddy-config:
