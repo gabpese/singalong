@@ -59,6 +59,11 @@ export function nextUp(state) {
  */
 export function playOrder(state) {
   const { current, waiting } = splitQueue(state);
+  if (Array.isArray(state?.play_order)) {
+    const byId = new Map(waiting.map((item) => [item.id, item]));
+    const ordered = state.play_order.map((id) => byId.get(id)).filter(Boolean);
+    return { current, upcoming: [...ordered, ...waiting.filter((item) => !ordered.includes(item))] };
+  }
   const next = waiting.find((item) => item.id === state?.next_item_id);
   return { current, upcoming: next ? [next, ...waiting.filter((item) => item !== next)] : waiting };
 }

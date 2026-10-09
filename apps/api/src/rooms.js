@@ -6,7 +6,7 @@
 //
 // Estado único por processo (hub em memória). Com várias réplicas da API, o hub passaria a usar Redis pub/sub.
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { clampOffset, clampPitch, nextPlayable, swapTarget } from './queue-logic.js';
+import { clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
 import { extractVideoId } from './youtube.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sem 0/O/1/I/L: fácil de ditar e digitar
@@ -190,9 +190,11 @@ export function createRoomService({
       fair: Boolean(room.fair),
       lastClientId: room.last_client_id,
     });
+    const waiting = items.filter((i) => i.status === 'queued');
     return {
       code: room.code,
       fair: Boolean(room.fair),
+      play_order: playOrder(waiting, { fair: Boolean(room.fair), lastClientId: room.last_client_id }).map((i) => i.id),
       playback: room.playback,
       current_item_id: room.current_item_id,
       next_item_id: upNext?.id ?? null,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { newClientId, parseHostHash, parseRoomCode } from '../public/identity.js';
-import { canRetry, formatDuration, formatPitch, progressPercent, songChip, splitQueue } from '../public/queue-view.js';
+import { canRetry, formatDuration, formatPitch, progressPercent, playOrder, songChip, splitQueue } from '../public/queue-view.js';
 
 test('newClientId: formato aceito pela API e sem depender de crypto.randomUUID', () => {
   const id = newClientId((bytes) => bytes.map((_, i) => i * 7));
@@ -120,4 +120,10 @@ test('wordFills: usa os tempos reais de cada palavra e cai na estimativa quando 
   assert.equal(wordFills(cue, 4, 2), null); // contagem não bate (texto editado): não arrisca
   assert.deepEqual(wordFills({ words: [[2, 2]] }, 1, 1), [0]); // palavra sem duração
   assert.deepEqual(wordFills({ words: [[2, 2]] }, 1, 3), [1]);
+});
+
+test('playOrder: com play_order do servidor (rodízio justo) a lista segue essa ordem', () => {
+  const queue = [1, 2, 3, 4].map((id) => ({ id }));
+  const state = { queue, current_item_id: null, play_order: [1, 2, 4, 3] };
+  assert.deepEqual(playOrder(state).upcoming.map((i) => i.id), [1, 2, 4, 3]);
 });

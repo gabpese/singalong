@@ -8,7 +8,7 @@ import { describeLyricsSource } from './lyrics-sync.js';
 import { keySummary } from './music.js';
 import { createPreviewPlayer } from './preview.js';
 import {
-  canRetry, filterSongs, formatDuration, formatPitch, nextUp, progressPercent, songChip, sortSongs, splitQueue, thumbnailUrl,
+  canRetry, filterSongs, formatDuration, formatPitch, nextUp, progressPercent, songChip, sortSongs, playOrder, splitQueue, thumbnailUrl,
 } from './queue-view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -312,15 +312,15 @@ function queueItem(item, index, waiting) {
       }, 'Tentar de novo') : null,
     pitchControl(item),
     isHost() ? [
-      h('button', { type: 'button', 'aria-label': 'Subir na fila', disabled: index === 0, onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'up' }).catch(() => {}) }, '▲'),
-      h('button', { type: 'button', 'aria-label': 'Descer na fila', disabled: index === waiting.length - 1, onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'down' }).catch(() => {}) }, '▼'),
+      h('button', { type: 'button', 'aria-label': 'Subir na fila', disabled: state.fair || index === 0, title: state.fair ? 'Com o rodízio justo ligado a ordem é automática' : null, onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'up' }).catch(() => {}) }, '▲'),
+      h('button', { type: 'button', 'aria-label': 'Descer na fila', disabled: state.fair || index === waiting.length - 1, title: state.fair ? 'Com o rodízio justo ligado a ordem é automática' : null, onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'down' }).catch(() => {}) }, '▼'),
     ] : item.mine
       // quem não é anfitrião pode adiar a PRÓPRIA música em uma posição (foi ao banheiro, quer esperar mais um pouco)
       ? h('button', {
         type: 'button',
         class: 'ghost',
         title: 'Passa a sua música uma posição para trás: a pessoa de trás canta antes',
-        disabled: index === waiting.length - 1,
+        disabled: state.fair || index === waiting.length - 1,
         onclick: () => act('POST', `/queue/${item.id}/move`, { direction: 'down' })
           .then(() => toast('Você cedeu a vez: sua música desceu uma posição.')).catch(() => {}),
       }, 'Ceder a vez') : null,
@@ -336,7 +336,7 @@ function queueItem(item, index, waiting) {
 
 function render() {
   if (!state) return;
-  const { current, waiting } = splitQueue(state);
+  const { current, upcoming: waiting } = playOrder(state);
 
   if (!connected) els.tvStatus.textContent = 'Reconectando à sala…';
   else els.tvStatus.replaceChildren(icon('display'), state.tv_connected ? ' TV conectada' : ' TV desconectada');

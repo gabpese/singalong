@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampOffset, clampPitch, nextPlayable, swapTarget } from '../src/queue-logic.js';
+import { clampOffset, clampPitch, fairOrder, nextPlayable, swapTarget } from '../src/queue-logic.js';
 
 const item = (id, video_id, client_id) => ({ id, video_id, client_id });
 
@@ -40,4 +40,12 @@ test('swapTarget', () => {
   assert.equal(swapTarget([1, 2, 3], 1, 'up'), null);
   assert.equal(swapTarget([1, 2, 3], 3, 'down'), null);
   assert.equal(swapTarget([1, 2, 3], 9, 'up'), null);
+});
+
+test('fairOrder: intercala as pessoas na fila inteira, uma música de cada por rodada', () => {
+  const queue = [item(1, 'A', 'gabriel'), item(2, 'B', 'carlos'), item(3, 'C', 'carlos'), item(4, 'D', 'gabriel')];
+  assert.deepEqual(fairOrder(queue).map((i) => i.id), [1, 2, 4, 3]);
+  // quem cantou por último vai para o fim da primeira rodada
+  assert.deepEqual(fairOrder(queue, 'gabriel').map((i) => i.id), [2, 1, 3, 4]);
+  assert.deepEqual(fairOrder([item(1, 'A', 'ana'), item(2, 'B', 'ana')], 'ana').map((i) => i.id), [1, 2]);
 });
