@@ -117,5 +117,19 @@ Erros do YouTube viram mensagens em português; "Tentar de novo" só aparece qua
 ```powershell
 cd apps/worker; python -I -m unittest discover -s tests -t .
 cd apps/api;    npm test
-cd apps/web;    npm test
+cd apps/web;    npm test            # lógica pura (node:test)
+cd apps/web;    npm run typecheck   # TypeScript
+cd apps/web;    npm run build; npm run e2e   # testes de ponta a ponta (Playwright, contra o build em dist/)
 ```
+
+Os testes de ponta a ponta sobem sozinhos uma API de teste (`apps/web/e2e/server.mjs`, com músicas prontas e fila de jobs em memória) e abrem um Chromium de verdade, com microfone falso. Na primeira vez: `npx playwright install chromium`.
+
+## Desenvolvimento do front-end
+
+O front-end é React + TypeScript com Vite, em `apps/web` (páginas `index.html`, `room.html` e `tv.html`; código em `src/`). Com a API rodando em `localhost:3000`:
+
+```powershell
+cd apps/web; npm install; npm run dev     # http://localhost:5173, com recarga rápida; /api e /media vão para a API
+```
+
+A imagem da API constrói o front-end (`vite build`) e serve o resultado; fora do Docker, rode `npm run build` e a API serve `apps/web/dist`.

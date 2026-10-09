@@ -12,6 +12,11 @@ export function exportFileName(song, pitch = 0) {
 /**
  * Pede o MP4 e espera ficar pronto. `onWaiting()` é chamado a cada consulta enquanto o worker trabalha.
  * Devolve a URL do arquivo; lança Error com a mensagem para mostrar à pessoa.
+ * @param {(method: string, path: string, body?: unknown) => Promise<any>} api
+ * @param {string} videoId
+ * @param {number} pitch
+ * @param {{ onWaiting?: (status: string) => void, sleep?: (ms: number) => Promise<unknown>, intervalMs?: number, timeoutMs?: number }} [options]
+ * @returns {Promise<string>}
  */
 export async function requestExport(api, videoId, pitch, { onWaiting, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), intervalMs = 2000, timeoutMs = 600_000 } = {}) {
   let info = await api('POST', `/api/songs/${videoId}/export`, { pitch });

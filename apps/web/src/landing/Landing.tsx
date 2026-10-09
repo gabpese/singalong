@@ -55,6 +55,7 @@ export function Landing() {
         <h2>Entrar numa sala</h2>
         <form className="row" autoComplete="off" onSubmit={join}>
           <input
+            className="join-code"
             type="text"
             inputMode="text"
             maxLength={8}

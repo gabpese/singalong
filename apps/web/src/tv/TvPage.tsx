@@ -119,7 +119,6 @@ export function TvPage({ code }: { code: string }) {
     // gancho de diagnóstico (testes no navegador)
     window.tv = { engine: controller.engine, get state() { return controller.state; } };
     return () => controller.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- as refs são estáveis
   }, [code]);
 
   const toggleFullscreen = useCallback(() => {

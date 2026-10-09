@@ -83,7 +83,7 @@ input[type=range] { accent-color: var(--accent); }
 .landing-page .lead { color: var(--dim); margin: 0 0 8px; font-size: 1.05rem; }
 .landing-page .card { display: grid; gap: 10px; }
 .landing-page .card h2 { margin: 0; }
-.landing-page #join-code { text-transform: uppercase; letter-spacing: .2em; font-size: 1.2rem; text-align: center; }
+.landing-page .join-code { text-transform: uppercase; letter-spacing: .2em; font-size: 1.2rem; text-align: center; }
 
 /* ---------- sala (celular) ---------- */
 .topbar {
@@ -248,7 +248,7 @@ body.tv { overflow: hidden; height: 100vh; }
 
 .tv-bottom { display: grid; gap: 8px; text-align: center; }
 .tv-progress { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
-.tv-progress #tv-bar { height: 100%; width: 0; background: var(--accent); transition: width .3s linear; }
+.tv-progress > div { height: 100%; width: 0; background: var(--accent); transition: width .3s linear; }
 
 /* corpo da TV: a letra e, ao lado, a fila (atual + próximas 5) */
 .tv-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--queue-w); gap: 28px; min-height: 0; }
