@@ -53,8 +53,10 @@ export function pitchClassDistance(a, b) {
   return Math.min(d, 12 - d);
 }
 
-const FULL = 1; // semitones de tolerância para o acerto inteiro (voz humana oscila: vibrato, escorregadas)
-const HALF = 2; // ...e para meio acerto
+// Crédito pela distância (em semitones, sem oitava) entre a nota cantada e a principal da original: cai aos poucos, porque
+// 2 ou 3 semitons de erro ainda é "quase" para uma voz humana (vibrato, escorregadas, nota imprecisa).
+const CREDIT_BY_DISTANCE = [1, 1, 0.8, 0.5]; // 0, 1, 2 e 3 semitons; mais que isso não pontua
+const creditFor = (distance) => CREDIT_BY_DISTANCE[distance] ?? 0;
 const BLOCK_SECONDS = 2; // a nota é conferida uma vez a cada 2 s: a melodia original muda várias vezes por segundo e ninguém acompanha cada troca
 const MAIN_SHARE = 0.4; // notas que a original sustenta por pelo menos 40% do bloco são as "principais" dele
 const MIN_REF_FRAMES = 10; // bloco com menos de 0,5 s de voz na original não é cobrado
@@ -146,7 +148,8 @@ export function createScorer(melody, { transpose = 0, onBlock = null } = {}) {
     }
     const info = voiced < MIN_REF_FRAMES ? null : {
       display: mostFrequent(notes),
-      classes: [...classes].filter(([, count]) => count >= voiced * MAIN_SHARE).map(([pc]) => pc),
+      // nenhuma nota chega ao limite (a original passa por várias): vale a mais frequente
+      classes: [...classes].filter(([, count]) => count >= voiced * MAIN_SHARE || count === Math.max(...classes.values())).map(([pc]) => pc),
     };
     refCache.set(block, info);
     return info;
@@ -164,7 +167,7 @@ export function createScorer(melody, { transpose = 0, onBlock = null } = {}) {
     let participation = 0;
     if (heard && ref) {
       dist = Math.min(...ref.classes.map((pc) => pitchClassDistance(sungClass, pc + shift)));
-      accuracy = dist <= FULL ? 1 : dist <= HALF ? 0.5 : 0;
+      accuracy = creditFor(dist);
       participation = Math.min(1, heard / n / PARTICIPATION_FULL);
     }
     return { n, heard, ref, sungClass, dist, accuracy, participation, points: n * participation * accuracy };

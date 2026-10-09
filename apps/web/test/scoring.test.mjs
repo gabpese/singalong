@@ -52,10 +52,11 @@ test('createScorer: confere UMA nota por bloco de 2 s e ignora as trocas dentro 
   assert.equal(s.reference, 60); // a "original" mostrada é uma só durante o bloco
 });
 
-test('createScorer: nota errada não pontua, quase certa vale metade, falhas do detector não punem', () => {
+test('createScorer: nota errada não pontua, quase certa vale a maior parte, falhas do detector não punem', () => {
   const sing = (offset, every = 1) => run(hold(60, FRAMES * 2), (i) => (i % (2 * every) === 0 ? 60 + offset : null)).score();
   assert.equal(sing(5), 0); // quinta errada
-  assert.equal(sing(2), 50); // quase: meio ponto
+  assert.equal(sing(3), 50); // erro pequeno: pontua pela metade
+  assert.equal(sing(2), 80); // quase: a maior parte do ponto
   assert.equal(sing(1), 100);
   assert.equal(sing(0, 2), 100); // o detector só pega metade das leituras
   assert.ok(sing(0, 20) < 40); // quase mudo: 1 leitura em 20 (com a nota segurada, ~10% dos quadros)
@@ -119,4 +120,10 @@ test('createScorer: onBlock e report descrevem a comparação (trecho, nota orig
   const [first, second] = s.report();
   assert.equal(first.trecho, '00:00–00:02');
   assert.deepEqual([second.trecho, second.original, second.cantada, second.distancia, second.acerto], ['00:02–00:04', 'G4', 'D', 5, 0]);
+});
+
+test('createScorer: se a original passa por várias notas no bloco, vale a mais frequente (não zero)', () => {
+  const wandering = [...hold(60, 14), ...hold(63, 13), ...hold(66, 13)]; // nenhuma chega a 40% do bloco
+  assert.equal(run(wandering, () => 60).score(), 100);
+  assert.equal(run(wandering, () => 60).report()[0].principais, 'C');
 });
