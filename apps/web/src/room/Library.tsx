@@ -45,31 +45,30 @@ function LibraryRow({ song }: { song: LibrarySong }) {
         <strong>{song.title ?? song.video_id}</strong>
         <span className="muted">{[song.artist, song.duration ? formatDuration(song.duration) : null].filter(Boolean).join(' · ')}</span>
         {song.key && <span className="muted small">{keySummary(song.key)}</span>}
-        <span className="export-row">
+      </div>
+      <button type="button" className="primary" onClick={add}>
+        Adicionar
+      </button>
+      <div className="export-row">
+        <span className="export-label">Vídeo MP4 para cantar offline</span>
+        <span className="export-controls">
+          <select aria-label="Tom do vídeo MP4" value={pitch} onChange={(event) => setPitch(Number(event.target.value))}>
+            {EXPORT_PITCHES.map((value: number) => (
+              <option key={value} value={value}>
+                {`Tom ${formatPitch(value)}`}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
-            className="ghost"
             title="Baixa um vídeo MP4 com o instrumental e a letra, para cantar offline"
             disabled={exporting}
             onClick={exportSong}
           >
             {exportLabel}
           </button>
-          <label className="muted small">
-            tom{' '}
-            <select aria-label="Tom do vídeo MP4" className="export-pitch" value={pitch} onChange={(event) => setPitch(Number(event.target.value))}>
-              {EXPORT_PITCHES.map((value: number) => (
-                <option key={value} value={value}>
-                  {formatPitch(value)}
-                </option>
-              ))}
-            </select>
-          </label>
         </span>
       </div>
-      <button type="button" className="primary" onClick={add}>
-        Adicionar
-      </button>
     </li>
   );
 }

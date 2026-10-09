@@ -92,6 +92,26 @@ export function filterSongs(songs, query) {
   });
 }
 
+/** Palavras de um texto para comparar versões: sem acento, maiúsculas, apóstrofos nem pontuação ("Don't Stop!" -> dont, stop). */
+function words(value) {
+  return normalizeText(value).replace(/['’`]/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+/**
+ * Músicas já prontas (o "Jukebox") que são a que a pessoa está pedindo: TODAS as palavras do artista e do nome digitados
+ * aparecem, inteiras, no artista ou no título da música. Sem artista ou sem nome, não sugere nada (seria só palpite).
+ */
+export function findJukeboxMatches(songs, artist, title) {
+  const wanted = [...new Set([...words(artist), ...words(title)])];
+  if (!words(artist).length || !words(title).length) return [];
+  return sortSongs(
+    songs.filter((song) => {
+      const have = new Set([...words(song.artist), ...words(song.title)]);
+      return wanted.every((word) => have.has(word));
+    }),
+  );
+}
+
 /** Ordem alfabética por artista e depois por nome; as sem artista vão para o fim (também em ordem alfabética). */
 export function sortSongs(songs) {
   const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });

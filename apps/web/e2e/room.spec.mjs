@@ -41,27 +41,27 @@ test('a biblioteca lista as músicas prontas, filtra por artista e nome e adicio
   await page.goto(room.guestUrl);
   await tab(page, 'Músicas').click();
   const library = page.locator('.library li');
-  await expect(library).toHaveCount(3);
-  await expect(page.getByRole('heading', { name: /Músicas já processadas/ })).toContainText('(3)');
+  await expect(library).toHaveCount(4);
+  await expect(page.getByRole('heading', { name: /Músicas já processadas/ })).toContainText('(4)');
 
   const filter = page.getByLabel('Filtrar as músicas já processadas');
   await filter.fill('faouzia');
-  await expect(library).toHaveCount(1);
+  await expect(library).toHaveCount(2);
   await expect(library.first()).toContainText('Unethical');
-  await expect(page.getByRole('heading', { name: /Músicas já processadas/ })).toContainText('(1 de 3)');
+  await expect(page.getByRole('heading', { name: /Músicas já processadas/ })).toContainText('(2 de 4)');
 
   await filter.fill('nada disso existe');
   await expect(page.getByText('Nenhuma música encontrada para “nada disso existe”.')).toBeVisible();
   await page.getByRole('button', { name: 'Limpar filtro' }).click();
-  await expect(library).toHaveCount(3);
+  await expect(library).toHaveCount(4);
 
   await page.getByLabel('Seu nome').isHidden(); // o campo de nome fica na aba "Adicionar"
-  await library.filter({ hasText: 'Unethical' }).getByRole('button', { name: 'Adicionar' }).click();
+  await library.filter({ hasText: 'Rolling in the Deep' }).getByRole('button', { name: 'Adicionar' }).click();
   await expect(toast(page)).toContainText('Adicionada à fila!');
   await tab(page, 'Fila').click();
   await expect(page.getByRole('heading', { name: 'Tocando agora' })).toBeVisible();
-  await expect(page.locator('#now-body, .now-content').first()).toContainText('Unethical');
-  expect((await roomState(request, room.code)).queue.map((i) => i.video_id)).toEqual([SONGS.bravo.id]);
+  await expect(page.locator('.now-content').first()).toContainText('Rolling in the Deep');
+  expect((await roomState(request, room.code)).queue.map((i) => i.video_id)).toEqual([SONGS.charlie.id]);
 });
 
 test('o que toca agora e a fila: quem canta, próximo e contagem', async ({ page, request }) => {
@@ -181,8 +181,8 @@ test('quem não é anfitrião só mexe nas próprias músicas e pode ceder a vez
 test('adicionar música: buscar no YouTube, escolher o vídeo e colocar na fila', async ({ page, request }) => {
   await request.post('/__test/search-results', {
     data: [
-      { video_id: 'newVideo001', title: 'Faouzia - Unethical (Official)', channel: 'Faouzia', duration: 190 },
-      { video_id: 'newVideo002', title: 'Unethical (cover)', channel: 'Alguém', duration: 200 },
+      { video_id: 'newVideo001', title: 'Billie Eilish - bad guy (Official)', channel: 'Billie Eilish', duration: 190 },
+      { video_id: 'newVideo002', title: 'bad guy (cover)', channel: 'Alguém', duration: 200 },
     ],
   });
   const room = await createRoom(request);
@@ -194,14 +194,14 @@ test('adicionar música: buscar no YouTube, escolher o vídeo e colocar na fila'
   await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
   await expect(page.getByText('Informe o artista e o nome da música')).toBeVisible();
 
-  await page.getByLabel('Artista').fill('Faouzia');
-  await page.getByLabel('Nome da música').fill('Unethical');
+  await page.getByLabel('Artista').fill('Billie Eilish');
+  await page.getByLabel('Nome da música').fill('Bad Guy');
   await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
   await expect(page.locator('.results .result')).toHaveCount(2);
   await expect(page.getByText('Toque no vídeo certo.')).toBeVisible();
 
   await page.locator('.results .result').first().click();
-  await expect(page.getByText('Selecionado: Faouzia - Unethical (Official)')).toBeVisible();
+  await expect(page.getByText('Selecionado: Billie Eilish - bad guy (Official)')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ouvir no YouTube' })).toBeVisible();
   await expect(page.locator('.results')).toBeHidden();
 
@@ -213,7 +213,7 @@ test('adicionar música: buscar no YouTube, escolher o vídeo e colocar na fila'
   await tab(page, 'Fila').click();
   await expect.poll(async () => (await roomState(request, room.code)).queue.length).toBe(1);
   const state = await roomState(request, room.code);
-  expect(state.queue[0]).toMatchObject({ video_id: 'newVideo001', added_by: 'Carla', title: 'Unethical', artist: 'Faouzia' });
+  expect(state.queue[0]).toMatchObject({ video_id: 'newVideo001', added_by: 'Carla', title: 'Bad Guy', artist: 'Billie Eilish' });
   await expect(page.locator('.now, .queue-item').filter({ hasText: 'Carla' }).first()).toBeVisible();
 });
 
@@ -304,7 +304,7 @@ test('exportar MP4: pede o vídeo no tom escolhido e baixa com o nome da música
   });
   await page.goto(room.guestUrl);
   await tab(page, 'Músicas').click();
-  const song = page.locator('.library li', { hasText: 'Unethical' });
+  const song = page.locator('.library li', { hasText: 'Unethical' }).first();
   await song.getByLabel('Tom do vídeo MP4').selectOption('2');
   const download = page.waitForEvent('download');
   await song.getByRole('button', { name: 'Baixar MP4' }).click();
@@ -344,4 +344,99 @@ test('as abas trocam a seção e a mudança de rodízio do anfitrião aparece pa
   await expect(page.getByRole('heading', { name: 'Tocando agora' })).toBeVisible();
   await hostPatch(request, room, { scoring: true });
   await expect(page.getByRole('heading', { name: 'Placar' })).toBeVisible(); // mudança de outro controle chega por WebSocket
+});
+
+test('adicionar música: se a versão já está pronta no Jukebox, o aviso deixa usá-la na hora', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.guestUrl);
+  await tab(page, 'Adicionar').click();
+  await page.getByLabel('Seu nome').fill('Carla');
+  await page.getByLabel('Artista').fill('Adèle'); // com acento, maiúsculas e palavras fora de ordem também acha
+  await page.getByLabel('Nome da música').fill('rolling DEEP');
+  await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading')).toHaveText('Encontramos esta versão pronta no nosso Jukebox, quer selecioná-la?');
+  await expect(dialog.getByText('Rolling in the Deep')).toBeVisible();
+  await expect(dialog.getByText(/Adele/)).toBeVisible();
+  await expect(dialog.getByRole('radio')).toBeHidden(); // uma só opção: não há o que escolher
+  await dialog.getByRole('button', { name: 'Usar esta versão' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect.poll(async () => (await roomState(request, room.code)).queue.length).toBe(1);
+  const state = await roomState(request, room.code);
+  expect(state.queue[0]).toMatchObject({ video_id: SONGS.charlie.id, added_by: 'Carla' });
+  await expect(page.getByText('Carla está cantando')).toBeVisible(); // foi para a aba da fila
+  await tab(page, 'Adicionar').click();
+  await expect(page.getByLabel('Artista')).toHaveValue(''); // o formulário volta ao começo
+  await expect(page.getByText('Adicionada à fila (essa música já estava pronta).')).toBeVisible();
+});
+
+test('adicionar música: com várias versões prontas, escolhe uma delas', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.guestUrl);
+  await tab(page, 'Adicionar').click();
+  await page.getByLabel('Artista').fill('Faouzia');
+  await page.getByLabel('Nome da música').fill('Unethical');
+  await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading')).toHaveText('Encontramos estas versões prontas no nosso Jukebox, quer selecionar uma destas?');
+  const options = dialog.getByRole('radio');
+  await expect(options).toHaveCount(2);
+  await expect(options.first()).toBeChecked(); // a primeira já vem escolhida
+  await dialog.getByText('Unethical (Acoustic)').click();
+  await expect(options.nth(1)).toBeChecked();
+  await dialog.getByRole('button', { name: 'Usar a versão selecionada' }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(async () => (await roomState(request, room.code)).queue.map((i) => i.video_id)).toEqual([SONGS.delta.id]);
+});
+
+test('adicionar música: "Buscar outra versão no YouTube" segue a busca e não pergunta de novo', async ({ page, request }) => {
+  await request.post('/__test/search-results', {
+    data: [{ video_id: 'otherVid001', title: 'Faouzia - Unethical (Live)', channel: 'Faouzia', duration: 210 }],
+  });
+  const room = await createRoom(request);
+  await page.goto(room.guestUrl);
+  await tab(page, 'Adicionar').click();
+  await page.getByLabel('Artista').fill('Faouzia');
+  await page.getByLabel('Nome da música').fill('Unethical');
+  await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Buscar outra versão no YouTube' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.results .result')).toHaveCount(1);
+  expect((await roomState(request, room.code)).queue).toHaveLength(0); // nada entrou na fila
+  // buscar de novo com o mesmo artista e nome: a pessoa já recusou, vai direto ao YouTube
+  await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.results .result')).toHaveCount(1);
+  // mudando o nome da música o aviso volta a valer
+  await page.getByLabel('Nome da música').fill('Unethical Acoustic');
+  await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('adicionar música: fechar o aviso com Esc não faz nada', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.guestUrl);
+  await tab(page, 'Adicionar').click();
+  await page.getByLabel('Artista').fill('Adele');
+  await page.getByLabel('Nome da música').fill('Rolling in the Deep');
+  await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByLabel('Artista')).toHaveValue('Adele'); // o formulário continua como estava
+  expect((await roomState(request, room.code)).queue).toHaveLength(0);
+});
+
+test('adicionar música: Enter nos campos também mostra o aviso do Jukebox', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.guestUrl);
+  await tab(page, 'Adicionar').click();
+  await page.getByLabel('Artista').fill('Stone Sour');
+  await page.getByLabel('Nome da música').fill('Wicked Game');
+  await page.getByLabel('Nome da música').press('Enter');
+  await expect(page.getByRole('dialog').getByText('Wicked Game')).toBeVisible();
 });

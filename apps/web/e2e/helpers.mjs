@@ -5,6 +5,7 @@ export const SONGS = {
   alpha: { id: 'songAlpha01', title: 'Wicked Game', artist: 'Stone Sour' },
   bravo: { id: 'songBravo02', title: 'Unethical', artist: 'Faouzia' },
   charlie: { id: 'songCharl03', title: 'Rolling in the Deep', artist: 'Adele' },
+  delta: { id: 'songDelta04', title: 'Unethical (Acoustic)', artist: 'Faouzia' },
 };
 
 export const ANA = 'client-ana-0001';

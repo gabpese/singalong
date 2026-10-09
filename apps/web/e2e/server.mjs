@@ -18,6 +18,7 @@ export const SONGS = [
   { id: 'songAlpha01', title: 'Wicked Game', artist: 'Stone Sour', tonic: 3 },
   { id: 'songBravo02', title: 'Unethical', artist: 'Faouzia', tonic: 9 },
   { id: 'songCharl03', title: 'Rolling in the Deep', artist: 'Adele', tonic: 0 },
+  { id: 'songDelta04', title: 'Unethical (Acoustic)', artist: 'Faouzia', tonic: 7 },
 ];
 
 const LYRICS = [

@@ -4,10 +4,11 @@
 // que a pede (submitLyrics).
 import { forwardRef, type FormEvent, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../lib/identity.js';
-import { formatDuration, thumbnailUrl } from '../lib/queue-view.js';
+import { findJukeboxMatches, formatDuration, thumbnailUrl } from '../lib/queue-view.js';
 import { buildSearchQuery, embedUrl, extractVideoId, watchUrl } from '../lib/youtube.js';
-import type { ApiError } from '../lib/types';
+import type { ApiError, LibrarySong } from '../lib/types';
 import { Icon } from '../ui/Icon';
+import { JukeboxDialog } from './JukeboxDialog';
 
 const SOURCE_HINTS: Record<string, string> = {
   lrclib:
@@ -51,6 +52,10 @@ interface Props {
   submitLyrics: (videoId: string, body: Record<string, unknown>) => Promise<string>;
   /** O painel precisa aparecer (ex.: abrir a aba "Adicionar"). */
   onShow: () => void;
+  /** Músicas já prontas (o Jukebox): se o artista e o nome batem com alguma, a pessoa pode usá-la em vez de buscar no YouTube. */
+  jukebox: LibrarySong[];
+  /** Coloca uma música pronta do Jukebox na fila e devolve a mensagem de sucesso. */
+  onPickJukebox: (song: LibrarySong) => Promise<string>;
 }
 
 /** Player oficial do YouTube numa moldura: para conferir se é a música certa antes de adicionar. */
@@ -73,7 +78,7 @@ function VideoFrame({ videoId }: { videoId: string }) {
 
 type Preview = { id: string; where: 'selection' | 'result' } | null;
 
-export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userName, onUserName, submitNew, submitLyrics, onShow }, ref) {
+export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userName, onUserName, submitNew, submitLyrics, onShow, jukebox, onPickJukebox }, ref) {
   const [artist, setArtist] = useState('');
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
@@ -87,6 +92,8 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
   const [lyricsFor, setLyricsFor] = useState<string | null>(null); // vídeo que espera a escolha da letra (item em needs_lyrics)
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [matches, setMatches] = useState<LibrarySong[] | null>(null); // versões prontas encontradas (abre o aviso)
+  const [declinedFor, setDeclinedFor] = useState(''); // pedido (artista|nome) em que a pessoa preferiu buscar no YouTube
   const artistRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -117,6 +124,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
     setLinkOpen(false);
     setSelected(null);
     setPreview(null);
+    setDeclinedFor('');
   }
 
   function togglePreviewOfSelection() {
@@ -125,12 +133,22 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
     setPreview(wasOpen ? null : { id: selected.id, where: 'selection' });
   }
 
-  async function runSearch() {
+  async function runSearch({ skipJukebox = false } = {}) {
     const query = buildSearchQuery(artist, title);
     if (!query) {
       setStatus('Informe o artista e o nome da música para buscar o vídeo.', true);
       (artist.trim() ? titleRef : artistRef).current?.focus();
       return;
+    }
+    // antes de ir ao YouTube: já temos essa música pronta? (não vale ao trocar a letra de um item que já está na fila)
+    if (!skipJukebox && !lyricsFor && declinedFor !== query) {
+      const found: LibrarySong[] = findJukeboxMatches(jukebox, artist, title);
+      if (found.length) {
+        clearResults();
+        setStatus('');
+        setMatches(found);
+        return;
+      }
     }
     select(null);
     setSearching(true);
@@ -189,6 +207,29 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function useJukeboxSong(song: LibrarySong) {
+    setSubmitting(true);
+    try {
+      const message = await onPickJukebox(song);
+      setMatches(null);
+      clearResults();
+      reset();
+      setStatus(message);
+    } catch (err) {
+      setMatches(null);
+      setStatus((err as ApiError).message, true);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /** "Buscar outra versão no YouTube": segue a busca e não pergunta de novo para este mesmo artista e nome. */
+  function searchYoutubeAnyway() {
+    setDeclinedFor(buildSearchQuery(artist, title) ?? '');
+    setMatches(null);
+    void runSearch({ skipJukebox: true });
   }
 
   useImperativeHandle(ref, () => ({
@@ -355,6 +396,15 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong({ userN
           {status.text}
         </p>
       </form>
+      {matches && (
+        <JukeboxDialog
+          songs={matches}
+          busy={submitting}
+          onUse={(song) => void useJukeboxSong(song)}
+          onSearchYoutube={searchYoutubeAnyway}
+          onClose={() => setMatches(null)}
+        />
+      )}
     </article>
   );
 });

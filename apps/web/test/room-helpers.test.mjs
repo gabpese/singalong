@@ -127,3 +127,24 @@ test('playOrder: com play_order do servidor (rodízio justo) a lista segue essa 
   const state = { queue, current_item_id: null, play_order: [1, 2, 4, 3] };
   assert.deepEqual(playOrder(state).upcoming.map((i) => i.id), [1, 2, 4, 3]);
 });
+
+test('findJukeboxMatches: acha as versões prontas pelas palavras de artista e nome, sem acento nem pontuação', async () => {
+  const { findJukeboxMatches } = await import('../src/lib/queue-view.js');
+  const songs = [
+    { video_id: 'a', artist: 'Faouzia', title: 'Unethical' },
+    { video_id: 'b', artist: 'Faouzia', title: 'Unethical (Acoustic)' },
+    { video_id: 'c', artist: 'Stone Sour', title: "Don't Stop" },
+    { video_id: 'd', artist: 'Adele', title: 'Rolling in the Deep' },
+    { video_id: 'e', artist: null, title: 'Unethical — cover' },
+  ];
+  const ids = (artist, title) => findJukeboxMatches(songs, artist, title).map((s) => s.video_id);
+  assert.deepEqual(ids('faouzia', 'unethical'), ['a', 'b']); // mais de uma versão
+  assert.deepEqual(ids('Adele', 'rolling in the deep'), ['d']);
+  assert.deepEqual(ids('stone sour', 'DONT STOP'), ['c']); // apóstrofo e maiúsculas não atrapalham
+  assert.deepEqual(ids('Adèle', 'Rolling Deep'), ['d']); // acento e palavras de menos (a ordem não importa)
+  assert.deepEqual(ids('Faouzia', 'Unethical Acoustic'), ['b']);
+  assert.deepEqual(ids('Faouz', 'Unethical'), []); // palavra pela metade não vale
+  assert.deepEqual(ids('Billie Eilish', 'Bad Guy'), []);
+  assert.deepEqual(ids('', 'Unethical'), []); // sem artista: não adivinha
+  assert.deepEqual(ids('Faouzia', '  '), []);
+});

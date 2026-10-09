@@ -81,6 +81,14 @@ export function RoomPage({ code }: { code: string }) {
     return 'Adicionada à fila! Ela está sendo preparada e toca quando chegar a vez.';
   }
 
+  /** Música do Jukebox escolhida no aviso do painel de adicionar: entra na fila na hora (já está pronta). */
+  async function addLibrarySong(song: LibrarySong) {
+    await act('POST', '/queue', { video_id: song.video_id, name: myName, display_title: song.title ?? undefined });
+    void loadLibrary();
+    showTab('queue');
+    return 'Adicionada à fila (essa música já estava pronta).';
+  }
+
   async function submitLyrics(videoId: string, body: Record<string, unknown>) {
     await api('PUT', `/api/songs/${videoId}/lyrics`, body, code);
     showTab('queue');
@@ -134,6 +142,8 @@ export function RoomPage({ code }: { code: string }) {
             onShow={() => showTab('add')}
             submitNew={submitNew}
             submitLyrics={submitLyrics}
+            jukebox={library}
+            onPickJukebox={addLibrarySong}
           />
         </section>
 
