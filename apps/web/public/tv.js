@@ -4,6 +4,8 @@ import { icon } from './icons.js';
 import { api, connectRoom, parseRoomCode } from './identity.js';
 import { keySummary } from './music.js';
 import { nextUp, playOrder, songChip, splitQueue } from './queue-view.js';
+import { createScorer, openMic } from './scoring.js';
+import { finalMessage, MIN_SCORED_FRAMES } from './score-view.js';
 import qrcode from './vendor/qrcode/qrcode.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -28,6 +30,14 @@ const els = {
   joinUrl: $('join-url'),
   unlock: $('unlock'),
   fullscreen: $('fullscreen'),
+  hud: $('score-hud'),
+  scoreNow: $('score-now'),
+  scoreHint: $('score-hint'),
+  final: $('score-final'),
+  finalScore: $('final-score'),
+  finalWho: $('final-who'),
+  finalMsg: $('final-msg'),
+  finalBoard: $('final-board'),
 };
 
 const code = parseRoomCode(location.search);
@@ -56,6 +66,7 @@ const engine = createEngine({
   onEnded(itemId) {
     if (endedFor === itemId) return;
     endedFor = itemId;
+    reportScore(itemId);
     connection.send({ type: 'ended', item_id: itemId });
   },
   onError(itemId, message) {
@@ -69,10 +80,101 @@ const engine = createEngine({
   },
 });
 
+// --- pontuação pelo microfone (só quando o anfitrião liga e a música tem a melodia de referência) ---
+let mic = null;
+let micFailed = false;
+let scorer = null;
+let scorerFor = null; // item que o `scorer` acompanha
+let finalTimer = null;
+
+function stopScoring() {
+  mic?.stop();
+  mic = null;
+  micFailed = false;
+  scorer = null;
+  scorerFor = null;
+  els.hud.hidden = true;
+}
+
+/** Prepara (ou mantém) a pontuação da música atual. */
+async function prepareScoring(state, current) {
+  const melodyUrl = current?.song.media?.melody;
+  if (!state.scoring) return stopScoring();
+  els.hud.hidden = !current;
+  if (!current) return;
+  els.scoreHint.textContent = melodyUrl ? '' : 'sem melodia de referência para esta música';
+  if (!melodyUrl) {
+    scorer = null;
+    scorerFor = null;
+    return;
+  }
+  if (scorerFor === current.id) {
+    scorer?.setTranspose(current.pitch);
+    return;
+  }
+  scorerFor = current.id;
+  scorer = null;
+  els.scoreNow.textContent = '0';
+  try {
+    const res = await fetch(melodyUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const melody = await res.json();
+    if (scorerFor !== current.id) return; // a sala já mudou de música
+    scorer = createScorer(melody, { transpose: current.pitch });
+  } catch {
+    els.scoreHint.textContent = 'não consegui carregar a melodia';
+    return;
+  }
+  if (!mic && !micFailed) {
+    try {
+      mic = await openMic();
+    } catch {
+      micFailed = true;
+    }
+  }
+  els.scoreHint.textContent = micFailed ? 'microfone indisponível (permita o acesso e abra a TV por http://localhost:3000)' : '';
+}
+
+// ~20 leituras por segundo: compara o tom cantado com a melodia no instante atual da música
+setInterval(() => {
+  if (!scorer || !mic || !engine.playing || engine.loadedId !== scorerFor) return;
+  const live = scorer.tick(engine.currentTime, mic.read().midi);
+  els.scoreNow.textContent = live ?? 0;
+}, 50);
+
+/** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */
+function reportScore(itemId) {
+  if (!scorer || scorerFor !== itemId || scorer.evaluated < MIN_SCORED_FRAMES) return;
+  const score = scorer.score();
+  const singer = latest?.queue.find((item) => item.id === itemId)?.added_by ?? '';
+  connection.send({ type: 'score', item_id: itemId, score });
+  showFinal(score, singer);
+}
+
+function renderFinalBoard() {
+  els.finalBoard.textContent = '';
+  for (const row of (latest?.scoreboard ?? []).slice(0, 3)) {
+    const li = document.createElement('li');
+    li.textContent = `${row.name} — ${row.score}`; // textContent: nomes vêm de terceiros
+    els.finalBoard.append(li);
+  }
+}
+
+function showFinal(score, singer) {
+  els.finalScore.textContent = String(score);
+  els.finalWho.textContent = singer;
+  els.finalMsg.textContent = finalMessage(score);
+  renderFinalBoard();
+  els.final.hidden = false;
+  clearTimeout(finalTimer);
+  finalTimer = setTimeout(() => { els.final.hidden = true; }, 9000);
+}
+
 const connection = connectRoom(code, 'tv', {
   onMessage(message) {
     if (message.type !== 'state') return;
     latest = message.state;
+    if (!els.final.hidden) renderFinalBoard();
     apply();
   },
   onStatus(status) {
@@ -185,6 +287,7 @@ async function apply() {
       state = latest;
       renderChrome(state);
       const { current } = splitQueue(state);
+      prepareScoring(state, current);
       if (!current) {
         engine.clear();
         endedFor = null;

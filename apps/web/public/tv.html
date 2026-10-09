@@ -35,6 +35,12 @@
         <p class="line next2" id="l-next2"></p>
       </section>
 
+      <aside class="score-hud" id="score-hud" hidden aria-live="off">
+        <span class="label">Pontuação</span>
+        <strong id="score-now">0</strong>
+        <small id="score-hint"></small>
+      </aside>
+
       <aside class="tv-queue" id="tv-queue-box" hidden aria-label="Fila de cantores">
         <h2>Fila</h2>
         <ol id="tv-queue"></ol>
@@ -52,6 +58,14 @@
       <div class="qr" id="qr" aria-label="QR code para entrar na sala"></div>
       <p class="hint" id="join-url"></p>
       <p class="idle-msg" id="idle-msg"></p>
+    </section>
+
+    <section class="score-final" id="score-final" hidden role="status">
+      <span class="label">Pontuação final</span>
+      <strong id="final-score"></strong>
+      <span id="final-who"></span>
+      <small id="final-msg"></small>
+      <ol id="final-board"></ol>
     </section>
 
     <button id="unlock" class="unlock" type="button" hidden>Toque aqui para ativar o som</button>

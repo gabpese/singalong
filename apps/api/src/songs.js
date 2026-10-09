@@ -5,6 +5,7 @@ const keys = (id) => ({
   instrumental: `cache/${id}/instrumental.mp3`,
   lyrics: `cache/${id}/lyrics.json`,
   meta: `cache/${id}/meta.json`,
+  melody: `cache/${id}/melody.json`, // opcional: a melodia da voz original, para a pontuação
 });
 
 export function createSongService({ storage, jobs }) {
@@ -37,7 +38,13 @@ export function createSongService({ storage, jobs }) {
       error_code: jobActive ? job.error_code ?? null : null,
       retry: jobActive ? job.retry ?? null : null,
       meta: ready ? await readMeta(id) : null,
-      media: ready ? { instrumental: storage.getUrl(k.instrumental), lyrics: storage.getUrl(k.lyrics) } : null,
+      media: ready
+        ? {
+          instrumental: storage.getUrl(k.instrumental),
+          lyrics: storage.getUrl(k.lyrics),
+          melody: (await storage.exists(k.melody)) ? storage.getUrl(k.melody) : null,
+        }
+        : null,
     };
   }
 

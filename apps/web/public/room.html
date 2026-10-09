@@ -20,6 +20,10 @@
         <button id="open-tv" type="button" class="has-icon"><span class="icon i-display" aria-hidden="true"></span>Abrir TV</button>
         <button id="copy-link" type="button" class="has-icon"><span class="icon i-link" aria-hidden="true"></span>Copiar link da sala</button>
         <button id="copy-host" type="button" class="has-icon" hidden><span class="icon i-host" aria-hidden="true"></span>Copiar link de anfitrião</button>
+        <label class="check" id="host-scoring" hidden>
+          <input id="scoring" type="checkbox">
+          <span>Pontuação pelo microfone<br><small class="muted">a TV compara a afinação de quem canta com a voz original (precisa de microfone na TV)</small></span>
+        </label>
         <label class="check" id="host-settings" hidden>
           <input id="fair" type="checkbox">
           <span>Rodízio justo<br><small class="muted">a mesma pessoa não canta duas seguidas quando há outra esperando</small></span>
@@ -39,6 +43,11 @@
         <h2>Na fila <span class="count" id="queue-count"></span></h2>
         <ol class="queue" id="queue"></ol>
         <p class="hint empty" id="queue-empty">Ninguém na fila. Toque em <strong>Adicionar</strong> para escolher uma música.</p>
+      </article>
+
+      <article class="card" id="scoreboard-card" hidden>
+        <h2>Placar</h2>
+        <ol class="scoreboard" id="scoreboard"></ol>
       </article>
     </section>
 

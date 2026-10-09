@@ -17,6 +17,7 @@ from .align import align_lyrics, attach_words
 from .errors import JobError, format_duration, NEVER, MANUAL
 from .ids import extract_video_id
 from .key import detect_key
+from .melody import extract_melody
 from .storage import LocalStorage
 
 PIPELINE_VERSION = 1
@@ -54,6 +55,7 @@ def keys(video_id: str) -> dict[str, str]:
         "instrumental": f"{base}/instrumental.mp3",
         "vocals": f"{base}/vocals.mp3",  # só a voz: usada para alinhar a letra colada pelo usuário
         "lyrics": f"{base}/lyrics.json",
+        "melody": f"{base}/melody.json",  # opcional: a melodia da voz original, para a pontuação
         "meta": f"{base}/meta.json",
         "source": f"{base}/source.json",  # metadados do vídeo: evita baixar de novo só para trocar a letra
     }
@@ -427,6 +429,16 @@ def process(
             except Exception as exc:  # noqa: BLE001 - é um refinamento: sem ele a letra continua valendo
                 log.warning("%s: não consegui medir as palavras (%s); o destaque será estimado", video_id, exc)
         storage.put(k["lyrics"], _write_json(work / "lyrics.json", cues))
+
+        if not storage.exists(k["melody"]) and (vocals_file is not None or storage.exists(k["vocals"])):
+            # músicas sem a voz isolada (cache antigo) ficam sem pontuação: não vale baixar e separar de novo só para isso
+            try:
+                t = time.monotonic()
+                log.info("%s: extraindo a melodia da voz", video_id)
+                storage.put(k["melody"], _write_json(work / "melody.json", extract_melody(get_vocals())))
+                timings["melody"] = round(time.monotonic() - t, 1)
+            except Exception as exc:  # noqa: BLE001 - é um extra: sem ele a música só não pontua
+                log.warning("%s: não consegui extrair a melodia (%s); a música não terá pontuação", video_id, exc)
 
         t = time.monotonic()
         key = music_key(storage, k, work, instrumental_file)

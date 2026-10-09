@@ -32,9 +32,14 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
   app.patch('/rooms/:code', {
     schema: {
       params: { type: 'object', properties: { code: CODE_PARAM } },
-      body: { type: 'object', additionalProperties: false, properties: { fair: { type: 'boolean' } }, required: ['fair'] },
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { fair: { type: 'boolean' }, scoring: { type: 'boolean' } },
+        minProperties: 1,
+      },
     },
-  }, async (request) => (await rooms.setFair(request.params.code, request.body.fair, actorOf(request))).state);
+  }, async (request) => (await rooms.setSettings(request.params.code, request.body, actorOf(request))).state);
 
   app.post('/rooms/:code/queue', {
     preHandler: rateLimited(limiters.addToQueue),

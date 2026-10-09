@@ -4,6 +4,7 @@ from pathlib import Path
 
 from singalong_worker.align import attach_words, clean_lines, group_words
 from singalong_worker.ids import extract_video_id
+from singalong_worker.melody import melody_from_f0
 from singalong_worker.key import MAJOR_PROFILE, MINOR_PROFILE, NOTES, best_key
 from singalong_worker.lyrics import apply_text, parse_cues, parse_lrc, parse_lyrics_file, pick_candidate
 from singalong_worker.search import parse_entries
@@ -11,6 +12,17 @@ from singalong_worker.pipeline import NeedsAlignment, NeedsLyrics, guess_artist_
 from singalong_worker.storage import LocalStorage
 
 VID = "dQw4w9WgXcQ"
+
+
+class MelodyTests(unittest.TestCase):
+    def test_notes_and_silence(self):
+        out = melody_from_f0([440.0, 440.0, None, float("nan"), 261.63, 261.63, 0])
+        self.assertEqual(out["midi"], [69, 69, -1, -1, 60, 60, -1])
+        self.assertEqual(out["hop"], 0.05)
+
+    def test_drops_isolated_blips(self):
+        out = melody_from_f0([None, 440.0, None, 440.0, 440.0, 440.0])
+        self.assertEqual(out["midi"], [-1, -1, -1, 69, 69, 69])
 
 
 class IdTests(unittest.TestCase):

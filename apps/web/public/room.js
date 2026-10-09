@@ -62,6 +62,10 @@ const els = {
   libraryCount: $('library-count'),
   hostSettings: $('host-settings'),
   fair: $('fair'),
+  scoring: $('scoring'),
+  hostScoring: $('host-scoring'),
+  scoreboardCard: $('scoreboard-card'),
+  scoreboard: $('scoreboard'),
   toast: $('toast'),
   previewBar: $('preview-bar'),
   previewTitle: $('preview-title'),
@@ -344,6 +348,11 @@ function render() {
   els.copyHost.hidden = !isHost();
   els.hostSettings.hidden = !isHost();
   els.fair.checked = state.fair;
+  els.hostScoring.hidden = !isHost();
+  els.scoring.checked = state.scoring;
+  els.scoreboardCard.hidden = !state.scoring && !state.scoreboard?.length;
+  els.scoreboard.replaceChildren(...(state.scoreboard ?? []).map((row) =>
+    h('li', {}, h('strong', {}, row.name), h('span', { class: 'muted' }, ` ${row.title ?? ''}`), h('b', { class: 'points' }, String(row.score)))));
 
   renderNow(current);
 
@@ -448,6 +457,7 @@ els.copyHost.addEventListener('click', () => {
   els.menu.open = false;
   copyText(`${location.origin}/room.html?room=${code}#host=${hostToken(code)}`, 'Link de anfitrião copiado! Quem abrir controla a sala.');
 });
+els.scoring.addEventListener('change', () => act('PATCH', '', { scoring: els.scoring.checked }).catch(() => { els.scoring.checked = !els.scoring.checked; }));
 els.fair.addEventListener('change', () => act('PATCH', '', { fair: els.fair.checked }).catch(() => { els.fair.checked = !els.fair.checked; }));
 
 // --- tempo real ---

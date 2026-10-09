@@ -194,6 +194,8 @@ export function createRoomService({
     return {
       code: room.code,
       fair: Boolean(room.fair),
+      scoring: Boolean(room.scoring),
+      scoreboard: db.listScored(room.code).map((r) => ({ id: r.id, name: r.added_by, title: r.title, score: r.score })),
       play_order: playOrder(waiting, { fair: Boolean(room.fair), lastClientId: room.last_client_id }).map((i) => i.id),
       playback: room.playback,
       current_item_id: room.current_item_id,
@@ -352,11 +354,25 @@ export function createRoomService({
       });
     },
 
-    setFair(code, fair, actor) {
+    /** Ajustes da sala, só do anfitrião: `fair` (rodízio justo) e `scoring` (pontuação pelo microfone). */
+    setSettings(code, settings, actor) {
       return mutate(code, actor, (room) => {
         requireHost(room, actor);
-        db.updateRoom(room.code, { fair: fair ? 1 : 0 });
+        const fields = {};
+        if (typeof settings.fair === 'boolean') fields.fair = settings.fair ? 1 : 0;
+        if (typeof settings.scoring === 'boolean') fields.scoring = settings.scoring ? 1 : 0;
+        db.updateRoom(room.code, fields);
       });
+    },
+
+    /** Pontuação final enviada pela TV ao fim da música (só vale com a pontuação ligada e para o item que está tocando). */
+    tvScore(code, itemId, score) {
+      const room = db.getRoom(normalizeCode(code));
+      const item = db.getItem(itemId);
+      if (!room?.scoring || !item || item.room_code !== room.code || item.status !== 'playing') return;
+      if (!Number.isInteger(score) || score < 0 || score > 100) return;
+      db.updateItem(item.id, { score });
+      this.tick().catch(() => {});
     },
 
     setOffset(code, videoId, offset, actor) {
@@ -417,7 +433,8 @@ export function createRoomService({
         return;
       }
       if (!Number.isInteger(message?.item_id)) return;
-      if (message.type === 'ended') this.tvEnded(code, message.item_id).catch(() => {});
+      if (message.type === 'score') this.tvScore(code, message.item_id, message.score);
+      else if (message.type === 'ended') this.tvEnded(code, message.item_id).catch(() => {});
       else if (message.type === 'position' && Number.isFinite(message.ms)) this.tvPosition(code, message.item_id, message.ms);
     },
 

@@ -284,6 +284,9 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 | 1 — Player isolado | ✅ | Letra sincronizada (preenchimento por palavra), pitch ±6 via AudioWorklet (SoundTouch), ajuste da letra. |
 | 2 — API + worker integrados | ✅ | Fastify + Redis Streams + worker consumidor; `docker compose up` sobe tudo. |
 | 3 — Salas e fila | ✅ | Salas com código/QR, fila por sala (SQLite), WebSocket, TV + controle + anfitrião, pré-carregamento, rodízio justo. |
+| 4 — Robustez | ✅ | Erros traduzidos, retentativas, limites, limpeza LRU, health checks, logs JSON. |
+| 5a/5b — Palavra a palavra | ✅ | Tempo real de cada palavra (`words` no `lyrics.json`), também para letras do LRCLIB/legenda; `refresh_words.py` completa o cache antigo. |
+| 5c — Pontuação por microfone | ✅ | Anfitrião liga na sala. Ver decisões abaixo. |
 
 ### Decisões e aprendizados da Fase 2
 - **Sem SQLite ainda.** A biblioteca é o próprio cache (`meta.json`); o estado dos jobs vive no Redis (`job:<id>`). O SQLite entra com salas e fila (Fase 3).
@@ -316,6 +319,13 @@ Na v1, `deploy/k8s/` fica vazio ou só com um README; não manter manifests sem 
 - **QR code** da TV usa `PUBLIC_URL` (endereço do computador na rede); sem ele, usa a origem da página e avisa se for localhost.
 - **Bugs que os testes pegaram:** o item que toca vinha depois dos que aguardam (rodízio justo dá posição maior); `append` do DOM imprimia "null" nas partes opcionais; letra da música anterior ficava na tela ao trocar de música.
 - **Fora desta fase:** múltiplas réplicas da API (o hub de WebSocket é em memória; passaria a Redis pub/sub), prioridade do worker pela ordem da fila (hoje é FIFO de chegada), HTTPS local para a TV por IP.
+
+### Fase 5c: pontuação pelo microfone
+- **Melodia de referência:** o worker extrai o tom da voz isolada (`librosa.pyin`, 1 nota MIDI a cada 50 ms, -1 = sem voz) para `cache/<id>/melody.json`. É opcional: sem ela (cache antigo sem `vocals.mp3`) a música só não pontua. `refresh_words.py` gera a melodia do cache existente.
+- **Quem capta:** a **TV** abre o microfone (`getUserMedia`, com cancelamento de eco para o instrumental não contar como voz) e detecta o tom com YIN no próprio navegador; exige `localhost` ou https.
+- **A nota:** percentual de quadros em que a voz original canta e o cantor acerta o tom, **ignorando a oitava**, com a melodia deslocada pelo tom escolhido na música. Até 1 semitom vale ponto inteiro, até 2 meio ponto; aceita até 200 ms de atraso do microfone. Só vale com pelo menos 5 s cantados.
+- **Servidor:** a sala ganha `scoring` (só o anfitrião muda, `PATCH /rooms/:code`); a TV manda `{type:'score'}` ao fim natural da música (só para o item tocando e com a pontuação ligada) e a nota vai para `queue_items.score` e para o `scoreboard` do estado (10 maiores). O celular mostra o **Placar**; a TV mostra a nota ao vivo e o resultado final por 9 s.
+- **Limite conhecido:** é afinação, não ritmo nem letra; barulho forte ou o instrumental vazando para o microfone pode render pontos indevidos.
 
 ### Fase 3b: tom, prévias, próximo cantor e novo layout
 - **Detecção do tom** (`worker/key.py`): perfil de croma do **instrumental** (librosa: HPSS + `chroma_cqt` com a afinação do arquivo compensada) correlacionado com os 24 perfis de Krumhansl-Kessler. Gravado em `meta.json` (`key: {tonic, mode, score, margin, alt}`); músicas antigas ganham o tom em segundo plano na subida do worker (~10 s cada). Validação: áudio sintético **24/24** tonalidades; em músicas reais, a coerência ao transpor foi **19/24** no método atual (empatado com STFT e melhor que CENS e CQT sem HPSS). Os erros se concentram nas músicas ambíguas (maior × relativa menor), e a **margem entre a 1ª e a 2ª tonalidade** prevê isso: abaixo de **0,08** a tela diz "Tom provável: X ou Y" em vez de fingir certeza. É uma estimativa, não uma verdade musical.

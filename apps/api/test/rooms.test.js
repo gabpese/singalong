@@ -441,3 +441,37 @@ test('WebSocket real: estado inicial, TV avisa o fim, posição só vai para os 
   const code1008 = await new Promise((resolve) => bad.on('close', (c) => resolve(c)));
   assert.equal(code1008, 1008); // sala inexistente
 });
+
+test('pontuação (opcional): só o anfitrião liga; a nota da TV vale só para a música tocando e vai para o placar', async () => {
+  const { code, host } = await newRoom();
+  assert.equal((await call('PATCH', `/rooms/${code}`, { client: BIA, body: { scoring: true } })).status, 403);
+  assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: {} })).status, 400);
+  const a = (await add(code, READY_A, { client: ANA })).body;
+  await app.rooms.tvScore(code, a.item_id, 80); // desligada: ignorada
+  assert.deepEqual((await call('GET', `/rooms/${code}`)).body.scoreboard, []);
+
+  const on = await call('PATCH', `/rooms/${code}`, { host, body: { scoring: true } });
+  assert.equal(on.body.scoring, true);
+  assert.equal(on.body.fair, false); // um ajuste não mexe no outro
+
+  await app.rooms.tvScore(code, a.item_id, 101); // fora de 0..100: ignorada
+  await app.rooms.tvScore(code, a.item_id, 87.5); // não inteira: ignorada
+  await app.rooms.tvScore(code, a.item_id, 87);
+  await app.rooms.tvEnded(code, a.item_id);
+  const b = (await add(code, READY_B, { client: BIA, name: 'Bia' })).body;
+  await app.rooms.tvScore(code, b.item_id, 95);
+  const { scoreboard } = (await call('GET', `/rooms/${code}`)).body;
+  assert.deepEqual(scoreboard.map((r) => [r.name, r.score]), [['Bia', 95], ['Ana', 87]]);
+});
+
+test('a melodia de referência só aparece quando existe no cache', async () => {
+  const dir = join(root, 'cache', READY_B);
+  await writeFile(join(dir, 'melody.json'), '{"hop":0.05,"midi":[]}');
+  const { code } = await newRoom();
+  const a = (await add(code, READY_A)).body;
+  await add(code, READY_B);
+  const { queue } = (await call('GET', `/rooms/${code}`)).body;
+  assert.equal(queue.find((i) => i.video_id === READY_A).song.media.melody, null);
+  assert.match(queue.find((i) => i.video_id === READY_B).song.media.melody, /melody\.json$/);
+  assert.ok(a.item_id);
+});
