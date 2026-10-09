@@ -1,0 +1,40 @@
+services:
+  worker:
+    profiles: ["cpu"]
+    build:
+      context: ./apps/worker
+      args:
+        TORCH_INDEX: cpu
+    image: singalong-worker:cpu
+    environment:
+      STORAGE_ROOT: /storage
+      YTDLP_COOKIES: /secrets/youtube_cookies.txt
+    volumes:
+      - ./storage:/storage
+      - ./secrets:/secrets:ro
+      - models:/models
+
+  worker-gpu:
+    profiles: ["gpu"]
+    build:
+      context: ./apps/worker
+      args:
+        TORCH_INDEX: cu121
+    image: singalong-worker:gpu
+    environment:
+      STORAGE_ROOT: /storage
+      YTDLP_COOKIES: /secrets/youtube_cookies.txt
+    volumes:
+      - ./storage:/storage
+      - ./secrets:/secrets:ro
+      - models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  models:

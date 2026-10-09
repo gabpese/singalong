@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Singalong — Player</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="stage" id="stage">
+    <header class="top">
+      <select id="song" aria-label="Música"></select>
+      <button id="fullscreen" type="button" title="Tela cheia (F)">⛶</button>
+    </header>
+
+    <section class="lyrics" id="lyrics" aria-live="off">
+      <p class="line prev" id="l-prev"></p>
+      <p class="line current" id="l-current"></p>
+      <p class="line next" id="l-next"></p>
+      <p class="line next2" id="l-next2"></p>
+    </section>
+
+    <footer class="controls">
+      <div class="transport">
+        <button id="play" type="button" disabled>▶ Tocar</button>
+        <span id="time">0:00</span>
+        <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Posição" disabled>
+        <span id="duration">0:00</span>
+      </div>
+      <div class="knobs">
+        <label>Tom
+          <input id="pitch" type="range" min="-6" max="6" value="0" step="1">
+          <output id="pitch-out">0</output>
+          <button id="pitch-reset" type="button" title="Voltar ao tom original">0</button>
+        </label>
+        <label>Ajuste da letra
+          <input id="offset" type="range" min="-2" max="2" value="0" step="0.05">
+          <output id="offset-out">0,00 s</output>
+        </label>
+      </div>
+      <p class="hint" id="status">Carregando músicas…</p>
+    </footer>
+  </main>
+  <script type="module" src="player.js"></script>
+</body>
+</html>
