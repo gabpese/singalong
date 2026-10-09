@@ -38,8 +38,18 @@ test('createScorer: acertar tudo = 100, silêncio = 0, só contam os quadros com
   assert.equal(sing(() => null).score(), 0);
   assert.equal(sing((m) => (m < 0 ? null : m)).evaluated, 7);
   assert.equal(sing((m) => (m < 0 ? null : m + 12)).score(), 100); // uma oitava acima também vale
-  assert.equal(sing((m) => (m < 0 ? null : m + 5)).score(), 0); // quinta errada
-  assert.equal(sing((m) => (m < 0 ? null : m + 2)).score(), 50); // quase: meio ponto
+});
+
+test('createScorer: nota errada não pontua, quase certa vale metade', () => {
+  const long = { hop: 0.05, midi: Array(40).fill(60) };
+  const sing = (offset) => {
+    const s = createScorer(long);
+    for (let i = 0; i < 40; i++) s.tick(i * 0.05 + 0.01, 60 + offset);
+    return s.score();
+  };
+  assert.equal(sing(5), 0); // quinta errada
+  assert.equal(sing(2), 50); // quase: meio ponto
+  assert.equal(sing(1), 100);
 });
 
 test('createScorer: o tom escolhido desloca a melodia e um quadro não conta duas vezes', () => {
@@ -51,7 +61,7 @@ test('createScorer: o tom escolhido desloca a melodia e um quadro não conta dua
   assert.equal(createScorer(melody).score(), null);
 });
 
-test('createScorer: tolera o atraso do microfone (a nota certa chega até 200 ms depois)', () => {
+test('createScorer: tolera o atraso do microfone (a nota certa chega até 500 ms depois)', () => {
   const s = createScorer({ hop: 0.05, midi: [60, 60, 60, 60, 67, 67, 67, 67] });
   s.tick(0.01, 60);
   s.tick(0.21, 60); // a referência já mudou para 67, mas o cantor ainda termina a nota anterior
@@ -67,16 +77,16 @@ test('noteName: nome da nota com a oitava', () => {
 });
 
 test('createScorer: segura a última nota por 150 ms (consoantes e respirações não contam como silêncio)', () => {
-  const s = createScorer({ hop: 0.05, midi: Array(12).fill(60) });
+  const s = createScorer({ hop: 0.05, midi: Array(60).fill(60) });
   s.tick(0.0, 60);
   s.tick(0.05, null); // 50 ms: ainda vale a nota segurada
   s.tick(0.1, null);
   assert.equal(s.score(), 100);
-  s.tick(0.5, null); // 500 ms depois, em outro trecho: silêncio de verdade
+  s.tick(2.5, null); // 2,5 s depois, em outro trecho: silêncio de verdade
   assert.equal(s.score(), 75);
 });
 
-test('createScorer: pontua por trechos de 0,3 s, então errar um instante no meio de um trecho não derruba a nota', () => {
+test('createScorer: pontua por trechos de 2 s, então errar um instante no meio de um trecho não derruba a nota', () => {
   const s = createScorer({ hop: 0.05, midi: Array(12).fill(60) });
   for (let i = 0; i < 12; i++) s.tick(i * 0.05 + 0.01, i === 2 || i === 8 ? 90 : 60); // um deslize em cada trecho
   assert.equal(s.score(), 100);

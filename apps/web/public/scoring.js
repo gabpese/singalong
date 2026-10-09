@@ -55,16 +55,17 @@ export function pitchClassDistance(a, b) {
 
 const FULL = 1.5; // semitones de tolerância para o acerto inteiro (voz humana oscila: vibrato, escorregadas)
 const HALF = 2.5; // ...e para meio acerto
-const WINDOW_FRAMES = 6; // a nota vale por trechos de 0,3 s: ninguém canta com precisão de 50 ms
+const WINDOW_FRAMES = 40; // a nota vale por trechos de 2 s: a melodia original muda várias vezes por segundo e ninguém acompanha cada troca
 const WINDOW_FULL = 0.6; // trecho com 60% ou mais de acertos conta inteiro
 const WINDOW_HALF = 0.3; // ...com 30% ou mais, conta metade
 const HOLD_SECONDS = 0.15; // o detector falha em consoantes e respirações: vale a última nota captada há menos de 150 ms
-const LAG_FRAMES = 4; // o som do microfone chega até 200 ms depois da nota de referência (ouvir, cantar, captar)
+const LAG_FRAMES = 10; // a nota cantada pode vir até 500 ms depois da de referência (ouvir, cantar, captar) ...
+const LEAD_FRAMES = 10; // ...ou até 500 ms antes (quem conhece a música canta adiantado)
 
 /**
  * Acompanha a música quadro a quadro (50 ms). `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
  * Só contam os quadros em que a voz original canta; quadros já avaliados (seek para trás) não contam duas vezes.
- * Os quadros se agrupam em trechos de 0,3 s, e cada trecho vale pela fração de acertos dele (ver WINDOW_*).
+ * Os quadros se agrupam em trechos de 2 s, e cada trecho vale pela fração de acertos dele (ver WINDOW_*).
  */
 export function createScorer(melody, { transpose = 0 } = {}) {
   const { hop, midi } = melody;
@@ -95,7 +96,7 @@ export function createScorer(melody, { transpose = 0 } = {}) {
       win.n++;
       if (sung != null) {
         let best = Infinity;
-        for (let j = idx - LAG_FRAMES; j <= idx + 1; j++) {
+        for (let j = idx - LAG_FRAMES; j <= idx + LEAD_FRAMES; j++) {
           if (midi[j] >= 0) best = Math.min(best, pitchClassDistance(sung, midi[j] + shift));
         }
         win.hit += best <= FULL ? 1 : best <= HALF ? 0.5 : 0;
