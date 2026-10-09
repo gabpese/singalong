@@ -70,6 +70,8 @@ def backfill(storage) -> int:
     import tempfile
     from pathlib import Path
 
+    from .meta_store import update_meta
+
     done = 0
     for meta_key in [k for k in storage.list("cache") if k.endswith("/meta.json")]:
         base = meta_key.rsplit("/", 1)[0]
@@ -80,12 +82,10 @@ def backfill(storage) -> int:
             with tempfile.TemporaryDirectory(prefix="singalong-key-") as tmp:
                 audio = Path(tmp) / "instrumental.mp3"
                 audio.write_bytes(storage.read(f"{base}/instrumental.mp3"))
-                meta["key"] = detect_key(audio)
-                updated = Path(tmp) / "meta.json"
-                updated.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-                storage.put(meta_key, updated)
+                key = detect_key(audio)  # a parte demorada fica fora da trava do meta.json
+            update_meta(storage, base.split("/")[1], lambda m: m.setdefault("key", key))
             done += 1
-            log.info("tom de %s: %s %s", base, meta["key"]["name"], meta["key"]["mode"])
+            log.info("tom de %s: %s %s", base, key["name"], key["mode"])
         except Exception as exc:  # noqa: BLE001 - uma música com problema não impede as outras
             log.warning("não consegui calcular o tom de %s: %s", base, exc)
     return done

@@ -432,3 +432,9 @@ input[type=range].seek::-webkit-slider-runnable-track { height: 6px; border-radi
 input[type=range].seek::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
 input[type=range].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--accent); }
 input[type=range].seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); }
+
+/* nível das vozes de apoio: uma linha própria, com a barra no estilo da de posição */
+.backing-row { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.backing-row .seek { flex: 1; }
+.backing-value { min-width: 3em; text-align: right; font-variant-numeric: tabular-nums; color: var(--dim); font-size: .9rem; }
+.queue-item .backing-row { margin-top: 0; }

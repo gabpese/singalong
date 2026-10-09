@@ -238,6 +238,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
             resumed = true;
           } else {
             engine.setPitch(current.pitch);
+            engine.setBacking(current.backing);
             engine.setOffset(current.lyric_offset);
           }
           await syncPlayback(state.playback);

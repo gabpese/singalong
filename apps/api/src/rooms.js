@@ -6,7 +6,7 @@
 //
 // Estado único por processo (hub em memória). Com várias réplicas da API, o hub passaria a usar Redis pub/sub.
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
+import { clampBacking, clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
 import { extractVideoId } from './youtube.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sem 0/O/1/I/L: fácil de ditar e digitar
@@ -212,6 +212,7 @@ export function createRoomService({
           added_by: item.added_by,
           client_id: item.client_id,
           pitch: item.pitch,
+          backing: item.backing,
           status: item.status,
           lyric_offset: db.getOffset(item.video_id),
           song: {
@@ -332,11 +333,15 @@ export function createRoomService({
       });
     },
 
-    setPitch(code, itemId, pitch, actor) {
+    /** Tom e nível das vozes de apoio de uma música da fila: só quem a escolheu (ou o anfitrião) muda. */
+    setItemSettings(code, itemId, { pitch, backing }, actor) {
       return mutate(code, actor, (room) => {
         const item = requireItem(room, itemId);
         requireEditable(room, item, actor);
-        db.updateItem(item.id, { pitch: clampPitch(pitch) });
+        db.updateItem(item.id, {
+          ...(pitch === undefined ? {} : { pitch: clampPitch(pitch) }),
+          ...(backing === undefined ? {} : { backing: clampBacking(backing) }),
+        });
       });
     },
 

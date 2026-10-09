@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 
 from singalong_worker.align import attach_words, clean_lines, group_words
+from singalong_worker.backing import backing_share, find_missing, is_usable, process as backing_process
+from singalong_worker.meta_store import update_meta
 from singalong_worker.export import ass_time, build_ass, ffmpeg_command, karaoke_text, output_key, pitch_filter
 from singalong_worker.ids import extract_video_id
 from singalong_worker.melody import lyric_spans, melody_from_f0
@@ -454,6 +456,65 @@ class SearchTests(unittest.TestCase):
         self.assertEqual([r["video_id"] for r in out], ["TLvtw4nXou0", "dQw4w9WgXcQ"])
         self.assertEqual(out[0], {"video_id": "TLvtw4nXou0", "title": "Jack's Lament", "channel": "Geoff", "duration": 265})
         self.assertEqual((out[1]["title"], out[1]["channel"]), ("dQw4w9WgXcQ", "Rick"))
+
+
+class BackingTests(unittest.TestCase):
+    def test_share_tells_a_single_voice_from_one_with_harmonies(self):
+        import numpy as np
+
+        t = np.arange(22050 * 20) / 22050
+        lead = 0.3 * np.sin(2 * np.pi * 220 * t)  # voz principal cantando o tempo todo
+        silent = np.zeros_like(lead)  # uma voz só: o apoio é (quase) silêncio
+        harmony = np.where((t % 10) < 4, 0.2, 0.005) * np.sin(2 * np.pi * 330 * t)  # apoio forte em 40% do tempo
+        self.assertLess(backing_share(lead, silent), 0.01)
+        self.assertGreater(backing_share(lead, harmony), 0.3)
+        self.assertEqual(backing_share(silent, harmony), 0.0)  # sem voz principal não há o que comparar
+        self.assertEqual(backing_share(np.zeros(100), np.zeros(100)), 0.0)  # áudio curto demais
+
+    def test_usable_threshold(self):
+        self.assertFalse(is_usable(0.0))
+        self.assertFalse(is_usable(0.04))
+        self.assertTrue(is_usable(0.05))
+        self.assertTrue(is_usable(0.26))
+
+    def test_find_missing_only_lists_analysed_songs_with_vocals(self):
+        with tempfile.TemporaryDirectory() as d:
+            storage = LocalStorage(d)
+            root = Path(d) / "cache"
+            for vid, meta, has_vocals in [
+                ("aaaaaaaaaaa", {"title": "sem análise"}, True),  # falta analisar
+                ("bbbbbbbbbbb", {"title": "feita", "backing": {"status": "ready", "share": 0.3}}, True),
+                ("ccccccccccc", {"title": "sem apoio", "backing": {"status": "none", "share": 0.0}}, True),
+                ("ddddddddddd", {"title": "sem a voz isolada"}, False),  # cache antigo: não dá para separar
+            ]:
+                (root / vid).mkdir(parents=True)
+                (root / vid / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+                if has_vocals:
+                    (root / vid / "vocals.mp3").write_bytes(b"x")
+            self.assertEqual(find_missing(storage), ["aaaaaaaaaaa"])
+
+    def test_process_refuses_a_song_that_is_not_ready(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(FileNotFoundError):
+                backing_process(LocalStorage(d), "aaaaaaaaaaa")
+
+
+class MetaStoreTests(unittest.TestCase):
+    def test_concurrent_updates_do_not_overwrite_each_other(self):
+        import threading
+
+        with tempfile.TemporaryDirectory() as d:
+            storage = LocalStorage(d)
+            (Path(d) / "cache" / "aaaaaaaaaaa").mkdir(parents=True)
+            (Path(d) / "cache" / "aaaaaaaaaaa" / "meta.json").write_text(json.dumps({"title": "T"}), encoding="utf-8")
+            threads = [threading.Thread(target=update_meta, args=(storage, "aaaaaaaaaaa", lambda m, i=i: m.update({f"campo{i}": i}))) for i in range(30)]
+            for th in threads:
+                th.start()
+            for th in threads:
+                th.join()
+            final = json.loads((Path(d) / "cache" / "aaaaaaaaaaa" / "meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(final["title"], "T")
+            self.assertEqual({k for k in final if k.startswith("campo")}, {f"campo{i}" for i in range(30)})  # nenhuma mudança se perdeu
 
 
 class TitlesBackfillTests(unittest.TestCase):

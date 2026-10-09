@@ -76,9 +76,14 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
   app.patch('/rooms/:code/queue/:itemId', {
     schema: {
       params: ITEM_PARAMS,
-      body: { type: 'object', additionalProperties: false, properties: { pitch: { type: 'integer' } }, required: ['pitch'] },
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { pitch: { type: 'integer' }, backing: { type: 'integer' } }, // tom (semitons) e vozes de apoio (0..100 %)
+        minProperties: 1,
+      },
     },
-  }, async (request) => (await rooms.setPitch(request.params.code, request.params.itemId, request.body.pitch, actorOf(request))).state);
+  }, async (request) => (await rooms.setItemSettings(request.params.code, request.params.itemId, request.body, actorOf(request))).state);
 
   app.post('/rooms/:code/player/:action', {
     schema: {

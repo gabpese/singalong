@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .errors import AUTO, MANUAL, JobError, classify
+from .backing import REQUEST_KEY as BACKING_REQUEST_KEY
 from .pipeline import Limits, NeedsLyrics, process
 from .storage import LocalStorage
 
@@ -125,6 +126,10 @@ def handle(r, storage: LocalStorage, settings: Settings, msg_id: str, fields: di
         set_job(r, video_id, status="processing", stage="", error="", error_code="", retry="")
         _run(r, storage, settings, video_id, payload, sleep)
         set_job(r, video_id, status="ready", stage="", error="", error_code="", retry="")
+        try:
+            r.lpush(BACKING_REQUEST_KEY, video_id)  # as vozes de apoio saem depois, em segundo plano: a música já está pronta
+        except Exception:  # noqa: BLE001 - é um extra; na próxima subida do worker a música é encontrada de qualquer jeito
+            log.warning("não consegui pedir as vozes de apoio", extra={"job": video_id})
         log.info("job pronto", extra={"job": video_id, "elapsed_s": round(time.monotonic() - started, 1)})
     except (NeedsLyrics, ValueError) as exc:
         # depende de uma decisão do usuário (escolher/corrigir a fonte da letra), não é falha do sistema

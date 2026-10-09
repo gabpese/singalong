@@ -5,6 +5,7 @@ import { canRetry, playOrder, songChip, thumbnailUrl } from '../lib/queue-view.j
 import type { ApiError, QueueItem, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
+import { BackingControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
 
 const FAIR_HINT = 'Com o rodízio justo ligado a ordem é automática';
@@ -114,6 +115,7 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
           </button>
         )}
       </div>
+      <BackingControl item={item} />
     </li>
   );
 }

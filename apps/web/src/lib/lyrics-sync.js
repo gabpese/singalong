@@ -119,6 +119,13 @@ export function describeLyricsSource(source) {
 export const PITCH_MIN = -6;
 export const PITCH_MAX = 6;
 
+/** Nível das vozes de apoio: inteiro de 0 a 100 (%); inválido = 0 (desligado). */
+export function clampBacking(level) {
+  const n = Math.round(Number(level));
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(Math.max(n, 0), 100);
+}
+
 /** Limita o tom a ±6 semitons (acima disso o áudio degrada) e arredonda para inteiro. */
 export function clampPitch(semitones) {
   const n = Math.round(Number(semitones));

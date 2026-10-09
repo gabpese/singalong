@@ -6,6 +6,7 @@ import { formatDuration, nextUp, progressPercent, splitQueue, thumbnailUrl } fro
 import type { QueueItem, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
+import { BackingControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
 import type { Position } from './useRoomConnection';
 
@@ -147,6 +148,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
               )}
               <PitchControl item={current} />
             </div>
+            <BackingControl item={current} />
             {isHost && (
               <div className="controls-row offset">
                 <span className="muted">Ajuste da letra</span>

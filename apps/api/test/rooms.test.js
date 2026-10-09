@@ -506,3 +506,40 @@ test('mudar a posição da música: a barra arrastada manda o ponto de destino (
     [{ type: 'seek', item_id: a.item_id, to: 95.5 }, { type: 'seek', item_id: a.item_id, to: 0 }],
   );
 });
+
+test('vozes de apoio: o nível (0..100) é de quem escolheu a música (ou do anfitrião), vale por item e convive com o tom', async () => {
+  const { code, host } = await newRoom();
+  const a = (await add(code, READY_A, { client: ANA })).body;
+  const setting = (client, body, opts = {}) => call('PATCH', `/rooms/${code}/queue/${a.item_id}`, { client, body, ...opts });
+  const itemOf = async () => (await call('GET', `/rooms/${code}`)).body.queue.find((i) => i.id === a.item_id);
+
+  assert.equal((await itemOf()).backing, 0); // padrão: desligado
+  assert.equal((await setting(ANA, { backing: 40 })).status, 200);
+  assert.equal((await itemOf()).backing, 40);
+  assert.equal((await itemOf()).pitch, 0); // um ajuste não mexe no outro
+
+  await setting(ANA, { backing: 250 }); // acima do limite: vira 100
+  assert.equal((await itemOf()).backing, 100);
+  await setting(ANA, { backing: -5 });
+  assert.equal((await itemOf()).backing, 0);
+
+  assert.equal((await setting(ANA, { pitch: 2, backing: 30 })).status, 200); // os dois de uma vez
+  assert.deepEqual([(await itemOf()).pitch, (await itemOf()).backing], [2, 30]);
+
+  assert.equal((await setting(BIA, { backing: 90 })).status, 403); // outra pessoa não mexe
+  assert.equal((await setting(BIA, { backing: 90 }, { host })).status, 200); // o anfitrião sim
+  assert.equal((await itemOf()).backing, 90);
+  assert.equal((await setting(ANA, {})).status, 400); // precisa de pelo menos um ajuste
+  assert.equal((await setting(ANA, { backing: 'muito' })).status, 400);
+  assert.equal((await setting(ANA, { backing: 1.5 })).status, 400);
+});
+
+test('vozes de apoio: a URL do backing.mp3 só aparece nas músicas que o têm', async () => {
+  await writeFile(join(root, 'cache', READY_B, 'backing.mp3'), 'apoio');
+  const { code } = await newRoom();
+  await add(code, READY_A);
+  await add(code, READY_B);
+  const { queue } = (await call('GET', `/rooms/${code}`)).body;
+  assert.equal(queue.find((i) => i.video_id === READY_A).song.media.backing, null);
+  assert.match(queue.find((i) => i.video_id === READY_B).song.media.backing, /backing\.mp3$/);
+});

@@ -6,8 +6,8 @@ já têm o título no `source.json`: o backfill o copia para o `meta.json`.
 """
 import json
 import logging
-import tempfile
-from pathlib import Path
+
+from .meta_store import update_meta
 
 log = logging.getLogger("worker.titles")
 
@@ -15,20 +15,16 @@ log = logging.getLogger("worker.titles")
 def backfill(storage) -> int:
     """Copia `video_title` do source.json para o meta.json das músicas que ainda não têm. Devolve quantas atualizou."""
     done = 0
-    for meta_key in [k for k in storage.list("cache") if k.endswith("/meta.json")]:
-        base = meta_key.rsplit("/", 1)[0]
+    for meta_key_path in [k for k in storage.list("cache") if k.endswith("/meta.json")]:
+        base = meta_key_path.rsplit("/", 1)[0]
+        video_id = base.split("/")[1]
         try:
-            meta = json.loads(storage.read(meta_key))
-            if meta.get("video_title") or not storage.exists(f"{base}/source.json"):
+            if json.loads(storage.read(meta_key_path)).get("video_title") or not storage.exists(f"{base}/source.json"):
                 continue
             video_title = json.loads(storage.read(f"{base}/source.json")).get("video_title")
             if not video_title:
                 continue
-            meta["video_title"] = video_title
-            with tempfile.TemporaryDirectory(prefix="singalong-titles-") as tmp:
-                updated = Path(tmp) / "meta.json"
-                updated.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-                storage.put(meta_key, updated)
+            update_meta(storage, video_id, lambda meta: meta.setdefault("video_title", video_title))
             done += 1
         except Exception as exc:  # noqa: BLE001 - uma música com problema não impede as outras
             log.warning("não consegui guardar o título do vídeo de %s: %s", base, exc)

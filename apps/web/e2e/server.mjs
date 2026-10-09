@@ -15,8 +15,8 @@ const publicDir = resolve(here, '..', process.env.E2E_PUBLIC ?? 'dist');
 
 /** Músicas prontas: o id (11 caracteres), o título, o artista e uma letra curta com o tempo de cada palavra. */
 export const SONGS = [
-  { id: 'songAlpha01', title: 'Wicked Game', artist: 'Stone Sour', tonic: 3, videoTitle: 'Stone Sour - Wicked Game Lyrics' },
-  { id: 'songBravo02', title: 'Unethical', artist: 'Faouzia', tonic: 9, videoTitle: 'Faouzia - UNETHICAL (Official Music Video)' },
+  { id: 'songAlpha01', title: 'Wicked Game', artist: 'Stone Sour', tonic: 3, videoTitle: 'Stone Sour - Wicked Game Lyrics', backing: true },
+  { id: 'songBravo02', title: 'Unethical', artist: 'Faouzia', tonic: 9, videoTitle: 'Faouzia - UNETHICAL (Official Music Video)', backing: true },
   { id: 'songCharl03', title: 'Rolling in the Deep', artist: 'Adele', tonic: 0, videoTitle: 'Adele - Rolling in the Deep (Official Music Video)' },
   // pedida como Faouzia + "Unethical (Acoustic)", mas o vídeo se chama "... (MAPHRA Vocal Cover)"
   { id: 'songDelta04', title: 'Unethical (Acoustic)', artist: 'Faouzia', tonic: 7, videoTitle: 'Faouzia - Unethical (MAPHRA Vocal Cover)' },
@@ -36,6 +36,7 @@ async function seed(root) {
     const dir = join(root, 'cache', song.id);
     await mkdir(dir, { recursive: true });
     await copyFile(join(here, 'fixtures', 'tone.mp3'), join(dir, 'instrumental.mp3'));
+    if (song.backing) await copyFile(join(here, 'fixtures', 'tone.mp3'), join(dir, 'backing.mp3')); // só algumas músicas têm vozes de apoio
     await writeFile(join(dir, 'lyrics.json'), JSON.stringify(LYRICS));
     await writeFile(join(dir, 'melody.json'), JSON.stringify(MELODY));
     await writeFile(

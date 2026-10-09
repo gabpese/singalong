@@ -6,6 +6,7 @@ const keys = (id) => ({
   lyrics: `cache/${id}/lyrics.json`,
   meta: `cache/${id}/meta.json`,
   melody: `cache/${id}/melody.json`, // opcional: a melodia da voz original, para a pontuação
+  backing: `cache/${id}/backing.mp3`, // opcional: só as vozes de apoio, para o controle de nível delas
 });
 
 /** Chave do MP4 exportado: o mesmo nome que o worker usa (karaoke.mp4, karaoke_p+2.mp4, karaoke_p-3.mp4). */
@@ -46,6 +47,7 @@ export function createSongService({ storage, jobs }) {
           instrumental: storage.getUrl(k.instrumental),
           lyrics: storage.getUrl(k.lyrics),
           melody: (await storage.exists(k.melody)) ? storage.getUrl(k.melody) : null,
+          backing: (await storage.exists(k.backing)) ? storage.getUrl(k.backing) : null,
         }
         : null,
     };

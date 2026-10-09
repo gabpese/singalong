@@ -12,6 +12,7 @@ import time
 
 import redis
 
+from .backing import serve as backing_serve
 from .export import serve as export_serve
 from .key import backfill as key_backfill
 from .titles import backfill as titles_backfill
@@ -79,6 +80,8 @@ def run() -> None:
     stop_threads = threading.Event()
     # a busca no YouTube roda numa thread própria: não pode esperar atrás de um job longo (Demucs)
     threading.Thread(target=search_serve, args=(settings.redis_url, settings.cookies, stop_threads), name="search", daemon=True).start()
+    # as vozes de apoio levam minutos em CPU: thread própria, uma música de cada vez, sem segurar a próxima do karaokê
+    threading.Thread(target=backing_serve, args=(settings.redis_url, storage, stop_threads), name="backing", daemon=True).start()
     # a exportação em MP4 também tem thread própria: leva um minuto e não pode esperar atrás do Demucs
     threading.Thread(target=export_serve, args=(settings.redis_url, storage, stop_threads), name="export", daemon=True).start()
     # músicas processadas antes do recurso de tom ganham o tom em segundo plano (uma vez cada)

@@ -10,6 +10,13 @@ export function clampPitch(value) {
   return Math.min(Math.max(n, PITCH_MIN), PITCH_MAX);
 }
 
+/** Nível das vozes de apoio: inteiro de 0 a 100 (%). Valores inválidos viram 0 (desligado). */
+export function clampBacking(value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(Math.max(n, 0), 100);
+}
+
 /** Ajuste da letra em segundos, limitado a ±10 s e a 2 casas. */
 export function clampOffset(value) {
   const n = Number(value);

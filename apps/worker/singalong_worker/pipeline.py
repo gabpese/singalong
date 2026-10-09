@@ -445,6 +445,7 @@ def process(
         if key and "key" not in timings:
             timings["key"] = round(time.monotonic() - t, 1)
 
+        previous = json.loads(storage.read(k["meta"])) if storage.exists(k["meta"]) else {}
         meta = {
             "video_id": video_id,
             "title": info["title"],
@@ -455,6 +456,7 @@ def process(
             "lyrics_lines": len(cues),
             "lyrics_word_timing": words_lines > 0,
             **({"key": key} if key else {}),
+            **({"backing": previous["backing"]} if "backing" in previous else {}),  # a voz isolada não mudou: o apoio continua valendo
             "pipeline_version": PIPELINE_VERSION,
             "timings_s": timings,
         }

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS queue_items (
   added_by    TEXT NOT NULL,
   client_id   TEXT NOT NULL,
   pitch       INTEGER NOT NULL DEFAULT 0,
+  backing     INTEGER NOT NULL DEFAULT 0,         -- nível das vozes de apoio (0..100 %)
   position    INTEGER NOT NULL,
   status      TEXT NOT NULL DEFAULT 'queued',     -- queued | playing | done | skipped
   created_at  INTEGER NOT NULL,
@@ -36,7 +37,7 @@ CREATE TABLE IF NOT EXISTS song_settings (
 `;
 
 const ROOM_FIELDS = new Set(['fair', 'scoring', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
-const ITEM_FIELDS = new Set(['pitch', 'position', 'status', 'played_at', 'score', 'title', 'artist']);
+const ITEM_FIELDS = new Set(['pitch', 'backing', 'position', 'status', 'played_at', 'score', 'title', 'artist']);
 
 export function openDb(path = ':memory:') {
   const db = new DatabaseSync(path);
@@ -51,6 +52,7 @@ export function openDb(path = ':memory:') {
   const hasColumn = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
   if (!hasColumn('rooms', 'scoring')) db.exec('ALTER TABLE rooms ADD COLUMN scoring INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('queue_items', 'score')) db.exec('ALTER TABLE queue_items ADD COLUMN score INTEGER');
+  if (!hasColumn('queue_items', 'backing')) db.exec('ALTER TABLE queue_items ADD COLUMN backing INTEGER NOT NULL DEFAULT 0');
 
   const one = (sql, ...params) => db.prepare(sql).get(...params) ?? null;
   const all = (sql, ...params) => db.prepare(sql).all(...params);

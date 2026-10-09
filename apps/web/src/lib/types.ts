@@ -20,7 +20,7 @@ export interface SongView {
   duration: number | null;
   lyrics_source: string | null;
   key: SongKey | null;
-  media: { instrumental: string; lyrics: string; melody: string | null } | null;
+  media: { instrumental: string; lyrics: string; melody: string | null; backing: string | null } | null;
 }
 
 export interface QueueItem {
@@ -30,6 +30,8 @@ export interface QueueItem {
   artist: string | null;
   added_by: string;
   pitch: number;
+  /** Nível das vozes de apoio (0..100 %); só vale se a música tem o arquivo de apoio. */
+  backing: number;
   status: string;
   lyric_offset: number;
   mine: boolean;

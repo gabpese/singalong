@@ -157,3 +157,15 @@ test('lineProgress usa o fim cantado: o preenchimento não se arrasta durante um
   assert.equal(lineProgress(hidden, 5.6), 1);
   assert.ok(lineProgress(hidden, 2.8) > 0.45 && lineProgress(hidden, 2.8) < 0.55);
 });
+
+test('clampBacking: nível das vozes de apoio, inteiro de 0 a 100; inválido desliga', async () => {
+  const { clampBacking } = await import('../src/lib/lyrics-sync.js');
+  assert.equal(clampBacking(40), 40);
+  assert.equal(clampBacking(40.6), 41);
+  assert.equal(clampBacking(-10), 0);
+  assert.equal(clampBacking(250), 100);
+  assert.equal(clampBacking('55'), 55);
+  assert.equal(clampBacking('muito'), 0);
+  assert.equal(clampBacking(undefined), 0);
+  assert.equal(clampBacking(null), 0);
+});
