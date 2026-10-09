@@ -1,0 +1,9 @@
+storage/
+__pycache__/
+*.pyc
+.env
+node_modules/
+secrets/
+test-results/
+playwright-report/
+dist/
