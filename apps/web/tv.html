@@ -7,68 +7,7 @@
   <link rel="icon" href="data:,">
 </head>
 <body class="tv">
-  <main class="tv-stage" id="stage">
-    <header class="tv-top">
-      <div class="singer is-now" id="singer-now" hidden>
-        <span class="label">Cantando agora</span>
-        <strong class="who" id="who-now"></strong>
-        <span class="what" id="what-now"></span>
-        <span class="key" id="key-now"></span>
-      </div>
-      <div class="singer is-next" id="singer-next" hidden>
-        <span class="label">Próximo</span>
-        <strong class="who" id="who-next"></strong>
-        <span class="what" id="what-next"></span>
-      </div>
-      <div class="tv-meta">
-        <span class="room-tag">Sala <strong id="room-code"></strong></span>
-        <button id="fullscreen" type="button" title="Tela cheia (F)" aria-label="Tela cheia">⛶</button>
-      </div>
-    </header>
-
-    <div class="tv-body">
-      <section class="lyrics" id="lyrics" aria-live="off">
-        <p class="line prev" id="l-prev"></p>
-        <p class="line current" id="l-current"></p>
-        <p class="line next" id="l-next"></p>
-        <p class="line next2" id="l-next2"></p>
-      </section>
-
-      <aside class="score-hud" id="score-hud" hidden aria-live="off">
-        <span class="label">Pontuação</span>
-        <strong id="score-now">0</strong>
-        <small id="score-hint"></small>
-      </aside>
-
-      <aside class="tv-queue" id="tv-queue-box" hidden aria-label="Fila de cantores">
-        <h2>Fila</h2>
-        <ol id="tv-queue"></ol>
-      </aside>
-    </div>
-
-    <footer class="tv-bottom">
-      <div class="tv-progress" aria-hidden="true"><div id="tv-bar"></div></div>
-      <p class="hint" id="notice" role="status"></p>
-    </footer>
-
-    <section class="idle" id="idle" hidden>
-      <h1><span class="icon i-singing" aria-hidden="true"></span>Singalong</h1>
-      <p class="idle-lead">Entre na sala <strong id="idle-code"></strong> pelo celular</p>
-      <div class="qr" id="qr" aria-label="QR code para entrar na sala"></div>
-      <p class="hint" id="join-url"></p>
-      <p class="idle-msg" id="idle-msg"></p>
-    </section>
-
-    <section class="score-final" id="score-final" hidden role="status">
-      <span class="label">Pontuação final</span>
-      <strong id="final-score"></strong>
-      <span id="final-who"></span>
-      <small id="final-msg"></small>
-      <ol id="final-board"></ol>
-    </section>
-
-    <button id="unlock" class="unlock" type="button" hidden>Toque aqui para ativar o som</button>
-  </main>
-  <script type="module" src="/src/legacy/tv.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/tv/main.tsx"></script>
 </body>
 </html>
