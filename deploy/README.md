@@ -46,8 +46,8 @@ Depois do período de teste, o que é **Always Free** continua funcionando; o re
 
 ### 2. Endereço grátis com HTTPS (você faz; 2 min)
 O HTTPS é **obrigatório**: sem ele o navegador não libera a troca de tom nem o microfone.
-1. Entre em <https://www.duckdns.org> (login com GitHub/Google), crie um subdomínio (ex.: `meusingalong`) e aponte para o **IP público** da VM.
-2. Seu endereço será `meusingalong.duckdns.org`. O Caddy emite o certificado (Let's Encrypt) sozinho.
+1. Entre em <https://www.duckdns.org> (login com GitHub/Google), crie um subdomínio (`singalong`) e aponte para o **IP público** da VM.
+2. Seu endereço será `singalong.duckdns.org`. O Caddy emite o certificado (Let's Encrypt) sozinho.
 
 ### 3. Preparar a VM (1 comando)
 No seu PC, no Git Bash (ajuste o caminho da chave e o IP):
