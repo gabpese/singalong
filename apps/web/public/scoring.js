@@ -116,9 +116,9 @@ export const classNameOf = (pc) => (pc == null ? '—' : NAMES[pc]);
 /**
  * Pontua a música em blocos de 2 s. `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
  * Em cada bloco confere UMA nota: a que o cantor mais cantou contra as notas principais que a original sustenta nele,
- * ignorando a oitava. Só contam os quadros em que a voz original canta; quadros já avaliados (seek) não contam duas vezes.
+ * ignorando a oitava. `onBlock(linha)` é chamada quando um bloco termina (depuração). Só contam os quadros em que a voz original canta; quadros já avaliados (seek) não contam duas vezes.
  */
-export function createScorer(melody, { transpose = 0 } = {}) {
+export function createScorer(melody, { transpose = 0, onBlock = null } = {}) {
   const { hop } = melody;
   const midi = smoothMelody(melody.midi); // a referência é a melodia estável, não a crua
   const blockFrames = Math.round(BLOCK_SECONDS / hop);
@@ -131,6 +131,7 @@ export function createScorer(melody, { transpose = 0 } = {}) {
   let heldAt = -Infinity;
   let reference = null; // nota de referência do bloco atual, já no tom escolhido
   let sungNow = null; // nota que o cantor mais cantou no bloco atual
+  let lastBlock = null;
 
   function refOf(block) {
     if (refCache.has(block)) return refCache.get(block);
@@ -151,6 +152,39 @@ export function createScorer(melody, { transpose = 0 } = {}) {
     return info;
   }
 
+  const clock = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+
+  /** A comparação de um bloco: o que a original sustenta, o que foi cantado e quantos pontos deu. */
+  function evaluate(block) {
+    const { n, heard, hist } = blocks.get(block);
+    const ref = refOf(block);
+    const sungClass = mostFrequent(hist);
+    let dist = null;
+    let accuracy = 0;
+    let participation = 0;
+    if (heard && ref) {
+      dist = Math.min(...ref.classes.map((pc) => pitchClassDistance(sungClass, pc + shift)));
+      accuracy = dist <= FULL ? 1 : dist <= HALF ? 0.5 : 0;
+      participation = Math.min(1, heard / n / PARTICIPATION_FULL);
+    }
+    return { n, heard, ref, sungClass, dist, accuracy, participation, points: n * participation * accuracy };
+  }
+
+  /** Uma linha legível por bloco (trecho, nota original, nota cantada, resultado). */
+  function explain(block) {
+    const { n, heard, ref, sungClass, dist, accuracy, participation } = evaluate(block);
+    return {
+      trecho: `${clock(block * BLOCK_SECONDS)}–${clock((block + 1) * BLOCK_SECONDS)}`,
+      original: ref ? noteName(ref.display + shift) : '—',
+      principais: ref ? ref.classes.map((pc) => classNameOf((pc + shift + 120) % 12)).join('/') : '',
+      cantada: heard ? classNameOf(sungClass) : '—',
+      distancia: dist,
+      acerto: accuracy,
+      leituras: `${heard}/${n}`,
+      participacao: Math.round(participation * 100) / 100,
+    };
+  }
+
   return {
     /** t = posição da música (s); captured = nota MIDI captada no microfone (ou null: silêncio). Devolve a nota ao vivo (0..100) ou null. */
     tick(t, captured) {
@@ -161,6 +195,8 @@ export function createScorer(melody, { transpose = 0 } = {}) {
       const sung = captured ?? (t - heldAt <= HOLD_SECONDS && t >= heldAt ? heldNote : null);
       const idx = Math.floor(t / hop);
       const block = Math.floor(idx / blockFrames);
+      if (onBlock && lastBlock !== null && block !== lastBlock && blocks.has(lastBlock)) onBlock(explain(lastBlock));
+      lastBlock = block;
       const ref = idx >= 0 && idx < midi.length ? refOf(block) : null;
       reference = ref ? ref.display + shift : null;
       sungNow = mostFrequent(blocks.get(block)?.hist ?? new Map());
@@ -183,17 +219,14 @@ export function createScorer(melody, { transpose = 0 } = {}) {
     score() {
       let total = 0;
       let points = 0;
-      for (const [block, { n, heard, hist }] of blocks) {
-        total += n;
-        const ref = refOf(block);
-        if (!heard || !ref) continue;
-        const sungClass = mostFrequent(hist);
-        const dist = Math.min(...ref.classes.map((pc) => pitchClassDistance(sungClass, pc + shift)));
-        const accuracy = dist <= FULL ? 1 : dist <= HALF ? 0.5 : 0;
-        points += n * Math.min(1, heard / n / PARTICIPATION_FULL) * accuracy;
+      for (const block of blocks.keys()) {
+        total += blocks.get(block).n;
+        points += evaluate(block).points;
       }
       return total ? Math.round((100 * points) / total) : null;
     },
+    /** Todos os blocos já avaliados, em ordem, para `console.table` no fim da música. */
+    report: () => [...blocks.keys()].sort((a, b) => a - b).map(explain),
     get reference() { return reference; },
     get sung() { return sungNow; },
     get evaluated() { return counted; },

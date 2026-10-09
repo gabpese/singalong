@@ -108,3 +108,15 @@ test('smoothMelody: vibrato, picos do detector e trechos curtos viram notas est�
   assert.deepEqual(smoothMelody(steps), [...hold(60, 8), ...hold(64, 8), -1, -1, ...hold(67, 8)]); // trocas reais ficam
   assert.deepEqual(smoothMelody(hold(60, 3)), hold(-1, 3)); // nota isolada curta demais: some
 });
+
+test('createScorer: onBlock e report descrevem a comparação (trecho, nota original, nota cantada)', () => {
+  const logged = [];
+  const midi = [...hold(60, FRAMES), ...hold(67, FRAMES)];
+  const s = createScorer({ hop: 0.05, midi }, { onBlock: (row) => logged.push(row) });
+  for (let i = 0; i < midi.length; i += 2) s.tick(i * 0.05 + 0.01, i < FRAMES ? 60 : 62); // acerta o 1º bloco, erra o 2º
+  assert.equal(logged.length, 1); // o 2º bloco ainda não terminou
+  assert.deepEqual(logged[0], { trecho: '00:00–00:02', original: 'C4', principais: 'C', cantada: 'C', distancia: 0, acerto: 1, leituras: '20/20', participacao: 1 });
+  const [first, second] = s.report();
+  assert.equal(first.trecho, '00:00–00:02');
+  assert.deepEqual([second.trecho, second.original, second.cantada, second.distancia, second.acerto], ['00:02–00:04', 'G4', 'D', 5, 0]);
+});

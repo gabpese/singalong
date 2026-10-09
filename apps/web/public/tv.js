@@ -120,7 +120,14 @@ async function prepareScoring(state, current) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const melody = await res.json();
     if (scorerFor !== current.id) return; // a sala já mudou de música
-    scorer = createScorer(melody, { transpose: current.pitch });
+    scorer = createScorer(melody, {
+      transpose: current.pitch,
+      // depuração: um log por bloco de 2 s (trecho, nota original, nota cantada e o resultado da comparação)
+      onBlock: (b) => console.log(
+        `[pontuação] ${b.trecho} | original ${b.original} (principais ${b.principais || '—'}) | cantada ${b.cantada} | `
+        + `distância ${b.distancia ?? '—'} → acerto ${b.acerto} | leituras ${b.leituras} (participação ${b.participacao})`,
+      ),
+    });
   } catch {
     els.scoreHint.textContent = 'não consegui carregar a melodia';
     return;
@@ -148,6 +155,8 @@ setInterval(() => {
 function reportScore(itemId) {
   if (!scorer || scorerFor !== itemId || scorer.evaluated < MIN_SCORED_FRAMES) return;
   const score = scorer.score();
+  console.log(`[pontuação] fim da música: ${score} pontos`);
+  console.table(scorer.report());
   const singer = latest?.queue.find((item) => item.id === itemId)?.added_by ?? '';
   connection.send({ type: 'score', item_id: itemId, score });
   showFinal(score, singer);
