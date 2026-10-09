@@ -87,6 +87,16 @@ export function wordProgress(span, lineP) {
   return Math.min(Math.max((lineP - span.from) / width, 0), 1);
 }
 
+/**
+ * Progresso (0..1) de cada palavra da linha no instante `t`, usando os tempos reais do alinhamento (`cue.words`).
+ * Devolve null quando a linha não tem tempos por palavra (ou a contagem não bate): aí vale a estimativa por tamanho.
+ */
+export function wordFills(cue, wordCount, t) {
+  const times = cue?.words;
+  if (!Array.isArray(times) || times.length !== wordCount) return null;
+  return times.map(([s, e]) => (e > s ? Math.min(Math.max((t - s) / (e - s), 0), 1) : t >= e ? 1 : 0));
+}
+
 const LYRICS_SOURCES = {
   video: 'legenda do vídeo',
   lrclib: 'buscada na internet',

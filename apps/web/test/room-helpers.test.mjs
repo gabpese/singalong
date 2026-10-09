@@ -108,3 +108,16 @@ test('canRetry: só oferece "Tentar de novo" quando vale a pena', () => {
   assert.equal(canRetry({ status: 'ready' }), false);
   assert.equal(songChip({ status: 'processing', stage: 'retrying' }).label, 'Tentando de novo…');
 });
+
+test('wordFills: usa os tempos reais de cada palavra e cai na estimativa quando não há', async () => {
+  const { wordFills } = await import('../public/lyrics-sync.js');
+  const cue = { start: 1, end: 4, text: 'Lock me up', words: [[1, 2], [2.5, 3], [3, 4]] };
+  assert.deepEqual(wordFills(cue, 3, 0), [0, 0, 0]);
+  assert.deepEqual(wordFills(cue, 3, 1.5), [0.5, 0, 0]);
+  assert.deepEqual(wordFills(cue, 3, 2.75), [1, 0.5, 0]); // pausa entre palavras: a segunda ainda não começou
+  assert.deepEqual(wordFills(cue, 3, 9), [1, 1, 1]);
+  assert.equal(wordFills({ ...cue, words: undefined }, 3, 2), null); // letra sem tempos por palavra
+  assert.equal(wordFills(cue, 4, 2), null); // contagem não bate (texto editado): não arrisca
+  assert.deepEqual(wordFills({ words: [[2, 2]] }, 1, 1), [0]); // palavra sem duração
+  assert.deepEqual(wordFills({ words: [[2, 2]] }, 1, 3), [1]);
+});

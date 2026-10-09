@@ -132,11 +132,15 @@ singalong/
 
 **Fase 3 — Salas e fila.** Controle pelo celular, WebSocket, pré-carregamento dos próximos, pular/remover/reordenar.
 
-**Fase 4 — Robustez (concluída).** Retentativas e erros visíveis (vídeo privado, sem áudio, letra não encontrada), limpeza LRU, Docker Compose, logs.
+**Fase 4 — Robustez (concluída).** Erros do YouTube traduzidos para mensagens claras, retentativas automáticas só para falhas transitórias, proteção contra job que derruba o worker em loop, limite de duração e de disco, limpeza do cache por uso (LRU), limite de requisições, health checks detalhados e logs em JSON. **Postgres opcional ficou de fora**: com uma única instância da API o SQLite basta, e a troca só se justifica junto das várias réplicas (Fase 7).
 
-**Fase 4 — Robustez (em andamento).** Escopo definido: erros do YouTube traduzidos para mensagens claras (vídeo privado, indisponível, cookies vencidos, ao vivo...), retentativas automáticas só para falhas transitórias, proteção contra job que derruba o worker em loop, limite de duração e de disco, limpeza do cache por uso (LRU), limite de requisições, health checks detalhados e logs em JSON. **Postgres opcional fica de fora**: com uma única instância da API o SQLite basta, e a troca só se justifica junto das várias réplicas (Fase 7).
+**Fase 5 — Extras.** Escopo decidido com o dono do projeto:
 
-**Fase 5 — Extras (fora da v1).** Letra palavra a palavra, alinhamento forçado por IA, pontuação por pitch do microfone, export MP4, vídeo de fundo.
+- **5a. Letra palavra a palavra com tempos reais.** Hoje o destaque das palavras é estimado pelo tamanho do texto dentro da linha. O alinhamento passa a guardar o tempo de cada palavra no `lyrics.json` (`words`), e o player usa esses tempos quando existem (com o cálculo atual como reserva para letras sem eles).
+- **5b. Alinhamento forçado por IA.** Já existe (Whisper/stable-ts sobre a voz isolada); aqui entra o refinamento: oferecer o alinhamento também para letras vindas do LRCLIB ou da legenda, para ganhar tempos por palavra.
+- **5c. Pontuação por afinação do microfone.** Opcional e **decidida pelo anfitrião** da sala (liga/desliga); sem ele, ninguém usa o microfone.
+- **5d. Exportar MP4** da música (instrumental + letra) para rodar o karaokê offline com as músicas que a pessoa já tem.
+- **Fora do escopo:** vídeo de fundo.
 
 ## 11. Riscos e pontos de atenção
 

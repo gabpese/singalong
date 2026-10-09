@@ -29,6 +29,17 @@ def detect_language(text: str, default: str = "en") -> str:
     return {"zh-cn": "zh", "zh-tw": "zh"}.get(code, code)
 
 
+def _word_times(chunk: list, line_start: float, line_end: float) -> list[list[float]]:
+    """[[início, fim], ...] de cada palavra da linha, sem sair da linha, sem voltar no tempo e sem buracos negativos."""
+    out, prev_end = [], line_start
+    for w in chunk:
+        s = min(max(float(w.start), prev_end), line_end)
+        e = min(max(float(w.end), s), line_end)
+        out.append([round(s, 2), round(e, 2)])
+        prev_end = e
+    return out
+
+
 def group_words(lines: list[str], words: list) -> list[dict]:
     """Agrupa as palavras alinhadas (com .start/.end) nas linhas, pela contagem de palavras de cada linha.
 
@@ -47,9 +58,30 @@ def group_words(lines: list[str], words: list) -> list[dict]:
         i += n
         start = max(float(chunk[0].start), last_start)  # nunca volta no tempo
         end = max(float(chunk[-1].end), start + MIN_LINE_SECONDS)
-        cues.append({"start": round(start, 2), "end": round(end, 2), "text": line})
+        cues.append({"start": round(start, 2), "end": round(end, 2), "text": line, "words": _word_times(chunk, start, end)})
         last_start = start
     return cues
+
+
+def attach_words(cues: list[dict], aligned: list[dict], tolerance: float = 2.5) -> tuple[list[dict], int]:
+    """Copia os tempos por palavra de `aligned` para `cues` (letra já sincronizada por linha, ex.: LRCLIB).
+
+    Os tempos das LINHAS não mudam. Linhas em que a IA discorda do original por mais de `tolerance` segundos
+    (ou com número de palavras diferente) ficam sem `words`: o player estima o preenchimento. Devolve (cues, linhas com palavras).
+    """
+    if len(cues) != len(aligned):
+        return cues, 0
+    out, done = [], 0
+    for cue, ref in zip(cues, aligned):
+        words = ref.get("words")
+        if words and len(words) == len(cue["text"].split()) and abs(ref["start"] - cue["start"]) <= tolerance:
+            lo, hi = cue["start"], max(cue["end"], cue["start"])
+            words = [[round(min(max(s, lo), hi), 2), round(min(max(e, lo), hi), 2)] for s, e in words]
+            out.append({**cue, "words": words})
+            done += 1
+        else:
+            out.append({k: v for k, v in cue.items() if k != "words"})
+    return out, done
 
 
 def _load_model(name: str, device: str | None):

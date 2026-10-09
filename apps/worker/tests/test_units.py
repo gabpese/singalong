@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from singalong_worker.align import clean_lines, group_words
+from singalong_worker.align import attach_words, clean_lines, group_words
 from singalong_worker.ids import extract_video_id
 from singalong_worker.key import MAJOR_PROFILE, MINOR_PROFILE, NOTES, best_key
 from singalong_worker.lyrics import apply_text, parse_cues, parse_lrc, parse_lyrics_file, pick_candidate
@@ -249,9 +249,9 @@ class AlignTests(unittest.TestCase):
         self.assertEqual(
             cues,
             [
-                {"start": 1.0, "end": 2.0, "text": "Lock me"},
-                {"start": 2.1, "end": 2.5, "text": "up"},
-                {"start": 5.0, "end": 5.5, "text": "again"},
+                {"start": 1.0, "end": 2.0, "text": "Lock me", "words": [[1.0, 1.4], [1.5, 2.0]]},
+                {"start": 2.1, "end": 2.5, "text": "up", "words": [[2.1, 2.5]]},
+                {"start": 5.0, "end": 5.5, "text": "again", "words": [[5.0, 5.5]]},
             ],
         )
 
@@ -260,6 +260,34 @@ class AlignTests(unittest.TestCase):
         cues = group_words(["a", "b"], words)
         self.assertEqual(cues[1]["start"], 10.0)
         self.assertTrue(all(c["end"] - c["start"] >= 0.3 for c in cues))
+
+    def test_tempos_por_palavra_ficam_dentro_da_linha_e_em_ordem(self):
+        words = [self.W(1.0, 3.0), self.W(2.0, 2.2), self.W(2.5, 9.0)]  # 2ª sobrepõe a 1ª; 3ª estoura o fim
+        (cue,) = group_words(["a b c"], words)
+        times = cue["words"]
+        self.assertEqual(len(times), 3)
+        flat = [t for pair in times for t in pair]
+        self.assertEqual(flat, sorted(flat))  # nunca volta no tempo
+        self.assertTrue(all(cue["start"] <= s <= e <= cue["end"] for s, e in times))
+
+    def test_attach_words_mantem_as_linhas_e_ignora_o_que_discorda(self):
+        cues = [
+            {"start": 10.0, "end": 12.0, "text": "Lock me"},
+            {"start": 20.0, "end": 22.0, "text": "up"},
+            {"start": 30.0, "end": 32.0, "text": "again now"},
+        ]
+        aligned = [
+            {"start": 10.3, "end": 12.1, "text": "Lock me", "words": [[10.3, 11.0], [11.2, 12.1]]},
+            {"start": 27.0, "end": 28.0, "text": "up", "words": [[27.0, 28.0]]},  # IA discorda em 7 s: fica sem palavras
+            {"start": 30.0, "end": 32.0, "text": "again now", "words": [[30.0, 31.0]]},  # contagem não bate
+        ]
+        out, done = attach_words(cues, aligned)
+        self.assertEqual(done, 1)
+        self.assertEqual([(c["start"], c["end"]) for c in out], [(10.0, 12.0), (20.0, 22.0), (30.0, 32.0)])  # linhas intactas
+        self.assertEqual(out[0]["words"], [[10.3, 11.0], [11.2, 12.0]])  # preso ao fim da linha original
+        self.assertNotIn("words", out[1])
+        self.assertNotIn("words", out[2])
+        self.assertEqual(attach_words(cues, aligned[:2]), (cues, 0))  # IA devolveu outro número de linhas: não mexe
 
     def test_group_words_recusa_quando_a_contagem_nao_bate(self):
         with self.assertRaisesRegex(ValueError, "Não consegui sincronizar"):

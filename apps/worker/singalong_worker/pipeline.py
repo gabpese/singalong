@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import lyrics as lyr
-from .align import align_lyrics
+from .align import align_lyrics, attach_words
 from .errors import JobError, format_duration, NEVER, MANUAL
 from .ids import extract_video_id
 from .key import detect_key
@@ -413,6 +413,19 @@ def process(
             cues = align_lyrics(vocals, need.text, device=device)
             source = "lrclib+align" if need.origin == "lrclib" else "align"
             timings["align"] = round(time.monotonic() - t, 1)
+        words_lines = sum(1 for c in cues if c.get("words"))
+        if cues and not words_lines and os.environ.get("WORD_TIMING", "on").lower() not in ("off", "0", "false"):
+            # letra com tempos só por linha (legenda, LRCLIB, arquivo): a IA ouve a voz e descobre o tempo de cada palavra
+            try:
+                vocals = get_vocals()
+                notify("aligning")
+                t = time.monotonic()
+                log.info("%s: medindo o tempo de cada palavra (IA)", video_id)
+                aligned = align_lyrics(vocals, "\n".join(c["text"] for c in cues), device=device)
+                cues, words_lines = attach_words(cues, aligned)
+                timings["words"] = round(time.monotonic() - t, 1)
+            except Exception as exc:  # noqa: BLE001 - é um refinamento: sem ele a letra continua valendo
+                log.warning("%s: não consegui medir as palavras (%s); o destaque será estimado", video_id, exc)
         storage.put(k["lyrics"], _write_json(work / "lyrics.json", cues))
 
         t = time.monotonic()
@@ -427,6 +440,7 @@ def process(
             "duration": info["duration"],
             "lyrics_source": source,
             "lyrics_lines": len(cues),
+            "lyrics_word_timing": words_lines > 0,
             **({"key": key} if key else {}),
             "pipeline_version": PIPELINE_VERSION,
             "timings_s": timings,

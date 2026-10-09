@@ -1,6 +1,6 @@
 // Motor da TV: toca o instrumental com troca de tom em tempo real e desenha a letra sincronizada.
 import { SoundTouchNode } from './vendor/soundtouch/SoundTouchNode.js';
-import { clampPitch, gapDisplay, lineProgress, locate, wordProgress, wordSpans } from './lyrics-sync.js';
+import { clampPitch, gapDisplay, lineProgress, locate, wordFills, wordProgress, wordSpans } from './lyrics-sync.js';
 
 /**
  * @param lyricsEls elementos { prev, current, next, next2 } onde a letra é desenhada
@@ -73,14 +73,14 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
     });
   }
 
-  function paintCurrentLine(lineP) {
-    for (const w of words) {
-      const p = Math.round(wordProgress(w.span, lineP) * 1000) / 10;
+  function paintCurrentLine(lineP, fills) {
+    words.forEach((w, i) => {
+      const p = Math.round((fills ? fills[i] : wordProgress(w.span, lineP)) * 1000) / 10;
       if (p !== w.p) {
         w.p = p;
         w.el.style.setProperty('--p', `${p}%`);
       }
-    }
+    });
   }
 
   /** Pausa longa na letra: no lugar da linha atual, "--------------" que some nos últimos 8 s (prepare-se!). */
@@ -120,7 +120,7 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
       lyricsEls.next2.textContent = text(current >= 0 ? current + 2 : next + 1);
     }
     if (gap) paintGap(gap.dashes);
-    else paintCurrentLine(current >= 0 ? lineProgress(cues[current], t) : 0);
+    else paintCurrentLine(current >= 0 ? lineProgress(cues[current], t) : 0, current >= 0 ? wordFills(cues[current], words.length, t) : null);
   }
 
   function loop() {
