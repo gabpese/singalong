@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { newClientId, parseHostHash, parseRoomCode } from '../public/identity.js';
-import { canRetry, formatDuration, formatPitch, progressPercent, playOrder, songChip, splitQueue } from '../public/queue-view.js';
+import { newClientId, parseHostHash, parseRoomCode } from '../src/lib/identity.js';
+import { canRetry, formatDuration, formatPitch, progressPercent, playOrder, songChip, splitQueue } from '../src/lib/queue-view.js';
 
 test('newClientId: formato aceito pela API e sem depender de crypto.randomUUID', () => {
   const id = newClientId((bytes) => bytes.map((_, i) => i * 7));
@@ -56,7 +56,7 @@ test('splitQueue: o atual vem separado dos que aguardam', () => {
 });
 
 test('normalizeText: sem acentos, minúsculas e espaços normalizados', async () => {
-  const { normalizeText } = await import('../public/queue-view.js');
+  const { normalizeText } = await import('../src/lib/queue-view.js');
   assert.equal(normalizeText('  Dó♯  RÉ  Fá '), 'do♯ re fa');
   assert.equal(normalizeText('Ação'), 'acao');
   assert.equal(normalizeText(null), '');
@@ -71,7 +71,7 @@ const library = [
 ];
 
 test('filterSongs: artista ou nome, sem acento nem maiúsculas, várias palavras em qualquer ordem', async () => {
-  const { filterSongs } = await import('../public/queue-view.js');
+  const { filterSongs } = await import('../src/lib/queue-view.js');
   const ids = (q) => filterSongs(library, q).map((s) => s.video_id);
   assert.deepEqual(ids(''), ['a', 'b', 'c', 'd', 'e']); // vazio: tudo
   assert.deepEqual(ids('   '), ['a', 'b', 'c', 'd', 'e']);
@@ -90,7 +90,7 @@ test('filterSongs: artista ou nome, sem acento nem maiúsculas, várias palavras
 });
 
 test('sortSongs: por artista e depois por nome, sem alterar a lista original', async () => {
-  const { sortSongs } = await import('../public/queue-view.js');
+  const { sortSongs } = await import('../src/lib/queue-view.js');
   const sorted = sortSongs(library).map((s) => s.video_id);
   assert.deepEqual(sorted, ['e', 'c', 'a', 'b', 'd']); // Alguém, Bring, Danny, Faouzia e, por último, a sem artista
   assert.deepEqual(library.map((s) => s.video_id), ['a', 'b', 'c', 'd', 'e']);
@@ -110,7 +110,7 @@ test('canRetry: só oferece "Tentar de novo" quando vale a pena', () => {
 });
 
 test('wordFills: usa os tempos reais de cada palavra e cai na estimativa quando não há', async () => {
-  const { wordFills } = await import('../public/lyrics-sync.js');
+  const { wordFills } = await import('../src/lib/lyrics-sync.js');
   const cue = { start: 1, end: 4, text: 'Lock me up', words: [[1, 2], [2.5, 3], [3, 4]] };
   assert.deepEqual(wordFills(cue, 3, 0), [0, 0, 0]);
   assert.deepEqual(wordFills(cue, 3, 1.5), [0.5, 0, 0]);

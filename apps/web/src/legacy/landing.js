@@ -1,4 +1,5 @@
-import { api, setHostToken } from './identity.js';
+import '../styles/style.css';
+import { api, setHostToken } from '../lib/identity.js';
 
 const $ = (id) => document.getElementById(id);
 const status = $('status');

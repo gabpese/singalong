@@ -1,16 +1,17 @@
 // Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
+import '../styles/style.css';
 import { initAddPanel } from './add-song.js';
-import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from './export-mp4.js';
-import { icon } from './icons.js';
+import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from '../lib/export-mp4.js';
+import { icon } from '../lib/icons.js';
 import {
   api, connectRoom, hostToken, parseHostHash, parseRoomCode, setHostToken, setUserName, userName,
-} from './identity.js';
-import { describeLyricsSource } from './lyrics-sync.js';
-import { keySummary } from './music.js';
-import { createPreviewPlayer } from './preview.js';
+} from '../lib/identity.js';
+import { describeLyricsSource } from '../lib/lyrics-sync.js';
+import { keySummary } from '../lib/music.js';
+import { createPreviewPlayer } from '../lib/preview.js';
 import {
   canRetry, filterSongs, formatDuration, formatPitch, nextUp, progressPercent, songChip, sortSongs, playOrder, splitQueue, thumbnailUrl,
-} from './queue-view.js';
+} from '../lib/queue-view.js';
 
 const $ = (id) => document.getElementById(id);
 

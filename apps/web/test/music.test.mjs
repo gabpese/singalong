@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isUncertain, keyLabel, keySummary, transposeKey } from '../public/music.js';
+import { isUncertain, keyLabel, keySummary, transposeKey } from '../src/lib/music.js';
 
 const a = { tonic: 9, mode: 'minor', margin: 0.2 }; // o modo existe nos dados, mas não aparece na tela
 

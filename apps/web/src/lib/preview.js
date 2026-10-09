@@ -1,7 +1,7 @@
 // Prévia do instrumental no celular, com troca de tom. Usa a versão do SoundTouch baseada em ScriptProcessor porque,
 // ao contrário do AudioWorklet, ela funciona em páginas http por IP (o celular entra na sala por http://192.168...).
 // Custo: decodifica a música inteira na memória (alguns MB) e processa na thread principal. Serve bem para ouvir uma prévia.
-import { PitchShifter } from './vendor/soundtouch-legacy/soundtouch.js';
+import { PitchShifter } from '../vendor/soundtouch-legacy/soundtouch.js';
 import { clampPitch } from './lyrics-sync.js';
 
 export function createPreviewPlayer({ onEnded } = {}) {

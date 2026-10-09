@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { embedUrl, extractVideoId } from '../public/youtube.js';
-import { nextUp, playOrder } from '../public/queue-view.js';
+import { embedUrl, extractVideoId } from '../src/lib/youtube.js';
+import { nextUp, playOrder } from '../src/lib/queue-view.js';
 
 const VID = 'dQw4w9WgXcQ';
 
@@ -41,7 +41,7 @@ test('playOrder: o próximo escolhido pelo servidor vem na frente; o resto segue
 });
 
 test('buildSearchQuery: "Artista - Nome da música", com espaços normalizados e os dois campos obrigatórios', async () => {
-  const { buildSearchQuery } = await import('../public/youtube.js');
+  const { buildSearchQuery } = await import('../src/lib/youtube.js');
   assert.equal(buildSearchQuery('Faouzia', 'Unethical'), 'Faouzia - Unethical');
   assert.equal(buildSearchQuery('  Bring Me  The Horizon ', "\tLosT\n"), 'Bring Me The Horizon - LosT');
   assert.equal(buildSearchQuery('Danny Elfman', "Jack's Lament"), "Danny Elfman - Jack's Lament"); // aspas e acentos intactos

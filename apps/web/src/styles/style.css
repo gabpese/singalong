@@ -342,13 +342,13 @@ body.tv { overflow: hidden; height: 100vh; }
   -webkit-mask: var(--icon) center / contain no-repeat;
   mask: var(--icon) center / contain no-repeat;
 }
-.i-singing { --icon: url('icons/singing.svg'); }
-.i-add-song { --icon: url('icons/add-song.svg'); }
-.i-musics { --icon: url('icons/musics.svg'); }
-.i-link { --icon: url('icons/link.svg'); }
-.i-host { --icon: url('icons/host.svg'); }
-.i-display { --icon: url('icons/display.svg'); }
-.i-search { --icon: url('icons/search.svg'); }
+.i-singing { --icon: url('/icons/singing.svg'); }
+.i-add-song { --icon: url('/icons/add-song.svg'); }
+.i-musics { --icon: url('/icons/musics.svg'); }
+.i-link { --icon: url('/icons/link.svg'); }
+.i-host { --icon: url('/icons/host.svg'); }
+.i-display { --icon: url('/icons/display.svg'); }
+.i-search { --icon: url('/icons/search.svg'); }
 /* botão com ícone + texto */
 .has-icon { display: inline-flex; align-items: center; justify-content: center; gap: .5em; }
 .has-icon .icon { width: 1.2em; height: 1.2em; vertical-align: 0; }

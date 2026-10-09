@@ -2,9 +2,9 @@
 // ("Artista - Nome") e depois buscam a letra. O link do vídeo é uma alternativa para quem já o tem.
 // Não sabe nada de salas: quem usa passa as funções que enviam o pedido (submitNew) e que trocam a letra de um item
 // que a pede (submitLyrics).
-import { api } from './identity.js';
-import { formatDuration, thumbnailUrl } from './queue-view.js';
-import { buildSearchQuery, embedUrl, extractVideoId, watchUrl } from './youtube.js';
+import { api } from '../lib/identity.js';
+import { formatDuration, thumbnailUrl } from '../lib/queue-view.js';
+import { buildSearchQuery, embedUrl, extractVideoId, watchUrl } from '../lib/youtube.js';
 
 const SOURCE_HINTS = {
   lrclib: 'Procura a letra com o artista e o nome da música que você informou. Se achar uma versão com os tempos certos, usa; senão, a IA sincroniza a letra com a voz da música (cerca de 1 minuto).',

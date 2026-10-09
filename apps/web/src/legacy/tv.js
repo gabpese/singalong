@@ -1,12 +1,13 @@
 // TV: toca o que a sala manda (fila no servidor), mostra a letra e avisa quando a música termina.
-import { createEngine } from './engine.js';
-import { icon } from './icons.js';
-import { api, connectRoom, parseRoomCode } from './identity.js';
-import { keySummary } from './music.js';
-import { nextUp, playOrder, songChip, splitQueue } from './queue-view.js';
-import { createScorer, noteName, openMic } from './scoring.js';
-import { finalMessage, MIN_SCORED_FRAMES } from './score-view.js';
-import qrcode from './vendor/qrcode/qrcode.mjs';
+import '../styles/style.css';
+import { createEngine } from '../lib/engine.js';
+import { icon } from '../lib/icons.js';
+import { api, connectRoom, parseRoomCode } from '../lib/identity.js';
+import { keySummary } from '../lib/music.js';
+import { nextUp, playOrder, songChip, splitQueue } from '../lib/queue-view.js';
+import { createScorer, noteName, openMic } from '../lib/scoring.js';
+import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.js';
+import qrcode from '../vendor/qrcode/qrcode.mjs';
 
 const $ = (id) => document.getElementById(id);
 const els = {

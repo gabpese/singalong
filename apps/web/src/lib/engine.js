@@ -1,5 +1,5 @@
 // Motor da TV: toca o instrumental com troca de tom em tempo real e desenha a letra sincronizada.
-import { SoundTouchNode } from './vendor/soundtouch/SoundTouchNode.js';
+import { SoundTouchNode } from '../vendor/soundtouch/SoundTouchNode.js';
 import { clampPitch, gapDisplay, lineProgress, locate, wordFills, wordProgress, wordSpans } from './lyrics-sync.js';
 
 /**
@@ -35,7 +35,7 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
         return;
       }
       try {
-        await SoundTouchNode.register(ctx, 'vendor/soundtouch/soundtouch-processor.js');
+        await SoundTouchNode.register(ctx, '/vendor/soundtouch/soundtouch-processor.js');
         stNode = new SoundTouchNode({ context: ctx });
         ctx.createMediaElementSource(audio).connect(stNode);
         stNode.connect(ctx.destination);

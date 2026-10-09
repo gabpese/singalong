@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { exportFileName, requestExport } from '../public/export-mp4.js';
+import { exportFileName, requestExport } from '../src/lib/export-mp4.js';
 
 test('exportFileName: "Artista - Título (tom).mp4" sem caracteres inválidos', () => {
   assert.equal(exportFileName({ artist: 'Stone Sour', title: 'Wicked Game', video_id: 'x' }), 'Stone Sour - Wicked Game.mp4');

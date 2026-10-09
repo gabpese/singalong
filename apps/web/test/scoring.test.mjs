@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../public/scoring.js';
+import { createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../src/lib/scoring.js';
 
 const sine = (hz, sampleRate = 48000, n = 2048, amp = 0.5) => Float32Array.from({ length: n }, (_, i) => amp * Math.sin((2 * Math.PI * hz * i) / sampleRate));
 

@@ -9,7 +9,7 @@ export function loadConfig(env = process.env) {
     port: Number(env.PORT ?? 3000),
     host: env.HOST ?? '0.0.0.0',
     storageRoot: resolve(env.STORAGE_ROOT ?? join(here, '..', '..', '..', 'storage')),
-    publicDir: resolve(env.PUBLIC_DIR ?? join(here, '..', '..', 'web', 'public')),
+    publicDir: resolve(env.PUBLIC_DIR ?? join(here, '..', '..', 'web', 'dist')),
     redisUrl: env.REDIS_URL ?? 'redis://localhost:6379/0',
     // SQLite das salas e da fila (num volume próprio: arquivos SQLite não gostam de bind mounts do Windows)
     dbPath: resolve(env.DB_PATH ?? join(here, '..', '..', '..', 'storage', 'singalong.db')),

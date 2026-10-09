@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   clampPitch, describeLyricsSource, lineProgress, locate, wordProgress, wordSpans,
-} from '../public/lyrics-sync.js';
+} from '../src/lib/lyrics-sync.js';
 
 const cues = [
   { start: 10, end: 12, text: 'a' },
@@ -79,7 +79,7 @@ test('describeLyricsSource: nada de jargão na tela', () => {
 });
 
 // ---------- pausas longas: aviso "--------------" ----------
-import { COUNTDOWN_SECONDS, GAP_DASHES, MIN_GAP_SECONDS, gapDisplay, sungEnd } from '../public/lyrics-sync.js';
+import { COUNTDOWN_SECONDS, GAP_DASHES, MIN_GAP_SECONDS, gapDisplay, sungEnd } from '../src/lib/lyrics-sync.js';
 
 const song = [
   { start: 12, end: 16, text: 'primeira linha da música' }, // intro de 12 s

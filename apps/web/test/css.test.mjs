@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const css = readFileSync(new URL('../public/style.css', import.meta.url), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+const css = readFileSync(new URL('../src/styles/style.css', import.meta.url), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 /** Seletores (texto antes do `{`) das regras de nível de topo, ou seja, fora de @media. */
 function topLevelSelectors(source) {
@@ -34,7 +34,7 @@ test('CSS: nenhuma classe simples é definida duas vezes (nomes iguais em telas 
 });
 
 test('CSS: todo ícone .i-<nome> aponta para um arquivo que existe em public/icons', () => {
-  const names = [...css.matchAll(/\.i-([a-z-]+)\s*\{\s*--icon:\s*url\('icons\/([a-z-]+\.svg)'\)/g)];
+  const names = [...css.matchAll(/\.i-([a-z-]+)\s*\{\s*--icon:\s*url\('\/icons\/([a-z-]+\.svg)'\)/g)];
   assert.ok(names.length >= 7, `ícones declarados: ${names.length}`);
   for (const [, name, file] of names) {
     assert.equal(file, `${name}.svg`, `.i-${name} deve apontar para ${name}.svg`);
