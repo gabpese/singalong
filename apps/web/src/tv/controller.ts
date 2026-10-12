@@ -1,6 +1,7 @@
 // Controlador da TV: liga a sala (WebSocket) ao motor de áudio e à pontuação. Não desenha nada: avisa a tela pelo `ui`.
 // A TV toca o que a sala manda (a fila é do servidor), avisa quando a música termina e a posição para os celulares.
 import { createEngine } from '../lib/engine.js';
+import { openVoice, voiceGain } from '../lib/voice.js';
 import { connectRoom } from '../lib/identity.js';
 import { splitQueue } from '../lib/queue-view.js';
 import { createScorer, noteName, openMic } from '../lib/scoring.js';
@@ -177,6 +178,38 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     finalTimer = setTimeout(() => ui.setFinal(null), FINAL_SECONDS * 1000);
   }
 
+  // --- a voz do microfone da TV nas caixas (o anfitrião liga) ---
+  let voiceOn = false;
+  let voiceFailed = false;
+  let voiceBusy = false;
+
+  /** Mantém a voz de acordo com a sala: liga/desliga o microfone e põe o volume (mudo enquanto nada toca). */
+  async function syncVoice() {
+    const state = latest;
+    if (!state?.voice) {
+      if (voiceOn || voiceFailed) {
+        engine.detachVoice();
+        voiceOn = false;
+        voiceFailed = false;
+      }
+      return;
+    }
+    if (!voiceOn && !voiceFailed && !voiceBusy) {
+      voiceBusy = true;
+      try {
+        await engine.attachVoice(await openVoice());
+        voiceOn = true;
+      } catch {
+        voiceFailed = true;
+        notify('Microfone indisponível para a voz nas caixas (permita o acesso ao microfone).', 8000);
+      } finally {
+        voiceBusy = false;
+      }
+    }
+    if (voiceOn) engine.setVoiceGain(voiceGain(state.voice_volume, { playing: engine.playing }));
+  }
+  const voiceTimer = setInterval(() => void syncVoice(), 400);
+
   // --- sala ---
   const connection: Connection = connectRoom(code, 'tv', {
     onMessage(message: ServerMessage) {
@@ -192,6 +225,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       if (message.type !== 'state') return;
       latest = message.state;
       ui.setRoom(latest);
+      void syncVoice();
       void apply();
     },
     onStatus(status: string) {
@@ -283,6 +317,8 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       clearInterval(scoreTimer);
       clearInterval(progressTimer);
       clearInterval(positionTimer);
+      clearInterval(voiceTimer);
+      engine.detachVoice();
       clearTimeout(noticeTimer);
       clearTimeout(finalTimer);
       stopScoring();

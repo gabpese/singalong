@@ -214,6 +214,8 @@ export function createRoomService({
       code: room.code,
       fair: Boolean(room.fair),
       scoring: Boolean(room.scoring),
+      voice: Boolean(room.voice),
+      voice_volume: room.voice_volume ?? 40,
       scoreboard: db.listScored(room.code).map((r) => ({ id: r.id, name: r.added_by, title: r.title, score: r.score })),
       play_order: playOrder(waiting, { fair: Boolean(room.fair), lastClientId: room.last_client_id }).map((i) => i.id),
       playback: room.playback,
@@ -400,13 +402,18 @@ export function createRoomService({
       });
     },
 
-    /** Ajustes da sala, só do anfitrião: `fair` (rodízio justo) e `scoring` (pontuação pelo microfone). */
+    /**
+     * Ajustes da sala, só do anfitrião: `fair` (rodízio justo), `scoring` (pontuação pelo microfone), `voice` (a voz do
+     * microfone da TV sai nas caixas junto com a música) e `voice_volume` (0 a 100).
+     */
     setSettings(code, settings, actor) {
       return mutate(code, actor, (room) => {
         requireHost(room, actor);
         const fields = {};
         if (typeof settings.fair === 'boolean') fields.fair = settings.fair ? 1 : 0;
         if (typeof settings.scoring === 'boolean') fields.scoring = settings.scoring ? 1 : 0;
+        if (typeof settings.voice === 'boolean') fields.voice = settings.voice ? 1 : 0;
+        if (Number.isInteger(settings.voice_volume)) fields.voice_volume = Math.min(100, Math.max(0, settings.voice_volume));
         db.updateRoom(room.code, fields);
       });
     },

@@ -30,6 +30,11 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
   let graphReady = null;
   let pitchAvailable = true;
   let loadToken = 0;
+  // a voz do microfone da TV na saída: microfone -> ganho -> saída (não passa pelo SoundTouch: a troca de tom é da música, não da voz)
+  let voiceStream = null;
+  let voiceSource = null;
+  let voiceNode = null;
+  let voiceGainValue = 0;
 
   // --- áudio: <audio> -> SoundTouch (tom) -> saída; sem AudioWorklet (página http fora de localhost) toca sem tom ---
   function ensureGraph() {
@@ -57,6 +62,10 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
       }
     })();
     return graphReady;
+  }
+
+  function applyVoice() {
+    if (voiceNode) voiceNode.gain.value = voiceGainValue;
   }
 
   function applyPitch() {
@@ -172,6 +181,32 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
       render();
     },
 
+    /** Liga o microfone (`stream`) na saída de áudio, junto com a música. O volume vem de `setVoiceGain`. */
+    async attachVoice(stream) {
+      await ensureGraph();
+      this.detachVoice();
+      voiceStream = stream;
+      voiceSource = ctx.createMediaStreamSource(stream);
+      voiceNode ??= ctx.createGain();
+      voiceSource.connect(voiceNode);
+      voiceNode.connect(ctx.destination);
+      applyVoice();
+    },
+
+    /** Desliga a voz e libera o microfone. */
+    detachVoice() {
+      voiceSource?.disconnect();
+      voiceSource = null;
+      for (const track of voiceStream?.getTracks() ?? []) track.stop();
+      voiceStream = null;
+    },
+
+    /** Ganho da voz na saída (0 = muda). */
+    setVoiceGain(gain) {
+      voiceGainValue = Math.max(0, Number(gain) || 0);
+      applyVoice();
+    },
+
     async play() {
       await ensureGraph();
       await ctx.resume();
@@ -231,6 +266,8 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
         gain: backingGain?.gain.value ?? null, ctx: ctx?.state ?? null, graph: Boolean(stNode),
       };
     },
+    get voiceAttached() { return voiceStream !== null; },
+    get voiceGain() { return voiceGainValue; },
     get offset() { return view.offset; },
     get cues() { return view.cues; },
   };

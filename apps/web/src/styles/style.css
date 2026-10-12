@@ -459,3 +459,8 @@ body.stage { background: #0b0b14; }
 .stage-bottom { min-height: 2.6em; display: grid; place-items: center; color: var(--dim); text-align: center; }
 .stage-end { display: grid; gap: 4px; color: var(--fg); font-size: 1.2rem; }
 .stage-end small { color: var(--dim); font-size: .85rem; }
+
+/* voz do microfone nas caixas: aviso antes de ligar e o volume */
+.voice-dialog .jukebox-body p { margin: 0; line-height: 1.45; }
+.voice-tips { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; color: var(--dim); }
+.menu-panel .voice-row { margin-top: 2px; }

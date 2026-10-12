@@ -8,6 +8,7 @@ import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
 import { BackingControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
+import { VoiceVolume } from './VoiceControl';
 import type { Position } from './useRoomConnection';
 
 const OFFSET_STEPS = [-0.5, -0.1, 0.1, 0.5];
@@ -149,6 +150,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
               <PitchControl item={current} />
             </div>
             <BackingControl item={current} />
+            <VoiceVolume />
             {isHost && (
               <div className="controls-row offset">
                 <span className="muted">Ajuste da letra</span>

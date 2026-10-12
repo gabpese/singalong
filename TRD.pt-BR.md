@@ -417,6 +417,22 @@ Anotado para o futuro (decisão de Out/2026): além da produção teremos **mais
 - **O app:** um instalador apontado para a `hml` ou a `stg` (o endereço do servidor já é uma configuração do app), para testar o fluxo de atualização com uma versão mais nova de mentira antes de publicar a Release.
 - **Scripts de deploy e CI:** o `deploy.sh` receberia o ambiente e a etiqueta; a promoção manual seria um fluxo de trabalho com um botão.
 
+### 12.14 M8: a voz nas caixas de som e o volume dela (Out/2026)
+
+**Decisão:** opção **B**: o anfitrião liga a voz numa opção própria da sala (**desligada por padrão**, separada da pontuação). Ao ligar, antes aparece um aviso amigável sobre **microfones direcionais**; desligar não pergunta nada.
+
+**Feito**
+- **Ajuste da sala `voice` e `voice_volume`** (0 a 100, padrão **40**, baixo de propósito), alterado só pelo anfitrião (`PATCH /rooms/:code`, validado; um ajuste não mexe nos outros; desligar a voz guarda o volume escolhido).
+- **O aviso** (janela nativa, "🎤 Ligar a voz nas caixas de som?"): a voz de quem canta vai sair junto com a música pelo microfone ligado à TV; use **microfones direcionais** (de mão); cante perto dele; deixe as caixas longe, viradas para a plateia; comece com o volume baixo; e se o apito (microfonia) aparecer, abaixe o volume da voz, que fica na sala. Botões: "Entendi, ligar a voz" e "Agora não".
+- **Volume:** uma barra "Volume da voz" no menu do anfitrião (abaixo da opção) e na música que está tocando, enviada à TV ao soltar. 50 % é o ganho 1 (o microfone como é captado), 100 % é o dobro, 0 é mudo.
+- **Na TV** (`lib/voice.js`, `engine.attachVoice`): o microfone vai **microfone → ganho → saída**, fora do trocador de tom (a troca de tom é da música, não da voz), aberto com **cancelamento de eco e supressão de ruído ligados e ganho automático desligado** (ele sobe o nível sozinho e causa o apito). Fica **mudo enquanto nada toca** (microfone aberto parado só dá microfonia) e é liberado ao desligar a opção. Se o microfone não for permitido, a TV avisa.
+- **Testes:** 4 das regras do ganho e do jeito de abrir o microfone (Node), 1 no servidor (só o anfitrião, validação, padrões, por sala) e 4 de ponta a ponta no navegador (o aviso e o "Agora não", quem não é anfitrião não vê, o volume, e na TV o microfone ligado com o ganho certo, mudo ao pausar e liberado ao desligar).
+
+**Falta**
+- **Mais de um microfone na saída** (dois cantores): fica para o futuro. Hoje é um microfone, o que o navegador da TV usa (no app do dono, o escolhido nas configurações).
+- Um **detector de microfonia** (baixar o volume sozinho): não feito; o aviso, o volume padrão baixo e o cancelamento de eco são a proteção por enquanto.
+- Não testado com caixas e microfones de verdade (só com o microfone falso do navegador): a sensação real (latência, apito) precisa do teste do dono.
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

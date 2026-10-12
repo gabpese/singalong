@@ -53,6 +53,9 @@ export interface RoomState {
   code: string;
   fair: boolean;
   scoring: boolean;
+  /** A voz do microfone da TV sai nas caixas junto com a música (o anfitrião liga) e o volume dela, de 0 a 100. */
+  voice: boolean;
+  voice_volume: number;
   scoreboard: ScoreRow[];
   play_order: number[];
   playback: Playback;

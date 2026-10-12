@@ -4,6 +4,7 @@ import { hostToken } from '../lib/identity.js';
 import type { RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { type Tab, useRoom } from './context';
+import { VoiceDialog, VoiceVolume } from './VoiceControl';
 import type { ConnectionStatus } from './useRoomConnection';
 
 /** Ajuste do anfitrião: o clique vale na hora e volta atrás só se o servidor recusar (sem "piscar" à espera da resposta). */
@@ -24,6 +25,45 @@ function HostSetting({ field, checked, children }: { field: 'fair' | 'scoring'; 
       />
       <span>{children}</span>
     </label>
+  );
+}
+
+/** Liga e desliga a voz do microfone da TV nas caixas: para ligar, antes um aviso sobre microfones direcionais (evita a microfonia). */
+function VoiceSetting({ checked }: { checked: boolean }) {
+  const { act, isHost } = useRoom();
+  const [asking, setAsking] = useState(false);
+  const [pending, setPending] = useState<boolean | null>(null);
+  const set = (value: boolean) => {
+    setPending(value);
+    act('PATCH', '', { voice: value })
+      .catch(() => {})
+      .finally(() => setPending(null));
+  };
+  return (
+    <>
+      <label className="check" hidden={!isHost}>
+        <input
+          type="checkbox"
+          checked={pending ?? checked}
+          onChange={(event) => (event.target.checked ? setAsking(true) : set(false))}
+        />
+        <span>
+          Voz do microfone nas caixas de som
+          <br />
+          <small className="muted">a voz de quem canta sai junto com a música (use microfones direcionais, para evitar a microfonia)</small>
+        </span>
+      </label>
+      <VoiceVolume />
+      {asking && (
+        <VoiceDialog
+          onConfirm={() => {
+            setAsking(false);
+            set(true);
+          }}
+          onCancel={() => setAsking(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -108,6 +148,7 @@ export function TopBar({ state, status }: { state: RoomState | null; status: Con
             <br />
             <small className="muted">a TV compara a afinação de quem canta com a voz original (precisa de microfone na TV)</small>
           </HostSetting>
+          <VoiceSetting checked={Boolean(state?.voice)} />
           <HostSetting field="fair" checked={Boolean(state?.fair)}>
             Rodízio justo
             <br />

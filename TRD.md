@@ -417,6 +417,22 @@ Noted for the future (decision of Oct 2026): besides production we will have **t
 - **The app:** an installer pointed at `hml` or `stg` (the server address is already a setting of the app), to test the update flow with a fake newer version before publishing the Release.
 - **Deploy scripts and CI:** `deploy.sh` would take the environment and the tag; the manual promotion would be a workflow with a button.
 
+### 12.14 M8: the voice in the speakers and its volume (Oct 2026)
+
+**Decision:** option **B**: the host turns the voice on in the room's own setting (**off by default**, separate from the scoring). Turning it on first shows a friendly notice about **directional microphones**; turning it off asks nothing.
+
+**Done**
+- **Room setting `voice` and `voice_volume`** (0 to 100, default **40**, low on purpose), changed only by the host (`PATCH /rooms/:code`, validated; one setting does not touch the others; turning the voice off keeps the chosen volume).
+- **The notice** (native dialog, "🎤 Ligar a voz nas caixas de som?"): the voice of whoever sings will come out together with the song through the microphone connected to the TV; use **directional (handheld) microphones**; sing close to it; keep the speakers away from it, facing the audience; start with a low volume; and if the whistle (feedback) appears, lower the voice volume, which stays in the room. Buttons: "Entendi, ligar a voz" and "Agora não".
+- **Volume:** a slider "Volume da voz" in the host's menu (under the option) and in the song that is playing, sent to the TV when released. 50 % is gain 1 (the microphone as it is captured), 100 % is double, 0 is mute.
+- **On the TV** (`lib/voice.js`, `engine.attachVoice`): the microphone goes **microphone → gain → output**, outside the pitch shifter (the key change is for the song, not for the voice), opened with **echo cancellation and noise suppression on and automatic gain off** (it raises the level by itself and causes the whistle). It is **muted while nothing plays** (an open microphone doing nothing only causes feedback), and released when the option is turned off. If the microphone is not allowed, the TV says so.
+- **Tests:** 4 for the gain rules and the way the microphone is opened (Node), 1 on the server (only the host, validation, defaults, per room) and 4 end to end in the browser (the notice and "Agora não", non-hosts do not see it, the volume, and on the TV the microphone attached with the right gain, muted on pause and released on turning off).
+
+**Left**
+- **More than one microphone in the output** (two singers): left for the future. Today it is one microphone, the one the TV's browser uses (in the owner's app, the one chosen in the settings).
+- A **feedback detector** (to lower the volume by itself): not done; the notice, the low default volume and the echo cancellation are the protection for now.
+- Not tested with real speakers and microphones (only the browser's fake microphone): the real feeling (latency, whistle) needs the owner's test.
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**
