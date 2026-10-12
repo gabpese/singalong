@@ -23,8 +23,8 @@ export function buildApp({ config, storage, jobs, logger = false }) {
   const limiters = Object.fromEntries(
     Object.entries({ ...DEFAULT_LIMITS, ...(config.rateLimits ?? {}) }).map(([name, options]) => [name, createRateLimiter(options)]),
   );
-  const songs = createSongService({ storage, jobs });
   const agents = createAgentService({ db, jobs });
+  const songs = createSongService({ storage, jobs, agents });
   const rooms = createRoomService({ db, songs, hub: createHub(), agents });
   app.decorate('rooms', rooms);
   app.decorate('agents', agents);

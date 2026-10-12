@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 from singalong_worker import runner
+from singalong_worker.backend import Job
 from singalong_worker.errors import AUTO, MANUAL, NEVER, JobError, classify, format_duration
 from singalong_worker.logsetup import JsonFormatter
 from singalong_worker.pipeline import Limits, NeedsLyrics, check_disk, validate_video_info
@@ -115,41 +116,44 @@ class DiskGuardTests(unittest.TestCase):
         self.assertIn("0.5 GB", ctx.exception.message)
 
 
-class FakeRedis:
-    """Só o que o runner usa: hash do job, contador e xack."""
+class FakeBackend:
+    """Só o que o runner usa do Backend: o estado do job, o contador de inícios, o ack e o pedido das vozes de apoio."""
 
     def __init__(self):
-        self.hashes, self.acked, self.expires = {}, [], {}
+        self.states, self.acked, self.backing = {}, [], []
 
-    def hset(self, key, mapping):
-        self.hashes.setdefault(key, {}).update(mapping)
+    def begin(self, job):
+        state = self.states.setdefault(job.video_id, {})
+        state["starts"] = int(state.get("starts", 0)) + 1
+        return state["starts"]
 
-    def hincrby(self, key, field, amount):
-        h = self.hashes.setdefault(key, {})
-        h[field] = int(h.get(field, 0)) + amount
-        return h[field]
+    def set_state(self, job, **fields):
+        self.states.setdefault(job.video_id, {}).update(fields)
 
-    def expire(self, key, ttl):
-        self.expires[key] = ttl
+    def finish(self, job):
+        self.acked.append(job.ref)
 
-    def xack(self, stream, group, msg_id):
-        self.acked.append(msg_id)
+    def request_backing(self, video_id):
+        self.backing.append(video_id)
 
     def job(self, vid="abcdefghijk"):
-        return self.hashes[f"job:{vid}"]
+        return self.states[vid]
 
 
 class RunnerTests(unittest.TestCase):
-    FIELDS = {"video_id": "abcdefghijk", "payload": json.dumps({"url": "https://youtu.be/abcdefghijk", "lyrics_source": "auto"})}
+    PAYLOAD = {"url": "https://youtu.be/abcdefghijk", "lyrics_source": "auto"}
 
     def setUp(self):
-        self.r = FakeRedis()
+        self.r = FakeBackend()
         self.settings = runner.Settings("redis://x", "/tmp", None, None, ["pt"], 1800, Path("/tmp/hb"), retry_wait=5)
         self.sleeps = []
 
+    def new_job(self):
+        return Job("abcdefghijk", dict(self.PAYLOAD), ref="1-0")
+
     def handle(self, side_effect):
         with mock.patch.object(runner, "process", side_effect=side_effect) as proc:
-            runner.handle(self.r, None, self.settings, "1-0", dict(self.FIELDS), sleep=self.sleeps.append)
+            runner.handle(self.r, None, self.settings, self.new_job(), sleep=self.sleeps.append)
         return proc
 
     def test_sucesso(self):
@@ -199,7 +203,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_job_que_derruba_o_worker_em_loop_e_abandonado(self):
         # simula reinícios: o mesmo pedido começa de novo várias vezes sem terminar (o processo morria no meio)
-        self.r.hashes["job:abcdefghijk"] = {"starts": 3}
+        self.r.states["abcdefghijk"] = {"starts": 3}
         proc = self.handle([{}])
         self.assertEqual(proc.call_count, 0)  # nem tenta de novo
         job = self.r.job()
@@ -207,15 +211,16 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(self.r.acked, ["1-0"])
 
     def test_abaixo_do_limite_de_reinicios_ainda_processa(self):
-        self.r.hashes["job:abcdefghijk"] = {"starts": 2}
+        self.r.states["abcdefghijk"] = {"starts": 2}
         proc = self.handle([{}])
         self.assertEqual(proc.call_count, 1)
         self.assertEqual(self.r.job()["status"], "ready")
+        self.assertEqual(self.r.backing, ["abcdefghijk"])  # pronta: as vozes de apoio saem depois, em segundo plano
 
     def test_durante_a_espera_o_estado_mostra_que_esta_tentando_de_novo(self):
         seen = []
         with mock.patch.object(runner, "process", side_effect=[RuntimeError("timed out"), {}]):
-            runner.handle(self.r, None, self.settings, "1-0", dict(self.FIELDS), sleep=lambda s: seen.append(dict(self.r.job())))
+            runner.handle(self.r, None, self.settings, self.new_job(), sleep=lambda s: seen.append(dict(self.r.job())))
         self.assertEqual(seen[0]["stage"], "retrying")
         self.assertIn("tentativa 1 de 3", seen[0]["error"])
 

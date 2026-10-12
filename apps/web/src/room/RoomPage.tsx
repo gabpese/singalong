@@ -134,6 +134,7 @@ export function RoomPage({ code }: { code: string }) {
         <section className="tab" hidden={tab !== 'add'}>
           <AddSong
             ref={addSong}
+            room={code}
             userName={name}
             onUserName={(value) => {
               setName(value);

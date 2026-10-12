@@ -186,3 +186,24 @@ test('o dono sai da sessão: pedidos pendentes falham com "owner_left" e as fila
   // o job abandonado não trava um novo pedido
   assert.equal((await store.enqueue(done.id, { lyrics_source: 'auto' }, { sessionId: sid() })).created, true);
 });
+
+test('pedido liberado e feito de novo por outro dono: a mensagem antiga é descartada e não vai para o dono antigo', { skip }, async () => {
+  const old = sid();
+  const fresh = sid();
+  const { id } = await enqueueIn(old);
+  assert.equal(await store.release(id), true);
+  const job = await store.get(id);
+  assert.deepEqual([job.status, job.error_code], ['failed', 'owner_left']);
+  assert.equal(await store.release(id), false); // já não está pendente
+
+  const again = await enqueueIn(fresh, id);
+  assert.equal(again.created, true);
+  assert.equal((await store.get(id)).session_id, fresh);
+  assert.equal(await store.claim(old, `dev-${rid()}`), null); // a mensagem da sessão antiga é descartada
+  assert.equal(await redis.xlen(`jobs:s:${old}`), 0);
+  const got = await store.claim(fresh, `dev-${rid()}`);
+  assert.equal(got.id, id);
+  // encerrar a sessão antiga agora não derruba o pedido do novo dono
+  await store.abandonSession(old);
+  assert.equal((await store.get(id)).status, 'pending');
+});

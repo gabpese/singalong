@@ -431,3 +431,44 @@ test('rota desconhecida do agente é 404 JSON', async () => {
   assert.equal(res.statusCode, 404);
   assert.equal(res.json().error, 'not_found');
 });
+
+test('pedido preso com um dono que sumiu é liberado para quem pedir depois; com o dono online, continua com ele', async () => {
+  const a = await pair('A');
+  const b = await pair('B');
+  const sa = await startSession(a, 'Ana');
+  const sb = await startSession(b, 'Beto');
+  const ra = await makeRoom(a, sa);
+  const rb = await makeRoom(b, sb);
+  await addSong(ra, 'preso000001');
+
+  await addSong(rb, 'preso000001'); // Ana está online: o pedido continua com ela (dedupe)
+  assert.equal((await claim(b)).statusCode, 204);
+
+  app.db.touchSession(sa.id, Date.now() - 60_000); // Ana sumiu
+  await addSong(rb, 'preso000001');
+  const got = await claim(b);
+  assert.equal(got.statusCode, 200);
+  assert.equal(got.json().job.id, 'preso000001');
+
+  // Ana volta: o pedido antigo dela já não existe (foi liberado e é do Beto agora)
+  await call('POST', '/agent/v1/heartbeat', { headers: a.headers, payload: {} });
+  assert.equal((await claim(a)).statusCode, 204);
+  assert.equal((await call('POST', '/agent/v1/jobs/preso000001/progress', { headers: a.headers, payload: { stage: 'x' } })).statusCode, 409);
+  assert.equal((await call('POST', '/agent/v1/jobs/preso000001/progress', { headers: b.headers, payload: { stage: 'x' } })).statusCode, 204);
+});
+
+test('o dono que sai não derruba o pedido que já foi passado a outro dono', async () => {
+  const a = await pair('A2');
+  const b = await pair('B2');
+  const sa = await startSession(a, 'Ana');
+  const sb = await startSession(b, 'Beto');
+  const ra = await makeRoom(a, sa);
+  const rb = await makeRoom(b, sb);
+  await addSong(ra, 'passa000001');
+  app.db.touchSession(sa.id, Date.now() - 60_000);
+  await addSong(rb, 'passa000001'); // liberado e pedido de novo pelo Beto
+  await call('DELETE', `/agent/v1/sessions/${sa.id}`, { headers: a.headers }); // Ana encerra a sessão depois
+  const song = (await roomState(rb)).queue.find((i) => i.video_id === 'passa000001').song;
+  assert.notEqual(song.error_code, 'owner_left'); // continua pendente com o Beto
+  assert.equal((await claim(b)).json().job.id, 'passa000001');
+});

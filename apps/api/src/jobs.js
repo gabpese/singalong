@@ -85,6 +85,7 @@ function toJob(hash) {
     retry: hash.retry || null, // auto | manual | never: vale tentar de novo?
     lyrics_source: hash.lyrics_source || null,
     updated_at: hash.updated_at ? Number(hash.updated_at) : null,
+    session_id: hash.session_id || null, // de qual sessão (agente) é o pedido; null = worker clássico
   };
 }
 
@@ -123,9 +124,17 @@ export function createRedisJobStore(redis, { staleMs = STALE_MS } = {}) {
     groups.add(stream);
   }
 
-  /** Marca a entrega do job ao dispositivo: conta a tentativa e guarda de onde veio (para progresso/ack). */
-  async function delivered(stream, msgId, deviceId, fields) {
+  /**
+   * Marca a entrega do job ao dispositivo: conta a tentativa e guarda de onde veio (para progresso/ack).
+   * Devolve null (e descarta a mensagem) se o pedido já é de OUTRA sessão: ele foi liberado e pedido de novo por outro dono.
+   */
+  async function delivered(stream, msgId, deviceId, fields, sessionId) {
     const id = fields.video_id;
+    if ((await redis.hget(jobKey(id), 'session_id')) !== sessionId) {
+      await redis.xack(stream, AGENT_GROUP, msgId);
+      await redis.xdel(stream, msgId);
+      return null;
+    }
     const attempt = await redis.hincrby(jobKey(id), 'starts', 1);
     await redis.hset(jobKey(id), 'claimed_by', deviceId, 'claim_stream', stream, 'claim_msg', msgId);
     return { id, payload: JSON.parse(fields.payload), attempt: Number(attempt) };
@@ -206,27 +215,45 @@ export function createRedisJobStore(redis, { staleMs = STALE_MS } = {}) {
     async claim(sessionId, deviceId, { waitMs = 0 } = {}) {
       const stream = sessionStream(sessionId);
       await ensureGroup(stream);
-      const own = await redis.xreadgroup('GROUP', AGENT_GROUP, deviceId, 'COUNT', 1, 'STREAMS', stream, '0');
-      const [ownMsg] = own?.[0]?.[1] ?? [];
-      if (ownMsg && ownMsg[1]?.length) return delivered(stream, ownMsg[0], deviceId, fieldsToObject(ownMsg[1]));
-      const stale = await redis.xautoclaim(stream, AGENT_GROUP, deviceId, staleMs, '0-0', 'COUNT', 1);
-      const [staleMsg] = stale?.[1] ?? [];
-      if (staleMsg?.[1]?.length) return delivered(stream, staleMsg[0], deviceId, fieldsToObject(staleMsg[1]));
-
-      const wait = clampWait(waitMs);
-      let reply;
-      if (wait) {
-        const blocking = redis.duplicate();
-        try {
-          reply = await blocking.xreadgroup('GROUP', AGENT_GROUP, deviceId, 'COUNT', 1, 'BLOCK', wait, 'STREAMS', stream, '>');
-        } finally {
-          blocking.disconnect();
+      const deadline = Date.now() + clampWait(waitMs);
+      // cada volta pega UMA mensagem; as órfãs (pedidos liberados) são descartadas e a volta seguinte tenta a próxima
+      for (let round = 0; round < 50; round++) {
+        let msg;
+        const own = await redis.xreadgroup('GROUP', AGENT_GROUP, deviceId, 'COUNT', 1, 'STREAMS', stream, '0');
+        [msg] = own?.[0]?.[1] ?? [];
+        if (!msg?.[1]?.length) {
+          const stale = await redis.xautoclaim(stream, AGENT_GROUP, deviceId, staleMs, '0-0', 'COUNT', 1);
+          [msg] = stale?.[1] ?? [];
         }
-      } else {
-        reply = await redis.xreadgroup('GROUP', AGENT_GROUP, deviceId, 'COUNT', 1, 'STREAMS', stream, '>');
+        if (!msg?.[1]?.length) {
+          const left = deadline - Date.now();
+          let reply;
+          if (left > 0) {
+            const blocking = redis.duplicate();
+            try {
+              reply = await blocking.xreadgroup('GROUP', AGENT_GROUP, deviceId, 'COUNT', 1, 'BLOCK', left, 'STREAMS', stream, '>');
+            } finally {
+              blocking.disconnect();
+            }
+          } else {
+            reply = await redis.xreadgroup('GROUP', AGENT_GROUP, deviceId, 'COUNT', 1, 'STREAMS', stream, '>');
+          }
+          [msg] = reply?.[0]?.[1] ?? [];
+        }
+        if (!msg?.[1]?.length) return null;
+        const job = await delivered(stream, msg[0], deviceId, fieldsToObject(msg[1]), sessionId);
+        if (job) return job;
       }
-      const [msg] = reply?.[0]?.[1] ?? [];
-      return msg ? delivered(stream, msg[0], deviceId, fieldsToObject(msg[1])) : null;
+      return null;
+    },
+    /** Libera um pedido preso com um dono que sumiu (pendente/em andamento): vira falha, e outro dono pode pedir de novo. */
+    async release(id) {
+      const hash = await redis.hgetall(jobKey(id));
+      if (!['pending', 'processing'].includes(hash.status)) return false;
+      await redis.hset(jobKey(id), { ...OWNER_LEFT, status: 'failed', updated_at: Date.now() });
+      await redis.hdel(jobKey(id), 'claimed_by', 'claim_stream', 'claim_msg');
+      await redis.expire(jobKey(id), FAILED_TTL);
+      return true;
     },
     /** Progresso de um job entregue ao dispositivo (renova o prazo de "sem sinal"). false se o job não é dele. */
     async progress(id, deviceId, fields) {
@@ -400,6 +427,9 @@ export function createMemoryJobStore({ now = Date.now, staleMs = STALE_MS } = {}
     async claim(sessionId, deviceId, { waitMs = 0 } = {}) {
       return poll(() => {
         const entries = lane(sessionId).jobs;
+        // pedidos liberados e feitos de novo por outro dono já não são desta sessão: descarta
+        const orphans = entries.filter((e) => jobs.get(e.video_id)?.session_id !== sessionId);
+        if (orphans.length) entries.splice(0, entries.length, ...entries.filter((e) => !orphans.includes(e)));
         const entry = entries.find((e) => claims.get(e.video_id)?.deviceId === deviceId) // o que ficou pendente com ele
           ?? entries.find((e) => claims.has(e.video_id) && now() - claims.get(e.video_id).at >= staleMs) // abandonado por outro
           ?? entries.find((e) => !claims.has(e.video_id));
@@ -408,6 +438,12 @@ export function createMemoryJobStore({ now = Date.now, staleMs = STALE_MS } = {}
         entry.starts += 1;
         return { id: entry.video_id, payload: entry.payload, attempt: entry.starts };
       }, waitMs);
+    },
+    async release(id) {
+      if (!busy(jobs.get(id))) return false;
+      jobs.set(id, { ...jobs.get(id), ...OWNER_LEFT, status: 'failed', updated_at: now() });
+      claims.delete(id);
+      return true;
     },
     async progress(id, deviceId, fields) {
       const claim = claims.get(id);
@@ -447,6 +483,7 @@ export function createMemoryJobStore({ now = Date.now, staleMs = STALE_MS } = {}
     },
     async abandonSession(sessionId) {
       for (const { video_id: id } of lane(sessionId).jobs) {
+        if (jobs.get(id)?.session_id !== sessionId) continue; // já foi liberado e pedido de novo por outro dono
         if (busy(jobs.get(id))) jobs.set(id, { ...jobs.get(id), ...OWNER_LEFT, status: 'failed', updated_at: now() });
         claims.delete(id);
       }

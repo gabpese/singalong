@@ -9,10 +9,58 @@ from .pipeline import NeedsLyrics, process
 from .storage import LocalStorage
 
 
+def _pair(args) -> int:
+    from .backend import BackendUnavailable, Rejected, pair
+
+    if not args.agent_url:
+        print("erro: informe --agent-url (ou AGENT_URL) com o endereço do servidor")
+        return 2
+    try:
+        result = pair(args.agent_url, args.pair, args.agent_name)
+    except Rejected as exc:
+        print(f"erro: {exc.message or exc.code}")
+        return 2
+    except BackendUnavailable as exc:
+        print(f"erro: não consegui falar com o servidor ({exc})")
+        return 4
+    print("Pareado. Guarde o token (ele só aparece agora) na variável AGENT_TOKEN:")
+    print(f"AGENT_TOKEN={result['token']}")
+    return 0
+
+
+def _create_room(args) -> int:
+    from .backend import AuthError, BackendUnavailable, HttpBackend, Rejected
+
+    token = os.environ.get("AGENT_TOKEN")
+    if not (args.agent_url and token):
+        print("erro: defina AGENT_URL e AGENT_TOKEN (o token do pareamento)")
+        return 2
+    backend = HttpBackend(args.agent_url, token, args.agent_name)
+    try:
+        backend.connect()  # retoma a sessão do agente em execução (ou inicia uma)
+        room = backend.create_room()
+    except (AuthError, Rejected) as exc:
+        print(f"erro: {exc}")
+        return 2
+    except BackendUnavailable as exc:
+        print(f"erro: não consegui falar com o servidor ({exc})")
+        return 4
+    base = args.agent_url.rstrip("/")
+    print(json.dumps({"code": room["code"], "host_token": room["host_token"]}))
+    print(f"TV:        {base}/tv.html?room={room['code']}")
+    print(f"Anfitrião: {base}/room.html?room={room['code']}#host={room['host_token']}")
+    print(f"Convidados entram pelo código {room['code']} ou pelo QR code da TV.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="singalong_worker", description="YouTube -> instrumental + letra sincronizada")
     p.add_argument("url", nargs="?", help="link do YouTube (ou ID de 11 caracteres); omitido com --consume")
-    p.add_argument("--consume", action="store_true", help="modo serviço: consome jobs do Redis (REDIS_URL)")
+    p.add_argument("--consume", action="store_true", help="modo serviço: consome jobs do Redis (REDIS_URL) ou, com AGENT_URL, do servidor por HTTP (agente local)")
+    p.add_argument("--pair", metavar="CODIGO", help="agente local: troca o código de pareamento por um token (use com --agent-url); imprime o token")
+    p.add_argument("--agent-url", default=os.environ.get("AGENT_URL") or None, help="endereço do servidor (ex.: https://singalong.exemplo.org)")
+    p.add_argument("--agent-name", default=os.environ.get("AGENT_SESSION_NAME") or "Meu computador", help="nome deste computador no pareamento / apelido da sessão")
+    p.add_argument("--create-room", action="store_true", help="agente local: cria uma sala na sua sessão (AGENT_URL + AGENT_TOKEN) e imprime o link de anfitrião")
     p.add_argument("--lyrics", choices=["auto", "video", "lrclib", "file", "text", "align", "none"], default="auto")
     p.add_argument("--loose", action="store_true", help="aceita letra online de versão com duração diferente da do vídeo")
     p.add_argument("--lyrics-file", type=Path, help="com --lyrics file: .lrc/.srt/.vtt com tempos; com --lyrics text ou align: texto puro, uma linha por verso")
@@ -26,11 +74,14 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     setup_logging(level="INFO")
 
+    if args.pair:
+        return _pair(args)
+    if args.create_room:
+        return _create_room(args)
     if args.consume:
         from .consumer import run  # importa só aqui: o modo CLI não precisa do cliente Redis
 
-        run()
-        return 0
+        return run()
     if not args.url:
         p.error("informe a url (ou use --consume)")
 

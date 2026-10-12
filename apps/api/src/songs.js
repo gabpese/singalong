@@ -12,7 +12,18 @@ const keys = (id) => ({
 /** Chave do MP4 exportado: o mesmo nome que o worker usa (karaoke.mp4, karaoke_p+2.mp4, karaoke_p-3.mp4). */
 export const exportKey = (id, pitch) => `cache/${id}/karaoke${pitch === 0 ? '' : `_p${pitch > 0 ? '+' : '-'}${Math.abs(pitch)}`}.mp4`;
 
-export function createSongService({ storage, jobs }) {
+export function createSongService({ storage, jobs, agents = null }) {
+  /**
+   * Um pedido pendente com um dono que SUMIU (sessão sem sinal) não pode prender a música para os outros: ele é liberado
+   * (vira falha "o dono saiu") e o pedido novo segue. Se o dono dele está online, o pedido continua com ele (dedupe).
+   */
+  async function releaseStale(id, sessionId) {
+    const job = await jobs.get(id);
+    if (!job?.session_id || job.session_id === sessionId || !['pending', 'processing'].includes(job.status)) return;
+    if (agents?.isOnline(job.session_id)) return;
+    await jobs.release?.(id);
+  }
+
   /** "Pronto" = os três artefatos existem (uma pasta parcial de job interrompido não conta). */
   async function isReady(id) {
     const k = keys(id);
@@ -107,6 +118,7 @@ export function createSongService({ storage, jobs }) {
       if ((await isReady(id)) && !explicitLyrics) {
         return { cached: true, created: false, deduped: false, song: await describe(id) };
       }
+      await releaseStale(id, sessionId);
       const { created } = await jobs.enqueue(id, payloadFor(id, body), { replace: Boolean(explicitLyrics), sessionId });
       return { cached: false, created, deduped: !created, song: await describe(id) };
     },
@@ -114,6 +126,7 @@ export function createSongService({ storage, jobs }) {
     /** Escolhe/troca a letra (reaproveita o instrumental do cache). error: 'not_found' | 'in_progress'. */
     async setLyrics(id, lyrics, { artist, title } = {}, { sessionId = null } = {}) {
       if (!(await describe(id))) return { error: 'not_found' };
+      await releaseStale(id, sessionId);
       const { created } = await jobs.enqueue(id, payloadFor(id, { lyrics, artist, title }), { replace: true, sessionId });
       if (!created) return { error: 'in_progress' };
       return { song: await describe(id) };
