@@ -144,6 +144,7 @@ def serve(backend, storage, stop: threading.Event) -> None:
             video_id = pending.popleft()
             try:
                 status = process(storage, video_id)
+                backend.publish_song(video_id)  # armazenamento local: o catálogo ganha as vozes de apoio
                 log.info("vozes de apoio de %s: %s", video_id, status)
             except Exception as exc:  # noqa: BLE001 - sem o apoio a música continua funcionando; tenta de novo na próxima subida
                 log.warning("não consegui separar as vozes de apoio de %s: %s", video_id, exc)

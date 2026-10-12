@@ -179,6 +179,7 @@ def serve(backend, storage: LocalStorage, stop: threading.Event) -> None:
             started = time.monotonic()
             try:
                 export_mp4(storage, video_id, pitch)
+                backend.publish_song(video_id)  # armazenamento local: o catálogo ganha o tom que acabou de ser exportado
                 backend.set_export_state(video_id, pitch, "ready")
                 log.info("MP4 pronto", extra={"job": video_id, "pitch": pitch, "elapsed_s": round(time.monotonic() - started, 1)})
             except Exception as exc:  # noqa: BLE001 - o pedido termina com uma mensagem, nunca fica "processando"

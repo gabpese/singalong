@@ -34,6 +34,11 @@ class Settings:
     agent_url: str | None = None
     agent_token: str | None = None
     agent_name: str = "Meu computador"  # o apelido da sessão, o que os convidados veem
+    # servidor local de mídia do agente (a TV busca as músicas daqui): AGENT_MEDIA_PORT=0 desliga e a nuvem usa o armazenamento dela
+    media_port: int = 8765
+    media_host: str = "127.0.0.1"  # onde escuta; em Docker, 0.0.0.0 (e publique a porta)
+    media_public: str | None = None  # o endereço que o NAVEGADOR usa, se for diferente de http://127.0.0.1:<porta> (Docker)
+    allowed_origins: tuple = ()  # origens (a da página da nuvem) que podem ler a mídia; o padrão é a de AGENT_URL
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -53,6 +58,10 @@ class Settings:
             agent_url=env.get("AGENT_URL") or None,
             agent_token=env.get("AGENT_TOKEN") or None,
             agent_name=env.get("AGENT_SESSION_NAME") or "Meu computador",
+            media_port=int(env.get("AGENT_MEDIA_PORT", "8765")),
+            media_host=env.get("AGENT_MEDIA_HOST") or "127.0.0.1",
+            media_public=(env.get("AGENT_MEDIA_PUBLIC") or "").rstrip("/") or None,
+            allowed_origins=tuple(o.strip() for o in (env.get("AGENT_ALLOWED_ORIGINS") or "").split(",") if o.strip()),
         )
 
 
@@ -115,6 +124,7 @@ def handle(backend, storage: LocalStorage, settings: Settings, job: Job, sleep: 
         log.info("job começou", extra={"job": video_id, "url": payload.get("url"), "lyrics": payload.get("lyrics_source"), "start": starts})
         backend.set_state(job, status="processing", stage="", error="", error_code="", retry="")
         _run(backend, storage, settings, job, sleep)
+        backend.publish_song(video_id)  # armazenamento local: a nuvem passa a ver a música antes de o job terminar
         backend.set_state(job, status="ready", stage="", error="", error_code="", retry="")
         try:
             backend.request_backing(video_id)  # as vozes de apoio saem depois, em segundo plano: a música já está pronta

@@ -120,7 +120,7 @@ class FakeBackend:
     """Só o que o runner usa do Backend: o estado do job, o contador de inícios, o ack e o pedido das vozes de apoio."""
 
     def __init__(self):
-        self.states, self.acked, self.backing = {}, [], []
+        self.states, self.acked, self.backing, self.events = {}, [], [], []
 
     def begin(self, job):
         state = self.states.setdefault(job.video_id, {})
@@ -129,6 +129,10 @@ class FakeBackend:
 
     def set_state(self, job, **fields):
         self.states.setdefault(job.video_id, {}).update(fields)
+        self.events.append(("state", fields.get("status")))
+
+    def publish_song(self, video_id):
+        self.events.append(("publish", video_id))
 
     def finish(self, job):
         self.acked.append(job.ref)
@@ -162,6 +166,14 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(self.r.job()["status"], "ready")
         self.assertEqual(self.r.acked, ["1-0"])
         self.assertEqual(self.r.job()["error_code"], "")
+
+    def test_a_musica_e_publicada_no_catalogo_antes_de_o_job_terminar(self):
+        # armazenamento local: a nuvem só enxerga a música pronta depois que ela está no catálogo
+        self.handle([{}])
+        events = self.r.events
+        self.assertLess(events.index(("publish", "abcdefghijk")), events.index(("state", "ready")))
+        self.handle([RuntimeError("ERROR: [youtube] x: Private video. Sign in if you've been granted access")])
+        self.assertEqual(self.r.events.count(("publish", "abcdefghijk")), 1)  # job que falhou não publica nada
 
     def test_falha_transitoria_tenta_de_novo_com_espera_crescente_e_termina_pronto(self):
         proc = self.handle([RuntimeError("HTTP Error 429"), RuntimeError("timed out"), {}])
