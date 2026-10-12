@@ -67,6 +67,7 @@ const roomViews = new Map(); // código da sala → { tv, host }
 let activeTab = 'session'; // session | rooms
 let activeRoom = null;
 let activeSub = 'tv'; // o padrão ao entrar numa sala é o modo TV
+let htmlFullscreen = false; // a página da sala (o ícone de tela cheia dela) pediu tela cheia: ela passa a ocupar a janela toda
 let settingsOpen = false; // a tela de configurações cobre as páginas
 let top = TABBAR_FALLBACK; // onde a interface termina e as páginas começam (a interface informa)
 
@@ -79,7 +80,7 @@ function layout() {
   const [width, height] = win.getContentSize();
   for (const [code, views] of roomViews) {
     for (const sub of ['tv', 'host']) {
-      views[sub].setBounds({ x: 0, y: top, width, height: Math.max(0, height - top) });
+      views[sub].setBounds({ x: 0, y: htmlFullscreen ? 0 : top, width, height: Math.max(0, height - (htmlFullscreen ? 0 : top)) });
       views[sub].setVisible(!settingsOpen && activeTab === 'rooms' && code === activeRoom && sub === activeSub);
     }
   }
@@ -98,6 +99,9 @@ function newRoomView(url) {
   view.webContents.on('will-navigate', (event, target) => {
     if (new URL(target).origin !== origin) event.preventDefault();
   });
+  // o ícone de tela cheia da própria página: a janela inteira entra em tela cheia e a página cobre tudo (Esc ou o ícone saem)
+  view.webContents.on('enter-html-full-screen', () => { htmlFullscreen = true; win.setFullScreen(true); layout(); });
+  view.webContents.on('leave-html-full-screen', () => { htmlFullscreen = false; win.setFullScreen(false); layout(); });
   view.webContents.loadURL(url);
   win.contentView.addChildView(view);
   return view;
@@ -282,10 +286,6 @@ function registerIpc() {
   handle('layout', (value) => {
     top = Math.max(0, Math.min(400, Math.round(Number(value) || TABBAR_FALLBACK)));
     layout();
-  });
-  handle('fullscreen', () => {
-    win.setFullScreen(!win.isFullScreen());
-    return win.isFullScreen();
   });
   handle('pickAudio', async () => {
     if (testMode && process.env.SINGALONG_TEST_PICK) return process.env.SINGALONG_TEST_PICK;

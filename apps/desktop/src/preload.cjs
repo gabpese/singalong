@@ -36,7 +36,6 @@ contextBridge.exposeInMainWorld('karaoke', {
   closeRoom: call('closeRoom'),
   settingsOpen: call('settingsOpen'),
   layout: call('layout'),
-  fullscreen: call('fullscreen'),
   onState: subscribe('state'),
   onTabs: subscribe('tabs'),
 });

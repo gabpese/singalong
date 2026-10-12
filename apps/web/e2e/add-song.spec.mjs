@@ -137,3 +137,27 @@ test('o aviso do Jukebox também vale com só o artista ou só o nome', async ({
   await searchButton(page).click();
   await expect(dialog.getByText('Wicked Game', { exact: true })).toBeVisible();
 });
+
+test('sem o nome da pessoa a música não entra na fila (e o campo recebe o foco)', async ({ page, request }) => {
+  await searchResults(request, BAD_GUY);
+  const room = await openAddTab(page, request);
+  await artistField(page).fill('billie');
+  await searchButton(page).click(); // buscar continua livre
+  await page.locator('.results .result').first().click();
+  await page.getByRole('combobox', { name: 'Letra' }).selectOption('none');
+  await page.getByLabel('Confirme o artista').fill('Billie Eilish');
+  await page.getByLabel('Confirme o nome da música').fill('Bad Guy');
+
+  await page.getByRole('button', { name: 'Adicionar à fila' }).click();
+  await expect(page.getByText('Digite o seu nome antes de adicionar uma música.')).toBeVisible();
+  await expect(page.getByLabel('Seu nome')).toBeFocused();
+  expect((await roomState(request, room.code)).queue).toHaveLength(0);
+
+  await page.getByLabel('Seu nome').fill('   '); // só espaços também não vale
+  await page.getByRole('button', { name: 'Adicionar à fila' }).click();
+  expect((await roomState(request, room.code)).queue).toHaveLength(0);
+
+  await page.getByLabel('Seu nome').fill('Carla');
+  await page.getByRole('button', { name: 'Adicionar à fila' }).click();
+  await expect.poll(async () => (await roomState(request, room.code)).queue.length).toBe(1);
+});

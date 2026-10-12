@@ -438,3 +438,8 @@ input[type=range].seek::-moz-range-thumb { width: 14px; height: 14px; border-rad
 .backing-row .seek { flex: 1; }
 .backing-value { min-width: 3em; text-align: right; font-variant-numeric: tabular-nums; color: var(--dim); font-size: .9rem; }
 .queue-item .backing-row { margin-top: 0; }
+
+/* o botão de buscar não pode encostar nos campos de artista e música */
+.search-block { display: flex; flex-direction: column; gap: 12px; }
+.search-block[hidden] { display: none; }
+.required { color: var(--accent); margin-left: 2px; }

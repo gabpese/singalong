@@ -180,7 +180,6 @@ function renderTabs() {
   $('subtabs').hidden = !inRooms;
   $('sub-tv').classList.toggle('active', tabs.sub === 'tv');
   $('sub-host').classList.toggle('active', tabs.sub === 'host');
-  $('tab-fullscreen').hidden = tabs.sub !== 'tv';
   const chips = $('room-chips');
   chips.replaceChildren();
   for (const code of tabs.rooms) {
@@ -283,7 +282,6 @@ $('room-create').addEventListener('click', async (e) => {
 
 for (const button of document.querySelectorAll('.tab[data-tab]')) button.addEventListener('click', () => act('selectTab', button.dataset.tab));
 for (const button of document.querySelectorAll('.subtab[data-sub]')) button.addEventListener('click', () => act('selectSub', button.dataset.sub));
-$('tab-fullscreen').addEventListener('click', () => act('fullscreen'));
 $('gear').addEventListener('click', () => (tabs.settings ? act('settingsOpen', false) : openSettings()));
 $('settings-back').addEventListener('click', () => act('settingsOpen', false));
 

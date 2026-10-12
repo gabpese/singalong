@@ -174,11 +174,9 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   assert.ok(urls().some((u) => u.includes(`/room.html?room=${code}`)), `a página do anfitrião não abriu: ${urls()}`);
   assert.ok(urls().some((u) => u.includes(`/tv.html?room=${code}`)), 'a página da TV não abriu');
   assert.equal(await id('screen-home').isHidden(), true);
-  await id('tab-fullscreen').waitFor();
   await shot('2b-sala-tv');
   await id('sub-host').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="sub-host"]').classList.contains('active'), null, { timeout: 15_000 });
-  assert.equal(await id('tab-fullscreen').isHidden(), true); // tela cheia só na TV
   const roomPage = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().includes('/room.html'));
   if (process.env.SINGALONG_SHOT_DIR) await roomPage.screenshot({ path: join(process.env.SINGALONG_SHOT_DIR, '2b-anfitriao-pagina.png') });
   await id('sub-tv').click();
