@@ -330,6 +330,8 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 - **Update 0.3.0 → 0.4.0:** announced by the server, downloaded, hash checked, installed silently and reopened by itself in about 45 s; the new version came up as `v0.4.0` and **the engine and settings were still there** (it did not ask to prepare again).
 - The uninstaller removed the app and the shortcuts and left the user's data.
 
+- **First-run and start screens:** the first opening installs the components by itself (a bar and "Installing components…", no warnings about time or size, no questions; a failure shows "Try again"). After pairing, the **start screen** shows the presentation image (`ui/welcome.png`) on the left and, on the right, the nickname field with "Start the session". Only after the session starts do the other options appear (rooms, import, YouTube, settings, log); ending the session returns to the start screen.
+
 **Decisions and what is left**
 - Distribution stays private: the installer is not uploaded anywhere by CI. The update folder must be a private link (section 7).
 - Not done: a test on a **clean virtual machine** (there is none here; the installed-app run above used an empty install folder and an empty data folder, but it is still this PC, which already has Chrome, Git and drivers). Whoever installs it on another computer should note what failed, if anything.

@@ -4,6 +4,7 @@ const api = window.karaoke;
 
 let state = null;
 let importFile = null;
+let autoStarted = false;
 
 const AGENT_TEXT = {
   stopped: ['Parada', ''],
@@ -44,9 +45,15 @@ function setPill(el, [text, kind]) {
 function render(s) {
   state = s;
   $('version').textContent = `v${s.version}`;
+  const running = s.agent.status !== 'stopped' && s.agent.status !== 'auth_error';
   $('screen-engine').hidden = s.phase !== 'engine';
   $('screen-pair').hidden = s.phase !== 'pair';
-  $('screen-home').hidden = s.phase !== 'home';
+  $('screen-welcome').hidden = !(s.phase === 'home' && !running);
+  $('screen-home').hidden = !(s.phase === 'home' && running);
+  if (s.phase === 'engine' && s.engine.status === 'missing' && !autoStarted) { // primeira abertura: começa sozinho, sem perguntar
+    autoStarted = true;
+    act('buildEngine', { engine: 'auto' });
+  }
 
   // atualização
   const u = s.update;
@@ -61,14 +68,12 @@ function render(s) {
   }
 
   // motor
-  const building = s.engine.status === 'building';
-  $('engine-build').disabled = building;
-  $('engine-build').textContent = s.engine.status === 'error' ? 'Tentar de novo' : 'Preparar';
-  $('engine-kind').disabled = building;
+  const building = s.engine.status !== 'error';
+  $('engine-build').hidden = building;
   $('engine-progress').hidden = !building;
-  if (building && s.engine.progress) {
+  if (s.engine.progress) {
     const p = s.engine.progress;
-    $('engine-label').textContent = p.total ? `${p.label} (${Math.round((p.done / p.total) * 100)}%)` : p.label;
+    $('engine-label').textContent = p.label;
     if (p.total) $('engine-bar').value = Math.round((p.done / p.total) * 100);
     else $('engine-bar').removeAttribute('value');
   }
@@ -77,12 +82,12 @@ function render(s) {
 
   // início
   const online = s.agent.status === 'online';
-  const running = s.agent.status !== 'stopped' && s.agent.status !== 'auth_error';
   setPill($('agent-pill'), AGENT_TEXT[s.agent.status] ?? ['?', '']);
-  $('session-toggle').textContent = running ? 'Encerrar sessão' : 'Iniciar sessão';
-  $('session-toggle').classList.toggle('primary', !running);
-  $('nickname').disabled = running;
-  if (document.activeElement !== $('nickname') && !$('nickname').value) $('nickname').value = s.nickname ?? '';
+  $('session-nick').textContent = s.nickname ?? '';
+  if (document.activeElement !== $('welcome-nickname') && !$('welcome-nickname').value) $('welcome-nickname').value = s.nickname ?? '';
+  $('welcome-server').textContent = s.server ? s.server.replace(/^https?:\/\//, '') : '';
+  $('welcome-error').hidden = s.agent.status !== 'auth_error';
+  $('welcome-error').textContent = s.agent.status === 'auth_error' ? s.agent.error ?? '' : '';
   $('agent-error').hidden = !s.agent.error;
   $('agent-error').textContent = s.agent.error ?? '';
   $('room-create').disabled = !online || Boolean(s.busy);
@@ -132,18 +137,16 @@ function renderLogs(logs) {
 }
 
 // --- ações ---
-$('engine-build').addEventListener('click', (e) => act('buildEngine', { engine: $('engine-kind').value }, e.currentTarget));
+$('engine-build').addEventListener('click', (e) => act('buildEngine', { engine: 'auto' }, e.currentTarget));
 
 $('pair-go').addEventListener('click', async (e) => {
   const data = await act('pair', { server: $('pair-server').value, code: $('pair-code').value, name: $('pair-name').value }, e.currentTarget);
   if (data) $('pair-code').value = '';
 });
 
-$('session-toggle').addEventListener('click', async (e) => {
-  const running = state.agent.status !== 'stopped' && state.agent.status !== 'auth_error';
-  if (running) await act('stopAgent', undefined, e.currentTarget);
-  else await act('startAgent', { nickname: $('nickname').value }, e.currentTarget);
-});
+$('welcome-start').addEventListener('click', (e) => act('startAgent', { nickname: $('welcome-nickname').value }, e.currentTarget));
+$('welcome-nickname').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('welcome-start').click(); });
+$('session-toggle').addEventListener('click', (e) => act('stopAgent', undefined, e.currentTarget));
 
 $('room-create').addEventListener('click', (e) => act('createRoom', undefined, e.currentTarget));
 
@@ -188,10 +191,12 @@ $('hardware').addEventListener('click', async (e) => {
   ].join('\n');
 });
 
-$('unpair').addEventListener('click', async (e) => {
+async function unpair(button) {
   if (!confirm('Desparear este computador? Você vai precisar de um código novo para conectar de novo.')) return;
-  await act('unpair', undefined, e.currentTarget);
-});
+  await act('unpair', undefined, button);
+}
+$('unpair').addEventListener('click', (e) => unpair(e.currentTarget));
+$('welcome-unpair').addEventListener('click', (e) => unpair(e.currentTarget));
 
 api.onState(render);
 const first = await act('snapshot');

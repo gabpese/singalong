@@ -110,7 +110,9 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   await id('pair-code').fill(await adminCode());
   await id('pair-name').fill('PC da sala');
   await id('pair-go').click();
-  await id('screen-home').waitFor();
+  await id('screen-welcome').waitFor(); // depois de parear: a tela de início (imagem + apelido)
+  assert.equal(await id('screen-home').isHidden(), true); // as outras opções só aparecem com a sessão
+  await shot('1b-inicio');
   assert.equal(await id('error').isHidden(), true);
 
   // o aviso de atualização do servidor aparece
@@ -119,16 +121,17 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   assert.match(await id('update-banner').textContent(), /Corrige o login/);
 
   // sem apelido não inicia
-  assert.equal(await id('room-create').isDisabled(), true);
-  await id('session-toggle').click();
+  await id('welcome-start').click();
   await id('error').waitFor();
   assert.match(await id('error').textContent(), /apelido/);
 
   // inicia a sessão com o worker de verdade
-  await id('nickname').fill('Dona Flor');
-  await id('session-toggle').click();
+  await id('welcome-nickname').fill('Dona Flor');
+  await id('welcome-start').click();
+  await id('screen-home').waitFor();
+  assert.equal(await id('screen-welcome').isHidden(), true);
+  assert.equal(await id('session-nick').textContent(), 'Dona Flor');
   await page.waitForFunction(() => document.querySelector('[data-testid="agent-status"]').textContent === 'Online', null, { timeout: 60_000 });
-  assert.equal(await id('session-toggle').textContent(), 'Encerrar sessão');
   assert.equal(await id('room-create').isEnabled(), true);
 
   // cria a sala: o servidor a conhece como sala da sessão "Dona Flor"
@@ -162,7 +165,7 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
 
   // encerra: a sessão some do servidor e as salas da lista também
   await id('session-toggle').click();
-  await page.waitForFunction(() => document.querySelector('[data-testid="agent-status"]').textContent === 'Parada', null, { timeout: 30_000 });
+  await id('screen-welcome').waitFor({ timeout: 30_000 }); // sem sessão: volta para a tela de início
   assert.equal(await page.locator('li[data-testid^="room-"]').count(), 0);
   await new Promise((resolve) => setTimeout(resolve, 300));
   const after = (await api.inject({ method: 'GET', url: `/api/rooms/${code}` })).json();

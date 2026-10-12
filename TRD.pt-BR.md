@@ -330,6 +330,8 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - **Atualização 0.3.0 → 0.4.0:** anunciada pelo servidor, baixada, hash conferido, instalada em silêncio e reaberta sozinha em cerca de 45 s; a versão nova subiu como `v0.4.0` e **o motor e as configurações continuaram lá** (não pediu para preparar de novo).
 - O desinstalador removeu o app e os atalhos e deixou os dados do usuário.
 
+- **Telas de primeira abertura e de início:** a primeira abertura instala os componentes sozinha (uma barra e "Instalando componentes…", sem avisos de tempo ou tamanho, sem perguntas; se falhar, aparece "Tentar de novo"). Depois do pareamento, a **tela de início** mostra a imagem de apresentação (`ui/welcome.png`) à esquerda e, à direita, o campo do apelido com "Começar a sessão". Só depois de iniciar a sessão aparecem as outras opções (salas, importar, YouTube, configurações, registro); encerrar a sessão volta para a tela de início.
+
 **Decisões e o que falta**
 - A distribuição continua privada: a CI não envia o instalador para lugar nenhum. A pasta de atualização precisa ser um link privado (seção 7).
 - Não feito: teste numa **máquina virtual limpa** (não há uma aqui; a execução acima usou uma pasta de instalação e uma de dados vazias, mas ainda é este PC, que já tem Chrome, Git e drivers). Quem instalar em outro computador deve anotar o que falhar, se algo falhar.

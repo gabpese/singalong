@@ -21,21 +21,14 @@
 
   <main>
     <!-- 1) preparar o motor -->
-    <section id="screen-engine" hidden data-testid="screen-engine">
-      <h2>Preparar o computador</h2>
-      <p>Na primeira vez, o aplicativo baixa e instala (só para ele, sem mexer no resto do seu computador) o que separa a voz da música: Python, ffmpeg, deno e a inteligência artificial. Leva alguns minutos e vários GB; pode fechar e continuar depois.</p>
-      <label>Placa de vídeo
-        <select id="engine-kind" data-testid="engine-kind">
-          <option value="auto">Escolher automaticamente (recomendado)</option>
-          <option value="cpu">Usar só o processador (mais lento)</option>
-        </select>
-      </label>
-      <button id="engine-build" type="button" class="primary" data-testid="engine-build">Preparar</button>
-      <div id="engine-progress" hidden>
-        <div id="engine-label" data-testid="engine-label"></div>
+    <section id="screen-engine" class="center" hidden data-testid="screen-engine">
+      <h2>Instalando componentes…</h2>
+      <div id="engine-progress">
         <progress id="engine-bar" max="100"></progress>
+        <div id="engine-label" class="muted" data-testid="engine-label"></div>
       </div>
       <p id="engine-error" class="error-text" hidden data-testid="engine-error"></p>
+      <button id="engine-build" type="button" class="primary" data-testid="engine-build" hidden>Tentar de novo</button>
     </section>
 
     <!-- 2) parear -->
@@ -48,15 +41,30 @@
       <button id="pair-go" type="button" class="primary" data-testid="pair-go">Parear</button>
     </section>
 
-    <!-- 3) início -->
+    <!-- 3) início: imagem de apresentação e o apelido para começar a sessão -->
+    <section id="screen-welcome" class="welcome" hidden data-testid="screen-welcome">
+      <div class="welcome-art"><img src="welcome.png" alt="Singalong: karaokê com a TV, o computador e o celular"></div>
+      <div class="welcome-form">
+        <h2>Vamos cantar?</h2>
+        <p class="muted">Escolha o apelido que os convidados vão ver e comece a sessão. A sua conta do YouTube nunca aparece para eles.</p>
+        <label>Seu apelido
+          <input id="welcome-nickname" type="text" maxlength="40" placeholder="Ex.: Dona Flor" autocomplete="off" data-testid="welcome-nickname">
+        </label>
+        <button id="welcome-start" type="button" class="primary big" data-testid="welcome-start">Começar a sessão</button>
+        <p id="welcome-error" class="error-text" hidden data-testid="welcome-error"></p>
+        <div class="welcome-foot muted">
+          <span id="welcome-server" data-testid="welcome-server"></span>
+          <button id="welcome-unpair" type="button" class="link" data-testid="welcome-unpair">Desparear este computador</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4) painel da sessão -->
     <section id="screen-home" hidden data-testid="screen-home">
       <div class="card" id="card-session">
         <h2>Sessão <span id="agent-pill" class="pill" data-testid="agent-status"></span></h2>
-        <p class="muted">Os convidados veem só este apelido. A conta do YouTube nunca aparece para eles.</p>
-        <div class="row">
-          <input id="nickname" type="text" maxlength="40" placeholder="Seu apelido" data-testid="nickname">
-          <button id="session-toggle" type="button" class="primary" data-testid="session-toggle">Iniciar sessão</button>
-        </div>
+        <p class="muted">Os convidados veem só este apelido: <strong id="session-nick" data-testid="session-nick"></strong>.</p>
+        <button id="session-toggle" type="button" data-testid="session-toggle">Encerrar sessão</button>
         <p id="agent-error" class="error-text" hidden data-testid="agent-error"></p>
       </div>
 
