@@ -80,9 +80,13 @@ On the agent side the code change is small: `runner.process` is already independ
 
 The idea of keeping everything on the user's computer and having the player read the local file runs into a browser limitation:
 
-- The karaoke page comes from **`https://singalong…`**. A browser **blocks** it from loading audio from `http://192.168.x.x` (mixed content and private network access). The exception is `http://localhost`.
-- So a **local** song only plays on the **TV running on the agent's own computer** (or connected to it by HDMI). A TV at another house or on another computer **cannot reach** the file.
-- **Chrome asks for permission.** Chrome has a *Local Network Access* permission: a public page that reaches `localhost` or the local network may trigger a prompt the user must accept ([source](https://developer.chrome.com/blog/local-network-access)). Confirmed details are missing (the version where it became the default, WebSocket and iframes): **test in M1** and, if it gets in the way, serve the TV page from the agent itself at `http://localhost`.
+- The karaoke page comes from **`https://singalong…`** and the file is at `http://…` on the agent's computer. Browsers with the *Local Network Access* permission ([source](https://developer.chrome.com/blog/local-network-access)) ask the user to accept it before the page talks to the local machine.
+- **Tested in Oct 2026 (installed Chrome 155 and Edge 155, plus Playwright's Chromium), from the real public page:**
+  - **Without the permission**, the request never reaches the local server. With the Chrome window visible it stays **pending**: Chrome shows the prompt and waits for the user; with no window (automation), it is blocked.
+  - **With the permission**, everything the player uses works, at `http://127.0.0.1`, `http://localhost` and even a **local network address** (`http://192.168.x.x`): `fetch` of the lyrics and melody, `<audio crossOrigin="anonymous">`, Web Audio (`createMediaElementSource`), play and seek (`Range` requests). Browsers no longer treat the local-network address as blocked mixed content.
+  - **The private-network preflight (`Access-Control-Allow-Private-Network`) was never requested:** in current Chrome the permission replaces it. **CORS** headers (`Access-Control-Allow-Origin` with the exact origin, `Vary: Origin`, `Expose-Headers` for `Content-Range`/`Accept-Ranges`) and `Range` support are still required.
+  - **Not tested:** Firefox and Safari (including iPhone's, which does not follow this model). That is why the instrumental preview on the phone stays out of v2.
+- **Decision (M1):** the local media server listens on `127.0.0.1` and the TV runs on the owner's computer. The first time, Chrome asks whether the page may access "devices on the local network": the app shows a simple step explaining to tap **Allow** (the choice is remembered for the site). Since the local-network address also works with the permission, a TV **on another Chromium device on the same network** is a future option, with no change to the design.
 - **The agent's local server** answers at `http://127.0.0.1:<port>/media` with `Range`, CORS for the cloud's origin and `Access-Control-Allow-Private-Network: true`.
 - **Limitations of mode A:** the **instrumental preview on the phone** does not work (the phone cannot reach the file); the YouTube video preview still does. The owner's PC must be on to play and to download.
 - A song that is **already in the cloud** (today's library, copied with `sync-library.sh`) keeps playing from anywhere until the hybrid exists.
@@ -192,7 +196,7 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 | Milestone | Deliverable | Definition of done |
 |---|---|---|
 | **M0 ✅** | `JobBackend` + the `/agent/v1` API + **sessions and per-session job routing** + a fake agent in the tests | The full flow passes with the current worker switched to HTTP; a room's job is only claimed by its session's agent |
-| **M1** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's local network prompt **tested** with the TV on `localhost` |
+| **M1** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's/Edge's local network prompt was already **tested** (section 5) and a local song plays on the TV from the local media server |
 | **M2** | Engine pack (CPU and cu121) + hardware probe | Installs without Python/Docker; GPU tested with a fallback |
 | **M3** | Electron shell: session, "Sign in to YouTube" screen, an "Import file" button, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
 | **M4** | **Windows** installer + auto-update | A clean install on a VM; update tested |
@@ -232,6 +236,6 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 13. The **engine pack is assembled on the user's computer**, from the official sources, with pinned versions and checksums (section 7).
 
 **Open**
-1. **Chrome's local network prompt** with the TV on `localhost`: test in M1; it may force the agent to serve the TV page.
+1. **Firefox and Safari** with the TV on the owner's computer: not tested (Chrome's and Edge's local network prompt was tested and works; section 5). v2 targets Chrome/Edge.
 
 **No means of testing at the moment:** RTX 50 (Blackwell) and other vendors' GPUs. The current torch (2.5.1/cu121) probably does not support the RTX 50; the installer tests the GPU and falls back to the CPU, but that was **not validated** on those cards. Raising the torch version would force a review of Demucs, today pinned to 2.5.1.

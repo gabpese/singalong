@@ -80,9 +80,13 @@ No agente, a mudança de código é pequena: `runner.process` já é independent
 
 A ideia de guardar tudo no computador do usuário e o player ler o arquivo local tem uma limitação de navegador:
 
-- A página do karaokê vem de **`https://singalong…`**. Um navegador **bloqueia** que ela carregue áudio de `http://192.168.x.x` (conteúdo misto e acesso a rede privada). A exceção é `http://localhost`.
-- Logo, a música **local** só toca na **TV que roda no próprio computador do agente** (ou ligada a ele por HDMI). A TV de outra casa ou de outro computador **não alcança** o arquivo.
-- **Chrome pede permissão.** O Chrome tem a permissão de "Acesso à rede local" (*Local Network Access*): uma página pública que acessa `localhost` ou a rede local pode gerar um aviso para o usuário aceitar ([fonte](https://developer.chrome.com/blog/local-network-access)). Faltam detalhes confirmados (versão em que virou padrão, WebSocket e iframes): **testar no M1** e, se atrapalhar, servir a página da TV pelo próprio agente em `http://localhost`.
+- A página do karaokê vem de **`https://singalong…`** e o arquivo está em `http://…` no computador do agente. Os navegadores com a permissão de "Acesso à rede local" (*Local Network Access*, [fonte](https://developer.chrome.com/blog/local-network-access)) pedem ao usuário que a aceite antes de a página falar com a máquina local.
+- **Testado em Out/2026 (Chrome 155 e Edge 155 instalados, mais o Chromium do Playwright), a partir da página pública real:**
+  - **Sem a permissão**, o pedido não chega ao servidor local. Com a janela do Chrome visível, ele fica **pendente**: o Chrome mostra o aviso e espera o usuário; sem janela (automação), é bloqueado.
+  - **Com a permissão**, tudo o que o player usa funciona, em `http://127.0.0.1`, `http://localhost` e até em um **endereço da rede local** (`http://192.168.x.x`): `fetch` da letra e da melodia, `<audio crossOrigin="anonymous">`, Web Audio (`createMediaElementSource`), tocar e saltar (pedidos `Range`). Os navegadores deixaram de tratar o endereço da rede local como conteúdo misto bloqueado.
+  - **O preflight de rede privada (`Access-Control-Allow-Private-Network`) não chegou a ser pedido:** no Chrome atual a permissão o substitui. Continuam necessários os cabeçalhos **CORS** (`Access-Control-Allow-Origin` com a origem exata, `Vary: Origin`, `Expose-Headers` de `Content-Range`/`Accept-Ranges`) e o suporte a `Range`.
+  - **Não testado:** Firefox e Safari (inclusive o do iPhone, que não segue esse modelo). Por isso a prévia do instrumental no celular continua fora da v2.
+- **Decisão (M1):** o servidor local de mídia escuta em `127.0.0.1` e a TV roda no computador do dono. A primeira vez, o Chrome pergunta se a página pode acessar "dispositivos na rede local": o app mostra um passo simples explicando para tocar em **Permitir** (a escolha fica guardada para o site). Como o endereço da rede local também funciona com a permissão, uma TV **em outro aparelho Chromium da mesma rede** é uma opção futura, sem mudar o desenho.
 - **O servidor local do agente** responde em `http://127.0.0.1:<porta>/media` com `Range`, CORS para a origem da nuvem e `Access-Control-Allow-Private-Network: true`.
 - **Limitações do modo A:** a **prévia do instrumental no celular** não funciona (o celular não alcança o arquivo); a prévia do vídeo do YouTube continua. O PC do dono precisa estar ligado para tocar e para baixar.
 - A música que **já está na nuvem** (a biblioteca atual, copiada com `sync-library.sh`) continua tocando de qualquer lugar até o híbrido existir.
@@ -192,7 +196,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | Marco | Entrega | Critério de pronto |
 |---|---|---|
 | **M0 ✅** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
-| **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; **testado** o aviso de rede local do Chrome com a TV em `localhost` |
+| **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
 | **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
@@ -232,6 +236,6 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 13. O **pacote do motor é montado no computador do usuário**, a partir das fontes oficiais, com versões e checksums fixados (seção 7).
 
 **Em aberto**
-1. **Aviso de rede local do Chrome** com a TV em `localhost`: testar no M1; pode obrigar o agente a servir a página da TV.
+1. **Firefox e Safari** com a TV no computador do dono: não testados (o aviso de rede local do Chrome e do Edge foi testado e funciona; seção 5). A v2 mira Chrome/Edge.
 
 **Sem meios de teste no momento:** RTX 50 (Blackwell) e GPUs de outros fabricantes. O torch atual (2.5.1/cu121) provavelmente não tem suporte à RTX 50; o instalador testa a GPU e cai para a CPU, mas isso **não foi validado** nessas placas. Subir a versão do torch obrigaria a revisar o Demucs, hoje fixado em 2.5.1.
