@@ -113,6 +113,39 @@ Para que cada pessoa peça o código pelo próprio app (em vez de você gerar co
 
 A chave do Brevo é um segredo: fica só no `.env` da VM (nunca no repositório nem no chat). As mensagens podem cair na caixa de spam na primeira vez.
 
+## Modo híbrido: músicas na nuvem (opcional)
+
+Para que as músicas preparadas por certas pessoas passem a existir no servidor (e qualquer sala as toque sem baixar de novo):
+
+1. A pessoa instala o app e pareia **pelo e-mail** (a tela de conectar pede o e-mail e envia o código).
+2. Na VM, edite o `.env` (`nano /opt/singalong/.env`) e liste os e-mails que enviam para a nuvem, separados por vírgula:
+
+   ```
+   ENABLED_TO_SEND_TO_CLOUD=ana@exemplo.com,bia@exemplo.com
+   ```
+3. Aplique: `./deploy.sh`. Se o `docker-compose.prod.yml` da VM for antigo, copie o novo deste repositório antes (ele repassa essa variável).
+
+Quem já estava pareado **antes desta versão** precisa parear de novo pelo e-mail (o servidor só passou a guardar o e-mail do pareamento agora); o mesmo vale para quem pareou com um código do administrador sem e-mail. A biblioteca que o computador já tinha sobe sozinha na próxima vez que o app iniciar a sessão. As músicas ficam em `storage/cache` no volume da API; a limpeza automática (`CACHE_MAX_GB`) apaga as menos tocadas quando passa do limite.
+
+## Página do administrador
+
+Não existe um `/admin` fixo (é o primeiro caminho que um atacante testa). A página fica num **endereço secreto que só você conhece**, definido no `.env` da VM:
+
+```bash
+# gere um endereço aleatório e grave no .env (não cole o resultado em nenhum chat):
+echo "ADMIN_PATH=$(openssl rand -hex 16)" >> /opt/singalong/.env
+cd /opt/singalong && ./deploy.sh
+grep ADMIN_PATH .env        # o valor é o seu endereço: https://SEU_ENDERECO/<valor>/
+```
+
+Sem `ADMIN_PATH` (ou com menos de 16 caracteres) e sem `ADMIN_TOKEN`, a página não existe e qualquer tentativa de adivinhar o endereço dá 404. Ao abrir, a página pede o `ADMIN_TOKEN`, que fica só naquela aba do navegador. Ali você:
+
+- **autoriza e-mails**: quem recebe o código de pareamento e quem envia músicas para a nuvem (muda na hora, sem `deploy.sh`);
+- **vê e desconecta os computadores** pareados;
+- **remove músicas da nuvem** (elas ficam bloqueadas: nenhum computador as envia de novo até você liberar).
+
+Guarde o endereço e o token só com você (gerenciador de senhas) e use sempre `https`. Para trocar o endereço, mude o `ADMIN_PATH` e rode `./deploy.sh`.
+
 ## Segurança
 
 - A API não tem login: quem souber o endereço e o código de uma sala entra nela. Não divulgue o endereço.

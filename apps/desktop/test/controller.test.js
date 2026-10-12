@@ -15,6 +15,7 @@ let base;
 const calls = [];
 let sessionOpen = false;
 let roomFail = false;
+let cloudOn = false;
 let versionAnswer = { status: 'ok', current: APP_VERSION };
 
 before(async () => {
@@ -28,7 +29,7 @@ before(async () => {
       if (req.url === '/agent/v1/pair/request') return body.includes('sem-servico') ? json(503, { error: 'email_disabled', message: 'Este servidor não envia códigos por e-mail.' }) : json(202, { ok: true, message: 'Se este e-mail estiver autorizado, o código chega em instantes.' });
       if (req.url.startsWith('/agent/v1/version')) return json(200, versionAnswer);
       if (req.headers.authorization !== 'Bearer tok-1') return json(401, { error: 'unauthorized', message: 'Dispositivo não autorizado.' });
-      if (req.url === '/agent/v1/me') return json(200, { device: { id: 'd1', name: 'PC' }, session: sessionOpen ? { id: 's1', display_name: 'Gabriel' } : null });
+      if (req.url === '/agent/v1/me') return json(200, { cloud: cloudOn, device: { id: 'd1', name: 'PC' }, session: sessionOpen ? { id: 's1', display_name: 'Gabriel' } : null });
       if (req.method === 'POST' && req.url === '/agent/v1/sessions/s1/rooms') return roomFail ? json(409, { error: 'session_ended', message: 'A sessão já terminou.' }) : json(201, { code: 'AB12', host_token: 'tok-anfitriao', session_id: 's1' });
       if (req.method === 'DELETE' && req.url === '/agent/v1/sessions/s1') { sessionOpen = false; return res.writeHead(204).end(); }
       if (req.method === 'DELETE' && req.url === '/agent/v1/devices/me') return res.writeHead(204).end();
@@ -411,4 +412,21 @@ test('pedir o código por e-mail: valida o e-mail, usa o servidor informado e mo
   await assert.rejects(controller.requestCode({ server: 'http://exemplo.org', email: 'a@b.com' }), /https/);
   await assert.rejects(controller.requestCode({ server: base, email: 'sem-servico@exemplo.com' }), /não envia códigos/);
   assert.equal(controller.snapshot().defaultServer, 'https://singalong.duckdns.org');
+});
+
+test('o app mostra que as músicas deste computador vão para a nuvem quando o servidor autoriza', async () => {
+  const { controller } = await ready();
+  sessionOpen = true;
+  cloudOn = true;
+  await controller.startAgent({ nickname: 'G' });
+  await until(() => controller.snapshot().agent.status === 'online');
+  assert.equal(controller.snapshot().agent.cloud, true);
+  await controller.stopAgent();
+  cloudOn = false;
+  sessionOpen = true; // o servidor de mentira fecha a sessão ao encerrar
+  await controller.startAgent({ nickname: 'G' });
+  await until(() => controller.snapshot().agent.status === 'online');
+  assert.equal(controller.snapshot().agent.cloud, false);
+  await controller.stopAgent();
+  sessionOpen = false;
 });

@@ -109,6 +109,7 @@ function render(s) {
   const creating = s.busy === 'criando sala';
   setPill($('agent-pill'), AGENT_TEXT[s.agent.status] ?? ['?', '']);
   $('session-nick').textContent = s.nickname ?? '';
+  $('cloud-note').hidden = !s.agent.cloud;
   $('agent-error').hidden = !s.agent.error;
   $('agent-error').textContent = s.agent.error ?? '';
   $('room-create').disabled = !online || Boolean(s.busy);

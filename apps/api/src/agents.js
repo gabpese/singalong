@@ -74,6 +74,7 @@ export function createAgentService({
   newId = randomUUID,
   newToken = () => `sga_${randomBytes(32).toString('base64url')}`,
   newPairCode = () => generateCode(PAIR_CODE_LENGTH),
+  cloudEmails = [], // e-mails (minúsculos) cujos computadores enviam as músicas para a nuvem automaticamente
 }) {
   /** Código digitado: ignora maiúsculas e espaços. */
   const normalizeCode = (code) => String(code ?? '').replace(/\s+/g, '').toUpperCase();
@@ -82,22 +83,41 @@ export function createAgentService({
 
   return {
     /** Gera um código de pareamento de uso único (quem chama já provou ser o administrador do servidor). */
-    startPairing() {
+    startPairing(email = null) {
       const code = newPairCode();
-      db.savePairCode(sha256(code), now() + PAIR_TTL_MS, now());
+      db.savePairCode(sha256(code), now() + PAIR_TTL_MS, now(), email);
       return { code, expires_in: PAIR_TTL_MS / 1000 };
     },
 
     /** Troca o código por um token de dispositivo (mostrado uma única vez). */
     completePairing(code, name) {
-      if (!db.consumePairCode(sha256(normalizeCode(code)), now())) {
+      const used = db.consumePairCode(sha256(normalizeCode(code)), now());
+      if (!used) {
         throw new HttpError(400, 'invalid_pair_code', 'Código de pareamento inválido ou vencido.');
       }
       const token = newToken();
       const id = newId();
-      db.createDevice({ id, name: clean(name, 60) || 'Meu computador', tokenHash: sha256(token), now: now() });
+      db.createDevice({ id, name: clean(name, 60) || 'Meu computador', tokenHash: sha256(token), now: now(), email: used.email });
       return { device_id: id, token };
     },
+
+    /** Este computador envia as músicas dele para a nuvem? Só se foi pareado com um e-mail da lista ENABLED_TO_SEND_TO_CLOUD. */
+    canUploadToCloud(device) {
+      const email = String(device?.email ?? '').toLowerCase();
+      if (!email) return false;
+      return cloudEmails.includes(email) || db.getEmailRule(email)?.can_cloud === 1; // o .env e a página do administrador somam
+    },
+
+    /** Este e-mail pode receber um código de pareamento? ('*' = qualquer um; o .env e a página do administrador somam.) */
+    canPairByEmail(email, envList = []) {
+      const clean = String(email ?? '').toLowerCase();
+      return envList.includes('*') || envList.includes(clean) || db.getEmailRule('*')?.can_pair === 1 || db.getEmailRule(clean)?.can_pair === 1;
+    },
+
+    isSongBlocked: (videoId) => db.isSongBlocked(videoId),
+
+    /** O recurso "código por e-mail" tem alguém autorizado (no .env ou na página)? */
+    hasPairRules: (envList = []) => envList.length > 0 || db.hasPairRules(),
 
     /** O dispositivo dono do token (ou null se o token não existe ou foi revogado). */
     authenticate(token) {

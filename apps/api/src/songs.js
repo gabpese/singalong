@@ -37,16 +37,27 @@ export function createSongService({ storage, jobs, agents = null }) {
     await jobs.release?.(id);
   }
 
-  /** "Pronto" = os três artefatos existem (uma pasta parcial de job interrompido não conta). */
-  async function isReady(id, ctx) {
-    const lib = localOf(ctx);
-    if (lib) {
-      const files = agents.librarySong(lib.deviceId, id)?.files;
-      return Boolean(files?.instrumental && files?.lyrics);
-    }
+  /** Pronta no catálogo do computador do dono desta sessão? */
+  const localReady = (lib, id) => {
+    const files = agents.librarySong(lib.deviceId, id)?.files;
+    return Boolean(files?.instrumental && files?.lyrics);
+  };
+
+  /** Pronta no armazenamento do servidor (a "nuvem")? Os três artefatos existem: uma pasta parcial de job interrompido não conta. */
+  async function cloudReady(id) {
     const k = keys(id);
     const found = await Promise.all([storage.exists(k.instrumental), storage.exists(k.lyrics), storage.exists(k.meta)]);
     return found.every(Boolean);
+  }
+
+  /**
+   * "Pronto": no catálogo local da sessão OU na nuvem (músicas que computadores autorizados enviaram: qualquer sessão as usa,
+   * sem baixar de novo do YouTube).
+   */
+  async function isReady(id, ctx) {
+    const lib = localOf(ctx);
+    if (lib && localReady(lib, id)) return true;
+    return cloudReady(id);
   }
 
   async function readMeta(id) {
@@ -57,7 +68,7 @@ export function createSongService({ storage, jobs, agents = null }) {
   async function mediaOf(id, ctx) {
     const lib = localOf(ctx);
     const k = keys(id);
-    if (lib) {
+    if (lib && localReady(lib, id)) { // o computador do dono é mais rápido: a TV dele busca ali
       const files = agents.librarySong(lib.deviceId, id).files;
       return {
         instrumental: localUrl(lib, k.instrumental),
@@ -93,7 +104,7 @@ export function createSongService({ storage, jobs, agents = null }) {
       error: jobActive ? job.error : null,
       error_code: jobActive ? job.error_code ?? null : null,
       retry: jobActive ? job.retry ?? null : null,
-      meta: ready ? (lib ? agents.librarySong(lib.deviceId, id).meta : await readMeta(id)) : null,
+      meta: ready ? (lib && localReady(lib, id) ? agents.librarySong(lib.deviceId, id).meta : await readMeta(id)) : null,
       media: ready ? await mediaOf(id, ctx) : null,
     };
   }
@@ -142,14 +153,14 @@ export function createSongService({ storage, jobs, agents = null }) {
     /** Músicas prontas (metadados do meta.json): as do catálogo do dono, se a sessão tem armazenamento local; senão as do servidor. */
     async list(ctx = {}) {
       const lib = localOf(ctx);
-      if (lib) return agents.libraryList(lib.deviceId);
+      const local = lib ? agents.libraryList(lib.deviceId) : [];
       const metaKeys = (await storage.list('cache')).filter((key) => key.endsWith('/meta.json'));
       const songs = [];
       for (const key of metaKeys) {
         const id = key.split('/')[1];
-        if (await isReady(id)) songs.push(await readMeta(id));
+        if (await cloudReady(id) && !local.some((song) => song.video_id === id)) songs.push(await readMeta(id));
       }
-      return songs;
+      return [...local, ...songs];
     },
 
     /**

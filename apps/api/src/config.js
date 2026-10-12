@@ -26,6 +26,11 @@ export function loadConfig(env = process.env) {
     // pareamento por e-mail: a pessoa pede o código e ele só é enviado se o e-mail estiver na lista (separada por vírgulas)
     pairAllowedEmails: (env.PAIR_ALLOWED_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     trustProxy: env.TRUST_PROXY === '1', // atrás do Caddy o IP de verdade vem no X-Forwarded-For (limites por IP)
+    // o endereço SECRETO da página do administrador (ex.: ADMIN_PATH=minha-gestao-9f3k2x7q1m4z8p5a): sem ele a página não existe.
+    // Só letras, números, _ e -, de 16 a 64 caracteres: um caminho fácil de adivinhar (/admin) é o primeiro que um atacante tenta.
+    adminPath: /^[A-Za-z0-9_-]{16,64}$/.test(env.ADMIN_PATH ?? '') ? env.ADMIN_PATH : '',
+    // e-mails cujos computadores enviam as músicas para a nuvem sozinhos (precisam ter pareado por e-mail)
+    cloudUploadEmails: (env.ENABLED_TO_SEND_TO_CLOUD ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     brevoApiKey: env.BREVO_API_KEY ?? '',
     mailFrom: env.MAIL_FROM ?? '',
     mailFromName: env.MAIL_FROM_NAME ?? 'Singalong',

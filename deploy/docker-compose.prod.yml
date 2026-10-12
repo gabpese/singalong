@@ -49,8 +49,12 @@ services:
       ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
       # atrás do Caddy: o IP de quem chama vem no X-Forwarded-For (limites de pedidos por IP)
       TRUST_PROXY: "1"
+      # o endereço SECRETO da página do administrador (sem ele a página não existe); gere com: openssl rand -hex 16
+      ADMIN_PATH: "${ADMIN_PATH:-}"
       # código de pareamento por e-mail (opcional): quem estiver em PAIR_ALLOWED_EMAILS pede o código no app e recebe por e-mail
       PAIR_ALLOWED_EMAILS: "${PAIR_ALLOWED_EMAILS:-}"
+      # modo híbrido: os computadores pareados com estes e-mails enviam as músicas deles para a nuvem sozinhos
+      ENABLED_TO_SEND_TO_CLOUD: "${ENABLED_TO_SEND_TO_CLOUD:-}"
       BREVO_API_KEY: "${BREVO_API_KEY:-}"
       MAIL_FROM: "${MAIL_FROM:-}"
       MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Singalong}"

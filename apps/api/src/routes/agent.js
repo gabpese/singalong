@@ -10,6 +10,17 @@ import { rateLimited } from '../rate-limit.js';
 import { pairingEmail } from '../mailer.js';
 import { updateInfo } from '../version.js';
 
+const MAX_CLOUD_FILE = 80 * 1024 * 1024; // o instrumental de uma música longa em MP3 não chega perto disso
+// o que pode ser enviado para a nuvem e o tamanho máximo de cada arquivo (a voz isolada, o source.json e os MP4 ficam de fora)
+const CLOUD_FILES = {
+  'instrumental.mp3': { kind: 'audio', max: MAX_CLOUD_FILE },
+  'backing.mp3': { kind: 'audio', max: MAX_CLOUD_FILE },
+  'lyrics.json': { kind: 'json', max: 10 * 1024 * 1024 },
+  'melody.json': { kind: 'json', max: 10 * 1024 * 1024 },
+  'meta.json': { kind: 'json', max: 1024 * 1024 },
+};
+/** Um MP3 começa com a etiqueta ID3 ou com um quadro de áudio (11 bits ligados). */
+const looksLikeMp3 = (data) => (data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) || (data[0] === 0xff && (data[1] & 0xe0) === 0xe0);
 const JOB_ID = { type: 'string', pattern: '^[A-Za-z0-9_-]{11,14}$' };
 const WAIT = { type: 'object', additionalProperties: false, properties: { wait_ms: { type: 'integer', minimum: 0, maximum: MAX_WAIT_MS } } };
 const TEXT = { type: 'string', maxLength: 500 };
@@ -26,7 +37,7 @@ const SEARCH_ITEM = {
   required: ['video_id', 'title'],
 };
 
-export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, mailer }) {
+export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, mailer, storage }) {
   app.decorateRequest('device', null);
 
   /** Exige o token de dispositivo; deixa o dispositivo em `request.device`. */
@@ -61,12 +72,12 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
   // --- pareamento ---
 
   // Quem chama já é o administrador do servidor (ADMIN_TOKEN). Sem esse segredo configurado o pareamento fica desligado.
-  app.post('/pair/start', { preHandler: rateLimited(limiters.pair) }, async (request, reply) => {
+  app.post('/pair/start', { preHandler: rateLimited(limiters.pair), schema: { body: { type: ['object', 'null'], additionalProperties: false, properties: { email: { type: 'string', maxLength: 254 } } } } }, async (request, reply) => {
     if (!config.adminToken) return reply.code(404).send({ error: 'not_found' });
     if (!safeEqual(request.headers['x-admin-token'], config.adminToken)) {
       throw new HttpError(403, 'forbidden', 'Token de administrador inválido.');
     }
-    return reply.code(201).send(agents.startPairing());
+    return reply.code(201).send(agents.startPairing(request.body?.email ? String(request.body.email).trim().toLowerCase() : null));
   });
 
   // A pessoa pede o código e informa o e-mail: ele só é enviado se o endereço estiver na lista do administrador
@@ -77,15 +88,15 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
     preHandler: rateLimited(limiters.pairRequest, { keyOf: (request) => request.ip }),
     schema: { body: { type: 'object', additionalProperties: false, properties: { email: { type: 'string', maxLength: 254 } }, required: ['email'] } },
   }, async (request, reply) => {
-    if (!mailer?.enabled || config.pairAllowedEmails.length === 0) {
+    if (!mailer?.enabled || !agents.hasPairRules(config.pairAllowedEmails)) {
       throw new HttpError(503, 'email_disabled', 'Este servidor não envia códigos por e-mail. Peça o código a quem administra o servidor.');
     }
     const email = request.body.email.trim().toLowerCase();
     if (!EMAIL_SHAPE.test(email)) throw new HttpError(400, 'bad_email', 'Digite um e-mail válido.');
     const limited = limiters.pairEmail.hit(email);
     // um asterisco na lista = qualquer e-mail pode pedir (os limites por IP e por endereço continuam valendo)
-    if (limited.ok && (config.pairAllowedEmails.includes('*') || config.pairAllowedEmails.includes(email))) {
-      const { code, expires_in: seconds } = agents.startPairing();
+    if (limited.ok && agents.canPairByEmail(email, config.pairAllowedEmails)) {
+      const { code, expires_in: seconds } = agents.startPairing(email); // o computador pareado com este código fica ligado a este e-mail
       const message = pairingEmail({ code, minutes: Math.round(seconds / 60), server: config.publicUrl || '' });
       mailer.send({ to: email, ...message }).catch((error) => request.log.error({ err: error.message }, 'não consegui enviar o código por e-mail'));
     }
@@ -109,6 +120,7 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
   app.get('/me', auth, async (request) => {
     const session = agents.activeSession(request.device);
     return {
+      cloud: agents.canUploadToCloud(request.device), // este computador envia as músicas para a nuvem?
       device: { id: request.device.id, name: request.device.name },
       session: session ? { id: session.id, display_name: session.display_name } : null,
     };
@@ -166,6 +178,65 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
     const session = agents.touch(request.device);
     if (session && request.body?.media_base !== undefined) agents.setMediaBase(session, request.body.media_base);
     return { ok: true, session_id: session?.id ?? null, server_time: Date.now(), update: updateInfo(request.body?.version, versionConfig()) };
+  });
+
+  // --- nuvem: as músicas dos computadores autorizados (ENABLED_TO_SEND_TO_CLOUD) passam a existir no servidor ---
+
+  // O arquivo vai cru no corpo (application/octet-stream). Só vale neste conjunto de rotas, com o limite de cada arquivo.
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_CLOUD_FILE }, (request, body, done) => done(null, body));
+
+  /** Só computadores pareados com um e-mail da lista enviam para a nuvem (e só se o servidor tem onde gravar). */
+  function requireCloud(request) {
+    if (!storage?.write || !agents.canUploadToCloud(request.device)) {
+      throw new HttpError(403, 'cloud_not_allowed', 'Este computador não está autorizado a enviar músicas para a nuvem.');
+    }
+    agents.touch(request.device);
+  }
+
+  // Quais destas músicas a nuvem ainda não tem (o agente envia só o que falta).
+  app.post('/cloud/missing', {
+    ...auth,
+    schema: { body: { type: 'object', additionalProperties: false, properties: { ids: { type: 'array', maxItems: 200, items: { type: 'string', pattern: VIDEO_ID_PATTERN } } }, required: ['ids'] } },
+  }, async (request) => {
+    requireCloud(request);
+    const missing = [];
+    for (const id of request.body.ids) {
+      if (agents.isSongBlocked(id)) continue; // o administrador tirou esta música da nuvem: não pedir de novo
+      const found = await Promise.all(['instrumental.mp3', 'lyrics.json', 'meta.json'].map((file) => storage.exists(`cache/${id}/${file}`)));
+      if (!found.every(Boolean)) missing.push(id);
+    }
+    return { missing };
+  });
+
+  // Um arquivo da música. O meta.json vai por último: só com ele a música passa a contar como pronta, então ninguém toca pela metade.
+  app.put('/cloud/:id/:file', {
+    ...auth,
+    bodyLimit: MAX_CLOUD_FILE,
+    schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: VIDEO_ID_PATTERN }, file: { type: 'string', enum: Object.keys(CLOUD_FILES) } }, required: ['id', 'file'] } },
+  }, async (request, reply) => {
+    requireCloud(request);
+    const { id, file } = request.params;
+    if (agents.isSongBlocked(id)) throw new HttpError(403, 'cloud_blocked', 'Esta música foi tirada da nuvem pelo administrador.');
+    const rule = CLOUD_FILES[file];
+    const data = request.body;
+    if (!Buffer.isBuffer(data) || data.length === 0) throw new HttpError(400, 'empty_file', 'O arquivo está vazio.');
+    if (data.length > rule.max) throw new HttpError(413, 'file_too_big', 'O arquivo é grande demais.');
+    if (rule.kind === 'audio' && !looksLikeMp3(data)) throw new HttpError(400, 'bad_file', 'O áudio não parece um MP3.');
+    if (rule.kind === 'json') {
+      let parsed;
+      try {
+        parsed = JSON.parse(data.toString('utf8'));
+      } catch {
+        throw new HttpError(400, 'bad_file', 'O arquivo não é um JSON válido.');
+      }
+      if (file === 'meta.json') {
+        if (parsed?.video_id !== id) throw new HttpError(400, 'bad_file', 'O meta.json não é desta música.');
+        const ready = await Promise.all(['instrumental.mp3', 'lyrics.json'].map((name) => storage.exists(`cache/${id}/${name}`)));
+        if (!ready.every(Boolean)) throw new HttpError(409, 'incomplete', 'Envie o instrumental e a letra antes do meta.json.');
+      }
+    }
+    await storage.write(`cache/${id}/${file}`, data);
+    return reply.code(204).send();
   });
 
   // --- catálogo local: as músicas que estão no computador do dono ---

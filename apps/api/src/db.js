@@ -56,6 +56,19 @@ CREATE TABLE IF NOT EXISTS sessions (
   ended_at     INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions (device_id, ended_at);
+-- Regras por e-mail, geridas na página do administrador: quem pode receber o código de pareamento e quem envia músicas para a nuvem.
+-- ('*' em can_pair = qualquer e-mail). Somam-se às listas do .env (PAIR_ALLOWED_EMAILS e ENABLED_TO_SEND_TO_CLOUD).
+CREATE TABLE IF NOT EXISTS email_rules (
+  email       TEXT PRIMARY KEY,
+  can_pair    INTEGER NOT NULL DEFAULT 0,
+  can_cloud   INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL
+);
+-- Músicas que o administrador tirou da nuvem: os computadores não as enviam de novo (até ele liberar).
+CREATE TABLE IF NOT EXISTS cloud_blocked (
+  video_id    TEXT PRIMARY KEY,
+  blocked_at  INTEGER NOT NULL
+);
 -- Catálogo do dono: as músicas que estão NO COMPUTADOR dele (armazenamento local). A nuvem não vê os arquivos; sabe só o
 -- que o agente publica (o meta.json e quais arquivos existem) e onde o navegador os busca (sessions.media_base).
 CREATE TABLE IF NOT EXISTS agent_songs (
@@ -89,6 +102,9 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('rooms', 'session_id')) db.exec('ALTER TABLE rooms ADD COLUMN session_id TEXT REFERENCES sessions(id)');
   // onde o navegador busca a mídia da sessão (o servidor local de mídia do agente); nulo = a mídia está no armazenamento do servidor
   if (!hasColumn('sessions', 'media_base')) db.exec('ALTER TABLE sessions ADD COLUMN media_base TEXT');
+  // o e-mail com que o computador foi pareado (pelo código enviado por e-mail): é ele que decide quem pode enviar músicas para a nuvem
+  if (!hasColumn('devices', 'email')) db.exec('ALTER TABLE devices ADD COLUMN email TEXT');
+  if (!hasColumn('pair_codes', 'email')) db.exec('ALTER TABLE pair_codes ADD COLUMN email TEXT');
 
   const one = (sql, ...params) => db.prepare(sql).get(...params) ?? null;
   const all = (sql, ...params) => db.prepare(sql).all(...params);
@@ -158,24 +174,24 @@ export function openDb(path = ':memory:') {
       }),
 
     // --- agente local: dispositivos, pareamento e sessões ---
-    createDevice: ({ id, name, tokenHash, now }) =>
-      run('INSERT INTO devices (id, name, token_hash, created_at, last_seen) VALUES (?, ?, ?, ?, ?)', id, name, tokenHash, now, now),
+    createDevice: ({ id, name, tokenHash, now, email = null }) =>
+      run('INSERT INTO devices (id, name, token_hash, created_at, last_seen, email) VALUES (?, ?, ?, ?, ?, ?)', id, name, tokenHash, now, now, email),
     getDeviceByTokenHash: (tokenHash) => one('SELECT * FROM devices WHERE token_hash = ? AND revoked_at IS NULL', tokenHash),
     getDevice: (id) => one('SELECT * FROM devices WHERE id = ?', id),
     touchDevice: (id, now) => run('UPDATE devices SET last_seen = ? WHERE id = ?', now, id),
     revokeDevice: (id, now) => run('UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL', now, id).changes > 0,
 
-    savePairCode: (codeHash, expiresAt, now) =>
+    savePairCode: (codeHash, expiresAt, now, email = null) =>
       transaction(() => {
         run('DELETE FROM pair_codes WHERE expires_at <= ?', now); // não acumula códigos vencidos
-        run('INSERT OR REPLACE INTO pair_codes (code_hash, expires_at) VALUES (?, ?)', codeHash, expiresAt);
+        run('INSERT OR REPLACE INTO pair_codes (code_hash, expires_at, email) VALUES (?, ?, ?)', codeHash, expiresAt, email);
       }),
-    /** Gasta o código (uso único): true só se existia e não tinha vencido. */
+    /** Gasta o código (uso único): { email } (o e-mail a que foi enviado, se houve) só se existia e não tinha vencido; senão null. */
     consumePairCode: (codeHash, now) =>
       transaction(() => {
-        const row = one('SELECT expires_at FROM pair_codes WHERE code_hash = ?', codeHash);
+        const row = one('SELECT expires_at, email FROM pair_codes WHERE code_hash = ?', codeHash);
         run('DELETE FROM pair_codes WHERE code_hash = ?', codeHash);
-        return Boolean(row) && row.expires_at > now;
+        return row && row.expires_at > now ? { email: row.email ?? null } : null;
       }),
 
     createSession: ({ id, deviceId, displayName, now }) =>
@@ -198,6 +214,23 @@ export function openDb(path = ':memory:') {
         }
       }),
     getAgentSong: (deviceId, videoId) => one('SELECT * FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId),
+    // --- administração (página em ADMIN_PATH) ---
+    listEmailRules: () => all('SELECT email, can_pair, can_cloud, created_at FROM email_rules ORDER BY email'),
+    getEmailRule: (email) => one('SELECT email, can_pair, can_cloud FROM email_rules WHERE email = ?', email),
+    upsertEmailRule: (email, canPair, canCloud, now) =>
+      run(
+        `INSERT INTO email_rules (email, can_pair, can_cloud, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(email) DO UPDATE SET can_pair = excluded.can_pair, can_cloud = excluded.can_cloud`,
+        email, canPair ? 1 : 0, canCloud ? 1 : 0, now,
+      ),
+    deleteEmailRule: (email) => run('DELETE FROM email_rules WHERE email = ?', email).changes > 0,
+    hasPairRules: () => one('SELECT 1 AS n FROM email_rules WHERE can_pair = 1 LIMIT 1') !== null,
+    listDevices: () => all('SELECT id, name, email, created_at, last_seen, revoked_at FROM devices ORDER BY created_at DESC'),
+    blockSong: (videoId, now) => run('INSERT OR REPLACE INTO cloud_blocked (video_id, blocked_at) VALUES (?, ?)', videoId, now),
+    unblockSong: (videoId) => run('DELETE FROM cloud_blocked WHERE video_id = ?', videoId).changes > 0,
+    isSongBlocked: (videoId) => one('SELECT 1 AS n FROM cloud_blocked WHERE video_id = ?', videoId) !== null,
+    listBlockedSongs: () => all('SELECT video_id, blocked_at FROM cloud_blocked ORDER BY blocked_at DESC'),
+
     listAgentSongs: (deviceId) => all('SELECT * FROM agent_songs WHERE device_id = ? ORDER BY video_id', deviceId),
     deleteAgentSong: (deviceId, videoId) => run('DELETE FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId).changes > 0,
     /** Encerra a sessão e devolve true se ela estava ativa. */

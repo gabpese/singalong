@@ -421,7 +421,7 @@ export function createController({
     try {
       const me = await api('GET', '/me', { timeout: 8000 });
       const wasOnline = state.agent.status === 'online';
-      state.agent = me.session ? { status: 'online', session: me.session, error: null } : { status: 'starting', session: null, error: null };
+      state.agent = me.session ? { status: 'online', session: me.session, error: null, cloud: Boolean(me.cloud) } : { status: 'starting', session: null, error: null };
       if (!wasOnline && me.session) {
         restarts = 0;
         log(`Sessão "${me.session.display_name}" ativa.`);

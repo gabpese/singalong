@@ -202,7 +202,7 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 | **M2 ✅** | Engine pack (CPU and cu121) + hardware probe | Installs without Python/Docker; GPU tested with a fallback |
 | **M3 ✅** | Electron shell: session, "Sign in to YouTube" screen, an "Import file" button, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
 | **M4 ✅** | **Windows** installer + auto-update | A clean install on a VM; update tested |
-| **M5** | Hybrid mode ("Take to the cloud") (v2.1) | A published song plays on another computer |
+| **M5 ✅** | Hybrid mode ("Take to the cloud") (v2.1) | A published song plays on another computer |
 | **M6** | macOS/Linux, AMD/Apple GPU | v3 |
 
 ### 12.1 M0: what was done and what changed from the plan (Oct 2026)
@@ -350,6 +350,36 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 **Decisions**
 - The list of authorized e-mails is an environment variable (a change means `./deploy.sh`); a page to manage it can come later.
 - To use it, the owner creates a free Brevo account, verifies the sender e-mail and puts the key in the server's `.env` (`deploy/README.md`).
+
+### 12.9 M5: hybrid mode, songs sent to the cloud (Oct 2026)
+
+**Decision:** the songs of **selected e-mails** go to the cloud **automatically**. The owner lists them in the server's `.env`: `ENABLED_TO_SEND_TO_CLOUD=ana@exemplo.com,bia@exemplo.com`. The same e-mail used to pair a computer is what decides it.
+
+**Done**
+- **Who sends:** a computer paired through the e-mail code (or through an administrator code that names the e-mail: `POST /pair/start {"email": ...}`) stays tied to that e-mail (`devices.email`). `GET /me` answers `cloud: true` when that e-mail is in `ENABLED_TO_SEND_TO_CLOUD`. Computers paired without an e-mail, or with an e-mail outside the list, can use the app but **never** send.
+- **What goes up:** `instrumental.mp3`, `lyrics.json`, `melody.json`, `backing.mp3` (if it exists) and, **last**, `meta.json`. The isolated voice, `source.json` and the MP4 files stay on the computer. Imported songs (`f-…`) go up too.
+- **API:** `POST /agent/v1/cloud/missing {ids}` (what the cloud does not have yet) and `PUT /agent/v1/cloud/:id/:file` (raw body). The server checks the allowed file names, the sizes (80 MB for audio, 10 MB for JSON, 1 MB for the meta), that the audio looks like an MP3, that the JSON is valid, that the `meta.json` belongs to that song and that it only arrives after the instrumental and the lyrics (`409` otherwise). The write is atomic (`.tmp` + rename), so nobody plays a half-written file; a song only counts as ready when its `meta.json` is there.
+- **The agent** (`cloud.py`, its own thread): at the start it sends what the cloud lacks from the existing library; afterwards every song that becomes ready (and every update: a corrected lyrics, backing vocals) goes up; what did not change is not sent again; a network failure retries one minute later. The `--import` command also sends the song.
+- **Who uses it:** a room without an app and a room of **another person's app** both see the cloud songs as ready (the local library comes first, the cloud is the fallback), with no download job. They also appear in the library of every room.
+- **App:** the Session tab says when the songs of this computer also go to the cloud.
+- **Tests:** 6 on the server (authorization by e-mail, order, validation, a plain room plays from the cloud, another person's local session plays from the cloud, replacement), 10 on the worker, 1 on the app; and an end-to-end run with the real API and the real agent (6/6): the existing library goes up by itself, an imported song goes up, an unauthorized computer sends nothing, and a plain room plays both without any job.
+
+**Left**
+- A way to **remove** a song from the cloud and a page to manage the e-mail list (today: edit `.env` and `./deploy.sh`).
+- The disk: the existing cache cleaner (`CACHE_MAX_GB`) deletes the least played songs when it is exceeded.
+- Copyright: a song that goes up is served to every room of the server. Keep the list short and trusted.
+
+### 12.10 Administrator page (Oct 2026)
+
+**Done** (secret address `ADMIN_PATH`, only for whoever has the `ADMIN_TOKEN`)
+- **Hidden address:** there is **no fixed `/admin`**: the page lives at an address only the owner knows (`ADMIN_PATH`, 16 to 64 random letters, numbers, `_` or `-`). Without `ADMIN_PATH` (or with a short or invalid one) or without `ADMIN_TOKEN`, no admin route exists at all and every guess (`/admin`, `/painel`, `/dashboard`...) is a plain `404`. The address is one layer; the real protection is still the token.
+- **Access:** the page is static and carries no secret; whoever opens it types the token, which stays only in that browser tab (`sessionStorage`). Every call sends it in the `X-Admin-Token` header (no cookies, so no CSRF), compared in constant time. Wrong tokens spend a small quota per IP (8 per 10 minutes, then `429`). The page has a strict CSP, `X-Frame-Options: DENY`, `noindex`, and without `ADMIN_TOKEN` it does not exist (`404`).
+- **E-mails:** add, change and remove who **receives the pairing code** and who **sends songs to the cloud** (`*` in "receives the code" frees any e-mail; it never frees sending). The effect is immediate, with no restart. The lists in the `.env` (`PAIR_ALLOWED_EMAILS`, `ENABLED_TO_SEND_TO_CLOUD`) still count and appear as fixed.
+- **Computers:** each paired computer with its e-mail, whether it sends songs and when it was last seen; **Disconnect** revokes it (its app must pair again).
+- **Cloud songs:** the list (title, artist, origin, size, date, total size) and **Remove from the cloud**: it deletes the song and **blocks** it (`cloud_blocked`), so the computers do not send it again, even when they restart and resend their libraries; **Release** allows it again.
+- **Tests:** 6 on the server (page and CSP, token and lock-out, e-mails with immediate effect, `*` and fixed lists, computers, remove/block/release) and 1 on the worker (a blocked song is not insisted on).
+
+**Decision:** only the owner removes songs from the cloud and manages the lists; the pairing e-mail flow and the automatic upload stay as they were.
 
 ## 13. Decisions made and open questions
 
