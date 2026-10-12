@@ -137,10 +137,9 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 
 ## 10. Perguntas em aberto
 
-**Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**; o download tenta **sem cookie primeiro**; **importar arquivos do próprio usuário e links de fontes abertas entra na v2** (F32, F33).
+**Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**; o download tenta **sem cookie primeiro**; **importar arquivos do próprio usuário e links de fontes abertas entra na v2** (F32, F33); **só o dono da sessão importa arquivos, pelo app** (o convidado não envia arquivo pelo celular); **o app não verifica a origem de um arquivo importado**, e a responsabilidade é de quem importa (uso pessoal), o que consta no aviso de uso.
 
 1. **O que a sessão mostra aos convidados?** O nome da conta do YouTube ou só um apelido escolhido pelo dono? (mostrar a conta real expõe a identidade dele)
-2. **Quem pode importar arquivos?** Na proposta, só o dono da sessão (pelo app); o convidado não envia arquivo pelo celular. Confirmar.
-3. **Como o convidado toca a música local?** Com armazenamento local, a **TV tem de rodar no computador do dono** (ou ligada a ele por HDMI); a prévia do instrumental no celular não funciona nesse modo. Isso é aceitável para a v2?
-4. **Vai ser distribuído publicamente?** Muda a postura sobre direitos autorais, o aviso sobre a conta e o tipo de assinatura de código.
-5. **Nome e identidade** do instalador e do agente.
+2. **Como o convidado toca a música local?** Com armazenamento local, a **TV tem de rodar no computador do dono** (ou ligada a ele por HDMI); a prévia do instrumental no celular não funciona nesse modo. Isso é aceitável para a v2?
+3. **Vai ser distribuído publicamente?** Muda a postura sobre direitos autorais, o aviso sobre a conta e o tipo de assinatura de código.
+4. **Nome e identidade** do instalador e do agente.

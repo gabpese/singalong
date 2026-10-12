@@ -208,10 +208,11 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 4. O download usa o login **só quando o YouTube bloquear** (sem cookie primeiro); "sempre" é uma opção.
 5. O **ffmpeg (build GPL)** vai dentro do pacote do motor (seção 7).
 6. **Importar arquivos do usuário e links de fontes abertas entra na v2** (seção 8.1).
+7. **Só o dono da sessão importa arquivos**, pelo app; o convidado não envia arquivo pelo celular.
+8. O app **não verifica a origem** de um arquivo importado: a responsabilidade é de quem importa (uso pessoal), e isso consta no aviso de uso.
 
 **Em aberto**
 1. **Apelido ou conta real** exibido aos convidados (mostrar a conta real expõe a identidade do dono).
-2. **Quem pode importar arquivos?** Proposta: só o dono da sessão, pelo app (seção 8.1); confirmar.
-3. **TV no computador do dono** (e sem prévia do instrumental no celular) é aceitável na v2? A verificação do aviso de rede local do Chrome (M1) pode obrigar a servir a página da TV pelo agente.
-4. **Distribuição pública?** Define a postura sobre direitos autorais, o aviso sobre a conta e a assinatura de código.
-5. **RTX 50 e outras:** confirmar com a sua máquina e uma placa nova se o torch atual funciona (ou subir a versão do torch, o que obriga a revisar o Demucs, hoje fixado em 2.5.1).
+2. **TV no computador do dono** (e sem prévia do instrumental no celular) é aceitável na v2? A verificação do aviso de rede local do Chrome (M1) pode obrigar a servir a página da TV pelo agente.
+3. **Distribuição pública?** Define a postura sobre direitos autorais, o aviso sobre a conta e a assinatura de código.
+4. **RTX 50 e outras:** confirmar com a sua máquina e uma placa nova se o torch atual funciona (ou subir a versão do torch, o que obriga a revisar o Demucs, hoje fixado em 2.5.1).

@@ -208,10 +208,11 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 4. Downloads use the login **only when YouTube blocks** (no cookies first); "always" is an option.
 5. **ffmpeg (a GPL build)** ships inside the engine pack (section 7).
 6. **Importing the user's files and links from open sources enters v2** (section 8.1).
+7. **Only the session owner imports files**, through the app; a guest does not upload a file from the phone.
+8. The app **does not verify the origin** of an imported file: responsibility lies with whoever imports it (personal use), and this appears in the terms of use.
 
 **Open**
 1. **Nickname or real account** shown to guests (showing the real account exposes the owner's identity).
-2. **Who can import files?** Proposal: only the session owner, through the app (section 8.1); confirm.
-3. Is a **TV on the owner's computer** (and no instrumental preview on the phone) acceptable in v2? Checking Chrome's local network prompt (M1) may force serving the TV page from the agent.
-4. **Public distribution?** It defines the stance on copyright, the warning about the account and the code signing.
-5. **RTX 50 and others:** confirm on your machine and on a new card whether the current torch works (or raise the torch version, which forces a review of Demucs, today pinned to 2.5.1).
+2. Is a **TV on the owner's computer** (and no instrumental preview on the phone) acceptable in v2? Checking Chrome's local network prompt (M1) may force serving the TV page from the agent.
+3. **Public distribution?** It defines the stance on copyright, the warning about the account and the code signing.
+4. **RTX 50 and others:** confirm on your machine and on a new card whether the current torch works (or raise the torch version, which forces a review of Demucs, today pinned to 2.5.1).

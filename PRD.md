@@ -137,10 +137,9 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 
 ## 10. Open questions
 
-**Decided (Oct 2026):** the download account is **one per session**, asked at the start, and applies to every room in the session; storage is **local first** (hybrid later); the first version is **Windows only**; downloads try **without cookies first**; **importing the user's own files and links from open sources enters v2** (F32, F33).
+**Decided (Oct 2026):** the download account is **one per session**, asked at the start, and applies to every room in the session; storage is **local first** (hybrid later); the first version is **Windows only**; downloads try **without cookies first**; **importing the user's own files and links from open sources enters v2** (F32, F33); **only the session owner imports files, through the app** (guests do not upload from the phone); **the app does not verify the origin of an imported file**, and that responsibility lies with whoever imports it (personal use), stated in the terms of use.
 
 1. **What does the session show guests?** The YouTube account's name or just a nickname chosen by the owner? (showing the real account exposes their identity)
-2. **Who can import files?** In the proposal, only the session owner (through the app); a guest does not upload a file from the phone. Confirm.
-3. **How does a guest play the local song?** With local storage, the **TV must run on the owner's computer** (or be connected to it by HDMI); the instrumental preview on the phone does not work in this mode. Is that acceptable for v2?
-4. **Will it be distributed publicly?** It changes the stance on copyright, the warning about the account and the kind of code signing.
-5. **Name and identity** of the installer and the agent.
+2. **How does a guest play the local song?** With local storage, the **TV must run on the owner's computer** (or be connected to it by HDMI); the instrumental preview on the phone does not work in this mode. Is that acceptable for v2?
+3. **Will it be distributed publicly?** It changes the stance on copyright, the warning about the account and the kind of code signing.
+4. **Name and identity** of the installer and the agent.
