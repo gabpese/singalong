@@ -41,6 +41,19 @@ Princípios:
 2. **A nuvem nunca recebe cookies**. O agente também **não obedece a comandos arbitrários**: o servidor manda só `video_id` e opções de um conjunto fechado (seção 8).
 3. **O motor reaproveita o código do worker atual**, trocando só o transporte (Redis → HTTP), sem reescrever o pipeline.
 4. **GPU é opcional**: o mesmo motor roda em CPU (seção 6).
+5. **Uma sessão = um dono = uma conta do YouTube** (seção 3.1). Todo pedido de música feito por um celular é executado pelo agente do dono da sessão da sala.
+
+### 3.1 Sessão, salas e quem baixa (decidido)
+
+**Modelo:** `Sessão { id, device_id (o agente do dono), perfil do YouTube, rooms[] }`. A sessão começa no app do dono, que **entra com o YouTube antes de qualquer download** (seção 8).
+
+- **Salas pertencem a uma sessão** (`rooms.session_id`). O dono cria a sala pelo app e o navegador abre a página dela já como anfitrião.
+- **Os celulares entram na sala pelo QR code, como hoje.** Quando um convidado pede uma música, a API cria o job e o **roteia para a sessão da sala**: só o agente dono dessa sessão consegue reivindicá-lo (`claim` filtra por `session_id`). O convidado nunca vê nem usa a conta do dono.
+- **Dono offline:** o job fica na fila e a sala mostra "o dono da sessão está desconectado" (detectado pelo `heartbeat`). Músicas já locais continuam tocando na TV do próprio dono.
+- **Fim da sessão:** ao sair do app, a sessão é encerrada; as salas seguem a regra atual (apagadas após 24 h paradas).
+- **O que a nuvem sabe da conta:** só um **apelido de exibição** e se a sessão está "conectada". Nunca cookies, e-mail ou senha.
+- **Servidor:** novas tabelas `sessions(id, device_id, display_name, created_at, last_seen)` e a coluna `rooms.session_id`; o stream de jobs passa a levar `session_id`.
+- **Papel da nuvem:** com o armazenamento local (seção 5), a nuvem vira o **ponto de encontro**: salas, fila, celulares, WebSocket e a API do agente. Ela não guarda músicas.
 
 ## 4. API do agente (nova, no servidor)
 
@@ -48,11 +61,12 @@ Prefixo `/agent/v1`, autenticada por **token de dispositivo** (`Authorization: B
 
 | Rota | Função |
 |---|---|
+| `POST /sessions` · `DELETE /sessions/:id` | Inicia/encerra a sessão do agente (só apelido de exibição, sem dados da conta) |
 | `POST /pair/start` · `POST /pair/complete` | Pareamento: a página web mostra um **código de 8 caracteres (10 min)**; o agente o envia e recebe o token (guardado no cofre do sistema: Credential Manager no Windows) |
 | `POST /jobs/claim` (long-poll, 25 s) | Entrega o próximo job `{video_id, lyrics_source, lyrics_text?, artist?, title?}`, com reivindicação com expiração (visibility timeout), como o `XAUTOCLAIM` de hoje |
 | `POST /jobs/:id/progress` | `{status, stage, error?, error_code?, retry?}` (mesmo conteúdo do hash `job:<id>`) |
 | `POST /jobs/:id/complete` | Marca `ready` ou `needs_lyrics` |
-| `PUT /library/:id/:file` | Envia um artefato para a nuvem (só quando a música é publicada, seção 5); atômico (`.tmp` + rename), limite de tamanho, só nomes permitidos |
+| `PUT /library/:id/:file` | **Só no modo híbrido (M5):** envia um artefato para a nuvem quando a música é publicada (seção 5); atômico (`.tmp` + rename), limite de tamanho, só nomes permitidos |
 | `POST /search/claim` · `POST /search/:id/result` | Busca no YouTube feita pelo agente (substitui `search:req/res`) |
 | `POST /exports/claim` · `POST /exports/:id/result` | Exportação de MP4 |
 | `POST /heartbeat` | Versão do agente, hardware detectado, fila local; a página web mostra "agente conectado" |
@@ -60,18 +74,24 @@ Prefixo `/agent/v1`, autenticada por **token de dispositivo** (`Authorization: B
 
 No agente, a mudança de código é pequena: `runner.process` já é independente do cliente Redis. Cria-se uma interface `JobBackend` com duas implementações (`RedisBackend`, a atual, e `HttpBackend`, nova). O Redis continua existindo no servidor e no modo Docker de desenvolvimento.
 
-## 5. Armazenamento: onde ficam os arquivos (decisão em aberto)
+## 5. Armazenamento: onde ficam os arquivos (decidido: local primeiro; híbrido depois)
 
-A ideia de guardar tudo no computador do usuário e o player ler o arquivo local tem uma limitação de navegador que precisa ser decidida:
+**Decisão (Out/2026):** a v2 usa o **modo A, só local**; o modo C (híbrido) é planejado depois (v2.1). A tabela abaixo mostra as três opções e por que a ordem.
+
+A ideia de guardar tudo no computador do usuário e o player ler o arquivo local tem uma limitação de navegador:
 
 - A página do karaokê vem de **`https://singalong…`**. Um navegador **bloqueia** que ela carregue áudio de `http://192.168.x.x` (conteúdo misto e acesso a rede privada). A exceção é `http://localhost`.
-- Logo, a música **local** só toca na **TV que roda no próprio computador do agente**. A TV de outra casa ou de outro computador **não alcança** o arquivo.
+- Logo, a música **local** só toca na **TV que roda no próprio computador do agente** (ou ligada a ele por HDMI). A TV de outra casa ou de outro computador **não alcança** o arquivo.
+- **Chrome pede permissão.** O Chrome tem a permissão de "Acesso à rede local" (*Local Network Access*): uma página pública que acessa `localhost` ou a rede local pode gerar um aviso para o usuário aceitar ([fonte](https://developer.chrome.com/blog/local-network-access)). Faltam detalhes confirmados (versão em que virou padrão, WebSocket e iframes): **testar no M1** e, se atrapalhar, servir a página da TV pelo próprio agente em `http://localhost`.
+- **O servidor local do agente** responde em `http://127.0.0.1:<porta>/media` com `Range`, CORS para a origem da nuvem e `Access-Control-Allow-Private-Network: true`.
+- **Limitações do modo A:** a **prévia do instrumental no celular** não funciona (o celular não alcança o arquivo); a prévia do vídeo do YouTube continua. O PC do dono precisa estar ligado para tocar e para baixar.
+- A música que **já está na nuvem** (a biblioteca atual, copiada com `sync-library.sh`) continua tocando de qualquer lugar até o híbrido existir.
 
 | Modo | Como funciona | Toca em qualquer lugar? | Custo/risco |
 |---|---|---|---|
-| **A. Só local** | O agente serve `http://localhost:<porta>/media`; a sala e a TV rodam no mesmo PC | Não | Zero; sem arquivos de terceiros na nuvem |
+| **A. Só local (v2, decidido)** | O agente serve `http://localhost:<porta>/media`; a sala e a TV rodam no mesmo PC | Não | Zero; sem arquivos de terceiros na nuvem |
 | **B. Nuvem** | O agente envia os arquivos para a VM (`PUT /library`); o player lê da nuvem | **Sim** | Disco da VM (45 GB livres; ~7 MB/música) e arquivos protegidos num servidor |
-| **C. Híbrido (recomendado)** | A música fica sempre na biblioteca local; **publicar na nuvem é opcional, por música** ("Levar para a nuvem") | Só as publicadas | Escolha do usuário; o servidor só guarda o que foi publicado |
+| **C. Híbrido (v2.1)** | A música fica sempre na biblioteca local; **publicar na nuvem é opcional, por música** ("Levar para a nuvem") | Só as publicadas | Escolha do usuário; o servidor só guarda o que foi publicado |
 
 O caso "ir à casa do meu irmão" **exige o modo B/C** para as músicas que se quer levar. Em todos os modos, a **pontuação, o tom e as vozes de apoio** continuam funcionando, pois dependem só dos arquivos e do player.
 
@@ -109,19 +129,31 @@ Requisitos mínimos propostos (**a medir** com testes reais antes de publicar): 
 - **Assinatura de código:** sem certificado, o Windows (SmartScreen) avisa. Caminhos gratuitos: SignPath Foundation (projetos open source) ou aceitar o aviso no começo. Certificado pago contraria a regra de custo zero.
 - **Licenças:** yt-dlp (Unlicense), ffmpeg (usar build LGPL, sem GPL), Demucs (MIT), pesos de modelos com licenças próprias: **revisar uma a uma** antes de redistribuir.
 
-## 8. Download do YouTube e cookies
+## 8. Download do YouTube e login da sessão
 
-1. **Primeiro sem cookie**, pela internet do usuário (IP residencial, que é o que o YouTube costuma aceitar).
-2. Se o YouTube pedir login ("Sign in to confirm you're not a bot"): usar o recurso nativo do yt-dlp **`--cookies-from-browser`**, com permissão do usuário e escolhendo o navegador. Observações:
-   - O Chrome/Edge recentes, no Windows, **criptografam os cookies de um jeito que o yt-dlp muitas vezes não consegue ler** (mesmo não sendo admin); o **Firefox** costuma funcionar. A alternativa é o usuário exportar um `cookies.txt`.
-   - Abrir um Chromium com Playwright só para o login **não é necessário**: acrescenta ~150 MB e não é mais confiável que ler o navegador que o usuário já tem.
-3. **Cookies nunca saem do computador**: o servidor não tem rota para recebê-los; o agente não os registra em log.
-4. **Validação no agente**: o `video_id` precisa casar com `^[A-Za-z0-9_-]{11}$`; o agente monta a URL canônica e **só aceita opções de uma lista fixa**. Um servidor comprometido não consegue mandar flags arbitrárias ao yt-dlp (execução de comando).
-5. Erros do YouTube continuam traduzidos (`errors.py`), com "Tentar de novo" só quando vale a pena.
+**Decisão (Out/2026):** o login do YouTube é pedido **no início da sessão**, antes de qualquer download, para nunca tentar, falhar e só então pedir. A conta escolhida baixa para **todas** as salas da sessão (seção 3.1).
+
+**Fluxo de login ("Entrar com o YouTube")**
+1. O app abre o **navegador padrão** do usuário na página de login do YouTube. **Não pode ser uma janela embutida do app:** o Google **bloqueia o login em navegadores embutidos**, como o Electron ("This browser or app may not be secure"; [política do Google](https://www.bleepingcomputer.com/news/security/google-to-block-logins-from-embedded-browser-frameworks), [guia sobre Electron](https://www.todesktop.com/docs/application/google-oauth-screen)).
+2. O usuário entra (ou já está logado) e, no app, **escolhe o navegador e o perfil** onde fez isso.
+3. O agente usa o recurso nativo do yt-dlp **`--cookies-from-browser`** para ler a sessão desse navegador. O OAuth do Google **não serve**: ele dá um token de API, não o cookie de sessão que o yt-dlp usa.
+4. **Validação:** o app faz um pedido que só funciona logado (a definir e testar no M1) e mostra "Conectado" ou pede para tentar de novo. Só então a sessão pode baixar.
+5. **Sessão vencida:** os cookies do YouTube giram com frequência (sobretudo com abas do YouTube abertas). O agente valida antes de cada job e, se venceu, avisa o dono ("entre de novo") e o job espera. Uma forma citada na wiki do yt-dlp é exportar os cookies de uma **janela anônima** que nunca mais é aberta.
+
+**Cuidados e limitações**
+- **Risco à conta.** O yt-dlp avisa que usar uma conta com ele pode levá-la a ser restringida ou banida, e recomenda pouca taxa de pedidos e, se possível, uma conta descartável ([wiki do yt-dlp](https://lab.trianta.dev/mirrors/yt-dlp.yt-dlp/wiki/Extractors)); há também relatos de bloqueio de IP ligado a cookies ([Pinchflat](https://github.com/kieraneglin/pinchflat/wiki/YouTube-Cookies)). **Recomendação ao entrar: usar uma conta secundária.** O agente limita a taxa (um download por vez, com pausa entre eles).
+- **Opção de reduzir o risco:** nas configurações, "usar o login: **sempre** (padrão, como decidido) ou **só quando o YouTube pedir**" (sem cookie primeiro, pela internet residencial, e com cookie só no erro de login). Ambas exigem o login feito no início.
+- O Chrome/Edge recentes, no Windows, **criptografam os cookies de um jeito que o yt-dlp muitas vezes não consegue ler** (mesmo não sendo admin); o **Firefox** costuma funcionar. A alternativa é o usuário exportar um `cookies.txt`. O app deve **testar a leitura** na tela de login e dizer qual navegador funcionou.
+- Abrir um Chromium com Playwright só para o login **não é necessário** e também esbarra nas proteções do Google contra automação: acrescenta ~150 MB sem ser mais confiável que ler o navegador que o usuário já tem.
+
+**Regras fixas do agente**
+- **Cookies nunca saem do computador**: o servidor não tem rota para recebê-los; o agente não os registra em log.
+- **Validação no agente**: o `video_id` precisa casar com `^[A-Za-z0-9_-]{11}$`; o agente monta a URL canônica e **só aceita opções de uma lista fixa**. Um servidor comprometido não consegue mandar flags arbitrárias ao yt-dlp (execução de comando).
+- Erros do YouTube continuam traduzidos (`errors.py`), com "Tentar de novo" só quando vale a pena.
 
 ## 9. Interface do agente
 
-Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres), **status** (conectado, processando, fila), **pasta da biblioteca**, **hardware detectado** (GPU/CPU, botão "usar CPU"), **navegador para cookies** (reserva), **logs**, **iniciar com o Windows**, **versão e atualização**. Sem telemetria.
+Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma vez), **Iniciar sessão / Entrar com o YouTube** (escolher navegador e perfil, com o teste "Conectado"), **status** (conectado, processando, fila, salas da sessão), **pasta da biblioteca**, **hardware detectado** (GPU/CPU, botão "usar CPU"), **uso do login** (sempre / só quando o YouTube pedir), **logs**, **iniciar com o Windows**, **versão e atualização**. Sem telemetria.
 
 ## 10. Segurança
 
@@ -143,17 +175,24 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres), **sta
 
 | Marco | Entrega | Critério de pronto |
 |---|---|---|
-| **M0** | `JobBackend` + API `/agent/v1` + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP |
-| **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv | Baixa e processa a partir da nuvem num PC com IP residencial |
+| **M0** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
+| **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`) e servidor local de mídia** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; **testado** o aviso de rede local do Chrome com a TV em `localhost` |
 | **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
-| **M3** | Casca Electron: pareamento, bandeja, pasta da biblioteca, logs | Um leigo pareia e processa uma música sem terminal |
-| **M4** | Instalador Windows + auto-update + modo híbrido ("Levar para a nuvem") | Instalação limpa em VM; atualização testada |
-| **M5** | macOS/Linux, GPU AMD/Apple | v3 |
+| **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
+| **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
+| **M5** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
+| **M6** | macOS/Linux, GPU AMD/Apple | v3 |
 
-## 13. Perguntas em aberto (precisam de decisão)
+## 13. Decisões tomadas e perguntas em aberto
 
-1. **Um dono por servidor ou vários?** Define se o token do agente vale para o servidor inteiro (simples, M0/M1) ou por biblioteca (M3+).
-2. **Modo de armazenamento padrão:** A, B ou C (recomendado: C).
-3. **Distribuição pública?** Define a postura sobre direitos autorais, a política de privacidade e a assinatura de código.
-4. **Primeira plataforma:** só Windows?
+**Decidido (Out/2026)**
+1. A conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão (seções 3.1 e 8).
+2. Armazenamento **local primeiro** (modo A); híbrido depois (M5).
+3. Primeira plataforma: **só Windows**.
+
+**Em aberto**
+1. **Apelido ou conta real** exibido aos convidados (mostrar a conta real expõe a identidade do dono).
+2. **Uso do login:** padrão "sempre" com a opção "só quando o YouTube pedir"; confirmar.
+3. **TV no computador do dono** (e sem prévia do instrumental no celular) é aceitável na v2? A verificação do aviso de rede local do Chrome (M1) pode obrigar a servir a página da TV pelo agente.
+4. **Distribuição pública?** Define a postura sobre direitos autorais, o aviso sobre a conta e a assinatura de código.
 5. **RTX 50 e outras:** confirmar com a sua máquina e uma placa nova se o torch atual funciona (ou subir a versão do torch, o que obriga a revisar o Demucs, hoje fixado em 2.5.1).

@@ -29,8 +29,8 @@ Um karaokê **próprio e colaborativo**: qualquer música do YouTube vira, em mi
 **Objetivos**
 1. Transformar um link/busca do YouTube em karaokê com o mínimo de passos.
 2. Fila justa e colaborativa, com a próxima música sempre pré-processada.
-3. Funcionar **de qualquer computador, sem o PC do dono ligado**, para as músicas já prontas (hospedagem gratuita).
-4. Poder **instalar sem conhecimento técnico** e processar músicas novas no computador do usuário (agente local).
+3. Funcionar **de qualquer computador, sem o PC do dono ligado**, para as músicas já prontas (hospedagem gratuita; é o que a v1 faz). Na v2 com armazenamento local, o PC do dono precisa estar ligado até existir o modo híbrido.
+4. Poder **instalar sem conhecimento técnico** e processar músicas novas no computador do usuário (agente local), numa **sessão com uma conta do YouTube** escolhida no início.
 5. **Custo zero** de operação para o dono (só recursos gratuitos).
 
 **Não objetivos (por enquanto)**
@@ -82,11 +82,19 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 | F20 | CI/CD no GitHub Actions com imagem multi-arquitetura | ✅ |
 | F21 | **Instalador** para Windows que instala o agente local (download, separação de voz, alinhamento) sem Docker | 🔧 |
 | F22 | O instalador detecta a placa de vídeo e usa a GPU NVIDIA quando possível; senão, usa a CPU | 🔧 |
-| F23 | Pareamento do agente com o servidor por código, sem digitar senha nem editar arquivos | 🔧 |
-| F24 | O YouTube é acessado pela internet do próprio usuário, **sem cookie por padrão**; cookie do navegador dele só como reserva, e nunca sai do computador | 🔧 |
-| F25 | Atualização automática do agente e do yt-dlp | 🔧 |
-| F26 | Escolher, por música, se ela fica só no computador do usuário ou vai também para a nuvem | 🔧 |
-| F27 | Versões para macOS e Linux; GPU AMD/Apple | 💡 |
+| F23 | Atualização automática do agente e do yt-dlp | 🔧 |
+| F24 | **Armazenamento local**: as músicas ficam numa pasta do computador do usuário e o player lê direto dela | 🔧 |
+| F25 | Escolher, por música, se ela também vai para a nuvem (**modo híbrido**, planejado depois do local) | 💡 |
+| F26 | Versões para macOS e Linux; GPU AMD/Apple | 💡 |
+
+### 5.6 Sessão e conta do YouTube (decidido)
+| ID | Requisito | Estado |
+|---|---|---|
+| F27 | O usuário **inicia uma sessão** no software e **entra com o YouTube logo no início**; a sessão tem **uma única conta**, escolhida por ele | 🔧 |
+| F28 | Todas as salas criadas na sessão usam **essa mesma conta** para baixar. Quando alguém pede uma música pelo celular, **quem baixa é o dono da sessão** a que aquele celular está conectado, com o padrão definido | 🔧 |
+| F29 | O login é pedido **antes** de qualquer download (não se tenta, falha e só então se pede), e o app mostra se a conta está conectada | 🔧 |
+| F30 | Os cookies da conta **ficam só no computador do dono**, nunca vão para a nuvem nem para os convidados | 🔧 |
+| F31 | Se o dono da sessão está offline, a sala avisa "o dono da sessão está desconectado" e o pedido espera na fila | 🔧 |
 
 ## 6. Requisitos não funcionais
 
@@ -111,21 +119,26 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 ## 8. Escopo das versões
 
 - **v1 (feito):** tudo de F1 a F20, rodando com Docker no PC do dono e/ou na VM gratuita (só a biblioteca copiada).
-- **v2 (próxima):** agente local + instalador para Windows (F10, F21 a F26), com a nuvem como servidor central.
-- **v3:** macOS/Linux, GPU AMD/Apple, contas e várias bibliotecas (F27).
+- **v2 (próxima):** agente local + instalador **só para Windows**, com sessão e conta do YouTube e **armazenamento local** (F10, F21 a F24, F27 a F31), com a nuvem como servidor central (salas, fila, celulares).
+- **v2.1:** modo híbrido, "levar para a nuvem" por música (F25).
+- **v3:** macOS/Linux, GPU AMD/Apple (F26).
 
 ## 9. Riscos e restrições
 
 - **Direitos autorais e termos do YouTube.** Baixar e separar música protegida pode violar os termos do YouTube e direitos autorais. O projeto é para uso pessoal e privado. Distribuir um instalador para terceiros que baixa do YouTube aumenta a exposição do projeto: decidir antes de divulgar (ver perguntas em aberto).
 - **O YouTube bloqueia IPs de datacenter** e muda com frequência; por isso o download acontece no computador do usuário.
+- **Risco para a conta do YouTube.** O próprio yt-dlp avisa que usar uma conta com ele pode levá-la a ser restringida ou banida, e há relatos de bloqueio de IP ligado ao uso de cookies. Como a sessão baixa **sempre com a conta escolhida**, o uso de uma **conta secundária, só para isso**, deve ser a recomendação padrão ao entrar.
+- **O login não pode ser feito numa janela embutida do app.** O Google bloqueia o login em navegadores embutidos (Electron e similares: "Este navegador ou app pode não ser seguro"). O login acontece no **navegador normal** do usuário, e o app lê dele a sessão. Os cookies do YouTube giram com frequência; o app precisa detectar a sessão vencida e pedir o login de novo.
 - **Hardware variado:** placas muito novas ou de outros fabricantes podem não ter aceleração; o fallback para CPU é obrigatório.
 - **Assinatura de código:** sem certificado, o Windows mostra aviso de "app desconhecido"; certificados pagos vão contra a regra de custo zero.
 - **Armazenamento:** a biblioteca local cresce (medido: ~16 MB por música no PC, com a voz isolada; ~7 MB na nuvem, sem ela); o motor de IA ocupa alguns GB.
 
 ## 10. Perguntas em aberto
 
-1. **Quem é o dono de uma biblioteca?** Um único dono por servidor (o servidor é pessoal) ou várias pessoas, cada uma com o seu agente?
-2. **Onde ficam os arquivos?** Só no PC do usuário (a TV precisa estar nele ou na mesma rede) ou também na nuvem, para tocar em qualquer lugar? (ver TRD, seção 5)
-3. **Vai ser distribuído publicamente?** Muda a postura sobre direitos autorais e o tipo de assinatura de código.
-4. **Plataformas:** só Windows na primeira versão?
+**Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**.
+
+1. **O que a sessão mostra aos convidados?** O nome da conta do YouTube ou só um apelido escolhido pelo dono? (mostrar a conta real expõe a identidade dele)
+2. **Uso do login:** em **todo** download (como decidido) ou, opcionalmente, **só quando o YouTube pedir**, para reduzir o risco à conta? Proposta: padrão "sempre", com a opção disponível.
+3. **Como o convidado toca a música local?** Com armazenamento local, a **TV tem de rodar no computador do dono** (ou ligada a ele por HDMI); a prévia do instrumental no celular não funciona nesse modo. Isso é aceitável para a v2?
+4. **Vai ser distribuído publicamente?** Muda a postura sobre direitos autorais, o aviso sobre a conta e o tipo de assinatura de código.
 5. **Nome e identidade** do instalador e do agente.
