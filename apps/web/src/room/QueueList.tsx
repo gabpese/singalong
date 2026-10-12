@@ -54,7 +54,7 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
         {showError && <span className="muted small">{item.song.error ?? ''}</span>}
       </div>
       <div className="actions">
-        {item.song.ready && (
+        {item.song.ready && !item.song.media?.local && (
           <button type="button" className="ghost" onClick={() => onPreview(item)}>
             Prévia
           </button>

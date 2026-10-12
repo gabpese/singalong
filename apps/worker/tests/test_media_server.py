@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 
 from singalong_worker import catalog
-from singalong_worker.media_server import MediaServer, parse_range
+from singalong_worker.media_server import MediaServer, download_name, parse_range
 from singalong_worker.storage import LocalStorage
 
 VID = "abcdefghijk"
@@ -137,6 +137,27 @@ class MediaServerTests(unittest.TestCase):
         except (OSError, NotImplementedError):
             self.skipTest("o sistema não permite criar links simbólicos sem privilégio")
         self.assertEqual(self.media("instrumental.mp3", vid="linkzinho00")[0], 404)
+
+    def test_download_pede_ao_navegador_para_baixar_com_o_nome_sugerido(self):
+        # a página está em outra origem: o atributo `download` não vale, então o servidor manda `Content-Disposition`
+        status, headers, body = self.media("karaoke_p+2.mp4?download=Legi%C3%A3o%20-%20Tempo%20Perdido%20(%2B2).mp4")
+        self.assertEqual((status, len(body)), (200, 100))
+        self.assertEqual(headers["Content-Disposition"], "attachment; filename*=UTF-8''Legi%C3%A3o%20-%20Tempo%20Perdido%20%28%2B2%29.mp4")
+        self.assertNotIn("Content-Disposition", self.media("karaoke.mp4")[1])
+        self.assertNotIn("Content-Disposition", self.media("karaoke.mp4?download=")[1])
+        # o nome não pode escapar da pasta de downloads nem quebrar o cabeçalho
+        status, headers, _ = self.media("karaoke.mp4?download=..%2F..%2Fx%0D%0AInjetado%3A%20sim.mp4")
+        self.assertEqual(status, 200)
+        self.assertNotIn("Injetado", "".join(headers.keys()))
+        self.assertNotIn("/", headers["Content-Disposition"].split("''", 1)[1])
+
+    def test_download_name(self):
+        self.assertEqual(download_name("AC/DC - Who Made Who?.mp4"), "AC DC - Who Made Who .mp4")
+        self.assertEqual(download_name("  a" + chr(9) + "b" + chr(10) + "c  "), "a b c")
+        self.assertIsNone(download_name(""))
+        self.assertIsNone(download_name(None))
+        self.assertIsNone(download_name('***'))
+        self.assertEqual(len(download_name("x" * 500)), 120)
 
     def test_parse_range(self):
         self.assertIsNone(parse_range(None, 100))

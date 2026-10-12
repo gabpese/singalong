@@ -1,7 +1,9 @@
 // Servidor dos testes de ponta a ponta: a API de verdade (rotas, salas, WebSocket) com fila de jobs em memória, um
 // storage temporário com músicas prontas e o front-end de `E2E_PUBLIC` (a pasta `dist` do build; padrão: `dist`).
 // Rotas /__test/* só existem aqui: deixam o teste fingir o worker (resultados de busca, andamento de jobs).
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { createServer } from 'node:http';
+import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +84,40 @@ app.post('/__test/session-offline', async (request) => {
   return { ok: true };
 });
 app.get('/__test/state', async () => ({ queue: jobs.queue, exportQueue: jobs.exportQueue, searchQueries: jobs.searchQueries }));
+
+// Servidor local de mídia do agente (o que o app do dono faz no computador dele): serve as músicas de `root/cache` em outra origem,
+// com CORS e Range, como o media_server.py. Registra os pedidos para o teste conferir de onde a TV buscou o áudio.
+const MEDIA_PORT = Number(process.env.E2E_MEDIA_PORT ?? 3101);
+const mediaLog = [];
+const mediaServer = createServer(async (req, res) => {
+  const origin = req.headers.origin;
+  mediaLog.push({ url: req.url, origin, range: req.headers.range ?? null });
+  const cors = {
+    ...(origin ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {}),
+    'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+    'Access-Control-Allow-Headers': 'range',
+  };
+  if (req.method === 'OPTIONS') return res.writeHead(204, cors).end();
+  const path = req.url.split('?')[0];
+  if (path === '/e2e/ping') return res.writeHead(200, { ...cors, 'Content-Type': 'application/json' }).end('{"ok":true}');
+  const match = /^\/e2e\/cache\/([A-Za-z0-9_-]{11})\/(instrumental\.mp3|lyrics\.json|melody\.json|backing\.mp3)$/.exec(path);
+  const file = match && join(root, 'cache', match[1], match[2]);
+  const info = file && (await stat(file).catch(() => null));
+  if (!info) return res.writeHead(404, cors).end();
+  const type = file.endsWith('.json') ? 'application/json' : 'audio/mpeg';
+  const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range ?? '');
+  if (range) {
+    const start = Number(range[1] || 0);
+    const end = Math.min(Number(range[2] || info.size - 1), info.size - 1);
+    res.writeHead(206, { ...cors, 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${info.size}`, 'Content-Length': end - start + 1 });
+    return createReadStream(file, { start, end }).pipe(res);
+  }
+  res.writeHead(200, { ...cors, 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': info.size });
+  return createReadStream(file).pipe(res);
+});
+await new Promise((resolve) => mediaServer.listen(MEDIA_PORT, '127.0.0.1', resolve));
+app.get('/__test/media-log', async () => mediaLog);
+app.delete('/__test/media-log', async () => { mediaLog.length = 0; return { ok: true }; });
 
 app.rooms.start({ tickMs: 300 });
 await app.listen({ port: PORT, host: '127.0.0.1' });

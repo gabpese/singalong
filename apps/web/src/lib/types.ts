@@ -20,7 +20,8 @@ export interface SongView {
   duration: number | null;
   lyrics_source: string | null;
   key: SongKey | null;
-  media: { instrumental: string; lyrics: string; melody: string | null; backing: string | null } | null;
+  /** `local`: os arquivos estão no computador do dono (servidor local de mídia), não no servidor. */
+  media: { instrumental: string; lyrics: string; melody: string | null; backing: string | null; local?: boolean } | null;
 }
 
 export interface QueueItem {
@@ -61,6 +62,8 @@ export interface RoomState {
   tv_connected: boolean;
   /** O dono da sessão da sala (agente local): só o apelido e se está conectado; null nas salas sem sessão. */
   owner: { nickname: string; online: boolean } | null;
+  /** As músicas da sala estão no computador do dono: sem prévia do instrumental no celular. */
+  local_media: boolean;
   queue: QueueItem[];
   me: { is_host: boolean };
 }

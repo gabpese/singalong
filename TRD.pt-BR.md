@@ -196,7 +196,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | Marco | Entrega | Critério de pronto |
 |---|---|---|
 | **M0 ✅** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
-| **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
+| **M1 (M1a ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
 | **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
@@ -217,6 +217,25 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 - **O Fastify descarta campos extras do corpo** (não os rejeita); por isso o servidor só aceita uma lista fixa de campos em cada rota do agente.
 
 **Fica para os próximos marcos:** o servidor local de mídia, o login do YouTube, a origem `file`/`open_url` (M1); a tela de pareamento e o aviso "o dono está desconectado" na interface (M3).
+
+### 12.2 M1a: armazenamento local (Out/2026)
+
+O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local de mídia e catálogo), **M1b** (download sem cookie primeiro e login do YouTube pelo navegador) e **M1c** (importar arquivos e fontes abertas). O M1a está pronto.
+
+**Feito**
+- **Agente:** `media_server.py` (servidor em `127.0.0.1`, com um token aleatório no caminho, só uma lista fixa de arquivos, CORS só para a origem da página, `Range`, `HEAD`/`OPTIONS`, `?download=` para baixar MP4) e `catalog.py` (o `meta.json` e quais arquivos existem). O `HttpBackend` envia o `media_base` ao iniciar a sessão e na batida de coração e publica o catálogo (`PUT /agent/v1/library`) ao iniciar, a cada música pronta, a cada análise de vozes de apoio e a cada MP4; uma falha de rede não derruba o job (a próxima batida tenta de novo).
+- **API:** tabela `agent_songs` (o catálogo é **do dispositivo**, não da sessão: sobrevive a reinícios), `sessions.media_base` (só máquina local ou rede privada, `http`, sem credenciais nem consulta), e o serviço de músicas descreve a música, a biblioteca e os MP4 pelo catálogo do dono quando a sala tem armazenamento local. Os identificadores `f-<12 hex>` (arquivos importados) já são aceitos.
+- **Front-end:** o estado da sala traz `local_media`; a TV verifica o acesso ao servidor local (o que também provoca o aviso do navegador) e orienta o usuário se for bloqueado; o celular não oferece a prévia do instrumental nas músicas locais; o download de MP4 de outra origem usa `?download=`.
+- **Testes:** API (13 do catálogo), agente (17 do servidor de mídia e do catálogo e 8 da publicação, 147 no total do worker), front-end (4 unitários e 4 ponta a ponta no Chrome, com um servidor de mídia em outra origem). Verificado também entre linguagens (API com armazenamento vazio + Redis + agente): a sala fica pronta pelo catálogo, o navegador lê o áudio com CORS e `Range`, outro site recebe 403, a voz isolada 404, e depois de reiniciar o agente a música continua pronta com o endereço novo. Em Docker, com a biblioteca real, o Chrome tocou uma música na TV a partir do container.
+
+**Decisões e aprendizados**
+- **O catálogo é do dispositivo:** quem inicia uma sessão nova já encontra a biblioteca; só o endereço da mídia (e o token) muda a cada execução do agente.
+- **O endereço de mídia é validado no servidor**, porque ele chega ao navegador de todos da sala: um agente comprometido não pode apontá-los para um site qualquer.
+- **O token no caminho** protege contra outra página ou programa do mesmo computador; o CORS (só a origem da página) contra outros sites; a lista fixa de arquivos mantém a voz isolada e o `source.json` dentro do computador.
+- **Docker é só para desenvolvimento:** o servidor de mídia escuta em `0.0.0.0` dentro do container (`AGENT_MEDIA_HOST`), a porta é publicada e o endereço que o navegador usa vem de `AGENT_MEDIA_PUBLIC`.
+- **Limites:** a prévia do instrumental no celular não existe para músicas locais; o MP4 de uma música local só baixa no computador do dono (o celular não alcança o servidor local); Firefox e Safari não foram testados.
+
+**Fica para o M1b e o M1c:** baixar sem cookie primeiro e o login do YouTube pelo navegador; o comando `importar` (arquivo e fontes abertas).
 
 ## 13. Decisões tomadas e perguntas em aberto
 

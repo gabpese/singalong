@@ -14,7 +14,7 @@ import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 log = logging.getLogger("worker.media")
 
@@ -22,6 +22,13 @@ SERVED = re.compile(r"^(instrumental\.mp3|lyrics\.json|melody\.json|backing\.mp3
 VIDEO_ID = re.compile(r"^([A-Za-z0-9_-]{11}|f-[0-9a-f]{12})$")
 CONTENT_TYPES = {".mp3": "audio/mpeg", ".json": "application/json; charset=utf-8", ".mp4": "video/mp4"}
 CHUNK = 64 * 1024
+BAD_NAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+
+def download_name(raw: str | None) -> str | None:
+    """O nome sugerido para baixar (?download=...), sem caracteres que os sistemas de arquivos não aceitam; None se vazio."""
+    name = re.sub(r"\s+", " ", BAD_NAME_CHARS.sub(" ", raw or "")).strip()[:120]
+    return name or None
 
 
 def parse_range(header: str | None, size: int) -> tuple[int, int] | None | str:
@@ -160,6 +167,9 @@ class MediaServer:
         byte_range = parse_range(handler.headers.get("Range"), size)
         headers = {**cors, "Content-Type": CONTENT_TYPES.get(target.suffix, "application/octet-stream"), "Accept-Ranges": "bytes",
                    "Cache-Control": "no-cache", "Cross-Origin-Resource-Policy": "cross-origin"}
+        name = download_name((parse_qs(urlsplit(handler.path).query).get("download") or [None])[0])
+        if name:  # a página está em outra origem: o atributo `download` não vale, então o próprio servidor manda baixar
+            headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(name)}"
         if byte_range == "invalid":
             return self._reply(handler, 416, {**cors, "Content-Range": f"bytes */{size}"})
         if byte_range is None:

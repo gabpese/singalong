@@ -35,3 +35,26 @@ export async function roomState(request, code, { host, client = ANA } = {}) {
 
 export const hostPatch = (request, room, body) =>
   request.patch(`/api/rooms/${room.code}`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data: body });
+
+const ADMIN = { 'x-admin-token': 'e2e-admin' };
+
+/** Faz o papel do app do dono: pareia um dispositivo, inicia a sessão (com o servidor local de mídia, se `mediaBase`) e cria uma sala nela. */
+export async function startAgentSession(request, nickname, mediaBase = null) {
+  const { code } = await (await request.post('/agent/v1/pair/start', { headers: ADMIN, data: {} })).json();
+  const { token } = await (await request.post('/agent/v1/pair/complete', { data: { code, name: 'PC do teste' } })).json();
+  const headers = { authorization: `Bearer ${token}` };
+  const sessionRes = await request.post('/agent/v1/sessions', { headers, data: { display_name: nickname, ...(mediaBase ? { media_base: mediaBase } : {}) } });
+  expect(sessionRes.status(), await sessionRes.text()).toBe(201);
+  const session = await sessionRes.json();
+  const room = await (await request.post(`/agent/v1/sessions/${session.id}/rooms`, { headers, data: {} })).json();
+  return { headers, session, room, tvUrl: `/tv.html?room=${room.code}`, guestUrl: `/room.html?room=${room.code}` };
+}
+
+/** Publica no catálogo do dono uma música que "está no computador dele". */
+export async function publishLocalSong(request, headers, song, files = {}) {
+  const res = await request.put('/agent/v1/library', {
+    headers,
+    data: { songs: [{ id: song.id, meta: { video_id: song.id, title: song.title, artist: song.artist, duration: 30, lyrics_source: 'lrclib' }, files: { instrumental: true, lyrics: true, melody: false, backing: false, exports: [], ...files } }] },
+  });
+  expect(res.status(), await res.text()).toBe(200);
+}

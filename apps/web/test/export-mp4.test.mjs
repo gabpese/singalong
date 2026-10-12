@@ -29,3 +29,14 @@ test('requestExport: pede, espera o worker e devolve a URL; erros viram mensagem
   const stuck = async () => ({ status: 'pending' });
   await assert.rejects(requestExport(stuck, 'abcdefghijk', 0, { sleep: async () => {}, timeoutMs: -1 }), /demorando/);
 });
+
+test('downloadTarget: da mesma origem usa o atributo download; de outra (servidor local de mídia) pede o nome por ?download=', async () => {
+  const { downloadTarget } = await import('../src/lib/export-mp4.js');
+  assert.deepEqual(downloadTarget('/media/cache/x/karaoke.mp4', 'A - B.mp4', 'https://singalong.example'), { href: '/media/cache/x/karaoke.mp4', useDownloadAttribute: true });
+  const local = downloadTarget('http://127.0.0.1:8765/tok/cache/abcdefghijk/karaoke_p+2.mp4', 'Legião - Tempo Perdido (+2).mp4', 'https://singalong.example');
+  assert.equal(local.useDownloadAttribute, false);
+  const url = new URL(local.href);
+  assert.equal(url.origin, 'http://127.0.0.1:8765');
+  assert.equal(url.pathname, '/tok/cache/abcdefghijk/karaoke_p+2.mp4');
+  assert.equal(url.searchParams.get('download'), 'Legião - Tempo Perdido (+2).mp4');
+});

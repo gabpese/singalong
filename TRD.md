@@ -196,7 +196,7 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 | Milestone | Deliverable | Definition of done |
 |---|---|---|
 | **M0 ✅** | `JobBackend` + the `/agent/v1` API + **sessions and per-session job routing** + a fake agent in the tests | The full flow passes with the current worker switched to HTTP; a room's job is only claimed by its session's agent |
-| **M1** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's/Edge's local network prompt was already **tested** (section 5) and a local song plays on the TV from the local media server |
+| **M1 (M1a ✅)** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's/Edge's local network prompt was already **tested** (section 5) and a local song plays on the TV from the local media server |
 | **M2** | Engine pack (CPU and cu121) + hardware probe | Installs without Python/Docker; GPU tested with a fallback |
 | **M3** | Electron shell: session, "Sign in to YouTube" screen, an "Import file" button, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
 | **M4** | **Windows** installer + auto-update | A clean install on a VM; update tested |
@@ -217,6 +217,25 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 - **Fastify drops extra body fields** (it does not reject them); so the server accepts only a fixed list of fields on each agent route.
 
 **Left for the next milestones:** the local media server, the YouTube login, the `file`/`open_url` source (M1); the pairing screen and the "owner is disconnected" notice in the interface (M3).
+
+### 12.2 M1a: local storage (Oct 2026)
+
+M1 was split into three parts: **M1a** (local storage: the local media server and the catalog), **M1b** (downloading without cookies first and the YouTube login through the browser) and **M1c** (importing files and open sources). M1a is done.
+
+**Done**
+- **Agent:** `media_server.py` (a server on `127.0.0.1`, with a random token in the path, only a fixed list of files, CORS only for the page's origin, `Range`, `HEAD`/`OPTIONS`, `?download=` to download MP4s) and `catalog.py` (the `meta.json` and which files exist). `HttpBackend` sends the `media_base` when starting the session and on the heartbeat and publishes the catalog (`PUT /agent/v1/library`) at start, on every ready song, on every backing-vocals analysis and on every MP4; a network failure does not kill the job (the next heartbeat retries).
+- **API:** an `agent_songs` table (the catalog belongs to the **device**, not the session: it survives restarts), `sessions.media_base` (local machine or private network only, `http`, no credentials or query), and the song service describes the song, the library and the MP4s from the owner's catalog when the room has local storage. `f-<12 hex>` identifiers (imported files) are already accepted.
+- **Front-end:** the room state carries `local_media`; the TV checks access to the local server (which also triggers the browser's prompt) and guides the user if blocked; the phone does not offer the instrumental preview for local songs; downloading an MP4 from another origin uses `?download=`.
+- **Tests:** API (13 for the catalog), agent (17 for the media server and the catalog and 8 for publishing, 147 in total for the worker), front-end (4 unit and 4 end to end in Chrome, with a media server on another origin). Also verified across languages (API with empty storage + Redis + agent): the room becomes ready through the catalog, the browser reads the audio with CORS and `Range`, another site gets 403, the isolated voice 404, and after restarting the agent the song is still ready with the new address. In Docker, with the real library, Chrome played a song on the TV from the container.
+
+**Decisions and lessons**
+- **The catalog belongs to the device:** whoever starts a new session already finds the library; only the media address (and the token) changes on each agent run.
+- **The media address is validated on the server**, because it reaches everyone's browser in the room: a compromised agent cannot point them at an arbitrary site.
+- **The token in the path** protects against another page or program on the same computer; CORS (only the page's origin) against other sites; the fixed list of files keeps the isolated voice and `source.json` inside the computer.
+- **Docker is for development only:** the media server listens on `0.0.0.0` inside the container (`AGENT_MEDIA_HOST`), the port is published and the address the browser uses comes from `AGENT_MEDIA_PUBLIC`.
+- **Limits:** the instrumental preview on the phone does not exist for local songs; a local song's MP4 only downloads on the owner's computer (the phone cannot reach the local server); Firefox and Safari were not tested.
+
+**Left for M1b and M1c:** downloading without cookies first and the YouTube login through the browser; the `import` command (file and open sources).
 
 ## 13. Decisions made and open questions
 
