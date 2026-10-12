@@ -400,6 +400,23 @@ Decisões (Out/2026): as três etapas abaixo, **nesta ordem**, formam a **versã
 - **Músicas no computador do dono:** o celular não alcança o servidor local de mídia, então **a TV repassa a letra ao servidor** (mensagem `lyrics`, validada: no máximo 3000 linhas, 400 KB, só da música que toca, só vinda da TV), que a envia aos celulares e a entrega a quem abre o palco no meio da música. Para músicas no servidor ou na nuvem o palco também busca a letra direto.
 - **Testes:** 7 do relógio e 4 das regras do palco (Node), 3 no servidor (repasse, quem pode enviar, validação) e 5 de ponta a ponta no navegador (o cantor vai ao palco e volta, a música de outra pessoa mantém a pessoa na sala, sem TV não há palco, sair do palco não é desfeito, músicas locais recebem a letra pela TV). Os 71 testes do navegador que já existiam continuam passando.
 
+### 12.13 Previsto: ambientes de homologação e de staging
+
+Anotado para o futuro (decisão de Out/2026): além da produção teremos **mais dois ambientes** para controlar o que sobe e o que não sobe:
+
+| Ambiente | Endereço | Para quê |
+|---|---|---|
+| Homologação (`hml`) | `https://singalong-hml.duckdns.org` | Onde cada versão nova é testada primeiro (pelo dono, com celulares e TV de verdade) antes de qualquer outra coisa |
+| Staging (`stg`) | `https://singalong-stg.duckdns.org` | Uma cópia da produção com a versão que está para subir: a última conferência antes de liberar |
+| Produção | `https://singalong.duckdns.org` | O que as pessoas usam |
+
+**Ideias a fechar quando formos fazer** (nada abaixo foi construído ainda):
+- **Caminho de uma versão:** merge na `main` → deploy automático na `hml` → depois da aprovação, a **mesma imagem** (a mesma etiqueta, sem novo build) é promovida para a `stg` → depois da aprovação, para a produção. Etiquetas de imagem por ambiente (a etiqueta do commit já é publicada; `hml`, `stg` e `prod` apontariam para ela).
+- **Mesma VM ou não:** a VM gratuita da Oracle (2 OCPU, 12 GB) pode rodar as três pilhas lado a lado (um projeto do compose por ambiente, atrás do mesmo Caddy com três nomes). Cada ambiente precisa dos **próprios dados**: volume, banco do Redis, `ADMIN_TOKEN`, `ADMIN_PATH`, `.env` e, de preferência, a própria lista de e-mails do pareamento. Os três nomes do DuckDNS apontam para o mesmo IP.
+- **E-mail e nuvem:** a `hml` e a `stg` não podem mandar e-mail para outras pessoas por engano (uma lista de teste, ou sem envio) nem dividir a biblioteca da nuvem com a produção.
+- **O app:** um instalador apontado para a `hml` ou a `stg` (o endereço do servidor já é uma configuração do app), para testar o fluxo de atualização com uma versão mais nova de mentira antes de publicar a Release.
+- **Scripts de deploy e CI:** o `deploy.sh` receberia o ambiente e a etiqueta; a promoção manual seria um fluxo de trabalho com um botão.
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**
