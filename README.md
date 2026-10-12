@@ -126,12 +126,21 @@ $out = docker compose --profile cpu run --rm -T worker --pair $code --agent-url 
 $env:AGENT_TOKEN = ($out | Select-String '^AGENT_TOKEN=').Line.Split('=', 2)[1].Trim()
 echo $env:AGENT_TOKEN   # sga_... (47 characters). $env: only lives in ONE terminal: set it again in each terminal you use below
 # terminal 1: the agent (leave it open; use --profile gpu and worker-gpu for speed)
-docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" worker --consume
+docker compose --profile cpu run --rm -p 8765:8765 -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" -e AGENT_MEDIA_HOST=0.0.0.0 -e AGENT_MEDIA_PUBLIC=http://127.0.0.1:8765 -e AGENT_ALLOWED_ORIGINS=http://localhost:3000 worker --consume
 # terminal 2: a room in the agent's session (prints the TV and host links)
 docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN worker --create-room --agent-url http://api:3000 --public-url http://localhost:3000
 ```
 
 Then open the TV link, join the room as a guest in another window, search and add a song: the search and the processing happen on the agent. Stop the agent with Ctrl+C and the next search says the owner is disconnected. `curl.exe -H "x-client-id: guest-0001" http://localhost:3000/api/rooms/CODE` shows `owner: {nickname, online}`. When the agent starts it also analyzes the backing vocals of songs already in `storage/` (slow on CPU), as the classic worker does.
+
+**Local storage (milestone M1a).** With the agent, the songs stay **on the owner's computer** (`storage/`). The agent starts a **local media server** (`http://127.0.0.1:8765/<random token>/cache/<id>/<file>`, only an allow-list of files: never the isolated voice) and publishes to the server a **catalog** of the ready songs (the `meta.json` and which files exist) when it starts and on every new song, backing-vocals analysis or MP4. The room's songs, library and MP4 links then point to that local server, so the **TV must run on the owner's computer**. Chrome/Edge ask once for the *Local Network Access* permission (the TV shows a hint explaining it); the phone has no instrumental preview for local songs. Tested with Chrome 155 and Edge 155 (Firefox and Safari were not).
+
+| Agent variable | Default | Purpose |
+|---|---|---|
+| `AGENT_MEDIA_PORT` | `8765` | port of the local media server (the next 9 are tried if it is busy); **`0` turns it off** and the server uses its own storage (the M0 behavior) |
+| `AGENT_MEDIA_HOST` | `127.0.0.1` | where it listens; with Docker use `0.0.0.0` and publish the port (`-p 8765:8765`) |
+| `AGENT_MEDIA_PUBLIC` | — | the address the **browser** uses when it is not `http://127.0.0.1:<port>` (Docker: `http://127.0.0.1:8765`) |
+| `AGENT_ALLOWED_ORIGINS` | the origin of `AGENT_URL` | origins (the cloud page) allowed to read the media, comma separated; with Docker the page is `http://localhost:3000` |
 
 ### Worker CLI (no API, for testing)
 

@@ -19,6 +19,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import catalog
+
 log = logging.getLogger("worker.backend")
 
 STREAM = "jobs"
@@ -33,6 +35,7 @@ FAILED_TTL = 86400
 
 TERMINAL = ("ready", "needs_lyrics", "failed")
 JOB_FIELDS = ("stage", "error", "error_code", "retry")
+CATALOG_BATCH = 50  # músicas por pedido de catálogo (o servidor aceita até 100)
 MAX_FIELD = 500  # o servidor recusa textos maiores que isso
 AGENT_VERSION = os.environ.get("SINGALONG_AGENT_VERSION", "0.0.0-m0")
 
@@ -130,6 +133,16 @@ class RedisBackend:
     def heartbeat(self) -> None:  # o worker clássico só toca o arquivo de saúde (consumer.py)
         return None
 
+    # armazenamento local só existe no agente: no worker clássico a música já está na pasta que a API lê
+    def attach_storage(self, storage) -> None:
+        return None
+
+    def publish_song(self, video_id: str) -> None:
+        return None
+
+    def publish_all(self) -> int:
+        return 0
+
     @staticmethod
     def _job(msg_id: str, fields: dict) -> Job:
         return Job(video_id=fields["video_id"], payload=json.loads(fields["payload"]), ref=msg_id)
@@ -212,6 +225,9 @@ class _Shared:
     """O que as cópias (threads) do mesmo agente compartilham: a sessão e a fila interna das vozes de apoio."""
 
     session_id: str | None = None
+    media_base: str | None = None  # o endereço do servidor local de mídia (o que o navegador usa)
+    storage: Any = None  # o armazenamento local, para publicar o catálogo
+    unpublished: set = field(default_factory=set)  # músicas que não deu para publicar (rede): tenta de novo na batida de coração
     backing: "queue.Queue[str]" = field(default_factory=queue.Queue)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -231,6 +247,17 @@ class HttpBackend:
     @property
     def session_id(self) -> str | None:
         return self._shared.session_id
+
+    @property
+    def media_base(self) -> str | None:
+        return self._shared.media_base
+
+    @media_base.setter
+    def media_base(self, value: str | None) -> None:
+        self._shared.media_base = value
+
+    def attach_storage(self, storage) -> None:
+        self._shared.storage = storage
 
     # --- HTTP ---
     def _call(self, method: str, path: str, body: dict | None = None, timeout: float = 30) -> dict | None:
@@ -271,7 +298,9 @@ class HttpBackend:
         current = me.get("session") or {}
         resume = current.get("id")
         name = current.get("display_name") if keep_name and resume else self.session_name
-        session = self._call("POST", "/sessions", {"display_name": name or self.session_name, **({"resume_id": resume} if resume else {})}) or {}
+        body = {"display_name": name or self.session_name, **({"resume_id": resume} if resume else {}),
+                **({"media_base": self.media_base} if self.media_base else {})}
+        session = self._call("POST", "/sessions", body) or {}
         self._shared.session_id = session.get("id")
         log.info("sessão do agente ativa", extra={"session": self._shared.session_id, "resumed": bool(resume)})
 
@@ -288,9 +317,12 @@ class HttpBackend:
             self._shared.session_id = None
 
     def heartbeat(self) -> None:
-        reply = self._call("POST", "/heartbeat", {"version": AGENT_VERSION}, timeout=15) or {}
+        reply = self._call("POST", "/heartbeat", {"version": AGENT_VERSION, **({"media_base": self.media_base} if self.media_base else {})}, timeout=15) or {}
         if not reply.get("session_id"):  # o servidor encerrou a sessão (varredura): inicia outra
             self.connect()
+            self.publish_all()  # a sessão nova começa sem saber das músicas: o catálogo é do dispositivo, mas confere
+        for video_id in list(self._shared.unpublished):  # o que não deu para publicar antes (rede caiu)
+            self.publish_song(video_id)
 
     def _reconnect_if_no_session(self, exc: Rejected) -> bool:
         if exc.code == "no_active_session":
@@ -306,6 +338,40 @@ class HttpBackend:
             if self._reconnect_if_no_session(exc):
                 return None
             raise
+
+    # --- catálogo local ---
+    def publish_song(self, video_id: str) -> None:
+        """Publica (ou atualiza) uma música no catálogo da nuvem. Uma falha de rede não derruba o job: fica para a próxima batida."""
+        storage = self._shared.storage
+        if storage is None or not self._shared.media_base:
+            return  # sem servidor local de mídia, a nuvem usa o armazenamento dela
+        entry = catalog.entry_for(storage, video_id)
+        if entry is None:
+            return
+        try:
+            self._retry(lambda: self._call("PUT", "/library", {"songs": [entry]}), tries=3)
+            self._shared.unpublished.discard(video_id)
+        except (BackendUnavailable, Rejected, AuthError) as exc:
+            self._shared.unpublished.add(video_id)
+            log.warning("não consegui publicar a música no catálogo", extra={"job": video_id, "reason": str(exc)})
+
+    def publish_all(self) -> int:
+        """Publica o catálogo inteiro (ao iniciar a sessão): em lotes, para caber no limite de cada pedido."""
+        storage = self._shared.storage
+        if storage is None or not self._shared.media_base:
+            return 0
+        entries = catalog.scan(storage)
+        sent = 0
+        for start in range(0, len(entries), CATALOG_BATCH):
+            batch = entries[start:start + CATALOG_BATCH]
+            try:
+                self._retry(lambda: self._call("PUT", "/library", {"songs": batch}), tries=3)
+                sent += len(batch)
+            except (BackendUnavailable, Rejected, AuthError) as exc:
+                self._shared.unpublished.update(entry["id"] for entry in batch)
+                log.warning("não consegui publicar parte do catálogo", extra={"reason": str(exc), "songs": len(batch)})
+        log.info("catálogo local publicado", extra={"songs": sent, "total": len(entries)})
+        return sent
 
     # --- jobs ---
     def pending(self) -> list[Job]:

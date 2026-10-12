@@ -31,11 +31,27 @@ export async function requestExport(api, videoId, pitch, { onWaiting, sleep = (m
   return info.url;
 }
 
-/** Inicia o download no navegador (o arquivo é da mesma origem, então `download` vale). */
+/**
+ * Como baixar o arquivo. Da mesma origem, o atributo `download` vale. De outra (o servidor local de mídia, no computador do
+ * dono) o navegador o ignora: o pedido leva `?download=<nome>` e o servidor local responde com `Content-Disposition: attachment`.
+ * @param {string} url
+ * @param {string} fileName
+ * @param {string} pageOrigin
+ * @returns {{ href: string, useDownloadAttribute: boolean }}
+ */
+export function downloadTarget(url, fileName, pageOrigin) {
+  const target = new URL(url, pageOrigin);
+  if (target.origin === pageOrigin) return { href: url, useDownloadAttribute: true };
+  target.searchParams.set('download', fileName);
+  return { href: target.href, useDownloadAttribute: false };
+}
+
+/** Inicia o download no navegador (do servidor ou, no armazenamento local, do computador do dono). */
 export function downloadFile(url, fileName) {
+  const { href, useDownloadAttribute } = downloadTarget(url, fileName, location.origin);
   const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
+  link.href = href;
+  if (useDownloadAttribute) link.download = fileName;
   document.body.append(link);
   link.click();
   link.remove();

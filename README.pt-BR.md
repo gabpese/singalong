@@ -131,12 +131,21 @@ $out = docker compose --profile cpu run --rm -T worker --pair $code --agent-url 
 $env:AGENT_TOKEN = ($out | Select-String '^AGENT_TOKEN=').Line.Split('=', 2)[1].Trim()
 echo $env:AGENT_TOKEN   # sga_... (47 caracteres). $env: vale só em UM terminal: defina de novo em cada terminal que usar abaixo
 # terminal 1: o agente (deixe aberto; use --profile gpu e worker-gpu para ir mais rápido)
-docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" worker --consume
+docker compose --profile cpu run --rm -p 8765:8765 -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" -e AGENT_MEDIA_HOST=0.0.0.0 -e AGENT_MEDIA_PUBLIC=http://127.0.0.1:8765 -e AGENT_ALLOWED_ORIGINS=http://localhost:3000 worker --consume
 # terminal 2: uma sala na sessão do agente (imprime os links da TV e do anfitrião)
 docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN worker --create-room --agent-url http://api:3000 --public-url http://localhost:3000
 ```
 
 Depois abra o link da TV, entre na sala como convidado em outra janela, busque e adicione uma música: a busca e o processamento acontecem no agente. Pare o agente com Ctrl+C e a próxima busca avisa que o dono está desconectado. `curl.exe -H "x-client-id: convidado-0001" http://localhost:3000/api/rooms/CODIGO` mostra `owner: {nickname, online}`. Ao subir, o agente também analisa as vozes de apoio das músicas que já estão em `storage/` (lento em CPU), como o worker clássico faz.
+
+**Armazenamento local (marco M1a).** Com o agente, as músicas ficam **no computador do dono** (`storage/`). O agente sobe um **servidor local de mídia** (`http://127.0.0.1:8765/<token aleatório>/cache/<id>/<arquivo>`, só uma lista fixa de arquivos: nunca a voz isolada) e publica para o servidor um **catálogo** das músicas prontas (o `meta.json` e quais arquivos existem) ao iniciar e a cada música, análise de vozes de apoio ou MP4 novos. As músicas, a biblioteca e os links de MP4 da sala passam a apontar para esse servidor local, então a **TV precisa rodar no computador do dono**. O Chrome/Edge pedem uma vez a permissão de *Acesso à rede local* (a TV mostra um aviso explicando); o celular não tem a prévia do instrumental das músicas locais. Testado no Chrome 155 e no Edge 155 (Firefox e Safari não).
+
+| Variável do agente | Padrão | Função |
+|---|---|---|
+| `AGENT_MEDIA_PORT` | `8765` | porta do servidor local de mídia (tenta as 9 seguintes se estiver ocupada); **`0` desliga** e o servidor usa o armazenamento dele (o comportamento do M0) |
+| `AGENT_MEDIA_HOST` | `127.0.0.1` | onde escuta; com Docker use `0.0.0.0` e publique a porta (`-p 8765:8765`) |
+| `AGENT_MEDIA_PUBLIC` | — | o endereço que o **navegador** usa quando não é `http://127.0.0.1:<porta>` (Docker: `http://127.0.0.1:8765`) |
+| `AGENT_ALLOWED_ORIGINS` | a origem de `AGENT_URL` | origens (a página da nuvem) que podem ler a mídia, separadas por vírgula; com Docker a página é `http://localhost:3000` |
 
 ### CLI do worker (sem API, para testes)
 

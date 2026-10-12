@@ -12,12 +12,14 @@ import signal
 import socket
 import threading
 import time
+from urllib.parse import urlsplit
 
-from .backend import AuthError, BackendUnavailable, make_backend
+from .backend import AuthError, BackendUnavailable, HttpBackend, make_backend
 from .backing import serve as backing_serve
 from .export import serve as export_serve
 from .key import backfill as key_backfill
 from .logsetup import setup_logging
+from .media_server import MediaServer
 from .runner import Settings, handle
 from .search import serve as search_serve
 from .storage import LocalStorage
@@ -47,6 +49,30 @@ def _heartbeat(path, backend, stop: threading.Event) -> None:
         stop.wait(HEARTBEAT_EVERY)
 
 
+def _start_media_server(settings: Settings, storage_root, backend):
+    """Sobe o servidor local de mídia e diz ao backend o endereço que o navegador deve usar. None se não se aplica."""
+    if not isinstance(backend, HttpBackend) or settings.media_port == 0:
+        return None  # o worker clássico e o agente com AGENT_MEDIA_PORT=0 usam o armazenamento do servidor
+    page = urlsplit(settings.agent_url or "")
+    origins = sorted({f"{page.scheme}://{page.netloc}", *settings.allowed_origins})
+    last_error = None
+    # com a porta "pública" fixa (Docker) não dá para trocar de porta; fora disso tenta as seguintes se a primeira estiver ocupada
+    for port in ([settings.media_port] if settings.media_public else range(settings.media_port, settings.media_port + 10)):
+        media = MediaServer(storage_root, origins, port, settings.media_host)
+        try:
+            local = media.start()
+        except OSError as exc:
+            last_error = exc
+            continue
+        if settings.media_host not in ("127.0.0.1", "localhost"):
+            log.warning("o servidor local de mídia escuta fora deste computador (%s): só faça isso em Docker ou numa rede de confiança", settings.media_host)
+        backend.media_base = f"{settings.media_public}/{media.token}" if settings.media_public else local
+        log.info("a TV vai buscar as músicas em %s (origens permitidas: %s)", backend.media_base, ", ".join(origins))
+        return media
+    log.error("não consegui subir o servidor local de mídia (%s): a nuvem vai usar o armazenamento dela", last_error)
+    return None
+
+
 def run() -> int:
     setup_logging()
     settings = Settings.from_env()
@@ -58,6 +84,8 @@ def run() -> int:
         # AGENT_URL sem AGENT_TOKEN: quase sempre a variável do token está vazia neste terminal (no PowerShell, $env: vale só por terminal)
         log.error("configuração do agente incompleta: %s. Confira se AGENT_TOKEN tem valor neste terminal.", exc)
         return 2
+    media = _start_media_server(settings, settings.storage_root, backend)
+    backend.attach_storage(storage)
     stopping = False
 
     def stop(signum, _frame):
@@ -81,6 +109,7 @@ def run() -> int:
             log.error("o servidor recusou o token do agente (revogado?). Pareie de novo: %s", exc)
             return 2
 
+    backend.publish_all()  # armazenamento local: a nuvem passa a ver as músicas que já estão neste computador
     stop_threads = threading.Event()
     # a busca no YouTube roda numa thread própria: não pode esperar atrás de um job longo (Demucs)
     threading.Thread(target=search_serve, args=(backend.clone(), settings.cookies, stop_threads), name="search", daemon=True).start()
@@ -125,6 +154,8 @@ def run() -> int:
         code = 2
     finally:
         stop_threads.set()
+        if media:
+            media.stop()
         close = getattr(backend, "end_session", None)
         if close and stopping:
             close()  # saída pedida pelo dono: encerra a sessão (os pedidos pendentes viram "o dono saiu")

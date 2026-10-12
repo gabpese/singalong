@@ -1,11 +1,14 @@
 """Os dois transportes do worker: Redis (clássico) e HTTP (agente local). Sem rede e sem Redis: tudo com dublês."""
 import io
 import json
+import tempfile
 import unittest
 import urllib.error
+from pathlib import Path
 from unittest import mock
 
 from singalong_worker import backend as backend_module
+from singalong_worker.storage import LocalStorage
 from singalong_worker.backend import (
     BACKING_KEY, DONE_TTL, EXPORT_KEY, FAILED_TTL, GROUP, SEARCH_KEY, STREAM, AuthError, BackendUnavailable, HttpBackend, Job, Rejected,
     RedisBackend, make_backend, pair,
@@ -383,6 +386,108 @@ class FactoryAndPairTests(unittest.TestCase):
 
         with self.assertRaises(BackendUnavailable):
             pair("https://s.example.org", "X", opener=down)
+
+
+class HttpCatalogTests(unittest.TestCase):
+    """Armazenamento local: o agente publica o catálogo e diz à nuvem onde o navegador busca a mídia."""
+
+    BASE = "http://127.0.0.1:8765/tok123"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.server = FakeServer()
+        self.b = HttpBackend("https://sing.example.org", "sga_token", "Gabriel", opener=self.server, retry_wait=0)
+        self.b._shared.session_id = "sess-1"
+        self.b.attach_storage(LocalStorage(self.root))
+
+    def song(self, vid="abcdefghijk", ready=True):
+        folder = self.root / "cache" / vid
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "instrumental.mp3").write_bytes(b"x")
+        if ready:
+            (folder / "lyrics.json").write_text("[]", encoding="utf-8")
+            (folder / "meta.json").write_text(json.dumps({"video_id": vid, "title": "T"}), encoding="utf-8")
+
+    def sent(self, path):
+        return [r for r in self.server.requests if r["path"] == path]
+
+    def test_connect_e_batida_de_coracao_enviam_o_endereco_da_midia(self):
+        self.server.reply({"device": {"id": "d"}, "session": None}, path="/me")
+        self.server.reply({"id": "s", "display_name": "Gabriel"}, path="/sessions")
+        self.b.connect()
+        self.assertNotIn("media_base", self.sent("/sessions")[0]["body"])  # sem servidor local: a nuvem usa o armazenamento dela
+        self.b.media_base = self.BASE
+        self.assertEqual(self.b.clone().media_base, self.BASE)  # as cópias (threads) compartilham
+        self.server.reply({"device": {"id": "d"}, "session": {"id": "s", "display_name": "Gabriel"}}, path="/me")
+        self.server.reply({"id": "s", "display_name": "Gabriel"}, path="/sessions")
+        self.b.connect(keep_name=True)
+        self.assertEqual(self.sent("/sessions")[1]["body"]["media_base"], self.BASE)
+        self.server.reply({"ok": True, "session_id": "s"}, path="/heartbeat")
+        self.b.heartbeat()
+        self.assertEqual(self.sent("/heartbeat")[0]["body"]["media_base"], self.BASE)
+
+    def test_publica_a_musica_pronta_com_o_meta_e_os_arquivos(self):
+        self.b.media_base = self.BASE
+        self.song()
+        self.b.publish_song("abcdefghijk")
+        (req,) = self.sent("/library")
+        self.assertEqual(req["method"], "PUT")
+        (entry,) = req["body"]["songs"]
+        self.assertEqual((entry["id"], entry["meta"]["title"]), ("abcdefghijk", "T"))
+        self.assertEqual(entry["files"], {"instrumental": True, "lyrics": True, "melody": False, "backing": False, "exports": []})
+
+    def test_sem_servidor_local_ou_musica_incompleta_nao_publica_nada(self):
+        self.song()
+        self.b.publish_song("abcdefghijk")  # sem media_base
+        self.b.media_base = self.BASE
+        self.song("bbbbbbbbbbb", ready=False)
+        self.b.publish_song("bbbbbbbbbbb")  # incompleta
+        self.b.publish_song("inexistente0")
+        self.assertEqual(self.sent("/library"), [])
+
+    def test_falha_de_rede_nao_derruba_o_job_e_a_proxima_batida_tenta_de_novo(self):
+        self.b.media_base = self.BASE
+        self.song()
+        for _ in range(3):
+            self.server.reply(urllib.error.URLError("sem rede"), path="/library")
+        self.b.publish_song("abcdefghijk")  # nenhuma exceção
+        self.assertEqual(len(self.sent("/library")), 3)
+        self.assertEqual(self.b._shared.unpublished, {"abcdefghijk"})
+        self.server.reply({"count": 1}, path="/library")
+        self.server.reply({"ok": True, "session_id": "sess-1"}, path="/heartbeat")
+        self.b.heartbeat()
+        self.assertEqual(len(self.sent("/library")), 4)
+        self.assertEqual(self.b._shared.unpublished, set())
+
+    def test_servidor_recusando_o_catalogo_ou_token_revogado_tambem_nao_derrubam(self):
+        self.b.media_base = self.BASE
+        self.song()
+        self.server.reply({"error": "invalid_library_entry"}, status=400, path="/library")
+        self.b.publish_song("abcdefghijk")
+        self.server.reply({"message": "revogado"}, status=401, path="/library")
+        self.b.publish_song("abcdefghijk")
+        self.assertEqual(self.b._shared.unpublished, {"abcdefghijk"})
+
+    def test_publish_all_envia_em_lotes_de_50(self):
+        self.b.media_base = self.BASE
+        for i in range(120):
+            self.song(f"m{i:010d}")
+        self.assertEqual(self.b.publish_all(), 120)
+        self.assertEqual([len(r["body"]["songs"]) for r in self.sent("/library")], [50, 50, 20])
+
+    def test_publish_all_sem_servidor_local_ou_sem_musicas(self):
+        self.assertEqual(self.b.publish_all(), 0)
+        self.b.media_base = self.BASE
+        self.assertEqual(self.b.publish_all(), 0)
+        self.assertEqual(self.sent("/library"), [])
+
+    def test_o_worker_classico_nao_tem_catalogo(self):
+        redis_backend = RedisBackend("redis://x", "w", client=FakeRedisClient())
+        self.assertIsNone(redis_backend.attach_storage(object()))
+        self.assertIsNone(redis_backend.publish_song("abcdefghijk"))
+        self.assertEqual(redis_backend.publish_all(), 0)
 
 
 if __name__ == "__main__":  # pragma: no cover

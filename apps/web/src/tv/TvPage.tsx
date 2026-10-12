@@ -1,5 +1,6 @@
 // TV: toca o que a sala manda, mostra a letra sincronizada, quem canta, a fila e a pontuação.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-media.js';
 import { keySummary } from '../lib/music.js';
 import { nextUp, playOrder, songChip, splitQueue } from '../lib/queue-view.js';
 import type { QueueItem, RoomState } from '../lib/types';
@@ -85,6 +86,37 @@ function ScoreFinal({ final, room }: { final: FinalResult | null; room: RoomStat
   );
 }
 
+/**
+ * Músicas no computador do dono: confere se esta página alcança o servidor local de mídia (isso também provoca o aviso de
+ * "Acesso à rede local" do Chrome/Edge) e devolve o texto que explica o que fazer, ou '' se está tudo certo.
+ */
+function useLocalMediaNotice(room: RoomState | null): string {
+  const base = localMediaBase(room);
+  const [status, setStatus] = useState<'idle' | 'checking' | 'ok' | 'blocked'>('idle');
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!base) {
+      setStatus('idle');
+      return undefined;
+    }
+    let cancelled = false;
+    const started = Date.now();
+    setStatus('checking');
+    setElapsed(0);
+    const tick = setInterval(() => setElapsed(Date.now() - started), 500);
+    void probeLocalMedia(base)
+      .then((ok: boolean) => {
+        if (!cancelled) setStatus(ok ? 'ok' : 'blocked');
+      })
+      .finally(() => clearInterval(tick));
+    return () => {
+      cancelled = true;
+      clearInterval(tick);
+    };
+  }, [base]);
+  return accessMessage(status, elapsed);
+}
+
 export function TvPage({ code }: { code: string }) {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [notice, setNotice] = useState('');
@@ -101,6 +133,7 @@ export function TvPage({ code }: { code: string }) {
     next2: useRef<HTMLParagraphElement>(null),
   };
   const controllerRef = useRef<TvController | null>(null);
+  const localMediaNotice = useLocalMediaNotice(room);
 
   useEffect(() => {
     document.title = `Singalong — TV ${code}`;
@@ -193,6 +226,9 @@ export function TvPage({ code }: { code: string }) {
         </div>
         <p className="hint" role="status">
           {notice}
+        </p>
+        <p className="hint local-media" role="alert" hidden={!localMediaNotice}>
+          {localMediaNotice}
         </p>
       </footer>
 
