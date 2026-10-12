@@ -418,13 +418,22 @@ class HttpBackend:
         base = f"cache/{video_id}"
         names = ["instrumental.mp3", "lyrics.json", *[n for n in ("melody.json", "backing.mp3") if storage.exists(f"{base}/{n}")], "meta.json"]
         sent = self._shared.cloud_sent.setdefault(video_id, {})
+        if sent.get("blocked"):
+            return False  # o administrador tirou esta música da nuvem: não insiste (até o app reiniciar)
         uploaded = False
         for name in names:
             data = storage.read(f"{base}/{name}")
             signature = (len(data), hash(data))
             if sent.get(name) == signature:
                 continue
-            self._retry(lambda: self._upload(video_id, name, data), tries=3)
+            try:
+                self._retry(lambda: self._upload(video_id, name, data), tries=3)
+            except Rejected as exc:
+                if exc.code != "cloud_blocked":
+                    raise
+                sent["blocked"] = True
+                log.info("o administrador não quer esta música na nuvem", extra={"job": video_id})
+                return False
             sent[name] = signature
             uploaded = True
         if uploaded:

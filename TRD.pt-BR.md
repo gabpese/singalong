@@ -369,6 +369,17 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - O disco: a limpeza de cache que já existe (`CACHE_MAX_GB`) apaga as menos tocadas quando passa do limite.
 - Direitos autorais: uma música que sobe é servida a todas as salas do servidor. Mantenha a lista curta e de confiança.
 
+### 12.10 Página do administrador (Out/2026)
+
+**Feito** (`/admin`, só para quem tem o `ADMIN_TOKEN`)
+- **Acesso:** a página é estática e não carrega segredo; quem a abre digita o token, que fica só naquela aba do navegador (`sessionStorage`). Toda chamada o manda no cabeçalho `X-Admin-Token` (sem cookies, então sem CSRF), comparado em tempo constante. Token errado gasta uma cota pequena por IP (8 a cada 10 minutos, depois `429`). A página tem CSP restrita, `X-Frame-Options: DENY`, `noindex` e, sem `ADMIN_TOKEN`, ela não existe (`404`).
+- **E-mails:** adicionar, alterar e remover quem **recebe o código de pareamento** e quem **envia músicas para a nuvem** (`*` em "recebe o código" libera qualquer e-mail; nunca libera o envio). O efeito é imediato, sem reiniciar. As listas do `.env` (`PAIR_ALLOWED_EMAILS`, `ENABLED_TO_SEND_TO_CLOUD`) continuam valendo e aparecem como fixas.
+- **Computadores:** cada computador pareado com o e-mail dele, se envia músicas e quando foi visto pela última vez; **Desconectar** o revoga (o app dele precisa parear de novo).
+- **Músicas da nuvem:** a lista (título, artista, origem, tamanho, data, tamanho total) e **Remover da nuvem**: apaga a música e a **bloqueia** (`cloud_blocked`), então os computadores não a enviam de novo, mesmo ao reiniciar e reenviar as bibliotecas; **Liberar** permite de novo.
+- **Testes:** 6 no servidor (página e CSP, token e bloqueio, e-mails com efeito imediato, `*` e listas fixas, computadores, remover/bloquear/liberar) e 1 no worker (música bloqueada não é reenviada).
+
+**Decisão:** só o dono tira músicas da nuvem e gerencia as listas; o fluxo de pareamento por e-mail e o envio automático continuam como estavam.
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

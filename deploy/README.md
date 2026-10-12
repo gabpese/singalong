@@ -127,6 +127,16 @@ Para que as músicas preparadas por certas pessoas passem a existir no servidor 
 
 Quem já estava pareado **antes desta versão** precisa parear de novo pelo e-mail (o servidor só passou a guardar o e-mail do pareamento agora); o mesmo vale para quem pareou com um código do administrador sem e-mail. A biblioteca que o computador já tinha sobe sozinha na próxima vez que o app iniciar a sessão. As músicas ficam em `storage/cache` no volume da API; a limpeza automática (`CACHE_MAX_GB`) apaga as menos tocadas quando passa do limite.
 
+## Página do administrador
+
+Em `https://SEU_ENDERECO/admin` (só com o `ADMIN_TOKEN` do `.env`; sem ele a página não existe). Ali você:
+
+- **autoriza e-mails**: quem recebe o código de pareamento e quem envia músicas para a nuvem (muda na hora, sem `deploy.sh`);
+- **vê e desconecta os computadores** pareados;
+- **remove músicas da nuvem** (elas ficam bloqueadas: nenhum computador as envia de novo até você liberar).
+
+O token é digitado ao abrir e fica só naquela aba do navegador. Não compartilhe o endereço com o token, e use sempre `https`.
+
 ## Segurança
 
 - A API não tem login: quem souber o endereço e o código de uma sala entra nela. Não divulgue o endereço.

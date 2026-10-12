@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Singalong: administração</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <main>
+    <h1>Administração do Singalong</h1>
+
+    <section id="login" class="card">
+      <p>Digite o token de administrador (o <code>ADMIN_TOKEN</code> do servidor). Ele fica só nesta aba do navegador.</p>
+      <form id="login-form">
+        <input id="token" type="password" autocomplete="off" placeholder="Token de administrador" aria-label="Token de administrador">
+        <button type="submit" class="primary">Entrar</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+    </section>
+
+    <div id="panel" hidden>
+      <p id="status" class="muted" role="status"></p>
+      <p id="mail-warning" class="warn" hidden>O envio de e-mail não está configurado neste servidor (BREVO_API_KEY e MAIL_FROM): ninguém consegue pedir código pelo app.</p>
+
+      <section class="card">
+        <h2>E-mails autorizados</h2>
+        <p class="muted">Quem <strong>recebe o código</strong> pode instalar o app e conectar o computador. Quem <strong>envia músicas</strong> alimenta a biblioteca da nuvem automaticamente. Use <code>*</code> em "recebe o código" para liberar qualquer e-mail.</p>
+        <table id="emails"><thead><tr><th>E-mail</th><th>Recebe o código</th><th>Envia músicas</th><th></th></tr></thead><tbody></tbody></table>
+        <form id="email-form" class="row">
+          <input id="new-email" type="text" placeholder="novo@email.com (ou *)" aria-label="E-mail" autocomplete="off">
+          <label class="check"><input id="new-pair" type="checkbox" checked> recebe o código</label>
+          <label class="check"><input id="new-cloud" type="checkbox"> envia músicas</label>
+          <button type="submit" class="primary">Adicionar</button>
+        </form>
+        <p id="fixed" class="muted" hidden></p>
+      </section>
+
+      <section class="card">
+        <h2>Computadores conectados</h2>
+        <table id="devices"><thead><tr><th>Nome</th><th>E-mail</th><th>Envia músicas</th><th>Visto por último</th><th></th></tr></thead><tbody></tbody></table>
+      </section>
+
+      <section class="card">
+        <h2>Músicas na nuvem <span id="cloud-total" class="muted"></span></h2>
+        <p class="muted">Remover apaga a música do servidor e a <strong>bloqueia</strong>: nenhum computador a envia de novo até você liberar.</p>
+        <table id="songs"><thead><tr><th>Música</th><th>Origem</th><th>Tamanho</th><th>Enviada em</th><th></th></tr></thead><tbody></tbody></table>
+        <h3>Bloqueadas</h3>
+        <table id="blocked"><thead><tr><th>Id</th><th>Bloqueada em</th><th></th></tr></thead><tbody></tbody></table>
+      </section>
+
+      <p><button id="logout" type="button">Sair</button></p>
+    </div>
+  </main>
+  <script src="/admin/admin.js" defer></script>
+</body>
+</html>

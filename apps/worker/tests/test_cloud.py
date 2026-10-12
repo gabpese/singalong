@@ -180,6 +180,18 @@ class CloudTests(unittest.TestCase):
         with self.assertRaises(BackendUnavailable):
             backend.cloud_sync(SONG)
 
+    def test_a_song_the_administrator_removed_is_not_pushed_again(self):
+        seed(self.storage)
+        body = b'{"error":"cloud_blocked","message":"bloqueada"}'
+        blocked = urllib.error.HTTPError("https://x.example/agent/v1/cloud", 403, "x", {}, io.BytesIO(body))
+        server = Server(fail=blocked)
+        backend = self.backend(server)
+        backend.refresh_cloud()
+        self.assertFalse(backend.cloud_sync(SONG))  # recusada: não levanta erro, só desiste
+        server.fail = None
+        self.assertFalse(backend.cloud_sync(SONG))  # e não tenta de novo nesta execução
+        self.assertEqual(server.puts, [])
+
     def test_the_serve_loop_does_the_backfill_then_each_queued_song_and_survives_a_failure(self):
         seed(self.storage, "aaaaaaaaaaa")
         server = Server()

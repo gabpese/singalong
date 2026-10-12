@@ -102,7 +102,22 @@ export function createAgentService({
     },
 
     /** Este computador envia as músicas dele para a nuvem? Só se foi pareado com um e-mail da lista ENABLED_TO_SEND_TO_CLOUD. */
-    canUploadToCloud: (device) => Boolean(device?.email) && cloudEmails.includes(String(device.email).toLowerCase()),
+    canUploadToCloud(device) {
+      const email = String(device?.email ?? '').toLowerCase();
+      if (!email) return false;
+      return cloudEmails.includes(email) || db.getEmailRule(email)?.can_cloud === 1; // o .env e a página do administrador somam
+    },
+
+    /** Este e-mail pode receber um código de pareamento? ('*' = qualquer um; o .env e a página do administrador somam.) */
+    canPairByEmail(email, envList = []) {
+      const clean = String(email ?? '').toLowerCase();
+      return envList.includes('*') || envList.includes(clean) || db.getEmailRule('*')?.can_pair === 1 || db.getEmailRule(clean)?.can_pair === 1;
+    },
+
+    isSongBlocked: (videoId) => db.isSongBlocked(videoId),
+
+    /** O recurso "código por e-mail" tem alguém autorizado (no .env ou na página)? */
+    hasPairRules: (envList = []) => envList.length > 0 || db.hasPairRules(),
 
     /** O dispositivo dono do token (ou null se o token não existe ou foi revogado). */
     authenticate(token) {

@@ -88,14 +88,14 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
     preHandler: rateLimited(limiters.pairRequest, { keyOf: (request) => request.ip }),
     schema: { body: { type: 'object', additionalProperties: false, properties: { email: { type: 'string', maxLength: 254 } }, required: ['email'] } },
   }, async (request, reply) => {
-    if (!mailer?.enabled || config.pairAllowedEmails.length === 0) {
+    if (!mailer?.enabled || !agents.hasPairRules(config.pairAllowedEmails)) {
       throw new HttpError(503, 'email_disabled', 'Este servidor não envia códigos por e-mail. Peça o código a quem administra o servidor.');
     }
     const email = request.body.email.trim().toLowerCase();
     if (!EMAIL_SHAPE.test(email)) throw new HttpError(400, 'bad_email', 'Digite um e-mail válido.');
     const limited = limiters.pairEmail.hit(email);
     // um asterisco na lista = qualquer e-mail pode pedir (os limites por IP e por endereço continuam valendo)
-    if (limited.ok && (config.pairAllowedEmails.includes('*') || config.pairAllowedEmails.includes(email))) {
+    if (limited.ok && agents.canPairByEmail(email, config.pairAllowedEmails)) {
       const { code, expires_in: seconds } = agents.startPairing(email); // o computador pareado com este código fica ligado a este e-mail
       const message = pairingEmail({ code, minutes: Math.round(seconds / 60), server: config.publicUrl || '' });
       mailer.send({ to: email, ...message }).catch((error) => request.log.error({ err: error.message }, 'não consegui enviar o código por e-mail'));
@@ -201,6 +201,7 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
     requireCloud(request);
     const missing = [];
     for (const id of request.body.ids) {
+      if (agents.isSongBlocked(id)) continue; // o administrador tirou esta música da nuvem: não pedir de novo
       const found = await Promise.all(['instrumental.mp3', 'lyrics.json', 'meta.json'].map((file) => storage.exists(`cache/${id}/${file}`)));
       if (!found.every(Boolean)) missing.push(id);
     }
@@ -215,6 +216,7 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
   }, async (request, reply) => {
     requireCloud(request);
     const { id, file } = request.params;
+    if (agents.isSongBlocked(id)) throw new HttpError(403, 'cloud_blocked', 'Esta música foi tirada da nuvem pelo administrador.');
     const rule = CLOUD_FILES[file];
     const data = request.body;
     if (!Buffer.isBuffer(data) || data.length === 0) throw new HttpError(400, 'empty_file', 'O arquivo está vazio.');

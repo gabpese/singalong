@@ -369,6 +369,17 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 - The disk: the existing cache cleaner (`CACHE_MAX_GB`) deletes the least played songs when it is exceeded.
 - Copyright: a song that goes up is served to every room of the server. Keep the list short and trusted.
 
+### 12.10 Administrator page (Oct 2026)
+
+**Done** (`/admin`, only for whoever has the `ADMIN_TOKEN`)
+- **Access:** the page is static and carries no secret; whoever opens it types the token, which stays only in that browser tab (`sessionStorage`). Every call sends it in the `X-Admin-Token` header (no cookies, so no CSRF), compared in constant time. Wrong tokens spend a small quota per IP (8 per 10 minutes, then `429`). The page has a strict CSP, `X-Frame-Options: DENY`, `noindex`, and without `ADMIN_TOKEN` it does not exist (`404`).
+- **E-mails:** add, change and remove who **receives the pairing code** and who **sends songs to the cloud** (`*` in "receives the code" frees any e-mail; it never frees sending). The effect is immediate, with no restart. The lists in the `.env` (`PAIR_ALLOWED_EMAILS`, `ENABLED_TO_SEND_TO_CLOUD`) still count and appear as fixed.
+- **Computers:** each paired computer with its e-mail, whether it sends songs and when it was last seen; **Disconnect** revokes it (its app must pair again).
+- **Cloud songs:** the list (title, artist, origin, size, date, total size) and **Remove from the cloud**: it deletes the song and **blocks** it (`cloud_blocked`), so the computers do not send it again, even when they restart and resend their libraries; **Release** allows it again.
+- **Tests:** 6 on the server (page and CSP, token and lock-out, e-mails with immediate effect, `*` and fixed lists, computers, remove/block/release) and 1 on the worker (a blocked song is not insisted on).
+
+**Decision:** only the owner removes songs from the cloud and manages the lists; the pairing e-mail flow and the automatic upload stay as they were.
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**
