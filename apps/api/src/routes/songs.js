@@ -32,9 +32,20 @@ export function missingLyricsText(lyrics) {
   return Boolean(lyrics) && ['text', 'file', 'align'].includes(lyrics.source) && !lyrics.text?.trim();
 }
 
+const ROOM_HEADER = /^[A-Za-z0-9]{4,8}$/;
+
 /** Plugin Fastify com as rotas de músicas (biblioteca, jobs de processamento e pesquisa). */
-export async function songRoutes(app, { songs, jobs, limiters }) {
-  // Pesquisa de vídeos no YouTube (atendida pelo worker); o link escolhido segue para POST /songs ou para a fila.
+export async function songRoutes(app, { songs, jobs, limiters, rooms, agents }) {
+  /**
+   * Para onde vai o pedido: o cabeçalho X-Room diz de que sala ele vem. Se a sala tem uma sessão, quem atende é o agente do
+   * dono dela; sem cabeçalho (ou sala sem sessão), o worker clássico. Sala que não existe: 404.
+   */
+  function sessionOf(request) {
+    const code = String(request.headers['x-room'] ?? '');
+    return ROOM_HEADER.test(code) ? rooms.sessionIdOf(code) : null;
+  }
+
+  // Pesquisa de vídeos no YouTube (atendida pelo worker ou pelo agente da sessão); o link escolhido segue para POST /songs ou para a fila.
   app.get('/search', {
     preHandler: rateLimited(limiters.search, { message: 'Muitas buscas seguidas. Espere alguns segundos e tente de novo.' }),
     schema: {
@@ -45,8 +56,12 @@ export async function songRoutes(app, { songs, jobs, limiters }) {
       },
     },
   }, async (request, reply) => {
+    const sessionId = sessionOf(request);
+    if (sessionId && !agents.isOnline(sessionId)) {
+      return reply.code(503).send({ error: 'owner_offline', message: 'O dono da sessão está desconectado. Cole o link do vídeo ou tente mais tarde.' });
+    }
     try {
-      const results = await jobs.search(request.query.q);
+      const results = await jobs.search(request.query.q, { sessionId });
       return results.map((r) => ({ ...r, thumbnail: `https://i.ytimg.com/vi/${r.video_id}/mqdefault.jpg` }));
     } catch (err) {
       request.log.warn({ err: err.message }, 'busca falhou');
@@ -77,7 +92,7 @@ export async function songRoutes(app, { songs, jobs, limiters }) {
     if (missingLyricsText(request.body.lyrics)) {
       return reply.code(400).send({ error: 'lyrics_text_required', message: 'Informe o texto da letra.' });
     }
-    const { cached, created, deduped, song } = await songs.request(id, request.body);
+    const { cached, created, deduped, song } = await songs.request(id, request.body, { sessionId: sessionOf(request) });
     if (cached) return reply.code(200).send({ ...song, cached: true });
     return reply.code(created ? 202 : 200).send({ ...song, deduped });
   });
@@ -93,7 +108,7 @@ export async function songRoutes(app, { songs, jobs, limiters }) {
     preHandler: rateLimited(limiters.addToQueue),
     schema: { params: ID_PARAM, body: { type: 'object', additionalProperties: false, properties: { pitch: PITCH } } },
   }, async (request, reply) => {
-    const result = await songs.requestExport(request.params.id, request.body?.pitch ?? 0);
+    const result = await songs.requestExport(request.params.id, request.body?.pitch ?? 0, { sessionId: sessionOf(request) });
     if (result.error === 'not_found') return reply.code(404).send({ error: 'not_found' });
     if (result.error === 'not_ready') return reply.code(409).send({ error: 'not_ready', message: 'A música ainda está sendo preparada.' });
     return reply.code(result.export.status === 'ready' ? 200 : 202).send(result.export);
@@ -111,7 +126,7 @@ export async function songRoutes(app, { songs, jobs, limiters }) {
     if (missingLyricsText(lyrics)) {
       return reply.code(400).send({ error: 'lyrics_text_required', message: 'Informe o texto da letra.' });
     }
-    const result = await songs.setLyrics(request.params.id, lyrics, { artist, title });
+    const result = await songs.setLyrics(request.params.id, lyrics, { artist, title }, { sessionId: sessionOf(request) });
     if (result.error === 'not_found') return reply.code(404).send({ error: 'not_found' });
     if (result.error === 'in_progress') {
       return reply.code(409).send({ error: 'job_in_progress', message: 'A música ainda está sendo processada.' });

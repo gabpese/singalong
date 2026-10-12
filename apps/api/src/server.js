@@ -28,5 +28,9 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
   });
 }
 
+// encerra as sessões do agente que ficaram dias sem sinal (o app fechou sem avisar); os pedidos delas viram falha
+const sweepSessions = setInterval(() => app.agents.sweep().catch((err) => app.log.warn({ err: err.message }, 'varredura de sessões')), 10 * 60 * 1000);
+sweepSessions.unref();
+
 app.rooms.start(); // relógio das salas: avança a fila quando uma música fica pronta e difunde o progresso
 await app.listen({ port: config.port, host: config.host });

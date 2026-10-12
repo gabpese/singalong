@@ -20,5 +20,7 @@ export function loadConfig(env = process.env) {
     publicUrl: (env.PUBLIC_URL ?? '').replace(/\/$/, ''),
     // URL pela qual o navegador alcança /media (vazio = mesma origem)
     publicBaseUrl: (env.PUBLIC_BASE_URL ?? '').replace(/\/$/, ''),
+    // segredo do administrador do servidor: só com ele dá para gerar códigos de pareamento do agente local (vazio = desligado)
+    adminToken: env.ADMIN_TOKEN ?? '',
   };
 }

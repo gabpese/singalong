@@ -80,10 +80,10 @@ export function createSongService({ storage, jobs }) {
     exportInfo,
 
     /** Pede o MP4 (instrumental + letra) no tom escolhido. error: 'not_found' (música não existe) | 'not_ready'. */
-    async requestExport(id, pitch) {
+    async requestExport(id, pitch, { sessionId = null } = {}) {
       if (!(await describe(id))) return { error: 'not_found' };
       if (!(await isReady(id))) return { error: 'not_ready' };
-      if ((await exportInfo(id, pitch)).status !== 'ready') await jobs.requestExport(id, pitch);
+      if ((await exportInfo(id, pitch)).status !== 'ready') await jobs.requestExport(id, pitch, { sessionId });
       return { export: await exportInfo(id, pitch) };
     },
 
@@ -98,20 +98,23 @@ export function createSongService({ storage, jobs }) {
       return songs;
     },
 
-    /** Usa o cache se estiver pronto; senão cria um job (ou reaproveita o que está em andamento: dedupe). */
-    async request(id, body = {}) {
+    /**
+     * Usa o cache se estiver pronto; senão cria um job (ou reaproveita o que está em andamento: dedupe).
+     * `sessionId`: o job vai para o agente dono da sessão (sem ele, para o worker clássico).
+     */
+    async request(id, body = {}, { sessionId = null } = {}) {
       const explicitLyrics = body.lyrics && body.lyrics.source !== 'auto';
       if ((await isReady(id)) && !explicitLyrics) {
         return { cached: true, created: false, deduped: false, song: await describe(id) };
       }
-      const { created } = await jobs.enqueue(id, payloadFor(id, body), { replace: Boolean(explicitLyrics) });
+      const { created } = await jobs.enqueue(id, payloadFor(id, body), { replace: Boolean(explicitLyrics), sessionId });
       return { cached: false, created, deduped: !created, song: await describe(id) };
     },
 
     /** Escolhe/troca a letra (reaproveita o instrumental do cache). error: 'not_found' | 'in_progress'. */
-    async setLyrics(id, lyrics, { artist, title } = {}) {
+    async setLyrics(id, lyrics, { artist, title } = {}, { sessionId = null } = {}) {
       if (!(await describe(id))) return { error: 'not_found' };
-      const { created } = await jobs.enqueue(id, payloadFor(id, { lyrics, artist, title }), { replace: true });
+      const { created } = await jobs.enqueue(id, payloadFor(id, { lyrics, artist, title }), { replace: true, sessionId });
       if (!created) return { error: 'in_progress' };
       return { song: await describe(id) };
     },

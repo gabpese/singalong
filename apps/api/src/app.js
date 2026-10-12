@@ -1,9 +1,11 @@
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
+import { createAgentService } from './agents.js';
 import { openDb } from './db.js';
 import { sendFile } from './files.js';
 import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.js';
 import { createHub, createRoomService, HttpError } from './rooms.js';
+import { agentRoutes } from './routes/agent.js';
 import { roomRoutes } from './routes/rooms.js';
 import { songRoutes } from './routes/songs.js';
 import { createSongService } from './songs.js';
@@ -22,8 +24,10 @@ export function buildApp({ config, storage, jobs, logger = false }) {
     Object.entries({ ...DEFAULT_LIMITS, ...(config.rateLimits ?? {}) }).map(([name, options]) => [name, createRateLimiter(options)]),
   );
   const songs = createSongService({ storage, jobs });
-  const rooms = createRoomService({ db, songs, hub: createHub() });
+  const agents = createAgentService({ db, jobs });
+  const rooms = createRoomService({ db, songs, hub: createHub(), agents });
   app.decorate('rooms', rooms);
+  app.decorate('agents', agents);
   app.decorate('db', db);
   app.addHook('onClose', async () => {
     rooms.stop();
@@ -55,8 +59,9 @@ export function buildApp({ config, storage, jobs, logger = false }) {
   });
 
   app.register(websocket);
-  app.register(songRoutes, { prefix: '/api', songs, jobs, limiters });
+  app.register(songRoutes, { prefix: '/api', songs, jobs, limiters, rooms, agents });
   app.register(roomRoutes, { prefix: '/api', rooms, config, limiters });
+  app.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters });
 
   if (storage.local) {
     app.get('/media/*', (request, reply) => {
@@ -68,7 +73,7 @@ export function buildApp({ config, storage, jobs, logger = false }) {
   // páginas (arquivos estáticos); qualquer outra rota sob /api que não existe cai em 404 JSON
   app.get('/*', (request, reply) => {
     const path = request.params['*'];
-    if (path.startsWith('api/')) return reply.code(404).send({ error: 'not_found' });
+    if (path.startsWith('api/') || path.startsWith('agent/')) return reply.code(404).send({ error: 'not_found' });
     const file = safeJoin(config.publicDir, path || 'index.html');
     return file ? sendFile(request, reply, file) : reply.code(403).send({ error: 'forbidden' });
   });

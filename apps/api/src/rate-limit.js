@@ -51,4 +51,5 @@ export const DEFAULT_LIMITS = {
   search: { max: 12, windowMs: 60_000 }, // cada busca vira uma consulta ao YouTube
   addToQueue: { max: 30, windowMs: 60_000 },
   createRoom: { max: 10, windowMs: 60_000 },
+  pair: { max: 10, windowMs: 60_000 }, // tentativas de pareamento do agente (o código tem 8 caracteres e vence em 10 min)
 };
