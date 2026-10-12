@@ -84,6 +84,7 @@ export function createRoomService({
   db,
   songs,
   hub,
+  agents = null, // o serviço do agente local: dá o apelido e o estado (online) do dono da sessão de uma sala
   now = Date.now,
   newCode = generateCode,
   newToken = () => randomBytes(16).toString('hex'),
@@ -202,6 +203,8 @@ export function createRoomService({
       next_item_id: upNext?.id ?? null,
       position_ms: position?.item_id === room.current_item_id ? position.ms : 0,
       tv_connected: hub.count(room.code, 'tv') > 0,
+      // o dono da sessão da sala (só o apelido e se está conectado); null nas salas sem sessão
+      owner: room.session_id && agents ? agents.ownerOf(room.session_id) : null,
       queue: items.map((item) => {
         const song = described.get(item.video_id);
         return {
@@ -262,16 +265,20 @@ export function createRoomService({
   }
 
   return {
-    createRoom() {
+    /** Cria a sala. Com `sessionId`, os pedidos de música dela vão para o agente dono dessa sessão. */
+    createRoom({ sessionId = null } = {}) {
       for (let attempt = 0; attempt < 20; attempt++) {
         const code = newCode();
         if (db.getRoom(code)) continue;
         const hostToken = newToken();
-        db.createRoom(code, hostToken, now());
+        db.createRoom(code, hostToken, now(), sessionId);
         return { code, host_token: hostToken };
       }
       throw new HttpError(503, 'no_room_code', 'Não consegui criar uma sala agora. Tente de novo.');
     },
+
+    /** A sessão a que a sala pertence (null = sala sem sessão); 404 se a sala não existe. */
+    sessionIdOf: (code) => requireRoom(code).session_id ?? null,
 
     getState: (code, actor) => stateFor(normalizeCode(code), actor),
 
@@ -293,7 +300,7 @@ export function createRoomService({
         if (db.countQueuedBy(room.code, actor.clientId) >= MAX_PER_CLIENT) {
           throw new HttpError(409, 'too_many', `Cada pessoa pode ter até ${MAX_PER_CLIENT} músicas na fila.`);
         }
-        const song = await songs.request(videoId, { lyrics: params.lyrics, artist, title });
+        const song = await songs.request(videoId, { lyrics: params.lyrics, artist, title }, { sessionId: room.session_id ?? null });
         const itemId = db.addItem({
           roomCode: room.code,
           videoId,

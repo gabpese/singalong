@@ -88,6 +88,51 @@ Rooms and the queue live in a SQLite database in the Docker volume `api-data`.
 Requests carry `X-Client-Id` (the browser's id) and, for the host, `X-Host-Token`.
 The contract between the API and the worker (Redis Streams) is documented in [apps/api/src/jobs.js](apps/api/src/jobs.js).
 
+### Local agent (milestone M0: server side and worker transport)
+
+A **local agent** is the worker running on the owner's computer and talking to the server over **outbound HTTP only** (`/agent/v1`), with no Redis access. The owner starts a **session** (with a nickname the guests see), creates the rooms of that session, and every song request made from a guest's phone in those rooms is routed to **that owner's agent** (never to another session's). Design and plan: [TRD](TRD.md).
+
+| Route (`/agent/v1`, `Authorization: Bearer <device token>`) | Purpose |
+|---|---|
+| `POST /pair/start` (header `X-Admin-Token`) · `POST /pair/complete {code, name}` | pairing: the admin generates an 8-character one-time code (10 min); the agent trades it for a device token |
+| `GET /me` · `DELETE /devices/me` | the device and its active session · revoke this device |
+| `POST /sessions {display_name, resume_id?}` · `DELETE /sessions/:id` · `POST /sessions/:id/rooms` | start/resume/end the session · create a room in it |
+| `POST /heartbeat` | proof of life (the owner shows as "online" for 45 s) |
+| `POST /jobs/claim {wait_ms}` · `POST /jobs/:id/progress` · `POST /jobs/:id/complete` | processing jobs (long-poll, up to 25 s) |
+| `POST /search/claim` · `POST /search/:id/result` | YouTube search done by the agent |
+| `POST /exports/claim` · `POST /exports/:id/:pitch/state` | MP4 export |
+
+Pages send the room code in `X-Room` so the search, the lyrics change and the export of a room go to its session's agent. The room state carries `owner: {nickname, online}` (and `null` for rooms without a session, which keep using the classic Redis worker).
+
+```bash
+# on the server (set ADMIN_TOKEN; without it pairing is off): generate a one-time code
+curl -X POST https://YOUR_HOST/agent/v1/pair/start -H "X-Admin-Token: $ADMIN_TOKEN"
+# on the owner's computer (the worker package; Python):
+python -m singalong_worker --pair CODE --agent-url https://YOUR_HOST          # prints AGENT_TOKEN=...
+export AGENT_URL=https://YOUR_HOST AGENT_TOKEN=... AGENT_SESSION_NAME="My nickname"
+python -m singalong_worker --consume        # the agent: starts the session and pulls jobs, searches and exports
+python -m singalong_worker --create-room    # prints the TV and host links of a new room in the session
+```
+
+**Trying the agent by hand with Docker** (PowerShell, from the project root; the interface does not show the owner's nickname or the "owner disconnected" notice yet, only the API does):
+
+```powershell
+$env:ADMIN_TOKEN = "any-long-secret"
+docker compose up -d --build --wait api redis  # only the API and Redis (no classic worker); --wait returns when the API is ready
+# generate the one-time code, trade it for a device token and keep it in $env:AGENT_TOKEN
+$resp = curl.exe -s -X POST http://localhost:3000/agent/v1/pair/start -H "X-Admin-Token: $env:ADMIN_TOKEN"; $resp   # {"code":"ABCD2345",...}
+$code = ($resp | ConvertFrom-Json).code
+$out = docker compose --profile cpu run --rm -T worker --pair $code --agent-url http://api:3000
+$env:AGENT_TOKEN = ($out | Select-String '^AGENT_TOKEN=').Line.Split('=', 2)[1].Trim()
+echo $env:AGENT_TOKEN   # sga_... (47 characters). $env: only lives in ONE terminal: set it again in each terminal you use below
+# terminal 1: the agent (leave it open; use --profile gpu and worker-gpu for speed)
+docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" worker --consume
+# terminal 2: a room in the agent's session (prints the TV and host links)
+docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN worker --create-room --agent-url http://api:3000 --public-url http://localhost:3000
+```
+
+Then open the TV link, join the room as a guest in another window, search and add a song: the search and the processing happen on the agent. Stop the agent with Ctrl+C and the next search says the owner is disconnected. `curl.exe -H "x-client-id: guest-0001" http://localhost:3000/api/rooms/CODE` shows `owner: {nickname, online}`. When the agent starts it also analyzes the backing vocals of songs already in `storage/` (slow on CPU), as the classic worker does.
+
 ### Worker CLI (no API, for testing)
 
 ```powershell

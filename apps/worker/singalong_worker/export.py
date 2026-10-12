@@ -3,9 +3,7 @@
 A letra vira uma legenda ASS (efeito de karaokê \\kf, com os tempos reais de cada palavra quando existem) queimada por
 cima de um fundo liso; o tom é trocado, se pedido, com o filtro rubberband do ffmpeg.
 
-Contrato com a API (Redis, documentado em apps/api/src/jobs.js):
-  lista  "export:req"           a API faz LPUSH de {"video_id", "pitch"}
-  hash   "export:<id>:<pitch>"  status (pending | processing | ready | failed) e error
+O transporte dos pedidos (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.js.
 """
 import json
 import logging
@@ -19,8 +17,6 @@ from .storage import LocalStorage
 
 log = logging.getLogger("worker.export")
 
-REQUEST_KEY = "export:req"
-STATE_TTL = 3600
 WIDTH, HEIGHT, FPS = 1280, 720, 25
 LEAD = 1.5  # a linha aparece 1,5 s antes de ser cantada
 HOLD = 0.8  # ...e fica 0,8 s depois
@@ -171,29 +167,23 @@ def export_mp4(storage: LocalStorage, video_id: str, pitch: int = 0, timeout: in
     return key
 
 
-def serve(redis_url: str, storage: LocalStorage, stop: threading.Event) -> None:
+def serve(backend, storage: LocalStorage, stop: threading.Event) -> None:
     """Loop da thread de exportação: atende pedidos da API um de cada vez enquanto `stop` não for sinalizado."""
-    import redis  # import tardio: os testes não precisam do cliente Redis
-
-    r = redis.Redis.from_url(redis_url, decode_responses=True, socket_timeout=30, socket_connect_timeout=5)
     while not stop.is_set():
         try:
-            item = r.brpop(REQUEST_KEY, timeout=2)
-            if not item:
+            request = backend.next_export(2)
+            if not request:
                 continue
-            request = json.loads(item[1])
             video_id, pitch = str(request["video_id"]), int(request.get("pitch", 0))
-            state = f"export:{video_id}:{pitch}"
-            r.hset(state, mapping={"status": "processing", "error": "", "updated_at": int(time.time() * 1000)})
+            backend.set_export_state(video_id, pitch, "processing")
             started = time.monotonic()
             try:
                 export_mp4(storage, video_id, pitch)
-                r.hset(state, mapping={"status": "ready", "error": "", "updated_at": int(time.time() * 1000)})
+                backend.set_export_state(video_id, pitch, "ready")
                 log.info("MP4 pronto", extra={"job": video_id, "pitch": pitch, "elapsed_s": round(time.monotonic() - started, 1)})
             except Exception as exc:  # noqa: BLE001 - o pedido termina com uma mensagem, nunca fica "processando"
                 log.exception("MP4 falhou", extra={"job": video_id, "pitch": pitch})
-                r.hset(state, mapping={"status": "failed", "error": str(exc)[:300], "updated_at": int(time.time() * 1000)})
-            r.expire(state, STATE_TTL)
+                backend.set_export_state(video_id, pitch, "failed", str(exc)[:300])
         except Exception:  # noqa: BLE001 - conexão ou pedido inválido: segue para o próximo
             log.warning("falha ao atender pedido de exportação", exc_info=True)
             stop.wait(2)

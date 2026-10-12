@@ -53,7 +53,8 @@ export const setHostToken = (code, token) => store.set(`host:${code}`, token);
 
 export function authHeaders(code) {
   const token = code ? hostToken(code) : '';
-  return { 'x-client-id': clientId(), ...(token ? { 'x-host-token': token } : {}) };
+  // x-room diz de que sala vem o pedido: com um agente local, é o dono da sessão dela quem atende a busca, a letra e o MP4
+  return { 'x-client-id': clientId(), ...(token ? { 'x-host-token': token } : {}), ...(code ? { 'x-room': code } : {}) };
 }
 
 /** Chamada JSON à API; em erro lança Error(message amigável) com `.status` e `.code`. */

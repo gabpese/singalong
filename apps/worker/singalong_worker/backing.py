@@ -7,8 +7,8 @@ instrumental + apoio com o volume que quem escolheu a música definir.
 Não bloqueia a música: ela fica pronta sem o apoio e uma thread própria o gera depois (leva minutos em CPU). Músicas sem
 apoio de verdade (uma voz só) ficam marcadas `backing.status = "none"` e não ganham o arquivo.
 
-Contrato (Redis, documentado em apps/api/src/jobs.js):
-  lista  "backing:req"   o worker faz LPUSH do video_id quando uma música fica pronta
+O pedido (o video_id de uma música que acabou de ficar pronta) vem do próprio worker, pelo backend (backend.py): uma lista no
+Redis no worker clássico, uma fila em memória no agente local.
 meta.json: `backing: {"status": "ready" | "none", "share": 0..1}`.
 """
 import json
@@ -24,8 +24,7 @@ from .meta_store import meta_key, update_meta
 
 log = logging.getLogger("worker.backing")
 
-REQUEST_KEY = "backing:req"
-MODEL = "UVR_MDXNET_KARA_2.onnx"
+MODEL ="UVR_MDXNET_KARA_2.onnx"
 MODEL_DIR = os.environ.get("BACKING_MODEL_DIR", "/models/audio-separator")
 SAMPLE_RATE = 22050
 FRAME = 2048
@@ -130,21 +129,18 @@ def find_missing(storage) -> list[str]:
     return sorted(missing)
 
 
-def serve(redis_url: str, storage, stop: threading.Event) -> None:
+def serve(backend, storage, stop: threading.Event) -> None:
     """Loop da thread: primeiro as músicas antigas sem análise, depois os pedidos de músicas novas, uma de cada vez."""
-    import redis  # import tardio: os testes não precisam do cliente Redis
-
-    r = redis.Redis.from_url(redis_url, decode_responses=True, socket_timeout=30, socket_connect_timeout=5)
     pending = deque(find_missing(storage))
     if pending:
         log.info("vozes de apoio: %d música(s) do cache para analisar em segundo plano", len(pending))
     while not stop.is_set():
         try:
             if not pending:
-                item = r.brpop(REQUEST_KEY, timeout=2)
-                if not item:
+                video_id = backend.next_backing(2)
+                if not video_id:
                     continue
-                pending.append(item[1])
+                pending.append(video_id)
             video_id = pending.popleft()
             try:
                 status = process(storage, video_id)

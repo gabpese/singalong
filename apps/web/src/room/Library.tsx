@@ -8,7 +8,7 @@ import type { ApiError, LibrarySong } from '../lib/types';
 import { useRoom } from './context';
 
 function LibraryRow({ song }: { song: LibrarySong }) {
-  const { act, toast, myName } = useRoom();
+  const { act, toast, myName, code } = useRoom();
   const [pitch, setPitch] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportLabel, setExportLabel] = useState('Baixar MP4');
@@ -18,7 +18,7 @@ function LibraryRow({ song }: { song: LibrarySong }) {
     setExporting(true);
     try {
       toast('Gerando o vídeo… pode levar alguns segundos.');
-      const url = await requestExport(api, song.video_id, pitch, { onWaiting: () => setExportLabel('Gerando…') });
+      const url = await requestExport((method, path, body) => api(method, path, body, code), song.video_id, pitch, { onWaiting: () => setExportLabel('Gerando…') });
       downloadFile(url, exportFileName(song, pitch));
       toast('Vídeo pronto! O download começou.');
     } catch (err) {

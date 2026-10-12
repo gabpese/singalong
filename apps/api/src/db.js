@@ -34,6 +34,28 @@ CREATE TABLE IF NOT EXISTS song_settings (
   video_id     TEXT PRIMARY KEY,
   lyric_offset REAL NOT NULL DEFAULT 0
 );
+-- Agente local (o app instalado no computador do dono): dispositivos pareados, códigos de pareamento e sessões.
+CREATE TABLE IF NOT EXISTS devices (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  token_hash  TEXT NOT NULL UNIQUE,                  -- só o SHA-256 do token: o token em si nunca fica guardado
+  created_at  INTEGER NOT NULL,
+  last_seen   INTEGER,
+  revoked_at  INTEGER
+);
+CREATE TABLE IF NOT EXISTS pair_codes (
+  code_hash   TEXT PRIMARY KEY,
+  expires_at  INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  id           TEXT PRIMARY KEY,
+  device_id    TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,                        -- o apelido que os convidados veem (nunca a conta do YouTube)
+  created_at   INTEGER NOT NULL,
+  last_seen    INTEGER NOT NULL,
+  ended_at     INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions (device_id, ended_at);
 `;
 
 const ROOM_FIELDS = new Set(['fair', 'scoring', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
@@ -53,6 +75,8 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('rooms', 'scoring')) db.exec('ALTER TABLE rooms ADD COLUMN scoring INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('queue_items', 'score')) db.exec('ALTER TABLE queue_items ADD COLUMN score INTEGER');
   if (!hasColumn('queue_items', 'backing')) db.exec('ALTER TABLE queue_items ADD COLUMN backing INTEGER NOT NULL DEFAULT 0');
+  // bancos criados antes do agente local não têm a sessão da sala (nula = sala sem dono de sessão: o worker clássico)
+  if (!hasColumn('rooms', 'session_id')) db.exec('ALTER TABLE rooms ADD COLUMN session_id TEXT REFERENCES sessions(id)');
 
   const one = (sql, ...params) => db.prepare(sql).get(...params) ?? null;
   const all = (sql, ...params) => db.prepare(sql).all(...params);
@@ -83,8 +107,8 @@ export function openDb(path = ':memory:') {
     close: () => db.close(),
 
     // --- salas ---
-    createRoom: (code, hostToken, now) =>
-      run('INSERT INTO rooms (code, host_token, created_at, last_active_at) VALUES (?, ?, ?, ?)', code, hostToken, now, now),
+    createRoom: (code, hostToken, now, sessionId = null) =>
+      run('INSERT INTO rooms (code, host_token, created_at, last_active_at, session_id) VALUES (?, ?, ?, ?, ?)', code, hostToken, now, now, sessionId),
     getRoom: (code) => one('SELECT * FROM rooms WHERE code = ?', code),
     listRoomCodes: () => all('SELECT code FROM rooms').map((r) => r.code),
     updateRoom: (code, fields) => update('rooms', ROOM_FIELDS, 'code', code, fields),
@@ -120,6 +144,38 @@ export function openDb(path = ':memory:') {
         run('UPDATE queue_items SET position = ? WHERE id = ?', b.position, idA);
         run('UPDATE queue_items SET position = ? WHERE id = ?', a.position, idB);
       }),
+
+    // --- agente local: dispositivos, pareamento e sessões ---
+    createDevice: ({ id, name, tokenHash, now }) =>
+      run('INSERT INTO devices (id, name, token_hash, created_at, last_seen) VALUES (?, ?, ?, ?, ?)', id, name, tokenHash, now, now),
+    getDeviceByTokenHash: (tokenHash) => one('SELECT * FROM devices WHERE token_hash = ? AND revoked_at IS NULL', tokenHash),
+    getDevice: (id) => one('SELECT * FROM devices WHERE id = ?', id),
+    touchDevice: (id, now) => run('UPDATE devices SET last_seen = ? WHERE id = ?', now, id),
+    revokeDevice: (id, now) => run('UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL', now, id).changes > 0,
+
+    savePairCode: (codeHash, expiresAt, now) =>
+      transaction(() => {
+        run('DELETE FROM pair_codes WHERE expires_at <= ?', now); // não acumula códigos vencidos
+        run('INSERT OR REPLACE INTO pair_codes (code_hash, expires_at) VALUES (?, ?)', codeHash, expiresAt);
+      }),
+    /** Gasta o código (uso único): true só se existia e não tinha vencido. */
+    consumePairCode: (codeHash, now) =>
+      transaction(() => {
+        const row = one('SELECT expires_at FROM pair_codes WHERE code_hash = ?', codeHash);
+        run('DELETE FROM pair_codes WHERE code_hash = ?', codeHash);
+        return Boolean(row) && row.expires_at > now;
+      }),
+
+    createSession: ({ id, deviceId, displayName, now }) =>
+      run('INSERT INTO sessions (id, device_id, display_name, created_at, last_seen) VALUES (?, ?, ?, ?, ?)', id, deviceId, displayName, now, now),
+    getSession: (id) => one('SELECT * FROM sessions WHERE id = ?', id),
+    activeSessionOf: (deviceId) => one('SELECT * FROM sessions WHERE device_id = ? AND ended_at IS NULL ORDER BY created_at DESC LIMIT 1', deviceId),
+    touchSession: (id, now) => run('UPDATE sessions SET last_seen = ? WHERE id = ? AND ended_at IS NULL', now, id),
+    renameSession: (id, displayName) => run('UPDATE sessions SET display_name = ? WHERE id = ?', displayName, id),
+    /** Encerra a sessão e devolve true se ela estava ativa. */
+    endSession: (id, now) => run('UPDATE sessions SET ended_at = ? WHERE id = ? AND ended_at IS NULL', now, id).changes > 0,
+    /** Sessões ativas sem sinal desde `before` (o app fechou sem avisar). */
+    listStaleSessions: (before) => all('SELECT * FROM sessions WHERE ended_at IS NULL AND last_seen < ?', before),
 
     // --- ajustes por música (valem em qualquer sala) ---
     ping: () => one('SELECT 1 AS ok').ok === 1,

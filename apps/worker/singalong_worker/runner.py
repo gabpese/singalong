@@ -1,8 +1,7 @@
 """Tratamento de UM job: retentativas, mensagens de erro claras e proteção contra job que derruba o worker em loop.
 
-Não depende do cliente Redis (recebe um objeto com hset/hincrby/expire/xack), então é testável sem Redis.
+Não conhece Redis nem HTTP: fala com um `Backend` (backend.py), então é testável sem nenhum dos dois.
 """
-import json
 import logging
 import os
 import time
@@ -10,17 +9,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .backend import Job
 from .errors import AUTO, MANUAL, JobError, classify
-from .backing import REQUEST_KEY as BACKING_REQUEST_KEY
 from .pipeline import Limits, NeedsLyrics, process
 from .storage import LocalStorage
 
-STREAM = "jobs"
-GROUP = "workers"
 log = logging.getLogger("worker.job")
-
-DONE_TTL = 3600  # status "ready" some do Redis depois de 1 h (a verdade passa a ser o storage)
-FAILED_TTL = 86400
 
 
 @dataclass
@@ -36,6 +30,10 @@ class Settings:
     retry_wait: float = 5.0  # espera antes da 2ª tentativa; depois 4× a cada nova tentativa (5 s, 20 s...)
     max_starts: int = 3  # quantas vezes um mesmo job pode (re)começar antes de ser dado como "derruba o worker"
     limits: Limits = field(default_factory=Limits)
+    # agente local: se `agent_url` está definida, o worker fala HTTP com o servidor (/agent/v1) em vez de ler o Redis
+    agent_url: str | None = None
+    agent_token: str | None = None
+    agent_name: str = "Meu computador"  # o apelido da sessão, o que os convidados veem
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -52,26 +50,19 @@ class Settings:
             retry_wait=float(env.get("WORKER_RETRY_WAIT", "5")),
             max_starts=int(env.get("WORKER_MAX_STARTS", "3")),
             limits=Limits.from_env(),
+            agent_url=env.get("AGENT_URL") or None,
+            agent_token=env.get("AGENT_TOKEN") or None,
+            agent_name=env.get("AGENT_SESSION_NAME") or "Meu computador",
         )
 
 
-def set_job(r, video_id: str, **fields) -> None:
-    """Atualiza o estado do job (hash job:<id>), que a API lê para mostrar o progresso."""
-    key = f"job:{video_id}"
-    r.hset(key, mapping={**{k: "" if v is None else str(v) for k, v in fields.items()}, "updated_at": int(time.time() * 1000)})
-    status = fields.get("status")
-    if status == "ready":
-        r.expire(key, DONE_TTL)
-    elif status in ("failed", "needs_lyrics"):
-        r.expire(key, FAILED_TTL)
+def _fail(backend, job: Job, err: JobError) -> None:
+    backend.set_state(job, status="failed", stage="", error=err.message, error_code=err.code, retry=err.retry)
 
 
-def _fail(r, video_id: str, err: JobError) -> None:
-    set_job(r, video_id, status="failed", stage="", error=err.message, error_code=err.code, retry=err.retry)
-
-
-def _run(r, storage: LocalStorage, settings: Settings, video_id: str, payload: dict, sleep: Callable[[float], None]) -> None:
+def _run(backend, storage: LocalStorage, settings: Settings, job: Job, sleep: Callable[[float], None]) -> None:
     """Roda o pipeline; falhas transitórias são repetidas com espera, as demais sobem já traduzidas (JobError)."""
+    payload = job.payload
     for attempt in range(1, settings.max_attempts + 1):
         try:
             process(
@@ -84,7 +75,7 @@ def _run(r, storage: LocalStorage, settings: Settings, video_id: str, payload: d
                 cookies=settings.cookies,
                 artist=payload.get("artist"),
                 title=payload.get("title"),
-                on_stage=lambda stage: set_job(r, video_id, status="processing", stage=stage),
+                on_stage=lambda stage: backend.set_state(job, status="processing", stage=stage),
                 lyrics_loose=bool(payload.get("lyrics_loose")),
                 limits=settings.limits,
             )
@@ -98,23 +89,22 @@ def _run(r, storage: LocalStorage, settings: Settings, video_id: str, payload: d
                     raise  # já era um JobError traduzido
                 raise err from exc
             wait = settings.retry_wait * 4 ** (attempt - 1)
-            log.warning("falha transitória, tentando de novo", extra={"job": video_id, "code": err.code, "attempt": attempt, "wait_s": wait})
-            set_job(r, video_id, status="processing", stage="retrying", error=f"{err.message} (tentativa {attempt} de {settings.max_attempts})")
+            log.warning("falha transitória, tentando de novo", extra={"job": job.video_id, "code": err.code, "attempt": attempt, "wait_s": wait})
+            backend.set_state(job, status="processing", stage="retrying", error=f"{err.message} (tentativa {attempt} de {settings.max_attempts})")
             sleep(wait)
 
 
-def handle(r, storage: LocalStorage, settings: Settings, msg_id: str, fields: dict, sleep: Callable[[float], None] = time.sleep) -> None:
-    video_id = fields["video_id"]
-    payload = json.loads(fields["payload"])
+def handle(backend, storage: LocalStorage, settings: Settings, job: Job, sleep: Callable[[float], None] = time.sleep) -> None:
+    video_id, payload = job.video_id, job.payload
     started = time.monotonic()
     try:
         # Conta quantas vezes ESTE pedido começou. Um job que mata o worker (falta de memória, por exemplo) é entregue de
         # novo a cada reinício; sem esse limite ele derrubaria o worker para sempre. O contador zera quando a API
-        # enfileira o pedido de novo (o script Lua recria o hash).
-        starts = int(r.hincrby(f"job:{video_id}", "starts", 1))
+        # enfileira o pedido de novo.
+        starts = backend.begin(job)
         if starts > settings.max_starts:
             log.error("job derrubou o worker várias vezes, desistindo", extra={"job": video_id, "starts": starts})
-            _fail(r, video_id, JobError(
+            _fail(backend, job, JobError(
                 "worker_crash",
                 "O processamento desta música travou o worker mais de uma vez (talvez falta de memória). "
                 "Tente outra versão do vídeo ou tente de novo mais tarde.",
@@ -123,25 +113,25 @@ def handle(r, storage: LocalStorage, settings: Settings, msg_id: str, fields: di
             return
 
         log.info("job começou", extra={"job": video_id, "url": payload.get("url"), "lyrics": payload.get("lyrics_source"), "start": starts})
-        set_job(r, video_id, status="processing", stage="", error="", error_code="", retry="")
-        _run(r, storage, settings, video_id, payload, sleep)
-        set_job(r, video_id, status="ready", stage="", error="", error_code="", retry="")
+        backend.set_state(job, status="processing", stage="", error="", error_code="", retry="")
+        _run(backend, storage, settings, job, sleep)
+        backend.set_state(job, status="ready", stage="", error="", error_code="", retry="")
         try:
-            r.lpush(BACKING_REQUEST_KEY, video_id)  # as vozes de apoio saem depois, em segundo plano: a música já está pronta
+            backend.request_backing(video_id)  # as vozes de apoio saem depois, em segundo plano: a música já está pronta
         except Exception:  # noqa: BLE001 - é um extra; na próxima subida do worker a música é encontrada de qualquer jeito
             log.warning("não consegui pedir as vozes de apoio", extra={"job": video_id})
         log.info("job pronto", extra={"job": video_id, "elapsed_s": round(time.monotonic() - started, 1)})
     except (NeedsLyrics, ValueError) as exc:
         # depende de uma decisão do usuário (escolher/corrigir a fonte da letra), não é falha do sistema
-        set_job(r, video_id, status="needs_lyrics", stage="", error=str(exc), error_code="", retry="")
+        backend.set_state(job, status="needs_lyrics", stage="", error=str(exc), error_code="", retry="")
         log.info("job precisa de letra", extra={"job": video_id, "reason": str(exc)})
     except JobError as err:
         log.error("job falhou", extra={"job": video_id, "code": err.code, "retry": err.retry, "reason": err.message},
                   exc_info=err.__cause__ is not None)
-        _fail(r, video_id, err)
+        _fail(backend, job, err)
     except Exception as exc:  # noqa: BLE001 - nada escapa: o job termina com uma mensagem, nunca fica "processando" para sempre
         err = classify(exc)
         log.exception("job falhou com erro inesperado", extra={"job": video_id, "code": err.code})
-        _fail(r, video_id, err)
+        _fail(backend, job, err)
     finally:
-        r.xack(STREAM, GROUP, msg_id)
+        backend.finish(job)

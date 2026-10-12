@@ -59,6 +59,8 @@ export interface RoomState {
   next_item_id: number | null;
   position_ms: number;
   tv_connected: boolean;
+  /** O dono da sessão da sala (agente local): só o apelido e se está conectado; null nas salas sem sessão. */
+  owner: { nickname: string; online: boolean } | null;
   queue: QueueItem[];
   me: { is_host: boolean };
 }

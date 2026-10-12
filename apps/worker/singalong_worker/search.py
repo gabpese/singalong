@@ -1,10 +1,7 @@
 """Busca de vídeos no YouTube (yt-dlp), atendida por uma thread do worker.
 
-Contrato com a API (Redis, documentado em apps/api/src/jobs.js):
-  lista  "search:req"        a API faz LPUSH de {"id", "q"}
-  lista  "search:res:<id>"   o worker responde com LPUSH de {"results": [...]} ou {"error": "..."} (expira em 60 s)
+O transporte (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.js.
 """
-import json
 import logging
 import shutil
 import tempfile
@@ -13,8 +10,6 @@ from pathlib import Path
 
 log = logging.getLogger("worker.search")
 
-REQUEST_KEY = "search:req"
-RESULT_TTL = 60
 MAX_RESULTS = 8
 
 
@@ -51,26 +46,25 @@ def parse_entries(entries: list) -> list[dict]:
     return results
 
 
-def serve(redis_url: str, cookies: Path | None, stop: threading.Event) -> None:
+def serve(backend, cookies: Path | None, stop: threading.Event) -> None:
     """Loop da thread de busca: atende pedidos enquanto `stop` não for sinalizado."""
-    import redis  # import tardio: os testes de parse_entries não precisam do cliente Redis
+    from .backend import AuthError, BackendUnavailable  # import tardio, como o resto do transporte
 
-    r = redis.Redis.from_url(redis_url, decode_responses=True, socket_timeout=30, socket_connect_timeout=5)
     while not stop.is_set():
         try:
-            item = r.brpop(REQUEST_KEY, timeout=2)
-            if not item:
+            request = backend.next_search(2)
+            if not request:
                 continue
-            request = json.loads(item[1])
             try:
                 reply = {"results": search_youtube(str(request["q"]), cookies)}
             except Exception as exc:  # noqa: BLE001 - o erro volta para a API em vez de derrubar a thread
                 log.warning("busca %r falhou: %s", request.get("q"), exc)
                 reply = {"error": f"{type(exc).__name__}: {exc}"[:300]}
-            key = f"search:res:{request['id']}"
-            r.lpush(key, json.dumps(reply, ensure_ascii=False))
-            r.expire(key, RESULT_TTL)
-        except (redis.ConnectionError, redis.TimeoutError):
+            backend.reply_search(str(request["id"]), reply)
+        except BackendUnavailable:
             stop.wait(2)
+        except AuthError:
+            log.error("o servidor recusou o token do agente; a busca parou")
+            stop.wait(30)
         except (ValueError, KeyError) as exc:  # pedido malformado: descarta
             log.warning("pedido de busca inválido: %s", exc)

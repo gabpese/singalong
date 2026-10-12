@@ -1,4 +1,7 @@
-"""Consumidor de jobs sobre Redis Streams. O contrato está documentado em apps/api/src/jobs.js.
+"""Loop principal do worker: puxa jobs do servidor e os processa. O transporte (backend.py) é um de dois:
+
+  Redis  o worker clássico (Docker): lê o stream "jobs" direto do Redis. Contrato em apps/api/src/jobs.js.
+  HTTP   o agente local: só conexões de saída para /agent/v1 do servidor (AGENT_URL + AGENT_TOKEN), sem acesso ao Redis.
 
 O worker sempre PUXA trabalho (nunca é chamado pela API), então pode rodar atrás de NAT / em outra máquina.
 O tratamento de cada job (retentativas, erros, proteção contra loop) está em runner.py.
@@ -10,52 +13,51 @@ import socket
 import threading
 import time
 
-import redis
-
+from .backend import AuthError, BackendUnavailable, make_backend
 from .backing import serve as backing_serve
 from .export import serve as export_serve
 from .key import backfill as key_backfill
-from .titles import backfill as titles_backfill
 from .logsetup import setup_logging
-from .runner import GROUP, STREAM, Settings, handle
+from .runner import Settings, handle
 from .search import serve as search_serve
 from .storage import LocalStorage
+from .titles import backfill as titles_backfill
 
 log = logging.getLogger("worker")
 
 HEARTBEAT_EVERY = 10  # segundos
+SERVER_HEARTBEAT_EVERY = 15  # o servidor considera o dono offline depois de 45 s sem sinal
 
 
-def _ensure_group(r: redis.Redis) -> None:
-    try:
-        # id "0": jobs enfileirados antes de o grupo existir não se perdem
-        r.xgroup_create(STREAM, GROUP, id="0", mkstream=True)
-    except redis.ResponseError as exc:
-        if "BUSYGROUP" not in str(exc):
-            raise
-
-
-def _entries(response) -> list[tuple[str, dict]]:
-    return [entry for _stream, entries in (response or []) for entry in entries]
-
-
-def _heartbeat(path, stop: threading.Event) -> None:
-    """Marca que o worker está vivo, mesmo durante um job de minutos (o healthcheck do Docker lê a data do arquivo)."""
+def _heartbeat(path, backend, stop: threading.Event) -> None:
+    """Marca que o worker está vivo, mesmo durante um job de minutos: o arquivo (o healthcheck do Docker lê a data dele) e,
+    no agente local, o sinal de vida para o servidor (senão a sala mostraria "dono offline" no meio de um job)."""
+    last_server = 0.0
     while not stop.is_set():
         try:
             path.touch()
         except OSError:
             pass
+        if time.monotonic() - last_server >= SERVER_HEARTBEAT_EVERY:
+            last_server = time.monotonic()
+            try:
+                backend.heartbeat()
+            except (BackendUnavailable, AuthError) as exc:
+                log.warning("sem sinal de vida para o servidor: %s", exc)
         stop.wait(HEARTBEAT_EVERY)
 
 
-def run() -> None:
+def run() -> int:
     setup_logging()
     settings = Settings.from_env()
-    # socket_timeout MAIOR que o block do XREADGROUP (5 s), senão a leitura ociosa estoura o timeout
-    r = redis.Redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=30, socket_connect_timeout=5)
     storage = LocalStorage(settings.storage_root)
     consumer = os.environ.get("WORKER_NAME", socket.gethostname())
+    try:
+        backend = make_backend(settings.redis_url, consumer, settings.agent_url, settings.agent_token, settings.agent_name)
+    except ValueError as exc:
+        # AGENT_URL sem AGENT_TOKEN: quase sempre a variável do token está vazia neste terminal (no PowerShell, $env: vale só por terminal)
+        log.error("configuração do agente incompleta: %s. Confira se AGENT_TOKEN tem valor neste terminal.", exc)
+        return 2
     stopping = False
 
     def stop(signum, _frame):
@@ -66,52 +68,65 @@ def run() -> None:
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    while True:  # espera o Redis ficar disponível (ordem de subida do compose / reinícios)
+    while True:  # espera o servidor ficar disponível (ordem de subida do compose / reinícios / rede)
         try:
-            r.ping()
-            _ensure_group(r)
+            backend.connect()
             break
-        except (redis.ConnectionError, redis.TimeoutError):
+        except BackendUnavailable as exc:
             if stopping:
-                return
-            log.warning("redis indisponível, tentando de novo em 2 s")
+                return 0
+            log.warning("servidor indisponível, tentando de novo em 2 s: %s", exc)
             time.sleep(2)
+        except AuthError as exc:
+            log.error("o servidor recusou o token do agente (revogado?). Pareie de novo: %s", exc)
+            return 2
 
     stop_threads = threading.Event()
     # a busca no YouTube roda numa thread própria: não pode esperar atrás de um job longo (Demucs)
-    threading.Thread(target=search_serve, args=(settings.redis_url, settings.cookies, stop_threads), name="search", daemon=True).start()
+    threading.Thread(target=search_serve, args=(backend.clone(), settings.cookies, stop_threads), name="search", daemon=True).start()
     # as vozes de apoio levam minutos em CPU: thread própria, uma música de cada vez, sem segurar a próxima do karaokê
-    threading.Thread(target=backing_serve, args=(settings.redis_url, storage, stop_threads), name="backing", daemon=True).start()
+    threading.Thread(target=backing_serve, args=(backend.clone(), storage, stop_threads), name="backing", daemon=True).start()
     # a exportação em MP4 também tem thread própria: leva um minuto e não pode esperar atrás do Demucs
-    threading.Thread(target=export_serve, args=(settings.redis_url, storage, stop_threads), name="export", daemon=True).start()
+    threading.Thread(target=export_serve, args=(backend.clone(), storage, stop_threads), name="export", daemon=True).start()
     # músicas processadas antes do recurso de tom ganham o tom em segundo plano (uma vez cada)
     # (o título do vídeo vem primeiro: é instantâneo e as duas atualizações reescrevem o mesmo meta.json, então não rodam juntas)
     threading.Thread(target=lambda: (titles_backfill(storage), key_backfill(storage)), name="backfill", daemon=True).start()
-    threading.Thread(target=_heartbeat, args=(settings.heartbeat_file, stop_threads), name="heartbeat", daemon=True).start()
+    threading.Thread(target=_heartbeat, args=(settings.heartbeat_file, backend.clone(), stop_threads), name="heartbeat", daemon=True).start()
 
-    log.info("worker consumindo", extra={"consumer": consumer, "stream": STREAM, "device": settings.device or "auto",
-                                         "max_duration_s": settings.limits.max_duration, "min_free_gb": settings.limits.min_free_gb})
+    log.info("worker consumindo", extra={"consumer": consumer, "transport": "http" if settings.agent_url else "redis",
+                                         "device": settings.device or "auto", "max_duration_s": settings.limits.max_duration,
+                                         "min_free_gb": settings.limits.min_free_gb})
 
-    # 1) o que ficou pendente deste consumidor (reinício no meio de um job)
-    for msg_id, fields in _entries(r.xreadgroup(GROUP, consumer, {STREAM: "0"}, count=50)):
-        if not stopping:
-            handle(r, storage, settings, msg_id, fields)
+    code = 0
+    try:
+        # 1) o que ficou pendente deste consumidor (reinício no meio de um job)
+        for job in backend.pending():
+            if not stopping:
+                handle(backend, storage, settings, job)
 
-    last_claim = 0.0
-    while not stopping:
-        try:
-            # 2) jobs abandonados por outro worker que caiu (sem ack há muito tempo)
-            if time.monotonic() - last_claim > 60:
-                last_claim = time.monotonic()
-                claimed = r.xautoclaim(STREAM, GROUP, consumer, min_idle_time=settings.stale_seconds * 1000, start_id="0-0", count=10)
-                for msg_id, fields in claimed[1]:
-                    if fields and not stopping:
-                        handle(r, storage, settings, msg_id, fields)
-            # 3) novos jobs
-            for msg_id, fields in _entries(r.xreadgroup(GROUP, consumer, {STREAM: ">"}, count=1, block=5000)):
-                handle(r, storage, settings, msg_id, fields)
-        except (redis.ConnectionError, redis.TimeoutError):
-            log.warning("conexão com o redis perdida, tentando de novo em 2 s")
-            time.sleep(2)
-    stop_threads.set()
+        last_claim = 0.0
+        while not stopping:
+            try:
+                # 2) jobs abandonados por outro worker que caiu (sem ack há muito tempo)
+                if time.monotonic() - last_claim > 60:
+                    last_claim = time.monotonic()
+                    for job in backend.reclaim(settings.stale_seconds):
+                        if not stopping:
+                            handle(backend, storage, settings, job)
+                # 3) novos jobs
+                job = backend.next_job(5)
+                if job:
+                    handle(backend, storage, settings, job)
+            except BackendUnavailable as exc:
+                log.warning("conexão com o servidor perdida, tentando de novo em 2 s: %s", exc)
+                time.sleep(2)
+    except AuthError as exc:
+        log.error("o servidor recusou o token do agente (revogado?). Pareie de novo: %s", exc)
+        code = 2
+    finally:
+        stop_threads.set()
+        close = getattr(backend, "end_session", None)
+        if close and stopping:
+            close()  # saída pedida pelo dono: encerra a sessão (os pedidos pendentes viram "o dono saiu")
     log.info("worker encerrado")
+    return code

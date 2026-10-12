@@ -58,6 +58,8 @@ interface Props {
   jukebox: LibrarySong[];
   /** Coloca uma música pronta do Jukebox na fila e devolve a mensagem de sucesso. */
   onPickJukebox: (song: LibrarySong) => Promise<string>;
+  /** Código da sala: a busca no YouTube é atendida pelo agente do dono da sessão dela (sem ele, pelo worker clássico). */
+  room?: string;
 }
 
 /** Player oficial do YouTube numa moldura: para conferir se é a música certa antes de adicionar. */
@@ -81,7 +83,7 @@ function VideoFrame({ videoId }: { videoId: string }) {
 type Preview = { id: string; where: 'selection' | 'result' } | null;
 
 export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
-  { userName, onUserName, submitNew, submitLyrics, onShow, jukebox, onPickJukebox },
+  { userName, onUserName, submitNew, submitLyrics, onShow, jukebox, onPickJukebox, room },
   ref,
 ) {
   // o que a pessoa digita para PROCURAR (basta um dos dois)
@@ -173,7 +175,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
     setSearching(true);
     setStatus(`Buscando “${query}” no YouTube…`);
     try {
-      const found: SearchResult[] = await api('GET', `/api/search?q=${encodeURIComponent(query)}`);
+      const found: SearchResult[] = await api('GET', `/api/search?q=${encodeURIComponent(query)}`, undefined, room);
       if (!found.length) {
         clearResults();
         return setStatus('Nada encontrado. Confira o que você digitou, ou use “Já tenho o link do vídeo”.', true);

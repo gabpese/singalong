@@ -93,6 +93,51 @@ Salas e fila ficam num SQLite no volume `api-data` do Docker.
 Os pedidos levam `X-Client-Id` (id do navegador) e, para o anfitrião, `X-Host-Token`.
 O contrato entre a API e o worker (Redis Streams) está documentado em [apps/api/src/jobs.js](apps/api/src/jobs.js).
 
+### Agente local (marco M0: lado do servidor e transporte do worker)
+
+O **agente local** é o worker rodando no computador do dono e falando com o servidor só por **HTTP de saída** (`/agent/v1`), sem acesso ao Redis. O dono inicia uma **sessão** (com um apelido que os convidados veem), cria as salas dela, e todo pedido de música feito pelo celular de um convidado nessas salas vai para o **agente desse dono** (nunca para o de outra sessão). Desenho e plano: [TRD](TRD.pt-BR.md).
+
+| Rota (`/agent/v1`, `Authorization: Bearer <token do dispositivo>`) | Função |
+|---|---|
+| `POST /pair/start` (cabeçalho `X-Admin-Token`) · `POST /pair/complete {code, name}` | pareamento: o administrador gera um código de 8 caracteres, de uso único (10 min); o agente o troca por um token de dispositivo |
+| `GET /me` · `DELETE /devices/me` | o dispositivo e a sessão ativa dele · revoga este dispositivo |
+| `POST /sessions {display_name, resume_id?}` · `DELETE /sessions/:id` · `POST /sessions/:id/rooms` | inicia/retoma/encerra a sessão · cria uma sala nela |
+| `POST /heartbeat` | sinal de vida (o dono aparece "online" por 45 s) |
+| `POST /jobs/claim {wait_ms}` · `POST /jobs/:id/progress` · `POST /jobs/:id/complete` | jobs de processamento (long-poll, até 25 s) |
+| `POST /search/claim` · `POST /search/:id/result` | busca no YouTube feita pelo agente |
+| `POST /exports/claim` · `POST /exports/:id/:pitch/state` | exportação de MP4 |
+
+As páginas enviam o código da sala em `X-Room`, para a busca, a troca de letra e a exportação de uma sala irem ao agente da sessão dela. O estado da sala traz `owner: {nickname, online}` (e `null` nas salas sem sessão, que continuam no worker clássico por Redis).
+
+```bash
+# no servidor (defina ADMIN_TOKEN; sem ele o pareamento fica desligado): gera um código de uso único
+curl -X POST https://SEU_ENDERECO/agent/v1/pair/start -H "X-Admin-Token: $ADMIN_TOKEN"
+# no computador do dono (o pacote do worker; Python):
+python -m singalong_worker --pair CODIGO --agent-url https://SEU_ENDERECO      # imprime AGENT_TOKEN=...
+export AGENT_URL=https://SEU_ENDERECO AGENT_TOKEN=... AGENT_SESSION_NAME="Meu apelido"
+python -m singalong_worker --consume        # o agente: inicia a sessão e puxa jobs, buscas e exportações
+python -m singalong_worker --create-room    # imprime os links da TV e do anfitrião de uma sala nova na sessão
+```
+
+**Testando o agente à mão com Docker** (PowerShell, na raiz do projeto; a interface ainda não mostra o apelido do dono nem o aviso "dono desconectado", só a API):
+
+```powershell
+$env:ADMIN_TOKEN = "um-segredo-longo-qualquer"
+docker compose up -d --build --wait api redis  # só a API e o Redis (sem o worker clássico); --wait volta quando a API está pronta
+# gera o código de uso único, troca por um token de dispositivo e guarda em $env:AGENT_TOKEN
+$resp = curl.exe -s -X POST http://localhost:3000/agent/v1/pair/start -H "X-Admin-Token: $env:ADMIN_TOKEN"; $resp   # {"code":"ABCD2345",...}
+$code = ($resp | ConvertFrom-Json).code
+$out = docker compose --profile cpu run --rm -T worker --pair $code --agent-url http://api:3000
+$env:AGENT_TOKEN = ($out | Select-String '^AGENT_TOKEN=').Line.Split('=', 2)[1].Trim()
+echo $env:AGENT_TOKEN   # sga_... (47 caracteres). $env: vale só em UM terminal: defina de novo em cada terminal que usar abaixo
+# terminal 1: o agente (deixe aberto; use --profile gpu e worker-gpu para ir mais rápido)
+docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" worker --consume
+# terminal 2: uma sala na sessão do agente (imprime os links da TV e do anfitrião)
+docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN worker --create-room --agent-url http://api:3000 --public-url http://localhost:3000
+```
+
+Depois abra o link da TV, entre na sala como convidado em outra janela, busque e adicione uma música: a busca e o processamento acontecem no agente. Pare o agente com Ctrl+C e a próxima busca avisa que o dono está desconectado. `curl.exe -H "x-client-id: convidado-0001" http://localhost:3000/api/rooms/CODIGO` mostra `owner: {nickname, online}`. Ao subir, o agente também analisa as vozes de apoio das músicas que já estão em `storage/` (lento em CPU), como o worker clássico faz.
+
 ### CLI do worker (sem API, para testes)
 
 ```powershell
