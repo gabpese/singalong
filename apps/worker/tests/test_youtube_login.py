@@ -43,17 +43,15 @@ class FindBrowserTests(TempDirCase):
         chrome = self.fake_exe("PF", "Google", "Chrome", "Application", "chrome.exe")
         edge = self.fake_exe("PFx86", "Microsoft", "Edge", "Application", "msedge.exe")
         env = {"ProgramFiles": str(self.dir / "PF"), "ProgramFiles(x86)": str(self.dir / "PFx86")}
-        self.assertEqual(yl.find_browser(env=env), ("chrome", chrome))  # sem preferência: o Chrome primeiro
-        self.assertEqual(yl.find_browser("edge", env), ("edge", edge))
-        self.assertEqual(yl.find_browser("chrome", env), ("chrome", chrome))
+        find = lambda preferred, env: yl.find_browser(preferred, env, search_system=False)  # noqa: E731 - independe do que a máquina tem
+        self.assertEqual(find(None, env), ("chrome", chrome))  # sem preferência: o Chrome primeiro
+        self.assertEqual(find("edge", env), ("edge", edge))
+        self.assertEqual(find("chrome", env), ("chrome", chrome))
         only_edge = {"ProgramFiles(x86)": str(self.dir / "PFx86")}
-        self.assertEqual(yl.find_browser("chrome", only_edge), ("edge", edge))  # o preferido não existe: cai no outro
+        self.assertEqual(find("chrome", only_edge), ("edge", edge))  # o preferido não existe: cai no outro
 
     def test_nenhum_instalado(self):
-        found = yl.find_browser(env={"ProgramFiles": str(self.dir / "vazio")})
-        if found is not None:  # numa máquina de desenvolvimento com Chrome em caminho do sistema (Linux/macOS)
-            self.skipTest("há um navegador instalado nos caminhos do sistema")
-        self.assertIsNone(found)
+        self.assertIsNone(yl.find_browser(env={"ProgramFiles": str(self.dir / "vazio")}, search_system=False))
 
 
 class CookieFilterTests(unittest.TestCase):
@@ -172,12 +170,15 @@ class LoginFlowTests(TempDirCase):
         self.assertIn("tempo", str(ctx.exception))
 
     def test_sem_navegador_instalado(self):
-        with self.assertRaises(yl.LoginError) as ctx:
-            yl.login(env={"AGENT_DATA_DIR": str(self.dir), "ProgramFiles": str(self.dir / "vazio"), "AGENT_BROWSER_PATH": str(self.dir / "nao-existe.exe")},
-                     say=lambda line: None, launcher=lambda *a, **k: self.fail("não devia abrir nada"))
+        original = yl.find_browser
+        yl.find_browser = lambda *a, **k: None  # nenhum navegador, qualquer que seja a máquina
+        try:
+            with self.assertRaises(yl.LoginError) as ctx:
+                yl.login(env={"AGENT_DATA_DIR": str(self.dir)}, say=lambda line: None, launcher=lambda *a, **k: self.fail("não devia abrir nada"))
+        finally:
+            yl.find_browser = original
         text = str(ctx.exception)
-        if "Não encontrei" not in text:
-            self.skipTest("há um navegador instalado nos caminhos do sistema")
+        self.assertIn("Não encontrei", text)
         self.assertIn("firefox", text)  # a mensagem aponta as alternativas
 
     def test_erro_do_protocolo_vira_login_error(self):

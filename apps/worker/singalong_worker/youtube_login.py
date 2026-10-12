@@ -42,17 +42,22 @@ def _env(env, name: str) -> str | None:
     return env.get(name) or next((value for key, value in env.items() if key.upper() == name.upper() and value), None)
 
 
-def find_browser(preferred: str | None = None, env=os.environ) -> tuple[str, Path] | None:
-    """O Chrome ou o Edge instalados: (nome, caminho). `AGENT_BROWSER_PATH` aponta um executável específico."""
+def find_browser(preferred: str | None = None, env=os.environ, search_system: bool = True) -> tuple[str, Path] | None:
+    """O Chrome ou o Edge instalados: (nome, caminho). `AGENT_BROWSER_PATH` aponta um executável específico.
+    `search_system=False` ignora os caminhos fixos do macOS e do Linux (os testes não podem depender do que a máquina tem)."""
     explicit = _env(env, "AGENT_BROWSER_PATH")
     if explicit and Path(explicit).is_file():
         return "navegador", Path(explicit)
+    system_paths = {
+        "chrome": [Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"), Path("/usr/bin/google-chrome"), Path("/usr/bin/google-chrome-stable"), Path("/usr/bin/chromium")],
+        "edge": [Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"), Path("/usr/bin/microsoft-edge")],
+    }
     program_files = [Path(path) for path in (_env(env, name) for name in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")) if path]
     candidates = {
         "chrome": [p / "Google/Chrome/Application/chrome.exe" for p in program_files]
-        + [Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"), Path("/usr/bin/google-chrome"), Path("/usr/bin/google-chrome-stable"), Path("/usr/bin/chromium")],
+        + (system_paths["chrome"] if search_system else []),
         "edge": [p / "Microsoft/Edge/Application/msedge.exe" for p in program_files]
-        + [Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"), Path("/usr/bin/microsoft-edge")],
+        + (system_paths["edge"] if search_system else []),
     }
     order = [preferred, *[n for n in candidates if n != preferred]] if preferred in candidates else ["chrome", "edge"]
     for name in order:
