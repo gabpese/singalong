@@ -1,0 +1,21 @@
+{
+  "name": "@singalong/desktop",
+  "private": true,
+  "version": "0.3.0",
+  "productName": "Singalong Karaoke",
+  "description": "Singalong Karaoke: a interface do computador do dono (pareia, monta o motor, inicia a sessão e o agente)",
+  "type": "module",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "test:e2e": "node --test \"e2e/*.e2e.js\""
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "playwright-core": "^1.50.0"
+  }
+}

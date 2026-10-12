@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Singalong Karaoke</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Singalong Karaoke</h1>
+    <span id="version" class="muted" data-testid="version"></span>
+  </header>
+
+  <div id="update" class="banner" hidden data-testid="update-banner">
+    <div><strong id="update-title"></strong><div id="update-notes" class="muted"></div></div>
+    <button id="update-open" type="button">Baixar a atualização</button>
+  </div>
+  <div id="error" class="banner error" hidden role="alert" data-testid="error"></div>
+
+  <main>
+    <!-- 1) preparar o motor -->
+    <section id="screen-engine" hidden data-testid="screen-engine">
+      <h2>Preparar o computador</h2>
+      <p>Na primeira vez, o aplicativo baixa e instala (só para ele, sem mexer no resto do seu computador) o que separa a voz da música: Python, ffmpeg, deno e a inteligência artificial. Leva alguns minutos e vários GB; pode fechar e continuar depois.</p>
+      <label>Placa de vídeo
+        <select id="engine-kind" data-testid="engine-kind">
+          <option value="auto">Escolher automaticamente (recomendado)</option>
+          <option value="cpu">Usar só o processador (mais lento)</option>
+        </select>
+      </label>
+      <button id="engine-build" type="button" class="primary" data-testid="engine-build">Preparar</button>
+      <div id="engine-progress" hidden>
+        <div id="engine-label" data-testid="engine-label"></div>
+        <progress id="engine-bar" max="100"></progress>
+      </div>
+      <p id="engine-error" class="error-text" hidden data-testid="engine-error"></p>
+    </section>
+
+    <!-- 2) parear -->
+    <section id="screen-pair" hidden data-testid="screen-pair">
+      <h2>Conectar ao servidor</h2>
+      <p>Peça o código de pareamento a quem administra o servidor. Ele só é usado uma vez.</p>
+      <label>Endereço do servidor <input id="pair-server" type="url" placeholder="https://singalong.exemplo.org" autocomplete="off" data-testid="pair-server"></label>
+      <label>Código de pareamento <input id="pair-code" type="text" maxlength="20" autocomplete="off" data-testid="pair-code"></label>
+      <label>Nome deste computador <input id="pair-name" type="text" maxlength="60" value="Meu computador" data-testid="pair-name"></label>
+      <button id="pair-go" type="button" class="primary" data-testid="pair-go">Parear</button>
+    </section>
+
+    <!-- 3) início -->
+    <section id="screen-home" hidden data-testid="screen-home">
+      <div class="card" id="card-session">
+        <h2>Sessão <span id="agent-pill" class="pill" data-testid="agent-status"></span></h2>
+        <p class="muted">Os convidados veem só este apelido. A conta do YouTube nunca aparece para eles.</p>
+        <div class="row">
+          <input id="nickname" type="text" maxlength="40" placeholder="Seu apelido" data-testid="nickname">
+          <button id="session-toggle" type="button" class="primary" data-testid="session-toggle">Iniciar sessão</button>
+        </div>
+        <p id="agent-error" class="error-text" hidden data-testid="agent-error"></p>
+      </div>
+
+      <div class="card" id="card-rooms">
+        <h2>Salas</h2>
+        <button id="room-create" type="button" data-testid="room-create">Criar sala</button>
+        <ul id="rooms" class="list" data-testid="rooms"></ul>
+      </div>
+
+      <div class="card" id="card-songs">
+        <h2>Músicas</h2>
+        <p class="muted">Importe um arquivo de áudio seu (mp3, flac, wav, m4a, ogg, opus). Ele fica neste computador.</p>
+        <button id="import-pick" type="button" data-testid="import-pick">Importar arquivo…</button>
+        <div id="import-form" hidden data-testid="import-form">
+          <div id="import-file" class="muted" data-testid="import-file"></div>
+          <div class="row">
+            <input id="import-artist" type="text" maxlength="120" placeholder="Artista" data-testid="import-artist">
+            <input id="import-title" type="text" maxlength="160" placeholder="Título" data-testid="import-title">
+          </div>
+          <button id="import-go" type="button" class="primary" data-testid="import-go">Importar</button>
+        </div>
+        <p id="import-result" class="muted" hidden data-testid="import-result"></p>
+      </div>
+
+      <div class="card" id="card-youtube">
+        <h2>YouTube <span id="yt-pill" class="pill" data-testid="yt-status"></span></h2>
+        <p class="muted">O aplicativo baixa sem entrar na conta e só usa o login quando o YouTube pedir. Prefira uma conta secundária.</p>
+        <div class="row">
+          <button id="yt-login" type="button" data-testid="yt-login">Entrar no YouTube</button>
+          <button id="yt-check" type="button" data-testid="yt-check">Conferir</button>
+        </div>
+      </div>
+
+      <div class="card" id="card-settings">
+        <h2>Configurações</h2>
+        <label>Navegador do login
+          <select id="browser" data-testid="browser">
+            <option value="auto">Automático</option>
+            <option value="chrome">Chrome</option>
+            <option value="edge">Edge</option>
+          </select>
+        </label>
+        <label class="check"><input id="login-item" type="checkbox" data-testid="login-item"> Abrir junto com o Windows</label>
+        <div class="row">
+          <button id="hardware" type="button" data-testid="hardware">Ver o hardware</button>
+          <button id="unpair" type="button" class="danger" data-testid="unpair">Desparear este computador</button>
+        </div>
+        <pre id="hardware-out" class="log" hidden data-testid="hardware-out"></pre>
+      </div>
+
+      <div class="card" id="card-logs">
+        <h2>Registro</h2>
+        <pre id="logs" class="log" data-testid="logs"></pre>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
