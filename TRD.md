@@ -400,6 +400,23 @@ Decisions (Oct 2026): the three steps below, **in this order**, make **version 1
 - **Songs on the owner's computer:** the phone cannot reach the owner's local media server, so **the TV passes the lyrics to the server** (`lyrics` message, validated: at most 3000 lines, 400 KB, only for the song playing, only from the TV), which relays them to the phones and gives them to whoever opens the stage in the middle of the song. For songs on the server or in the cloud the stage also fetches the lyrics directly.
 - **Tests:** 7 for the clock and 4 for the stage rules (Node), 3 on the server (relay, who can send, validation) and 5 end-to-end in the browser (the singer goes to the stage and back, someone else's song keeps the person in the room, no TV means no stage, leaving the stage is not undone, local songs get the lyrics through the TV). The 71 existing browser tests still pass.
 
+### 12.13 Planned: homologation and staging environments
+
+Noted for the future (decision of Oct 2026): besides production we will have **two more environments** to control what goes up and what does not:
+
+| Environment | Address | Purpose |
+|---|---|---|
+| Homologation (`hml`) | `https://singalong-hml.duckdns.org` | Where each new version is tried first (by the owner, with real phones and the TV) before anything else |
+| Staging (`stg`) | `https://singalong-stg.duckdns.org` | A copy of production with the version that is about to go up: last check before releasing |
+| Production | `https://singalong.duckdns.org` | What people use |
+
+**Ideas to settle when we do it** (nothing below is built yet):
+- **Path of a version:** merge into `main` → automatic deploy to `hml` → after approval, promote the **same image** (same tag, not a new build) to `stg` → after approval, to production. Image tags per environment (the commit tag is already published; `hml`, `stg` and `prod` would point to it).
+- **Same VM or not:** the free Oracle VM (2 OCPU, 12 GB) can run the three stacks side by side (one compose project per environment, behind the same Caddy with three host names). Each environment needs its **own data**: its own volume, Redis database, `ADMIN_TOKEN`, `ADMIN_PATH`, `.env` and, ideally, its own pairing e-mails list. The three DuckDNS names point to the same IP.
+- **Mail and cloud:** `hml`/`stg` must not send e-mails to other people by mistake (a test list, or no sending) and must not share the cloud library with production.
+- **The app:** an installer pointed at `hml` or `stg` (the server address is already a setting of the app), to test the update flow with a fake newer version before publishing the Release.
+- **Deploy scripts and CI:** `deploy.sh` would take the environment and the tag; the manual promotion would be a workflow with a button.
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**
