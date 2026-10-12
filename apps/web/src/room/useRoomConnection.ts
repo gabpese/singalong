@@ -1,5 +1,5 @@
 // Estado da sala em tempo real (WebSocket com reconexão) e a posição da música que a TV informa.
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { connectRoom } from '../lib/identity.js';
 import type { RoomState, ServerMessage } from '../lib/types';
 
@@ -17,6 +17,9 @@ export function useRoomConnection(code: string) {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [gone, setGone] = useState(false);
   const [position, setPosition] = useState<Position>({ ms: 0, at: performance.now(), itemId: null });
+  const connectionRef = useRef<{ send(payload: unknown): void } | null>(null);
+  /** Manda uma mensagem à sala pelo WebSocket (ex.: o nome da pessoa). */
+  const send = useCallback((payload: unknown) => connectionRef.current?.send(payload), []);
 
   useEffect(() => {
     const connection = connectRoom(code, 'controller', {
@@ -35,8 +38,12 @@ export function useRoomConnection(code: string) {
         setGone(true);
       },
     });
-    return () => connection.close();
+    connectionRef.current = connection;
+    return () => {
+      connectionRef.current = null;
+      connection.close();
+    };
   }, [code]);
 
-  return { state, setState, status, gone, position };
+  return { state, setState, status, gone, position, send };
 }

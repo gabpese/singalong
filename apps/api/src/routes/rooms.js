@@ -74,6 +74,24 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
     },
   }, async (request) => (await rooms.move(request.params.code, request.params.itemId, request.body.direction, actorOf(request))).state);
 
+  // dueto: convidar alguém que está na sala (pid da lista `people`), desfazer o convite e responder a ele
+  app.post('/rooms/:code/queue/:itemId/invite', {
+    schema: {
+      params: ITEM_PARAMS,
+      body: { type: 'object', additionalProperties: false, properties: { pid: { type: 'string', pattern: '^[a-f0-9]{10}$' } }, required: ['pid'] },
+    },
+  }, async (request) => (await rooms.invite(request.params.code, request.params.itemId, request.body.pid, actorOf(request))).state);
+
+  app.delete('/rooms/:code/queue/:itemId/invite', { schema: { params: ITEM_PARAMS } }, async (request) =>
+    (await rooms.cancelInvite(request.params.code, request.params.itemId, actorOf(request))).state);
+
+  app.post('/rooms/:code/queue/:itemId/invite/respond', {
+    schema: {
+      params: ITEM_PARAMS,
+      body: { type: 'object', additionalProperties: false, properties: { accept: { type: 'boolean' } }, required: ['accept'] },
+    },
+  }, async (request) => (await rooms.respondInvite(request.params.code, request.params.itemId, request.body.accept, actorOf(request))).state);
+
   app.patch('/rooms/:code/queue/:itemId', {
     schema: {
       params: ITEM_PARAMS,
@@ -134,6 +152,7 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
         role,
         clientId: CLIENT_ID.test(String(client ?? '')) ? client : '',
         hostToken: host,
+        name: request.query.name,
       });
     } catch {
       socket.close(1008, 'room_not_found');

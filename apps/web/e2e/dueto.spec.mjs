@@ -1,0 +1,127 @@
+// Dueto: o dono da música convida alguém que está na sala, a pessoa aceita, e na vez da música os DOIS vão para o palco, com a
+// letra em duas cores (verde e vermelho, amarelo quando cantam juntos).
+import { expect, test } from '@playwright/test';
+import { addToQueue, ANA, BIA, createRoom, SONGS } from './helpers.mjs';
+
+test.use({ viewport: { width: 390, height: 844 } });
+
+const CAIO = 'client-caio-0001';
+
+/** Uma pessoa no celular: o client_id e o nome dela ficam no navegador (o nome é o que aparece na lista de quem está na sala). */
+async function phone(browser, client, name) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(([id, who]) => {
+    localStorage.setItem('clientId', id);
+    localStorage.setItem('userName', who);
+  }, [client, name]);
+  return { context, page: await context.newPage() };
+}
+
+const tvPlaying = (page) => page.evaluate(() => window.tv.engine.playing && window.tv.engine.duration > 0 && window.tv.engine.currentTime > 0);
+const hostPost = (request, room, path) => request.post(`/api/rooms/${room.code}${path}`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host } });
+
+test('convidar, aceitar e cantar junto: os dois vão ao palco e a letra tem as duas cores', async ({ browser, page: tv, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: CAIO, name: 'Caio' }); // toca primeiro; a da Ana aguarda
+  await addToQueue(request, room.code, SONGS.bravo, { client: ANA, name: 'Ana' });
+
+  const ana = await phone(browser, ANA, 'Ana');
+  const bia = await phone(browser, BIA, 'Bia');
+  await ana.page.goto(room.guestUrl);
+  await bia.page.goto(room.guestUrl);
+
+  // a Ana convida a Bia (que está na sala): a lista mostra quem está aqui, menos ela mesma
+  await ana.page.getByRole('button', { name: 'Convidar para cantar junto' }).click();
+  const dialog = ana.page.getByRole('dialog');
+  await expect(dialog.getByRole('button', { name: 'Bia' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Ana' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Bia' }).click();
+  await expect(ana.page.getByText('Convite enviado para Bia, aguardando…')).toBeVisible();
+
+  // a Bia vê o pedido, na hora, e aceita
+  const invite = bia.page.getByRole('region', { name: 'Convites para cantar junto' });
+  await expect(invite).toContainText('Ana convidou você para cantar');
+  await invite.getByRole('button', { name: 'Aceitar' }).click();
+  await expect(invite).toHaveCount(0);
+  await expect(bia.page.getByText('Dueto com Ana ✓')).toBeVisible();
+  await expect(ana.page.getByText('Dueto com Bia ✓')).toBeVisible();
+
+  // a TV toca a primeira música; o anfitrião pula e entra a dupla
+  await tv.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(tv)).toBe(true);
+  await hostPost(request, room, '/player/skip');
+
+  // os dois vão da sala para o palco
+  await expect(ana.page).toHaveURL(/\/stage\.html/, { timeout: 10_000 });
+  await expect(bia.page).toHaveURL(/\/stage\.html/, { timeout: 10_000 });
+  await expect(ana.page.locator('.stage-artist')).toContainText('Ana & Bia');
+
+  // a letra do palco: a 1ª linha é da Ana (verde), a 2ª da Bia (vermelho)
+  await expect(ana.page.locator('.line.current')).toContainText('Primeira linha da letra');
+  await expect(ana.page.locator('.line.current')).toHaveAttribute('data-part', 'a');
+  await expect(ana.page.locator('.line.next')).toHaveAttribute('data-part', 'b');
+  await expect(bia.page.locator('.line.current')).toHaveAttribute('data-part', 'a');
+  // cada um vê qual é a sua cor
+  await expect(ana.page.locator('.stage-legend')).toContainText('Você canta nas partes verdes');
+  await expect(bia.page.locator('.stage-legend')).toContainText('Você canta nas partes vermelhas');
+  // as cores são as combinadas, com o contorno branco
+  const colors = await ana.page.evaluate(() => {
+    const read = (selector) => getComputedStyle(document.querySelector(selector)).getPropertyValue('--part').trim().toLowerCase();
+    const stroke = getComputedStyle(document.querySelector('.line.current .w')).webkitTextStrokeColor;
+    return { a: read('.line.current'), b: read('.line.next'), stroke };
+  });
+  expect(colors.a).toBe('#3a5a40');
+  expect(colors.b).toBe('#541e1b');
+  expect(colors.stroke).toBe('rgb(255, 255, 255)');
+
+  // a TV mostra os dois nomes, as cores e a mesma divisão
+  await expect(tv.locator('.duet-legend')).toContainText('Ana');
+  await expect(tv.locator('.duet-legend')).toContainText('Bia');
+  await expect(tv.locator('.line.current')).toHaveAttribute('data-part', 'a');
+
+  // quando acaba, os dois voltam para a sala
+  await hostPost(request, room, '/player/skip');
+  await expect(ana.page).toHaveURL(/\/room\.html/, { timeout: 12_000 });
+  await expect(bia.page).toHaveURL(/\/room\.html/, { timeout: 12_000 });
+  await ana.context.close();
+  await bia.context.close();
+});
+
+test('recusar desfaz o convite; quem não foi convidado não vê o pedido e a Ana continua sozinha na música', async ({ browser, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: CAIO, name: 'Caio' });
+  await addToQueue(request, room.code, SONGS.bravo, { client: ANA, name: 'Ana' });
+  const ana = await phone(browser, ANA, 'Ana');
+  const bia = await phone(browser, BIA, 'Bia');
+  const caio = await phone(browser, CAIO, 'Caio');
+  for (const person of [ana, bia, caio]) await person.page.goto(room.guestUrl);
+
+  await ana.page.getByRole('button', { name: 'Convidar para cantar junto' }).click();
+  await ana.page.getByRole('dialog').getByRole('button', { name: 'Bia' }).click();
+  await expect(bia.page.getByRole('region', { name: 'Convites para cantar junto' })).toBeVisible();
+  await expect(caio.page.getByRole('region', { name: 'Convites para cantar junto' })).toHaveCount(0);
+
+  await bia.page.getByRole('button', { name: 'Recusar' }).click();
+  await expect(bia.page.getByRole('region', { name: 'Convites para cantar junto' })).toHaveCount(0);
+  await expect(ana.page.getByRole('button', { name: 'Convidar para cantar junto' })).toBeVisible(); // voltou a poder convidar
+  await expect(ana.page.getByText('Dueto com')).toHaveCount(0);
+
+  // convidar e cancelar
+  await ana.page.getByRole('button', { name: 'Convidar para cantar junto' }).click();
+  await ana.page.getByRole('dialog').getByRole('button', { name: 'Bia' }).click();
+  await expect(bia.page.getByRole('region', { name: 'Convites para cantar junto' })).toBeVisible();
+  await ana.page.getByRole('button', { name: 'Cancelar o convite' }).click();
+  await expect(bia.page.getByRole('region', { name: 'Convites para cantar junto' })).toHaveCount(0);
+  for (const person of [ana, bia, caio]) await person.context.close();
+});
+
+test('sem mais ninguém na sala o convite avisa que não há quem convidar', async ({ browser, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: CAIO, name: 'Caio' });
+  await addToQueue(request, room.code, SONGS.bravo, { client: ANA, name: 'Ana' });
+  const ana = await phone(browser, ANA, 'Ana');
+  await ana.page.goto(room.guestUrl);
+  await ana.page.getByRole('button', { name: 'Convidar para cantar junto' }).click();
+  await expect(ana.page.getByRole('dialog')).toContainText('Ninguém mais está na sala agora');
+  await ana.context.close();
+});

@@ -1,6 +1,7 @@
 // Palco: a tela de canto do celular. Mostra a letra no ritmo da TV (que toca a música) e devolve o cantor à sala quando acaba.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSyncClock } from '../lib/clock.js';
+import { myPart, PART_NAMES } from '../lib/duet.js';
 import { connectRoom } from '../lib/identity.js';
 import { createLyricsView } from '../lib/lyrics-view.js';
 import { splitQueue } from '../lib/queue-view.js';
@@ -85,6 +86,7 @@ export function StagePage({ code }: { code: string }) {
       itemRef.current = mine;
       itemInfo.current = current;
       setItem(current);
+      view.current?.setDuet(current?.guest?.status === 'accepted');
       clock.current.reset();
       clock.current.position(state.position_ms);
       const waiting = pendingLyrics.current;
@@ -93,6 +95,7 @@ export function StagePage({ code }: { code: string }) {
     if (state.current_item_id === itemRef.current) {
       itemInfo.current = current ?? itemInfo.current;
       if (current) setItem(current); // título, cantor e ajuste da letra sempre atuais
+      view.current?.setDuet(current?.guest?.status === 'accepted'); // dueto: a letra ganha as duas cores
       clock.current.setPlaying(state.playback === 'playing');
       view.current?.setOffset(current?.lyric_offset ?? 0);
       // com a música no servidor (ou na nuvem) a letra vem direto; no computador do dono só a TV a alcança e a repassa pelo servidor
@@ -133,7 +136,7 @@ export function StagePage({ code }: { code: string }) {
           <h1 className="stage-song">{current?.title ?? '…'}</h1>
           <p className="stage-artist">
             {current?.artist ?? ''}
-            {current?.added_by ? ` — ${current.added_by}` : ''}
+            {current?.singers ? ` — ${current.singers}` : ''}
           </p>
         </div>
         <button type="button" onClick={leave}>
@@ -147,6 +150,14 @@ export function StagePage({ code }: { code: string }) {
         <p className="line next" ref={lyricsRefs.next} />
         <p className="line next2" ref={lyricsRefs.next2} />
       </section>
+
+      {item?.guest?.status === 'accepted' && (
+        <p className="duet-legend stage-legend" aria-label="Cores do dueto">
+          <span data-part={myPart(item)}>{`Você canta nas partes ${PART_NAMES[myPart(item)]}s`.replace('verdes', 'verdes').replace('vermelhos', 'vermelhas')}</span>
+          <span data-part={myPart(item) === 'a' ? 'b' : 'a'}>{item.mine ? item.guest.name : item.added_by}</span>
+          <span data-part="both">os dois</span>
+        </p>
+      )}
 
       <footer className="stage-bottom" role="status">
         {ended ? (

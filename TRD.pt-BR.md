@@ -433,6 +433,26 @@ Anotado para o futuro (decisão de Out/2026): além da produção teremos **mais
 - Um **detector de microfonia** (baixar o volume sozinho): não feito; o aviso, o volume padrão baixo e o cancelamento de eco são a proteção por enquanto.
 - Não testado com caixas e microfones de verdade (só com o microfone falso do navegador): a sensação real (latência, apito) precisa do teste do dono.
 
+### 12.15 M9: dueto, e a 1.0.0 (Out/2026)
+
+**Decisão:** o convite funciona com um **aviso para o convidado** ("Ana convidou você para cantar X em dupla" com **Aceitar** e **Recusar**), então ninguém é levado ao palco sem querer.
+
+**Feito**
+- **Quem está na sala:** os celulares dizem ao servidor o nome da pessoa (na conexão e numa mensagem `hello` quando ele muda) e o estado traz `people` (nome e um `pid`, um resumo sem volta do `client_id`, que continua nunca saindo do servidor).
+- **O convite** (`POST /rooms/:code/queue/:id/invite {pid}`, `DELETE .../invite`, `POST .../invite/respond {accept}`): o dono da música (ou o anfitrião) convida alguém que está na sala **agora**; só músicas que ainda aguardam; um convidado por música (convidar de novo troca o convidado); só o convidado responde; recusar ou cancelar desfaz. O estado traz `guest`, `singers` ("Ana & Bia") e, personalizados, `invite_for_me` e `guest_me`. No celular: **"Convidar para cantar junto"** na linha da música (uma lista de quem está na sala; sem mais ninguém, um aviso), o convite como um aviso com **Aceitar/Recusar** para o convidado e "Dueto com Bia ✓" para os dois.
+- **Os dois vão ao palco:** a regra que leva o cantor da sala ao palco (M7) vale também para o convidado que aceitou; a TV, a fila e o placar mostram "Ana & Bia".
+- **A letra em duas cores** (`lib/duet.js` e `lib/lyrics-view.js`): **verde `#3A5A40`** para quem adicionou a música, **vermelho `#541E1B`** para o convidado, **amarelo** (a cor de sempre) quando cantam juntos, sempre com **contorno branco** (as duas cores são muito escuras) enquanto a linha se preenche; as linhas que ainda vêm ganham um ponto na cor de quem canta. Cada cantor vê no palco qual é a sua cor ("Você canta nas partes verdes/vermelhas") e a TV mostra uma legenda com os dois nomes.
+- **A divisão automática:** as linhas que **se repetem** (o refrão; sem diferenciar maiúsculas, acentos e pontuação; as muito curtas, como "oh oh", não contam) são cantadas pelos dois; as demais se alternam, uma linha para cada um (a, b, a, b...), começando pelo dono; linhas vazias são puladas. É uma função só (`splitParts`), então uma divisão feita à mão pode substituí-la depois.
+- **A pontuação é da dupla:** é a mesma nota da música (um microfone só), mostrada com os dois nomes.
+- **Testes:** 6 no servidor (quem está na sala e nenhum `client_id` vazando, mudança de nome, convidar/aceitar, recusar/cancelar e quem pode o quê, trocar e músicas que já tocam, a nota da dupla), 8 da divisão e das regras do palco (Node) e 3 de ponta a ponta (convidar → aceitar → os dois no palco com as cores certas, o contorno e a legenda, volta à sala; recusar e cancelar; ninguém para convidar). Os 80 testes do navegador que já existiam continuam passando.
+
+**Nota:** com as três etapas feitas (palco, volume da voz e dueto) este é o conteúdo da **versão 1.0.0**. Falta antes de lançá-la: os seus testes com aparelhos de verdade (o palco nos celulares, a voz com caixas e microfones, um dueto com duas pessoas), um instalador novo e a Release.
+
+**Fica para depois**
+- Uma divisão escolhida à mão pelos dois cantores (a automática continua como sugestão).
+- Mais de dois cantores, e um microfone por cantor.
+- O rodízio justo não considera o convidado (só a vez do dono conta).
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

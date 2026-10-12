@@ -169,6 +169,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const loaded = await res.json();
         if (token !== loadToken) return; // outra música foi pedida no meio do caminho
+        view.setDuet(item.guest?.status === 'accepted'); // dueto: a letra ganha as duas cores
         view.setCues(loaded);
         onLyrics?.(item.id, loaded);
       } catch (err) {

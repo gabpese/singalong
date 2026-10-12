@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS queue_items (
   status      TEXT NOT NULL DEFAULT 'queued',     -- queued | playing | done | skipped
   created_at  INTEGER NOT NULL,
   played_at   INTEGER,
-  score       INTEGER                             -- pontuação final (0..100), quando a sala pontua
+  score       INTEGER,                            -- pontuação final (0..100), quando a sala pontua
+  guest_client_id TEXT,                           -- dueto: a pessoa convidada para cantar junto (o client_id dela nunca sai do servidor)
+  guest_name      TEXT,
+  guest_status    TEXT                            -- pending (convite enviado) | accepted (vai cantar junto)
 );
 CREATE INDEX IF NOT EXISTS idx_items_room ON queue_items (room_code, status, position);
 CREATE TABLE IF NOT EXISTS song_settings (
@@ -84,7 +87,7 @@ CREATE TABLE IF NOT EXISTS agent_songs (
 `;
 
 const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
-const ITEM_FIELDS = new Set(['pitch', 'backing', 'position', 'status', 'played_at', 'score', 'title', 'artist']);
+const ITEM_FIELDS = new Set(['pitch', 'backing', 'position', 'status', 'played_at', 'score', 'title', 'artist', 'guest_client_id', 'guest_name', 'guest_status']);
 
 export function openDb(path = ':memory:') {
   const db = new DatabaseSync(path);
@@ -101,6 +104,9 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('rooms', 'voice')) db.exec('ALTER TABLE rooms ADD COLUMN voice INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('rooms', 'voice_volume')) db.exec('ALTER TABLE rooms ADD COLUMN voice_volume INTEGER NOT NULL DEFAULT 40');
   if (!hasColumn('queue_items', 'score')) db.exec('ALTER TABLE queue_items ADD COLUMN score INTEGER');
+  if (!hasColumn('queue_items', 'guest_client_id')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_client_id TEXT');
+  if (!hasColumn('queue_items', 'guest_name')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_name TEXT');
+  if (!hasColumn('queue_items', 'guest_status')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_status TEXT');
   if (!hasColumn('queue_items', 'backing')) db.exec('ALTER TABLE queue_items ADD COLUMN backing INTEGER NOT NULL DEFAULT 0');
   // bancos criados antes do agente local não têm a sessão da sala (nula = sala sem dono de sessão: o worker clássico)
   if (!hasColumn('rooms', 'session_id')) db.exec('ALTER TABLE rooms ADD COLUMN session_id TEXT REFERENCES sessions(id)');
@@ -163,7 +169,7 @@ export function openDb(path = ':memory:') {
       all("SELECT * FROM queue_items WHERE room_code = ? AND status IN ('queued', 'playing') ORDER BY position", roomCode),
     /** Placar da sala: as maiores pontuações (nome, música, nota). */
     listScored: (roomCode, limit = 10) =>
-      all('SELECT id, added_by, title, score FROM queue_items WHERE room_code = ? AND score IS NOT NULL ORDER BY score DESC, id LIMIT ?', roomCode, limit),
+      all('SELECT id, added_by, guest_name, guest_status, title, score FROM queue_items WHERE room_code = ? AND score IS NOT NULL ORDER BY score DESC, id LIMIT ?', roomCode, limit),
     countQueuedBy: (roomCode, clientId) =>
       one("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = ? AND client_id = ? AND status = 'queued'", roomCode, clientId).n,
     countQueued: (roomCode) => one("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = ? AND status = 'queued'", roomCode).n,
