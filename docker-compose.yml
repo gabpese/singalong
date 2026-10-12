@@ -29,6 +29,10 @@ services:
       # segredo do administrador: liga o pareamento do agente local (/agent/v1); vazio = desligado
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       ADMIN_PATH: ${ADMIN_PATH:-}
+      APP_LATEST_VERSION: ${APP_LATEST_VERSION:-}
+      APP_MIN_VERSION: ${APP_MIN_VERSION:-}
+      APP_NOTES: ${APP_NOTES:-}
+      APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}
       PAIR_ALLOWED_EMAILS: ${PAIR_ALLOWED_EMAILS:-}
       ENABLED_TO_SEND_TO_CLOUD: ${ENABLED_TO_SEND_TO_CLOUD:-}
       BREVO_API_KEY: ${BREVO_API_KEY:-}

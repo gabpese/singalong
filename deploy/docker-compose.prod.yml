@@ -49,6 +49,11 @@ services:
       ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
       # atrás do Caddy: o IP de quem chama vem no X-Forwarded-For (limites de pedidos por IP)
       TRUST_PROXY: "1"
+      # aviso de atualização do app instalado: a versão mais recente, a mínima aceita, o que mudou e onde baixar (vazio = não avisa)
+      APP_LATEST_VERSION: "${APP_LATEST_VERSION:-}"
+      APP_MIN_VERSION: "${APP_MIN_VERSION:-}"
+      APP_NOTES: "${APP_NOTES:-}"
+      APP_DOWNLOAD_URL: "${APP_DOWNLOAD_URL:-}"
       # o endereço SECRETO da página do administrador (sem ele a página não existe); gere com: openssl rand -hex 16
       ADMIN_PATH: "${ADMIN_PATH:-}"
       # código de pareamento por e-mail (opcional): quem estiver em PAIR_ALLOWED_EMAILS pede o código no app e recebe por e-mail
