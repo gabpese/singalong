@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS rooms (
   host_token      TEXT NOT NULL,
   fair            INTEGER NOT NULL DEFAULT 0,
   scoring         INTEGER NOT NULL DEFAULT 0,       -- pontuação pelo microfone (decidida pelo anfitrião)
+  voice           INTEGER NOT NULL DEFAULT 0,       -- a voz do microfone da TV sai nas caixas junto com a música (decidida pelo anfitrião)
+  voice_volume    INTEGER NOT NULL DEFAULT 40,      -- volume dessa voz, de 0 a 100
   current_item_id INTEGER,
   playback        TEXT NOT NULL DEFAULT 'idle',   -- idle | playing | paused
   last_client_id  TEXT,                           -- quem cantou por último (rodízio justo)
@@ -81,7 +83,7 @@ CREATE TABLE IF NOT EXISTS agent_songs (
 );
 `;
 
-const ROOM_FIELDS = new Set(['fair', 'scoring', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
+const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
 const ITEM_FIELDS = new Set(['pitch', 'backing', 'position', 'status', 'played_at', 'score', 'title', 'artist']);
 
 export function openDb(path = ':memory:') {
@@ -96,6 +98,8 @@ export function openDb(path = ':memory:') {
   // bancos criados antes da pontuação não têm estas colunas
   const hasColumn = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
   if (!hasColumn('rooms', 'scoring')) db.exec('ALTER TABLE rooms ADD COLUMN scoring INTEGER NOT NULL DEFAULT 0');
+  if (!hasColumn('rooms', 'voice')) db.exec('ALTER TABLE rooms ADD COLUMN voice INTEGER NOT NULL DEFAULT 0');
+  if (!hasColumn('rooms', 'voice_volume')) db.exec('ALTER TABLE rooms ADD COLUMN voice_volume INTEGER NOT NULL DEFAULT 40');
   if (!hasColumn('queue_items', 'score')) db.exec('ALTER TABLE queue_items ADD COLUMN score INTEGER');
   if (!hasColumn('queue_items', 'backing')) db.exec('ALTER TABLE queue_items ADD COLUMN backing INTEGER NOT NULL DEFAULT 0');
   // bancos criados antes do agente local não têm a sessão da sala (nula = sala sem dono de sessão: o worker clássico)

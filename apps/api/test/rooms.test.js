@@ -464,6 +464,26 @@ test('pontuação (opcional): só o anfitrião liga; a nota da TV vale só para 
   assert.deepEqual(scoreboard.map((r) => [r.name, r.score]), [['Bia', 95], ['Ana', 87]]);
 });
 
+test('voz do microfone da TV nas caixas: só o anfitrião liga e ajusta o volume (0 a 100); começa desligada e baixa', async () => {
+  const { code, host } = await newRoom();
+  const start = (await call('GET', `/rooms/${code}`)).body;
+  assert.deepEqual([start.voice, start.voice_volume], [false, 40]); // desligada por padrão, volume baixo
+  assert.equal((await call('PATCH', `/rooms/${code}`, { client: BIA, body: { voice: true } })).status, 403);
+  assert.equal((await call('PATCH', `/rooms/${code}`, { client: BIA, body: { voice_volume: 90 } })).status, 403);
+
+  const on = await call('PATCH', `/rooms/${code}`, { host, body: { voice: true } });
+  assert.deepEqual([on.body.voice, on.body.voice_volume, on.body.scoring, on.body.fair], [true, 40, false, false]); // um ajuste não mexe nos outros
+  const louder = await call('PATCH', `/rooms/${code}`, { host, body: { voice_volume: 75 } });
+  assert.deepEqual([louder.body.voice, louder.body.voice_volume], [true, 75]);
+  for (const bad of [101, -1, 50.5, 'alto']) assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: { voice_volume: bad } })).status, 400, String(bad));
+  assert.equal((await call('GET', `/rooms/${code}`)).body.voice_volume, 75); // os valores inválidos não mudaram nada
+
+  const off = await call('PATCH', `/rooms/${code}`, { host, body: { voice: false } });
+  assert.deepEqual([off.body.voice, off.body.voice_volume], [false, 75]); // desligar guarda o volume escolhido
+  const other = await newRoom();
+  assert.equal((await call('GET', `/rooms/${other.code}`)).body.voice, false); // e é por sala
+});
+
 test('a melodia de referência só aparece quando existe no cache', async () => {
   const dir = join(root, 'cache', READY_B);
   await writeFile(join(dir, 'melody.json'), '{"hop":0.05,"midi":[]}');
