@@ -56,6 +56,16 @@ CREATE TABLE IF NOT EXISTS sessions (
   ended_at     INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions (device_id, ended_at);
+-- Catálogo do dono: as músicas que estão NO COMPUTADOR dele (armazenamento local). A nuvem não vê os arquivos; sabe só o
+-- que o agente publica (o meta.json e quais arquivos existem) e onde o navegador os busca (sessions.media_base).
+CREATE TABLE IF NOT EXISTS agent_songs (
+  device_id   TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  video_id    TEXT NOT NULL,
+  meta        TEXT NOT NULL,                         -- o meta.json da música (JSON)
+  files       TEXT NOT NULL,                         -- { instrumental, lyrics, melody, backing, exports: [tons] }
+  updated_at  INTEGER NOT NULL,
+  PRIMARY KEY (device_id, video_id)
+);
 `;
 
 const ROOM_FIELDS = new Set(['fair', 'scoring', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
@@ -77,6 +87,8 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('queue_items', 'backing')) db.exec('ALTER TABLE queue_items ADD COLUMN backing INTEGER NOT NULL DEFAULT 0');
   // bancos criados antes do agente local não têm a sessão da sala (nula = sala sem dono de sessão: o worker clássico)
   if (!hasColumn('rooms', 'session_id')) db.exec('ALTER TABLE rooms ADD COLUMN session_id TEXT REFERENCES sessions(id)');
+  // onde o navegador busca a mídia da sessão (o servidor local de mídia do agente); nulo = a mídia está no armazenamento do servidor
+  if (!hasColumn('sessions', 'media_base')) db.exec('ALTER TABLE sessions ADD COLUMN media_base TEXT');
 
   const one = (sql, ...params) => db.prepare(sql).get(...params) ?? null;
   const all = (sql, ...params) => db.prepare(sql).all(...params);
@@ -172,6 +184,22 @@ export function openDb(path = ':memory:') {
     activeSessionOf: (deviceId) => one('SELECT * FROM sessions WHERE device_id = ? AND ended_at IS NULL ORDER BY created_at DESC LIMIT 1', deviceId),
     touchSession: (id, now) => run('UPDATE sessions SET last_seen = ? WHERE id = ? AND ended_at IS NULL', now, id),
     renameSession: (id, displayName) => run('UPDATE sessions SET display_name = ? WHERE id = ?', displayName, id),
+    setSessionMedia: (id, mediaBase) => run('UPDATE sessions SET media_base = ? WHERE id = ?', mediaBase, id),
+
+    /** Publica (ou atualiza) músicas do catálogo do dispositivo: `entries` = [{ videoId, meta, files }]. */
+    upsertAgentSongs: (deviceId, entries, now) =>
+      transaction(() => {
+        for (const { videoId, meta, files } of entries) {
+          run(
+            `INSERT INTO agent_songs (device_id, video_id, meta, files, updated_at) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(device_id, video_id) DO UPDATE SET meta = excluded.meta, files = excluded.files, updated_at = excluded.updated_at`,
+            deviceId, videoId, JSON.stringify(meta), JSON.stringify(files), now,
+          );
+        }
+      }),
+    getAgentSong: (deviceId, videoId) => one('SELECT * FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId),
+    listAgentSongs: (deviceId) => all('SELECT * FROM agent_songs WHERE device_id = ? ORDER BY video_id', deviceId),
+    deleteAgentSong: (deviceId, videoId) => run('DELETE FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId).changes > 0,
     /** Encerra a sessão e devolve true se ela estava ativa. */
     endSession: (id, now) => run('UPDATE sessions SET ended_at = ? WHERE id = ? AND ended_at IS NULL', now, id).changes > 0,
     /** Sessões ativas sem sinal desde `before` (o app fechou sem avisar). */

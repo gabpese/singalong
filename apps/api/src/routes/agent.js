@@ -3,7 +3,7 @@
 // O agente é o app instalado no computador do dono. Ele só faz conexões de SAÍDA: pareia uma vez com um código, inicia uma
 // sessão, cria as salas dela e fica puxando trabalho (long-poll). Só o agente dono da sessão de uma sala recebe os
 // pedidos dessa sala. Autenticação: `Authorization: Bearer <token do dispositivo>`.
-import { MAX_NAME, safeEqual } from '../agents.js';
+import { MAX_LIBRARY_BATCH, MAX_NAME, VIDEO_ID_PATTERN, safeEqual } from '../agents.js';
 import { MAX_WAIT_MS } from '../jobs.js';
 import { HttpError } from '../rooms.js';
 import { rateLimited } from '../rate-limit.js';
@@ -87,12 +87,18 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters }
       body: {
         type: 'object',
         additionalProperties: false,
-        properties: { display_name: { type: 'string', minLength: 1, maxLength: MAX_NAME * 2 }, resume_id: { type: 'string', maxLength: 64 } },
+        properties: {
+          display_name: { type: 'string', minLength: 1, maxLength: MAX_NAME * 2 },
+          resume_id: { type: 'string', maxLength: 64 },
+          // o servidor local de mídia do agente (http://127.0.0.1:porta/token): é de onde o navegador busca as músicas da sessão
+          media_base: { type: 'string', maxLength: 200 },
+        },
         required: ['display_name'],
       },
     },
   }, async (request, reply) => {
-    const session = await agents.startSession(request.device, request.body.display_name, { resumeId: request.body.resume_id });
+    const { display_name: name, resume_id: resumeId, media_base: mediaBase } = request.body;
+    const session = await agents.startSession(request.device, name, { resumeId, mediaBase });
     return reply.code(201).send({ id: session.id, display_name: session.display_name });
   });
 
@@ -114,10 +120,33 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters }
       body: {
         type: 'object',
         additionalProperties: false,
-        properties: { version: { type: 'string', maxLength: 40 }, hardware: { type: 'object' } },
+        properties: { version: { type: 'string', maxLength: 40 }, hardware: { type: 'object' }, media_base: { type: 'string', maxLength: 200 } },
       },
     },
-  }, async (request) => ({ ok: true, session_id: agents.touch(request.device)?.id ?? null, server_time: Date.now() }));
+  }, async (request) => {
+    const session = agents.touch(request.device);
+    if (session && request.body?.media_base !== undefined) agents.setMediaBase(session, request.body.media_base);
+    return { ok: true, session_id: session?.id ?? null, server_time: Date.now() };
+  });
+
+  // --- catálogo local: as músicas que estão no computador do dono ---
+
+  // O agente publica o que tem (ao iniciar, e a cada música pronta, com vozes de apoio ou MP4 novos). Só o meta e quais arquivos existem.
+  app.put('/library', {
+    ...auth,
+    schema: { body: { type: 'object', additionalProperties: false, properties: { songs: { type: 'array', maxItems: MAX_LIBRARY_BATCH, items: { type: 'object' } } }, required: ['songs'] } },
+  }, async (request) => {
+    agents.touch(request.device);
+    return { count: agents.publishLibrary(request.device, request.body.songs) };
+  });
+
+  app.delete('/library/:id', {
+    ...auth,
+    schema: { params: { type: 'object', properties: { id: { type: 'string', pattern: VIDEO_ID_PATTERN } }, required: ['id'] } },
+  }, async (request, reply) => {
+    if (!agents.unpublish(request.device, request.params.id)) throw new HttpError(404, 'not_found', 'Esta música não está no catálogo.');
+    return reply.code(204).send();
+  });
 
   // --- jobs de processamento ---
 

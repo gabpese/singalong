@@ -1,4 +1,5 @@
 import { rateLimited } from '../rate-limit.js';
+import { VIDEO_ID_PATTERN } from '../agents.js';
 import { LYRICS_SCHEMA } from './songs.js';
 import { HttpError, normalizeCode } from '../rooms.js';
 
@@ -50,7 +51,7 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
         additionalProperties: false,
         properties: {
           url: { type: 'string', maxLength: 300 },
-          video_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{11}$' },
+          video_id: { type: 'string', pattern: VIDEO_ID_PATTERN },
           lyrics: LYRICS_SCHEMA,
           artist: { type: 'string', maxLength: 200 },
           title: { type: 'string', maxLength: 200 },
@@ -116,7 +117,7 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
     schema: {
       params: {
         type: 'object',
-        properties: { code: CODE_PARAM, videoId: { type: 'string', pattern: '^[A-Za-z0-9_-]{11}$' } },
+        properties: { code: CODE_PARAM, videoId: { type: 'string', pattern: VIDEO_ID_PATTERN } },
         required: ['code', 'videoId'],
       },
       body: { type: 'object', additionalProperties: false, properties: { offset: { type: 'number' } }, required: ['offset'] },

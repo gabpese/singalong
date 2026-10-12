@@ -1,7 +1,8 @@
+import { VIDEO_ID_PATTERN } from '../agents.js';
 import { rateLimited } from '../rate-limit.js';
 import { extractVideoId } from '../youtube.js';
 
-const ID_PARAM = { type: 'object', properties: { id: { type: 'string', pattern: '^[A-Za-z0-9_-]{11}$' } }, required: ['id'] };
+const ID_PARAM = { type: 'object', properties: { id: { type: 'string', pattern: VIDEO_ID_PATTERN } }, required: ['id'] };
 
 export const LYRICS_SCHEMA = {
   type: 'object',
@@ -69,7 +70,8 @@ export async function songRoutes(app, { songs, jobs, limiters, rooms, agents }) 
     }
   });
 
-  app.get('/songs', async () => songs.list());
+  // a biblioteca: com X-Room de uma sala com armazenamento local, é o catálogo do dono; senão, a do servidor
+  app.get('/songs', async (request) => songs.list({ sessionId: sessionOf(request) }));
 
   // Adiciona um link: usa o cache se já estiver pronto; senão cria um job (ou reaproveita o que está em andamento).
   app.post('/songs', {
@@ -98,7 +100,7 @@ export async function songRoutes(app, { songs, jobs, limiters, rooms, agents }) 
   });
 
   app.get('/songs/:id', { schema: { params: ID_PARAM } }, async (request, reply) => {
-    const song = await songs.describe(request.params.id);
+    const song = await songs.describe(request.params.id, { sessionId: sessionOf(request) });
     return song ?? reply.code(404).send({ error: 'not_found' });
   });
 
@@ -116,7 +118,7 @@ export async function songRoutes(app, { songs, jobs, limiters, rooms, agents }) 
 
   app.get('/songs/:id/export', {
     schema: { params: ID_PARAM, querystring: { type: 'object', properties: { pitch: PITCH } } },
-  }, async (request) => songs.exportInfo(request.params.id, request.query.pitch ?? 0));
+  }, async (request) => songs.exportInfo(request.params.id, request.query.pitch ?? 0, { sessionId: sessionOf(request) }));
 
   // Escolha/troca da fonte da letra (reaproveita o instrumental do cache; só refaz a letra).
   app.put('/songs/:id/lyrics', {

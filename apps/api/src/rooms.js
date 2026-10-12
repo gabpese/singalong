@@ -142,9 +142,12 @@ export function createRoomService({
     db.updateRoom(code, { last_active_at: t });
   }
 
-  async function readySet(items) {
+  /** O contexto das músicas de uma sala: se ela tem sessão com armazenamento local, as músicas estão no catálogo do dono. */
+  const songCtx = (room) => ({ sessionId: room.session_id ?? null });
+
+  async function readySet(items, room) {
     const ids = [...new Set(items.map((i) => i.video_id))];
-    const flags = await Promise.all(ids.map((id) => songs.isReady(id)));
+    const flags = await Promise.all(ids.map((id) => songs.isReady(id, songCtx(room))));
     return new Set(ids.filter((_, i) => flags[i]));
   }
 
@@ -153,7 +156,7 @@ export function createRoomService({
     const room = db.getRoom(code);
     if (!room || (room.current_item_id && room.playback !== 'idle')) return false;
     const queued = db.listActive(code).filter((i) => i.status === 'queued');
-    const pick = nextPlayable(queued, await readySet(queued), { fair: Boolean(room.fair), lastClientId: room.last_client_id });
+    const pick = nextPlayable(queued, await readySet(queued, room), { fair: Boolean(room.fair), lastClientId: room.last_client_id });
     if (!pick) {
       if (room.current_item_id || room.playback !== 'idle') db.updateRoom(code, { current_item_id: null, playback: 'idle' });
       return false;
@@ -183,7 +186,7 @@ export function createRoomService({
     // o que está tocando vem primeiro (com o rodízio justo ele pode ter posição maior que a de quem aguarda)
     const items = db.listActive(room.code).sort((a, b) => Number(b.status === 'playing') - Number(a.status === 'playing'));
     const ids = [...new Set(items.map((i) => i.video_id))];
-    const described = new Map(await Promise.all(ids.map(async (id) => [id, await songs.describe(id)])));
+    const described = new Map(await Promise.all(ids.map(async (id) => [id, await songs.describe(id, songCtx(room))])));
     const position = positions.get(room.code);
     // quem toca a seguir: a mesma regra do avanço da fila (só músicas prontas; rodízio justo, se ligado)
     const ready = new Set(ids.filter((id) => described.get(id)?.media));
@@ -293,7 +296,7 @@ export function createRoomService({
         // as já prontas (biblioteca) têm esses dados no meta.json
         const artist = params.artist?.trim();
         const title = params.title?.trim();
-        if (!(await songs.isReady(videoId)) && !(artist && title)) {
+        if (!(await songs.isReady(videoId, songCtx(room))) && !(artist && title)) {
           throw new HttpError(400, 'artist_title_required', 'Informe o artista e o nome da música.');
         }
         if (db.countQueued(room.code) >= MAX_QUEUE) throw new HttpError(409, 'queue_full', 'A fila está cheia.');
