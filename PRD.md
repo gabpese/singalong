@@ -58,6 +58,8 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 | F8 | Jukebox: suggest versions that are already ready before searching YouTube | ✅ |
 | F9 | A library with an artist/title filter, sorted alphabetically | ✅ |
 | F10 | Process new songs **without the owner's PC on and without YouTube blocking** (local agent) | 🔧 |
+| F32 | **Import an audio file of the user's own** (mp3, flac, wav, m4a, ogg, opus): the app separates the voice, finds/aligns the lyrics and leaves the song ready, **without going through YouTube** | 🔧 |
+| F33 | **Paste the link of an open source** from a fixed list (SoundCloud, Bandcamp, Internet Archive; more later) when the song allows download | 🔧 |
 
 ### 5.3 Playback
 | ID | Requirement | Status |
@@ -119,7 +121,7 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 ## 8. Release scope
 
 - **v1 (done):** everything from F1 to F20, running with Docker on the owner's PC and/or on the free VM (library copied over only).
-- **v2 (next):** a local agent + an installer **for Windows only**, with a session and YouTube account and **local storage** (F10, F21 to F24, F27 to F31), with the cloud as the central server (rooms, queue, phones).
+- **v2 (next):** a local agent + an installer **for Windows only**, with a session and YouTube account and **local storage** (F10, F21 to F24, F27 to F33), with the cloud as the central server (rooms, queue, phones).
 - **v2.1:** hybrid mode, "take to the cloud" per song (F25).
 - **v3:** macOS/Linux, AMD/Apple GPU (F26).
 
@@ -135,10 +137,10 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 
 ## 10. Open questions
 
-**Decided (Oct 2026):** the download account is **one per session**, asked at the start, and applies to every room in the session; storage is **local first** (hybrid later); the first version is **Windows only**.
+**Decided (Oct 2026):** the download account is **one per session**, asked at the start, and applies to every room in the session; storage is **local first** (hybrid later); the first version is **Windows only**; downloads try **without cookies first**; **importing the user's own files and links from open sources enters v2** (F32, F33).
 
 1. **What does the session show guests?** The YouTube account's name or just a nickname chosen by the owner? (showing the real account exposes their identity)
-2. **Importing the user's own audio files** (and open sources, such as Jamendo and the Internet Archive) as an alternative that does not go through YouTube: does it enter v2?
+2. **Who can import files?** In the proposal, only the session owner (through the app); a guest does not upload a file from the phone. Confirm.
 3. **How does a guest play the local song?** With local storage, the **TV must run on the owner's computer** (or be connected to it by HDMI); the instrumental preview on the phone does not work in this mode. Is that acceptable for v2?
 4. **Will it be distributed publicly?** It changes the stance on copyright, the warning about the account and the kind of code signing.
 5. **Name and identity** of the installer and the agent.

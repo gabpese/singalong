@@ -155,6 +155,18 @@ Proposed minimum requirements (**to be measured** with real tests before publish
 - **Validation on the agent**: the `video_id` must match `^[A-Za-z0-9_-]{11}$`; the agent builds the canonical URL and **accepts only options from a fixed list**. A compromised server cannot send arbitrary flags to yt-dlp (command execution).
 - YouTube errors stay translated (`errors.py`), with "Tentar de novo" (try again) only when worth it.
 
+### 8.1 Sources without YouTube: the user's file and open sources (v2)
+
+The pipeline only needs **an audio file**; downloading is just the first step. So a job gets a source type: `source: youtube | file | open_url`.
+
+- **`file` (F32):** the owner picks the file through the **operating system's file picker** in the app (the server never supplies a path). The agent **copies** the file (does not move it) into the library, validates it with `ffprobe` (an audio format, a duration within the current 900 s limit, a maximum size, e.g. 200 MB) and continues from **vocal separation**, skipping the download. Formats: mp3, flac, wav, m4a, ogg, opus.
+- **Identifier:** today the id is YouTube's `video_id` (11 characters). Files use `f-` + the first 12 hexadecimal characters of the **SHA-256 of the content**, which also **avoids duplicating** the same file. The id validation in the API and the worker accepts both formats (regex `^[A-Za-z0-9_-]{11}$` or `^f-[0-9a-f]{12}$`), and the rest (`storage`, MP3, `lyrics.json`, `meta.json`) does not change.
+- **Metadata:** `source.json` keeps the title/artist read from the file's tags (if any); as today, **artist and title are confirmed and required** before looking up the lyrics.
+- **`open_url` (F33):** the owner pastes a link; the agent only accepts **hosts from a fixed list** (SoundCloud, Bandcamp, Internet Archive; more later), downloads with yt-dlp **without cookies** and follows the same path as the file. The server never sends an arbitrary host to the agent (the same rule as section 8). It only works when the author allows downloads; the app shows the site's error when it does not.
+- **Who imports:** in v2, **only the session owner, through the app**. A guest does not upload a file from the phone (it avoids large uploads and third parties' files passing through the cloud). Guests keep requesting songs from the library and from YouTube.
+- **Copyright:** the app does not verify the file's origin; responsibility lies with whoever imports (personal use), which should appear in the terms of use.
+- **Tests:** a unit test of the pipeline from a short synthetic WAV (no network), id validation (`f-…`), rejection of an invalid format/size/duration and of a host outside the list.
+
 ## 9. Agent interface
 
 System tray + a simple window: **Pair** (8-character code, once), **Start session / Sign in to YouTube** (pick the browser and profile, with the "Connected" test), **status** (connected, processing, queue, the session's rooms), **library folder**, **detected hardware** (GPU/CPU, a "use CPU" button), **use of the login** (only when YouTube asks, default / always), **logs**, **start with Windows**, **version and update**. No telemetry.
@@ -180,9 +192,9 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 | Milestone | Deliverable | Definition of done |
 |---|---|---|
 | **M0** | `JobBackend` + the `/agent/v1` API + **sessions and per-session job routing** + a fake agent in the tests | The full flow passes with the current worker switched to HTTP; a room's job is only claimed by its session's agent |
-| **M1** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`) and a local media server** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's local network prompt **tested** with the TV on `localhost` |
+| **M1** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's local network prompt **tested** with the TV on `localhost` |
 | **M2** | Engine pack (CPU and cu121) + hardware probe | Installs without Python/Docker; GPU tested with a fallback |
-| **M3** | Electron shell: session, "Sign in to YouTube" screen, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
+| **M3** | Electron shell: session, "Sign in to YouTube" screen, an "Import file" button, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
 | **M4** | **Windows** installer + auto-update | A clean install on a VM; update tested |
 | **M5** | Hybrid mode ("Take to the cloud") (v2.1) | A published song plays on another computer |
 | **M6** | macOS/Linux, AMD/Apple GPU | v3 |
@@ -195,10 +207,11 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 3. First platform: **Windows only**.
 4. Downloads use the login **only when YouTube blocks** (no cookies first); "always" is an option.
 5. **ffmpeg (a GPL build)** ships inside the engine pack (section 7).
+6. **Importing the user's files and links from open sources enters v2** (section 8.1).
 
 **Open**
 1. **Nickname or real account** shown to guests (showing the real account exposes the owner's identity).
-2. **Importing the user's own audio files** (and open sources) as a YouTube-free alternative: does it enter v2?
+2. **Who can import files?** Proposal: only the session owner, through the app (section 8.1); confirm.
 3. Is a **TV on the owner's computer** (and no instrumental preview on the phone) acceptable in v2? Checking Chrome's local network prompt (M1) may force serving the TV page from the agent.
 4. **Public distribution?** It defines the stance on copyright, the warning about the account and the code signing.
 5. **RTX 50 and others:** confirm on your machine and on a new card whether the current torch works (or raise the torch version, which forces a review of Demucs, today pinned to 2.5.1).

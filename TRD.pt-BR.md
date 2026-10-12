@@ -155,6 +155,18 @@ Requisitos mínimos propostos (**a medir** com testes reais antes de publicar): 
 - **Validação no agente**: o `video_id` precisa casar com `^[A-Za-z0-9_-]{11}$`; o agente monta a URL canônica e **só aceita opções de uma lista fixa**. Um servidor comprometido não consegue mandar flags arbitrárias ao yt-dlp (execução de comando).
 - Erros do YouTube continuam traduzidos (`errors.py`), com "Tentar de novo" só quando vale a pena.
 
+### 8.1 Fontes sem YouTube: arquivo do usuário e fontes abertas (v2)
+
+O pipeline só precisa de **um arquivo de áudio**; o download é apenas a primeira etapa. Por isso o job ganha um tipo de origem: `source: youtube | file | open_url`.
+
+- **`file` (F32):** o dono escolhe o arquivo pelo **seletor de arquivos do sistema** no app (o servidor nunca indica um caminho). O agente **copia** o arquivo (não move) para a biblioteca, valida com `ffprobe` (formato de áudio, duração dentro do limite atual de 900 s, tamanho máximo, p. ex. 200 MB) e segue a partir da **separação de voz**, pulando o download. Formatos: mp3, flac, wav, m4a, ogg, opus.
+- **Identificador:** hoje o id é o `video_id` do YouTube (11 caracteres). Arquivos usam `f-` + os primeiros 12 caracteres hexadecimais do **SHA-256 do conteúdo**, o que também **evita duplicar** o mesmo arquivo. A validação de id na API e no worker passa a aceitar os dois formatos (regex `^[A-Za-z0-9_-]{11}$` ou `^f-[0-9a-f]{12}$`), e o resto (`storage`, MP3, `lyrics.json`, `meta.json`) não muda.
+- **Metadados:** `source.json` guarda título/artista lidos das etiquetas do arquivo (se houver); como hoje, **artista e nome são confirmados e obrigatórios** antes de buscar a letra.
+- **`open_url` (F33):** o dono cola um link; o agente só aceita **hosts de uma lista fixa** (SoundCloud, Bandcamp, Internet Archive; outras depois), baixa com o yt-dlp **sem cookies** e segue o mesmo caminho do arquivo. O servidor nunca manda um host arbitrário ao agente (mesma regra da seção 8). Só funciona quando o autor permite download; o app mostra o erro do site quando não permite.
+- **Quem importa:** na v2, **só o dono da sessão, pelo app**. O convidado não envia arquivo pelo celular (evita upload grande e arquivos de terceiros passando pela nuvem). O convidado continua pedindo músicas da biblioteca e do YouTube.
+- **Direitos autorais:** o app não verifica a origem do arquivo; a responsabilidade é de quem importa (uso pessoal), o que deve constar no aviso de uso.
+- **Testes:** unitário do pipeline a partir de um WAV curto sintético (sem rede), validação do id (`f-…`), rejeição de formato/tamanho/duração inválidos e de host fora da lista.
+
 ## 9. Interface do agente
 
 Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma vez), **Iniciar sessão / Entrar com o YouTube** (escolher navegador e perfil, com o teste "Conectado"), **status** (conectado, processando, fila, salas da sessão), **pasta da biblioteca**, **hardware detectado** (GPU/CPU, botão "usar CPU"), **uso do login** (só quando o YouTube pedir, padrão / sempre), **logs**, **iniciar com o Windows**, **versão e atualização**. Sem telemetria.
@@ -180,9 +192,9 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | Marco | Entrega | Critério de pronto |
 |---|---|---|
 | **M0** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
-| **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`) e servidor local de mídia** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; **testado** o aviso de rede local do Chrome com a TV em `localhost` |
+| **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; **testado** o aviso de rede local do Chrome com a TV em `localhost` |
 | **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
-| **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
+| **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
 | **M5** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
 | **M6** | macOS/Linux, GPU AMD/Apple | v3 |
@@ -195,10 +207,11 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 3. Primeira plataforma: **só Windows**.
 4. O download usa o login **só quando o YouTube bloquear** (sem cookie primeiro); "sempre" é uma opção.
 5. O **ffmpeg (build GPL)** vai dentro do pacote do motor (seção 7).
+6. **Importar arquivos do usuário e links de fontes abertas entra na v2** (seção 8.1).
 
 **Em aberto**
 1. **Apelido ou conta real** exibido aos convidados (mostrar a conta real expõe a identidade do dono).
-2. **Importar arquivos de áudio do próprio usuário** (e fontes abertas) como alternativa sem YouTube: entra na v2?
+2. **Quem pode importar arquivos?** Proposta: só o dono da sessão, pelo app (seção 8.1); confirmar.
 3. **TV no computador do dono** (e sem prévia do instrumental no celular) é aceitável na v2? A verificação do aviso de rede local do Chrome (M1) pode obrigar a servir a página da TV pelo agente.
 4. **Distribuição pública?** Define a postura sobre direitos autorais, o aviso sobre a conta e a assinatura de código.
 5. **RTX 50 e outras:** confirmar com a sua máquina e uma placa nova se o torch atual funciona (ou subir a versão do torch, o que obriga a revisar o Demucs, hoje fixado em 2.5.1).

@@ -58,6 +58,8 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 | F8 | Jukebox: sugerir versões já prontas antes de buscar no YouTube | ✅ |
 | F9 | Biblioteca com filtro por artista e nome, ordenada alfabeticamente | ✅ |
 | F10 | Processar músicas novas **sem o PC do dono ligado e sem o YouTube bloquear** (agente local) | 🔧 |
+| F32 | **Importar um arquivo de áudio do próprio usuário** (mp3, flac, wav, m4a, ogg, opus): o app separa a voz, acha/alinha a letra e deixa a música pronta, **sem passar pelo YouTube** | 🔧 |
+| F33 | **Colar o link de uma fonte aberta** de uma lista fixa (SoundCloud, Bandcamp, Internet Archive; outras depois) quando a música permite download | 🔧 |
 
 ### 5.3 Reprodução
 | ID | Requisito | Estado |
@@ -119,7 +121,7 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 ## 8. Escopo das versões
 
 - **v1 (feito):** tudo de F1 a F20, rodando com Docker no PC do dono e/ou na VM gratuita (só a biblioteca copiada).
-- **v2 (próxima):** agente local + instalador **só para Windows**, com sessão e conta do YouTube e **armazenamento local** (F10, F21 a F24, F27 a F31), com a nuvem como servidor central (salas, fila, celulares).
+- **v2 (próxima):** agente local + instalador **só para Windows**, com sessão e conta do YouTube e **armazenamento local** (F10, F21 a F24, F27 a F33), com a nuvem como servidor central (salas, fila, celulares).
 - **v2.1:** modo híbrido, "levar para a nuvem" por música (F25).
 - **v3:** macOS/Linux, GPU AMD/Apple (F26).
 
@@ -135,10 +137,10 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 
 ## 10. Perguntas em aberto
 
-**Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**.
+**Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**; o download tenta **sem cookie primeiro**; **importar arquivos do próprio usuário e links de fontes abertas entra na v2** (F32, F33).
 
 1. **O que a sessão mostra aos convidados?** O nome da conta do YouTube ou só um apelido escolhido pelo dono? (mostrar a conta real expõe a identidade dele)
-2. **Importar arquivos de áudio do próprio usuário** (e fontes abertas, como Jamendo e Internet Archive) como alternativa que não passa pelo YouTube: entra na v2?
+2. **Quem pode importar arquivos?** Na proposta, só o dono da sessão (pelo app); o convidado não envia arquivo pelo celular. Confirmar.
 3. **Como o convidado toca a música local?** Com armazenamento local, a **TV tem de rodar no computador do dono** (ou ligada a ele por HDMI); a prévia do instrumental no celular não funciona nesse modo. Isso é aceitável para a v2?
 4. **Vai ser distribuído publicamente?** Muda a postura sobre direitos autorais, o aviso sobre a conta e o tipo de assinatura de código.
 5. **Nome e identidade** do instalador e do agente.
