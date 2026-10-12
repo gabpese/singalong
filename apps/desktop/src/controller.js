@@ -101,6 +101,7 @@ export function createController({
       server: config.server,
       deviceName: config.device_name,
       nickname: config.nickname,
+      microphone: config.microphone ?? null,
       browser,
       browserName: BROWSER_NAMES[browser],
       engineDir: config.engine_dir,
@@ -155,14 +156,16 @@ export function createController({
   }
 
   // --- motor ---
-  async function buildEngine({ engine = 'auto' } = {}) {
+  async function buildEngine({ engine = 'auto', switchEngine = false } = {}) {
     if (state.engine.status === 'building') return snapshot();
+    if (switchEngine && agentProcess) throw new UserError('session_running', 'Encerre a sessão para trocar a placa de vídeo.');
     state.engine = { ...state.engine, status: 'building', error: null, progress: { label: 'Preparando…' } };
     publish();
     try {
       const final = await assembleImpl({
         root: config.engine_dir,
         engine,
+        ...(switchEngine ? { switchEngine: true } : {}),
         ...(workerSource ? { workerSource } : {}),
         onProgress: ({ label, done, total, line }) => {
           state.engine.progress = { label, done: done ?? null, total: total ?? null };
@@ -280,16 +283,15 @@ export function createController({
 
   async function createRoom() {
     requirePaired();
-    if (state.agent.status !== 'online') throw new UserError('not_online', 'Inicie a sessão antes de criar uma sala.');
-    const { code, output } = await runWorker(['--create-room', '--public-url', config.server], { timeoutMs: 60000 });
-    const first = output.split(/\r?\n/).find((line) => line.startsWith('{'));
-    if (code !== 0 || !first) throw new UserError('create_room', output.split(/\r?\n/).find((l) => l.startsWith('erro')) ?? 'Não consegui criar a sala.');
-    const room = JSON.parse(first);
-    const entry = { code: room.code, tv: `${config.server}/tv.html?room=${room.code}`, host: `${config.server}/room.html?room=${room.code}#host=${room.host_token}` };
-    state.rooms = [entry, ...state.rooms.filter((r) => r.code !== entry.code)];
-    log(`Sala ${entry.code} criada.`);
-    publish();
-    return entry;
+    const session = state.agent.session;
+    if (state.agent.status !== 'online' || !session) throw new UserError('not_online', 'Inicie a sessão antes de criar uma sala.');
+    return withBusy('criando sala', async () => {
+      const room = await api('POST', `/sessions/${session.id}/rooms`, { body: {}, timeout: 20000 });
+      const entry = { code: room.code, tv: `${config.server}/tv.html?room=${room.code}`, host: `${config.server}/room.html?room=${room.code}#host=${room.host_token}` };
+      state.rooms = [entry, ...state.rooms.filter((r) => r.code !== entry.code)];
+      log(`Sala ${entry.code} criada.`);
+      return entry;
+    });
   }
 
   async function youtubeStatus() {
@@ -455,6 +457,10 @@ export function createController({
   async function setSettings(patch) {
     const allowed = {};
     if (patch.nickname !== undefined) allowed.nickname = String(patch.nickname).trim().slice(0, 40);
+    if (patch.microphone !== undefined) { // { id, label } escolhido nas configurações; null = o padrão do sistema
+      const mic = patch.microphone;
+      allowed.microphone = mic && typeof mic.id === 'string' && mic.id ? { id: mic.id.slice(0, 300), label: String(mic.label ?? '').slice(0, 120) } : null;
+    }
     await save(allowed);
     publish();
     return snapshot();

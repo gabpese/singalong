@@ -6,7 +6,8 @@ let state = null;
 let importFile = null;
 let autoStarted = false;
 let checkedYoutube = false;
-let tabs = { active: 'session', room: null };
+let tabs = { tab: 'session', rooms: [], room: null, sub: 'tv', settings: false };
+let hardwareInfo = null;
 
 const AGENT_TEXT = {
   stopped: ['Parada', ''],
@@ -44,17 +45,22 @@ function setPill(el, [text, kind]) {
   el.className = `pill ${kind}`.trim();
 }
 
+const isRunning = (s) => s.agent.status !== 'stopped' && s.agent.status !== 'auth_error';
+
 function render(s) {
   state = s;
   $('version').textContent = `v${s.version}`;
-  const running = s.agent.status !== 'stopped' && s.agent.status !== 'auth_error';
+  const running = isRunning(s);
   const paired = s.phase === 'home';
+  const settings = paired && tabs.settings;
+  $('gear').hidden = !paired;
   $('screen-engine').hidden = s.phase !== 'engine';
   $('screen-pair').hidden = s.phase !== 'pair';
-  $('screen-welcome').hidden = !(paired && !running);
-  $('screen-home').hidden = !(paired && running);
+  $('screen-welcome').hidden = !(paired && !running && !settings);
+  $('screen-home').hidden = !(paired && running && !settings);
+  $('screen-settings').hidden = !settings;
   $('tabs').hidden = !(paired && running);
-  $('main').classList.toggle('full', paired && !running); // a tela de início usa a janela inteira
+  $('main').classList.toggle('full', paired && !running && !settings); // a tela de início usa a janela inteira
   if (s.phase === 'engine' && s.engine.status === 'missing' && !autoStarted) { // primeira abertura: começa sozinho, sem perguntar
     autoStarted = true;
     act('buildEngine', { engine: 'auto' });
@@ -76,7 +82,7 @@ function render(s) {
     $('update-open').textContent = progress ? `Baixando… ${progress.percent}%` : 'Atualizar agora';
   }
 
-  // instalando componentes
+  // instalando componentes (também aparece ao trocar a placa de vídeo)
   const building = s.engine.status !== 'error';
   $('engine-build').hidden = building;
   $('engine-progress').hidden = !building;
@@ -96,23 +102,32 @@ function render(s) {
   $('welcome-server').textContent = s.server ? s.server.replace(/^https?:\/\//, '') : '';
   $('welcome-error').hidden = s.agent.status !== 'auth_error';
   $('welcome-error').textContent = s.agent.status === 'auth_error' ? s.agent.error ?? '' : '';
-  $('library-welcome').textContent = s.libraryDir ?? '';
 
   // sessão em andamento
   const online = s.agent.status === 'online';
+  const creating = s.busy === 'criando sala';
   setPill($('agent-pill'), AGENT_TEXT[s.agent.status] ?? ['?', '']);
-  setPill($('yt-pill-home'), YT_TEXT[s.youtube.status] ?? ['?', '']);
   $('session-nick').textContent = s.nickname ?? '';
   $('agent-error').hidden = !s.agent.error;
   $('agent-error').textContent = s.agent.error ?? '';
   $('room-create').disabled = !online || Boolean(s.busy);
+  $('room-create-spinner').hidden = !creating;
+  $('room-create-label').textContent = creating ? 'Criando a sala…' : 'Criar sala';
   $('import-pick').disabled = Boolean(s.busy);
   $('import-go').disabled = Boolean(s.busy);
-  $('library-home').textContent = s.libraryDir ?? '';
-  $('library-change-home').hidden = true; // a pasta só muda com a sessão parada (tela de início)
-  renderRooms(s.rooms);
+  renderRooms(s.rooms, creating);
 
-  // espera: login do YouTube e importação
+  // configurações
+  setPill($('yt-pill-home'), YT_TEXT[s.youtube.status] ?? ['?', '']);
+  $('library-home').textContent = s.libraryDir ?? '';
+  $('library-change').disabled = running;
+  $('library-note').hidden = !running;
+  $('gpu-apply').disabled = running;
+  $('gpu-note').hidden = !running;
+  $('gpu-note').textContent = running ? 'Encerre a sessão para trocar a placa de vídeo.' : '';
+  renderGpu();
+
+  // espera: login do YouTube
   const waiting = s.busy === 'login do YouTube';
   $('wait').hidden = !waiting;
   if (waiting) {
@@ -123,46 +138,75 @@ function render(s) {
   renderTabs();
 }
 
-function renderRooms(rooms) {
+function renderRooms(rooms, creating = false) {
   const list = $('rooms');
   list.replaceChildren();
+  if (creating) {
+    const item = document.createElement('li');
+    item.setAttribute('data-testid', 'room-creating');
+    item.className = 'loading';
+    const spinner = document.createElement('span');
+    spinner.className = 'spinner small';
+    const text = document.createElement('span');
+    text.textContent = 'Criando a sala…';
+    item.append(spinner, text);
+    list.append(item);
+  }
   for (const room of rooms) {
     const item = document.createElement('li');
-    item.dataset.testid = `room-${room.code}`;
     item.setAttribute('data-testid', `room-${room.code}`);
     const code = document.createElement('span');
     code.className = 'code';
     code.textContent = room.code;
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.textContent = tabs.room === room.code ? 'Aberta' : 'Abrir';
-    open.disabled = tabs.room === room.code;
-    open.setAttribute('data-testid', `open-${room.code}`);
-    open.addEventListener('click', () => act('openRoom', room.code));
-    item.append(code, open);
+    const enter = document.createElement('button');
+    enter.type = 'button';
+    enter.textContent = 'Entrar';
+    enter.setAttribute('data-testid', `enter-${room.code}`);
+    enter.addEventListener('click', () => act('openRoom', room.code));
+    item.append(code, enter);
     list.append(item);
   }
 }
 
-/** As abas Anfitrião e TV são páginas do servidor dentro da janela: quando uma delas está ativa, a interface só mostra as abas. */
+/** "Salas" tem as salas abertas e, em cada uma, as sub-abas TV e Anfitrião: as páginas do servidor ficam dentro da janela. */
 function renderTabs() {
-  const paired = state?.phase === 'home';
-  const running = state && state.agent.status !== 'stopped' && state.agent.status !== 'auth_error';
-  const web = running && paired && tabs.active !== 'session' && tabs.room;
-  for (const button of document.querySelectorAll('.tab[data-tab]')) {
-    const name = button.dataset.tab;
-    button.classList.toggle('active', tabs.active === name);
-    if (name !== 'session') button.disabled = !tabs.room;
+  if (!state) return;
+  const running = isRunning(state) && state.phase === 'home';
+  const inRooms = running && tabs.tab === 'rooms' && tabs.rooms.length > 0 && !tabs.settings;
+  $('tab-session').classList.toggle('active', tabs.tab === 'session' || tabs.settings);
+  $('tab-rooms').classList.toggle('active', tabs.tab === 'rooms' && !tabs.settings);
+  $('tab-rooms').disabled = tabs.rooms.length === 0;
+  $('rooms-count').textContent = tabs.rooms.length ? String(tabs.rooms.length) : '';
+  $('subtabs').hidden = !inRooms;
+  $('sub-tv').classList.toggle('active', tabs.sub === 'tv');
+  $('sub-host').classList.toggle('active', tabs.sub === 'host');
+  $('tab-fullscreen').hidden = tabs.sub !== 'tv';
+  const chips = $('room-chips');
+  chips.replaceChildren();
+  for (const code of tabs.rooms) {
+    const chip = document.createElement('span');
+    chip.className = `chip${code === tabs.room ? ' active' : ''}`;
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.textContent = `Sala ${code}`;
+    pick.setAttribute('data-testid', `chip-${code}`);
+    pick.addEventListener('click', () => act('selectRoom', code));
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = '×';
+    close.title = 'Fechar esta sala (ela continua existindo)';
+    close.setAttribute('aria-label', `Fechar a sala ${code}`);
+    close.setAttribute('data-testid', `close-${code}`);
+    close.addEventListener('click', () => act('closeRoom', code));
+    chip.append(pick, close);
+    chips.append(chip);
   }
-  $('tab-room').textContent = tabs.room ? `Sala ${tabs.room}` : '';
-  $('tab-back').hidden = !web;
-  $('tab-fullscreen').hidden = tabs.active !== 'tv' || !web;
-  $('main').hidden = Boolean(web);
-  renderRooms(state?.rooms ?? []);
+  const web = inRooms; // com uma sala aberta, a janela só mostra o cabeçalho e as abas (a página da sala ocupa o resto)
+  $('main').hidden = web;
   reportLayout();
 }
 
-/** Diz ao processo principal onde a interface termina (as páginas das abas começam logo abaixo). */
+/** Diz ao processo principal onde a interface termina (as páginas das salas começam logo abaixo). */
 let lastTop = 0;
 function reportLayout() {
   const top = Math.ceil($('chrome').getBoundingClientRect().bottom);
@@ -172,6 +216,54 @@ function reportLayout() {
   }
 }
 new ResizeObserver(reportLayout).observe($('chrome'));
+
+// --- configurações ---
+function renderGpu() {
+  const select = $('gpu-select');
+  if (!state || $('screen-settings').hidden) return;
+  if (document.activeElement === select) return;
+  const gpu = hardwareInfo?.gpus?.[0];
+  const options = [['auto', hardwareInfo ? `Automático (recomendado: ${hardwareInfo.engine === 'cu121' ? 'placa de vídeo' : 'processador'})` : 'Automático']];
+  if (gpu) options.push(['cu121', `Placa de vídeo: ${gpu.name}`]);
+  options.push(['cpu', 'Processador (mais lento)']);
+  const current = state.engine.kind;
+  const wanted = current === 'cu121' ? 'cu121' : current === 'cpu' ? 'cpu' : 'auto';
+  if (select.dataset.signature !== JSON.stringify(options) + wanted) {
+    select.replaceChildren(...options.map(([value, label]) => Object.assign(document.createElement('option'), { value, textContent: label })));
+    select.value = options.some(([value]) => value === wanted) ? wanted : 'auto';
+    select.dataset.signature = JSON.stringify(options) + wanted;
+  }
+  const machine = hardwareInfo ? `${hardwareInfo.cpu_cores} núcleos · ${hardwareInfo.ram_mb ? Math.round(hardwareInfo.ram_mb / 1024) : '?'} GB de memória · ${gpu ? `${gpu.name} (driver ${gpu.driver})` : 'sem placa NVIDIA'}` : '';
+  $('gpu-info').textContent = `Em uso: ${current === 'cu121' ? 'placa de vídeo' : 'processador'}${state.engine.reason ? ` (${state.engine.reason})` : ''}. ${machine}`;
+}
+
+async function loadMicrophones() {
+  const select = $('mic-select');
+  let devices = [];
+  try {
+    const probe = await navigator.mediaDevices.getUserMedia({ audio: true }); // só para o navegador mostrar os nomes dos microfones
+    probe.getTracks().forEach((track) => track.stop());
+  } catch {
+    /* sem permissão ou sem microfone: a lista pode vir sem nomes */
+  }
+  try {
+    devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+  } catch {
+    devices = [];
+  }
+  const chosen = state?.microphone?.id ?? '';
+  const options = [{ value: '', label: 'Padrão do sistema' }, ...devices.map((d, i) => ({ value: d.deviceId, label: d.label || `Microfone ${i + 1}` }))];
+  if (chosen && !options.some((o) => o.value === chosen)) options.push({ value: chosen, label: `${state.microphone.label || 'Microfone escolhido'} (desconectado)` });
+  select.replaceChildren(...options.map((o) => Object.assign(document.createElement('option'), o.value === chosen ? { value: o.value, textContent: o.label, selected: true } : { value: o.value, textContent: o.label })));
+  select.value = chosen;
+}
+
+async function openSettings() {
+  await act('settingsOpen', true);
+  hardwareInfo ??= await act('hardware');
+  renderGpu();
+  loadMicrophones();
+}
 
 // --- ações ---
 $('engine-build').addEventListener('click', (e) => act('buildEngine', { engine: 'auto' }, e.currentTarget));
@@ -186,12 +278,14 @@ $('welcome-nickname').addEventListener('keydown', (e) => { if (e.key === 'Enter'
 $('session-toggle').addEventListener('click', (e) => act('stopAgent', undefined, e.currentTarget));
 $('room-create').addEventListener('click', async (e) => {
   const room = await act('createRoom', undefined, e.currentTarget);
-  if (room) act('openRoom', room.code); // a sala nova já abre na aba do anfitrião
+  if (room) act('openRoom', room.code); // a sala nova já abre, no modo TV
 });
 
 for (const button of document.querySelectorAll('.tab[data-tab]')) button.addEventListener('click', () => act('selectTab', button.dataset.tab));
-$('tab-back').addEventListener('click', () => act('selectTab', 'session'));
+for (const button of document.querySelectorAll('.subtab[data-sub]')) button.addEventListener('click', () => act('selectSub', button.dataset.sub));
 $('tab-fullscreen').addEventListener('click', () => act('fullscreen'));
+$('gear').addEventListener('click', () => (tabs.settings ? act('settingsOpen', false) : openSettings()));
+$('settings-back').addEventListener('click', () => act('settingsOpen', false));
 
 $('import-pick').addEventListener('click', async () => {
   const file = await act('pickAudio');
@@ -221,39 +315,38 @@ $('yt-login-home').addEventListener('click', (e) => act('youtubeLogin', undefine
 $('yt-check').addEventListener('click', (e) => act('youtubeStatus', undefined, e.currentTarget));
 $('wait-cancel').addEventListener('click', () => act('cancelBusy'));
 
-async function changeLibrary() {
+$('library-change').addEventListener('click', async () => {
   const dir = await act('pickFolder');
   if (dir) await act('setLibrary', dir);
-}
-$('library-change-welcome').addEventListener('click', changeLibrary);
+});
+
+$('gpu-apply').addEventListener('click', async (e) => {
+  const kind = $('gpu-select').value;
+  const current = state.engine.kind === 'cu121' ? 'cu121' : 'cpu';
+  if (kind !== 'auto' && kind === current) return;
+  if (!confirm('Trocar a placa de vídeo? O aplicativo vai reinstalar parte dos componentes.')) return;
+  await act('settingsOpen', false);
+  await act('buildEngine', { engine: kind, switchEngine: true }, e.currentTarget);
+});
+
+$('mic-select').addEventListener('change', (e) => {
+  const option = e.currentTarget.selectedOptions[0];
+  act('settings', { microphone: e.currentTarget.value ? { id: e.currentTarget.value, label: option.textContent } : null });
+});
 
 $('login-item').addEventListener('change', (e) => act('loginItem', e.currentTarget.checked));
 $('update-open').addEventListener('click', () => state.update?.url && act('applyUpdate', undefined, $('update-open')));
 
-$('hardware').addEventListener('click', async (e) => {
-  const data = await act('hardware', undefined, e.currentTarget);
-  if (!data) return;
-  const gpu = data.gpus?.[0];
-  $('hardware-out').hidden = false;
-  $('hardware-out').textContent = [
-    `Processador: ${data.cpu_cores} núcleos · Memória: ${data.ram_mb ? Math.round(data.ram_mb / 1024) : '?'} GB`,
-    `Placa de vídeo: ${gpu ? `${gpu.name} (driver ${gpu.driver})` : 'nenhuma NVIDIA encontrada'}`,
-    `Motor recomendado: ${data.engine === 'cu121' ? 'placa de vídeo' : 'processador'} — ${data.reason}`,
-    `Motor instalado: ${state.engine.kind === 'cu121' ? 'placa de vídeo' : 'processador'}${state.engine.reason ? ` — ${state.engine.reason}` : ''}`,
-  ].join('\n');
-});
-
-async function unpair(button) {
+$('unpair').addEventListener('click', async (e) => {
   if (!confirm('Desparear este computador? Você vai precisar de um código novo para conectar de novo.')) return;
-  await act('unpair', undefined, button);
-}
-$('unpair').addEventListener('click', (e) => unpair(e.currentTarget));
-$('welcome-unpair').addEventListener('click', (e) => unpair(e.currentTarget));
+  await act('settingsOpen', false);
+  await act('unpair', undefined, e.currentTarget);
+});
 
 api.onState(render);
 api.onTabs((value) => {
   tabs = value;
-  renderTabs();
+  if (state) render(state);
 });
 const first = await act('snapshot');
 if (first) render(first);

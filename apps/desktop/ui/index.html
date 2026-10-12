@@ -14,6 +14,7 @@
       <img src="icon.png" alt="" class="brand-icon">
       <h1>Singalong Karaoke</h1>
       <span id="version" class="muted" data-testid="version"></span>
+      <button id="gear" type="button" class="gear" hidden title="Configurações" aria-label="Configurações" data-testid="gear"><span class="gear-icon"></span></button>
     </header>
 
     <div id="update" class="banner" hidden data-testid="update-banner">
@@ -22,21 +23,24 @@
     </div>
     <div id="error" class="banner error" hidden role="alert" data-testid="error"></div>
 
-    <!-- abas: aparecem com a sessão em andamento -->
+    <!-- abas principais: aparecem com a sessão em andamento -->
     <nav id="tabs" class="tabs" hidden data-testid="tabs">
       <button id="tab-session" type="button" class="tab" data-tab="session" data-testid="tab-session">Sessão</button>
-      <button id="tab-host" type="button" class="tab" data-tab="host" data-testid="tab-host" disabled>Anfitrião</button>
-      <button id="tab-tv" type="button" class="tab" data-tab="tv" data-testid="tab-tv" disabled>TV</button>
-      <span id="tab-room" class="muted" data-testid="tab-room"></span>
-      <button id="tab-back" type="button" class="tab back" hidden data-testid="tab-back">← Voltar à sessão</button>
-      <button id="tab-fullscreen" type="button" class="tab" hidden data-testid="tab-fullscreen">Tela cheia</button>
+      <button id="tab-rooms" type="button" class="tab" data-tab="rooms" data-testid="tab-rooms" disabled>Salas <span id="rooms-count" class="count" data-testid="rooms-count"></span></button>
+    </nav>
+    <!-- dentro de "Salas": as salas abertas e as sub-abas TV e Anfitrião -->
+    <nav id="subtabs" class="subtabs" hidden data-testid="subtabs">
+      <div id="room-chips" class="chips" data-testid="room-chips"></div>
+      <button id="sub-tv" type="button" class="subtab" data-sub="tv" data-testid="sub-tv">TV</button>
+      <button id="sub-host" type="button" class="subtab" data-sub="host" data-testid="sub-host">Anfitrião</button>
+      <button id="tab-fullscreen" type="button" class="subtab right" data-testid="tab-fullscreen">Tela cheia</button>
     </nav>
   </div>
 
   <main id="main">
     <!-- 1) instalando os componentes (sem avisos de tempo ou tamanho) -->
     <section id="screen-engine" class="center" hidden data-testid="screen-engine">
-      <h2>Instalando componentes…</h2>
+      <h2 id="engine-title">Instalando componentes…</h2>
       <div id="engine-progress">
         <progress id="engine-bar" max="100"></progress>
         <div id="engine-label" class="muted" data-testid="engine-label"></div>
@@ -77,13 +81,12 @@
         </div>
 
         <div class="welcome-foot muted">
-          <div class="folder">Músicas em <span id="library-welcome" data-testid="library-welcome"></span> <button id="library-change-welcome" type="button" class="link" data-testid="library-change-welcome">Alterar…</button></div>
-          <div><span id="welcome-server" data-testid="welcome-server"></span> · <button id="welcome-unpair" type="button" class="link" data-testid="welcome-unpair">Desparear</button></div>
+          <span id="welcome-server" data-testid="welcome-server"></span>
         </div>
       </div>
     </section>
 
-    <!-- 4) aba Sessão (a sessão em andamento) -->
+    <!-- 4) aba Sessão: criar/entrar em salas e importar músicas -->
     <section id="screen-home" hidden data-testid="screen-home">
       <div class="card" id="card-session">
         <h2>Sessão <span id="agent-pill" class="pill" data-testid="agent-status"></span></h2>
@@ -94,7 +97,7 @@
 
       <div class="card" id="card-rooms">
         <h2>Salas</h2>
-        <button id="room-create" type="button" class="primary" data-testid="room-create">Criar sala</button>
+        <button id="room-create" type="button" class="primary" data-testid="room-create"><span id="room-create-spinner" class="spinner small" hidden></span><span id="room-create-label">Criar sala</span></button>
         <ul id="rooms" class="list" data-testid="rooms"></ul>
       </div>
 
@@ -112,29 +115,62 @@
         </div>
         <p id="import-result" class="muted" hidden data-testid="import-result"></p>
       </div>
+    </section>
 
-      <div class="card" id="card-settings">
+    <!-- 5) configurações (a engrenagem) -->
+    <section id="screen-settings" hidden data-testid="screen-settings">
+      <div class="settings-head">
+        <button id="settings-back" type="button" data-testid="settings-back">← Voltar</button>
         <h2>Configurações</h2>
+      </div>
+
+      <div class="card">
+        <h3>Conta do YouTube <span id="yt-pill-home" class="pill" data-testid="yt-status-home"></span></h3>
+        <p class="muted">O login só é usado quando o YouTube pedir. Prefira uma conta secundária.</p>
         <div class="row">
-          <span class="muted">YouTube <span id="yt-pill-home" class="pill" data-testid="yt-status-home"></span></span>
-          <button id="yt-login-home" type="button" data-testid="yt-login-home">Entrar de novo</button>
+          <button id="yt-login-home" type="button" data-testid="yt-login-home">Entrar / trocar de conta</button>
           <button id="yt-check" type="button" data-testid="yt-check">Conferir</button>
         </div>
+      </div>
+
+      <div class="card">
+        <h3>Placa de vídeo</h3>
+        <p id="gpu-info" class="muted" data-testid="gpu-info"></p>
         <div class="row">
-          <span class="muted">Músicas em <span id="library-home" data-testid="library-home"></span></span>
-          <button id="library-change-home" type="button" data-testid="library-change-home" title="Encerre a sessão para trocar a pasta">Alterar…</button>
+          <select id="gpu-select" data-testid="gpu-select" aria-label="Placa de vídeo"></select>
+          <button id="gpu-apply" type="button" data-testid="gpu-apply">Aplicar</button>
         </div>
+        <p id="gpu-note" class="muted" hidden></p>
+      </div>
+
+      <div class="card">
+        <h3>Pasta das músicas</h3>
+        <p class="muted"><span id="library-home" data-testid="library-home"></span></p>
+        <div class="row">
+          <button id="library-change" type="button" data-testid="library-change">Alterar…</button>
+          <span id="library-note" class="muted" hidden>Encerre a sessão para trocar a pasta. As músicas que já estão na pasta antiga não são movidas.</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Microfone</h3>
+        <p class="muted">O microfone que a TV usa para a pontuação.</p>
+        <div class="row">
+          <select id="mic-select" data-testid="mic-select" aria-label="Microfone"></select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Geral</h3>
         <label class="check"><input id="login-item" type="checkbox" data-testid="login-item"> Abrir junto com o Windows</label>
         <div class="row">
-          <button id="hardware" type="button" data-testid="hardware">Ver o hardware</button>
           <button id="unpair" type="button" class="danger" data-testid="unpair">Desparear este computador</button>
         </div>
-        <pre id="hardware-out" class="log" hidden data-testid="hardware-out"></pre>
       </div>
     </section>
   </main>
 
-  <!-- espera (login do YouTube, importação): dá para cancelar -->
+  <!-- espera (login do YouTube): dá para cancelar -->
   <div id="wait" class="overlay" hidden data-testid="wait">
     <div class="wait-box">
       <div class="spinner" aria-hidden="true"></div>

@@ -101,3 +101,33 @@ section.center #engine-progress { width: min(420px, 100%); display: flex; flex-d
 .spinner { width: 34px; height: 34px; border: 4px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+
+/* engrenagem (ícone settings.svg como máscara: acompanha a cor do tema) */
+header { position: relative; }
+.gear { margin-left: auto; padding: 6px 8px; border: 0; background: transparent; display: inline-flex; }
+.gear-icon { width: 24px; height: 24px; display: block; background: var(--muted); -webkit-mask: url(settings.svg) center / contain no-repeat; mask: url(settings.svg) center / contain no-repeat; }
+.gear:hover .gear-icon { background: var(--accent); }
+
+/* sub-abas da sala */
+.count { font-size: 11px; background: var(--accent); color: var(--accent-text); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+.count:empty { display: none; }
+.subtabs { display: flex; align-items: center; gap: 6px; padding: 6px 24px; border-bottom: 1px solid var(--border); background: var(--card); }
+.chips { display: flex; gap: 6px; margin-right: 12px; flex-wrap: wrap; }
+.chip { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.chip.active { border-color: var(--accent); }
+.chip button { border: 0; border-radius: 0; padding: 4px 10px; background: transparent; font-size: 13px; }
+.chip button:last-child { padding: 4px 8px; color: var(--muted); }
+.subtab { padding: 6px 14px; border-radius: 8px; font-size: 14px; }
+.subtab.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+.subtab.right { margin-left: auto; }
+
+/* criando sala */
+button .spinner.small, .spinner.small { width: 14px; height: 14px; border-width: 2px; display: inline-block; vertical-align: -2px; margin-right: 8px; }
+.list li.loading { color: var(--muted); }
+.list li.loading .spinner { margin-right: 0; }
+
+/* configurações */
+.settings-head { display: flex; align-items: center; gap: 14px; }
+.settings-head h2 { margin: 0; font-size: 20px; }
+.card h3 { font-size: 15px; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+.card .row select { flex: 1 1 260px; }

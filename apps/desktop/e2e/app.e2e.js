@@ -128,8 +128,19 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   // o login do YouTube é o primeiro passo e a pasta das músicas pode ser escolhida (aqui o seletor é substituído por uma pasta de teste)
   assert.equal((await id('yt-login').textContent()).trim(), 'Entrar no YouTube');
   assert.equal(await id('yt-status').textContent(), 'Não conectado');
-  await id('library-change-welcome').click();
-  await page.waitForFunction((dir) => document.querySelector('[data-testid="library-welcome"]').textContent === dir, musicFolder, { timeout: 15_000 });
+
+  // configurações (a engrenagem): conta do YouTube, placa de vídeo, pasta das músicas e microfone
+  await id('gear').click();
+  await id('screen-settings').waitFor();
+  assert.equal(await id('screen-welcome').isHidden(), true);
+  await page.waitForFunction(() => document.querySelector('[data-testid="gpu-info"]').textContent.startsWith('Em uso:'), null, { timeout: 60_000 });
+  assert.ok((await id('gpu-select').locator('option').count()) >= 2); // automático e processador (e a placa, se houver)
+  await id('mic-select').waitFor();
+  await id('library-change').click(); // aqui o seletor de pasta é substituído por uma pasta de teste
+  await page.waitForFunction((dir) => document.querySelector('[data-testid="library-home"]').textContent === dir, musicFolder, { timeout: 15_000 });
+  await shot('1c-configuracoes');
+  await id('settings-back').click();
+  await id('screen-welcome').waitFor();
 
   // sem apelido não inicia
   await id('welcome-start').click();
@@ -145,33 +156,47 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   await page.waitForFunction(() => document.querySelector('[data-testid="agent-status"]').textContent === 'Online', null, { timeout: 60_000 });
   assert.equal(await id('room-create').isEnabled(), true);
 
-  // cria a sala: o servidor a conhece como sala da sessão "Dona Flor"
+  // cria a sala: o servidor a conhece como sala da sessão "Dona Flor"; a tela mostra que está criando
   await id('room-create').click();
-  const room = page.locator('li[data-testid^="room-"]').first();
-  await room.waitFor({ state: 'attached', timeout: 30_000 });
-  const code = (await room.locator('.code').textContent()).trim(); // (a lista fica escondida: a sala já abriu na aba do anfitrião)
+  await id('tab-rooms').waitFor();
+  await page.waitForFunction(() => document.querySelector('[data-testid="tab-rooms"]').classList.contains('active'), null, { timeout: 30_000 });
+  const code = (await page.locator('[data-testid^="chip-"]').first().getAttribute('data-testid')).slice('chip-'.length);
   assert.match(code, /^[A-Z0-9]{4}$/);
   const state = (await api.inject({ method: 'GET', url: `/api/rooms/${code}` })).json();
   assert.deepEqual(state.owner, { nickname: 'Dona Flor', online: true });
 
-  // a sala nova abre sozinha na aba do anfitrião, com a página do servidor DENTRO da janela; a TV é a outra aba
-  await id('tabs').waitFor();
-  assert.equal(await id('tab-room').textContent(), `Sala ${code}`);
-  await page.waitForFunction(() => document.querySelector('[data-testid="tab-host"]').classList.contains('active'), null, { timeout: 15_000 });
+  // entrar numa sala abre o MODO TV (a página do servidor DENTRO da janela); o Anfitrião é a outra sub-aba
+  await id('subtabs').waitFor();
+  assert.equal(await id('rooms-count').textContent(), '1');
+  await page.waitForFunction(() => document.querySelector('[data-testid="sub-tv"]').classList.contains('active'), null, { timeout: 15_000 });
   const urls = () => browser.contexts().flatMap((c) => c.pages().map((p) => p.url()));
   await new Promise((resolve) => setTimeout(resolve, 1000));
   assert.ok(urls().some((u) => u.includes(`/room.html?room=${code}`)), `a página do anfitrião não abriu: ${urls()}`);
   assert.ok(urls().some((u) => u.includes(`/tv.html?room=${code}`)), 'a página da TV não abriu');
-  assert.equal(await id('screen-home').isHidden() || (await id('main').count()) >= 0, true);
+  assert.equal(await id('screen-home').isHidden(), true);
+  await id('tab-fullscreen').waitFor();
+  await shot('2b-sala-tv');
+  await id('sub-host').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="sub-host"]').classList.contains('active'), null, { timeout: 15_000 });
+  assert.equal(await id('tab-fullscreen').isHidden(), true); // tela cheia só na TV
   const roomPage = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().includes('/room.html'));
   if (process.env.SINGALONG_SHOT_DIR) await roomPage.screenshot({ path: join(process.env.SINGALONG_SHOT_DIR, '2b-anfitriao-pagina.png') });
-  await shot('2b-anfitriao');
-  await id('tab-tv').click();
-  await page.waitForFunction(() => document.querySelector('[data-testid="tab-tv"]').classList.contains('active'), null, { timeout: 15_000 });
-  await id('tab-fullscreen').waitFor();
-  await id('tab-back').click(); // "Voltar à sessão"
+  await id('sub-tv').click();
+
+  // de volta à aba Sessão: criar outra sala, entrar em outra sala, importar músicas
+  await id('tab-session').click();
   await id('screen-home').waitFor();
-  assert.equal(await id('tab-back').isHidden(), true);
+  assert.equal(await id('subtabs').isHidden(), true);
+  await id('room-create').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="rooms-count"]').textContent === '2', null, { timeout: 30_000 });
+  assert.equal(await page.locator('[data-testid^="chip-"]').count(), 2);
+  await id('tab-session').click();
+  await id(`enter-${code}`).click(); // entrar de novo na primeira sala: volta para o modo TV dela
+  await page.waitForFunction((c) => document.querySelector(`[data-testid="chip-${c}"]`).parentElement.classList.contains('active'), code, { timeout: 15_000 });
+  await id(`close-${code}`).click(); // fechar a aba da sala (ela continua existindo no servidor)
+  await page.waitForFunction(() => document.querySelector('[data-testid="rooms-count"]').textContent === '1', null, { timeout: 15_000 });
+  await id('tab-session').click();
+  await id('screen-home').waitFor();
 
   // importar um "áudio" que é só texto: o erro do worker volta legível e o botão fica livre de novo
   await id('import-pick').click();
@@ -185,16 +210,9 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   assert.equal(await id('import-go').isEnabled(), true);
 
   await shot('2-sessao');
-  // o hardware aparece
-  await id('hardware').click();
-  await id('hardware-out').waitFor({ timeout: 60_000 });
-  assert.match(await id('hardware-out').textContent(), /Motor recomendado/);
-
-
   // encerra: a sessão some do servidor e as salas da lista também
   await id('session-toggle').click();
   await id('screen-welcome').waitFor({ timeout: 30_000 }); // sem sessão: volta para a tela de início
-  assert.equal(await page.locator('li[data-testid^="room-"]').count(), 0);
   await new Promise((resolve) => setTimeout(resolve, 300));
   const after = (await api.inject({ method: 'GET', url: `/api/rooms/${code}` })).json();
   assert.equal(after.owner?.online ?? false, false);

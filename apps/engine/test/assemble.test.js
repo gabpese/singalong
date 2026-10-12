@@ -195,3 +195,26 @@ test('o manifesto de verdade: todos os componentes têm URL https, SHA-256 e arq
   assert.ok(manifest.components.ffmpeg.version.includes('GPL'));
   assert.equal(manifest.torch.version, '2.5.1'); // o Demucs 4.0.1 quebra com outros
 });
+
+test('trocar de motor depois de montado: só o torch é reinstalado (com --force-reinstall) e o teste da GPU refeito', { skip: !canTar }, async (t) => {
+  const s = await scenario(t);
+  await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl });
+  assert.equal((await readState(s.root)).engine, 'cu121');
+  s.commands.length = 0;
+  s.downloads.length = 0;
+
+  const state = await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl, engine: 'cpu', switchEngine: true });
+  assert.equal(state.engine, 'cpu');
+  assert.equal(state.complete, true);
+  const torch = s.commands.filter((c) => c.includes('torch==2.5.1') && c.includes('install'));
+  assert.equal(torch.length, 1);
+  assert.ok(torch[0].includes('--force-reinstall') && torch[0].includes('https://idx/cpu'));
+  assert.equal(s.commands.filter((c) => c.includes('einops')).length, 0); // o resto não foi refeito
+  assert.equal(s.downloads.length, 0);
+  assert.equal(state.torch_installed, '2.5.1+cpu');
+
+  // pedir o mesmo motor que já está instalado não faz nada
+  s.commands.length = 0;
+  await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl, engine: 'cpu', switchEngine: true });
+  assert.equal(s.commands.filter((c) => c.includes('install')).length, 0);
+});

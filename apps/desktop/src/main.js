@@ -36,7 +36,7 @@ const controller = createController({
   ...(app.isPackaged ? { workerSource: join(process.resourcesPath, 'worker') } : {}),
   emit: (event, payload) => {
     win?.webContents.send(`sg:${event}`, payload);
-    if (event === 'state' && payload.agent.status === 'stopped') closeRoomViews();
+    if (event === 'state' && payload.agent.status === 'stopped' && roomViews.size) closeAllRooms();
   },
   ...(launcher ? { launcher } : {}),
 });
@@ -61,29 +61,35 @@ function allowedExternal(url) {
   }
 }
 
-// --- abas: as páginas do anfitrião e da TV rodam dentro da janela ---
+// --- abas: "Sessão" e "Salas"; dentro de uma sala, as sub-abas "TV" e "Anfitrião" (páginas do servidor dentro da janela) ---
 const TABBAR_FALLBACK = 96;
-const rooms = { code: null, host: null, tv: null }; // views da sala aberta
-let activeTab = 'session'; // session | host | tv
+const roomViews = new Map(); // código da sala → { tv, host }
+let activeTab = 'session'; // session | rooms
+let activeRoom = null;
+let activeSub = 'tv'; // o padrão ao entrar numa sala é o modo TV
+let settingsOpen = false; // a tela de configurações cobre as páginas
 let top = TABBAR_FALLBACK; // onde a interface termina e as páginas começam (a interface informa)
 
 function sendTabs() {
-  win?.webContents.send('sg:tabs', { active: activeTab, room: rooms.code });
+  win?.webContents.send('sg:tabs', { tab: activeTab, rooms: [...roomViews.keys()], room: activeRoom, sub: activeSub, settings: settingsOpen });
 }
 
 function layout() {
   if (!win) return;
   const [width, height] = win.getContentSize();
-  for (const tab of ['host', 'tv']) {
-    const view = rooms[tab];
-    if (!view) continue;
-    view.setBounds({ x: 0, y: top, width, height: Math.max(0, height - top) });
-    view.setVisible(activeTab === tab);
+  for (const [code, views] of roomViews) {
+    for (const sub of ['tv', 'host']) {
+      views[sub].setBounds({ x: 0, y: top, width, height: Math.max(0, height - top) });
+      views[sub].setVisible(!settingsOpen && activeTab === 'rooms' && code === activeRoom && sub === activeSub);
+    }
   }
 }
 
 function newRoomView(url) {
-  const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: 'persist:sala' } });
+  const view = new WebContentsView({
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: 'persist:sala', preload: join(here, 'room-preload.cjs') },
+  });
+  view.setBackgroundColor('#0b0b14');
   const origin = new URL(url).origin;
   view.webContents.setWindowOpenHandler(({ url: target }) => {
     if (target.startsWith(origin)) shell.openExternal(target); // links do próprio servidor abrem no navegador; o resto é ignorado
@@ -97,15 +103,30 @@ function newRoomView(url) {
   return view;
 }
 
-function closeRoomViews() {
-  for (const tab of ['host', 'tv']) {
-    if (rooms[tab]) {
-      win?.contentView.removeChildView(rooms[tab]);
-      rooms[tab].webContents.close();
-      rooms[tab] = null;
-    }
+function destroyRoom(code) {
+  const views = roomViews.get(code);
+  if (!views) return;
+  for (const view of [views.tv, views.host]) {
+    win?.contentView.removeChildView(view);
+    view.webContents.close();
   }
-  rooms.code = null;
+  roomViews.delete(code);
+}
+
+function closeRoom(code) {
+  destroyRoom(code);
+  if (activeRoom === code) {
+    activeRoom = [...roomViews.keys()].at(-1) ?? null;
+    if (!activeRoom) activeTab = 'session';
+  }
+  if (!roomViews.size && win?.isFullScreen()) win.setFullScreen(false);
+  layout();
+  sendTabs();
+}
+
+function closeAllRooms() {
+  for (const code of [...roomViews.keys()]) destroyRoom(code);
+  activeRoom = null;
   activeTab = 'session';
   if (win?.isFullScreen()) win.setFullScreen(false);
   sendTabs();
@@ -114,19 +135,41 @@ function closeRoomViews() {
 function openRoom(code) {
   const room = controller.snapshot().rooms.find((r) => r.code === code);
   if (!room) throw new UserError('no_room', 'Sala não encontrada.');
-  if (rooms.code !== code) {
-    closeRoomViews();
-    rooms.code = code;
-    rooms.host = newRoomView(room.host);
-    rooms.tv = newRoomView(room.tv);
-  }
-  selectTab('host');
+  if (!roomViews.has(code)) roomViews.set(code, { tv: newRoomView(room.tv), host: newRoomView(room.host) });
+  activeTab = 'rooms';
+  activeRoom = code;
+  activeSub = 'tv'; // entrar numa sala abre o modo TV
+  settingsOpen = false;
+  layout();
+  sendTabs();
 }
 
 function selectTab(tab) {
-  if (!['session', 'host', 'tv'].includes(tab)) return;
-  if (tab !== 'session' && !rooms[tab]) return;
+  if (tab === 'rooms' && !roomViews.size) return;
+  if (!['session', 'rooms'].includes(tab)) return;
   activeTab = tab;
+  settingsOpen = false;
+  layout();
+  sendTabs();
+}
+
+function selectRoom(code) {
+  if (!roomViews.has(code)) return;
+  activeRoom = code;
+  activeTab = 'rooms';
+  layout();
+  sendTabs();
+}
+
+function selectSub(sub) {
+  if (!['tv', 'host'].includes(sub)) return;
+  activeSub = sub;
+  layout();
+  sendTabs();
+}
+
+function setSettingsOpen(open) {
+  settingsOpen = Boolean(open);
   layout();
   sendTabs();
 }
@@ -214,7 +257,11 @@ function registerIpc() {
   handle('youtubeStatus', () => controller.youtubeStatus());
   handle('importFile', (arg) => controller.importFile(arg));
   handle('hardware', () => controller.hardware());
-  handle('settings', (arg) => controller.setSettings(arg));
+  handle('settings', async (arg) => {
+    const snapshot = await controller.setSettings(arg);
+    if (arg?.microphone !== undefined) for (const views of roomViews.values()) views.tv.webContents.reload(); // a TV passa a usar o microfone novo
+    return snapshot;
+  });
   handle('checkUpdate', () => controller.checkUpdate());
   handle('applyUpdate', () => applyUpdate());
   handle('loginItem', (enabled) => {
@@ -227,6 +274,11 @@ function registerIpc() {
   });
   handle('openRoom', (code) => openRoom(String(code)));
   handle('selectTab', (tab) => selectTab(tab));
+  handle('selectRoom', (code) => selectRoom(String(code)));
+  handle('selectSub', (sub) => selectSub(sub));
+  handle('closeRoom', (code) => closeRoom(String(code)));
+  handle('settingsOpen', (open) => setSettingsOpen(open));
+  ipcMain.on('sg:mic-id', (event) => { event.returnValue = controller.snapshot().microphone?.id ?? ''; });
   handle('layout', (value) => {
     top = Math.max(0, Math.min(400, Math.round(Number(value) || TABBAR_FALLBACK)));
     layout();

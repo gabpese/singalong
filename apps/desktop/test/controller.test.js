@@ -14,6 +14,7 @@ let server;
 let base;
 const calls = [];
 let sessionOpen = false;
+let roomFail = false;
 let versionAnswer = { status: 'ok', current: APP_VERSION };
 
 before(async () => {
@@ -27,6 +28,7 @@ before(async () => {
       if (req.url.startsWith('/agent/v1/version')) return json(200, versionAnswer);
       if (req.headers.authorization !== 'Bearer tok-1') return json(401, { error: 'unauthorized', message: 'Dispositivo não autorizado.' });
       if (req.url === '/agent/v1/me') return json(200, { device: { id: 'd1', name: 'PC' }, session: sessionOpen ? { id: 's1', display_name: 'Gabriel' } : null });
+      if (req.method === 'POST' && req.url === '/agent/v1/sessions/s1/rooms') return roomFail ? json(409, { error: 'session_ended', message: 'A sessão já terminou.' }) : json(201, { code: 'AB12', host_token: 'tok-anfitriao', session_id: 's1' });
       if (req.method === 'DELETE' && req.url === '/agent/v1/sessions/s1') { sessionOpen = false; return res.writeHead(204).end(); }
       if (req.method === 'DELETE' && req.url === '/agent/v1/devices/me') return res.writeHead(204).end();
       json(404, { error: 'not_found' });
@@ -211,12 +213,14 @@ test('agente que cai é reiniciado; token recusado (código 2) não reinicia e p
 });
 
 test('criar sala exige a sessão online e devolve os links da TV e do anfitrião', async () => {
-  const { controller } = await ready();
+  const { controller, events } = await ready();
   await assert.rejects(controller.createRoom(), /Inicie a sessão/);
   sessionOpen = true;
   await controller.startAgent({ nickname: 'Gabriel' });
   await until(() => controller.snapshot().agent.status === 'online');
   const room = await controller.createRoom();
+  assert.ok(events.some((s) => s.busy === 'criando sala')); // a tela mostra "criando a sala…" enquanto espera
+  assert.equal(controller.snapshot().busy, null);
   assert.equal(room.code, 'AB12');
   assert.equal(room.tv, `${base}/tv.html?room=AB12`);
   assert.equal(room.host, `${base}/room.html?room=AB12#host=tok-anfitriao`);
@@ -226,12 +230,15 @@ test('criar sala exige a sessão online e devolve os links da TV e do anfitrião
   sessionOpen = false;
 });
 
-test('sala que falha mostra o motivo', async () => {
-  const { controller } = await ready({ mode: 'room-fail' });
+test('sala que falha mostra o motivo e libera a tela', async () => {
+  const { controller } = await ready();
+  roomFail = true;
   sessionOpen = true;
   await controller.startAgent({ nickname: 'G' });
   await until(() => controller.snapshot().agent.status === 'online');
-  await assert.rejects(controller.createRoom(), /não consegui falar com o servidor/);
+  await assert.rejects(controller.createRoom(), /A sessão já terminou/);
+  assert.equal(controller.snapshot().busy, null);
+  roomFail = false;
   await controller.stopAgent();
   sessionOpen = false;
 });
@@ -361,4 +368,30 @@ test('a pasta das músicas: valida, grava, sobrevive ao reinício e não muda co
   await assert.rejects(spy.setLibraryDir(join(dataDir, 'outra')), /Encerre a sessão/);
   await spy.stopAgent();
   sessionOpen = false;
+});
+
+test('trocar a placa de vídeo pede ao motor para trocar (só com a sessão parada) e mostra o progresso', async () => {
+  const calls = [];
+  const { controller } = await ready({ assembleImpl: async (options) => { calls.push(options); options.onProgress?.({ label: 'Instalando torch' }); return { engine: options.engine === 'auto' ? 'cu121' : options.engine, engine_reason: 'teste' }; } });
+  const snap = await controller.buildEngine({ engine: 'cpu', switchEngine: true });
+  assert.equal(calls.at(-1).switchEngine, true);
+  assert.equal(calls.at(-1).engine, 'cpu');
+  assert.equal(snap.engine.kind, 'cpu');
+  assert.equal(snap.engine.status, 'ready');
+
+  sessionOpen = true;
+  await controller.startAgent({ nickname: 'G' });
+  await assert.rejects(controller.buildEngine({ engine: 'cu121', switchEngine: true }), /Encerre a sessão/);
+  await controller.stopAgent();
+  sessionOpen = false;
+});
+
+test('o microfone escolhido fica guardado, é limpo ao voltar ao padrão e entra no estado', async () => {
+  const { controller, dataDir } = await ready();
+  assert.equal(controller.snapshot().microphone, null);
+  const snap = await controller.setSettings({ microphone: { id: 'abc123', label: 'Microfone USB' } });
+  assert.deepEqual(snap.microphone, { id: 'abc123', label: 'Microfone USB' });
+  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).microphone.id, 'abc123');
+  assert.equal((await controller.setSettings({ microphone: { id: '', label: 'x' } })).microphone, null);
+  assert.equal((await controller.setSettings({ microphone: null })).microphone, null);
 });
