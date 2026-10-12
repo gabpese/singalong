@@ -118,6 +118,45 @@ jobs:
           node-version: 24
       - run: npm test
 
+  desktop:
+    name: App do dono (controlador em ${{ matrix.os }}; janela só no Windows)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      # a janela de verdade (Electron) falando com a API de verdade e o worker de verdade
+      - name: Garantir o binário do Electron
+        if: runner.os == 'Windows'
+        run: node node_modules/electron/install.js
+      - name: Dependências da API
+        if: runner.os == 'Windows'
+        run: npm ci
+        working-directory: apps/api
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Windows'
+        with:
+          python-version: "3.11"
+      - name: Python do worker
+        if: runner.os == 'Windows'
+        run: pip install numpy langdetect websockets yt-dlp
+      - name: Teste de ponta a ponta do app
+        if: runner.os == 'Windows'
+        run: |
+          $env:SINGALONG_TEST_PYTHON = (Get-Command python).Source
+          npm run test:e2e
+        shell: pwsh
+
   docker-api:
     name: Imagem da API (build)
     runs-on: ubuntu-latest

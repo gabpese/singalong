@@ -185,6 +185,19 @@ node src\cli.js verify   --dir D:\Singalong\engine
 
 `assemble` needs only Node 22+ and Windows 10/11 (it uses Windows' own `tar.exe`); nothing is installed on the system, and it continues where it stopped if interrupted. The `cu121` engine takes about 5.6 GB. On the server, `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` define the update notice (below the minimum, the agent stops receiving jobs until it is updated).
 
+**The owner's app (milestone M3).** An Electron window that does everything above without a terminal: prepares the engine, pairs, starts the session, creates rooms, signs in to YouTube and imports files.
+
+```powershell
+cd apps\desktop
+npm install
+npm start                # opens the app (the engine is built on the first run; pairing needs a code from the server administrator)
+npm test                 # the controller's tests
+$env:SINGALONG_TEST_PYTHON = "C:\path\to\python.exe"   # a Python with numpy, langdetect, websockets and yt-dlp
+npm run test:e2e         # the real window + the real API + the real worker
+```
+
+Your data (configuration, engine, library) lives in `%APPDATA%\Singalong Karaoke`. Closing the window with a running session only hides it (the tray icon brings it back; "Quit" ends the session).
+
 ### Worker CLI (no API, for testing)
 
 ```powershell

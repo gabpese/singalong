@@ -190,6 +190,19 @@ node src\cli.js verify   --dir D:\Singalong\engine
 
 O `assemble` precisa só do Node 22+ e do Windows 10/11 (usa o `tar.exe` do próprio Windows); nada é instalado no sistema e, se for interrompido, continua de onde parou. O motor `cu121` ocupa cerca de 5,6 GB. No servidor, `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` definem o aviso de atualização (abaixo da mínima, o agente deixa de receber jobs até atualizar).
 
+**O app do dono (marco M3).** Uma janela Electron que faz tudo isso sem terminal: prepara o motor, pareia, inicia a sessão, cria salas, entra no YouTube e importa arquivos.
+
+```powershell
+cd apps\desktop
+npm install
+npm start                # abre o app (o motor é montado na primeira vez; o pareamento pede um código do administrador do servidor)
+npm test                 # os testes do controlador
+$env:SINGALONG_TEST_PYTHON = "C:\caminho\para\python.exe"   # um Python com numpy, langdetect, websockets e yt-dlp
+npm run test:e2e         # a janela de verdade + a API de verdade + o worker de verdade
+```
+
+Os seus dados (configuração, motor, biblioteca) ficam em `%APPDATA%\Singalong Karaoke`. Fechar a janela com a sessão rodando só a esconde (o ícone da bandeja a traz de volta; "Sair" encerra a sessão).
+
 ### CLI do worker (sem API, para testes)
 
 ```powershell

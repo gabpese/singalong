@@ -200,7 +200,7 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 | **M0 ✅** | `JobBackend` + the `/agent/v1` API + **sessions and per-session job routing** + a fake agent in the tests | The full flow passes with the current worker switched to HTTP; a room's job is only claimed by its session's agent |
 | **M1 (M1a ✅, M1b ✅, M1c ✅)** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's/Edge's local network prompt was already **tested** (section 5) and a local song plays on the TV from the local media server |
 | **M2 ✅** | Engine pack (CPU and cu121) + hardware probe | Installs without Python/Docker; GPU tested with a fallback |
-| **M3** | Electron shell: session, "Sign in to YouTube" screen, an "Import file" button, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
+| **M3 ✅** | Electron shell: session, "Sign in to YouTube" screen, an "Import file" button, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
 | **M4** | **Windows** installer + auto-update | A clean install on a VM; update tested |
 | **M5** | Hybrid mode ("Take to the cloud") (v2.1) | A published song plays on another computer |
 | **M6** | macOS/Linux, AMD/Apple GPU | v3 |
@@ -298,6 +298,25 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 - The Blackwell cards (RTX 50) use the CPU until the engine moves to a newer torch/CUDA.
 
 **Left for M3/M4:** the shell that calls `assemble` with a progress bar and the "update available" screen; the installer; a clean-VM test.
+
+### 12.6 M3: the owner's app, Electron interface (Oct 2026)
+
+**Done** (`apps/desktop`)
+- **Controller without Electron** (`src/controller.js`): keeps the configuration (`config.json` in the user's data folder), builds the engine (calls `apps/engine` and shows the progress), pairs (`/pair/complete`), starts and stops the **agent** (the worker in service mode, as a child process, restarted if it falls, not restarted if the server refuses the token), polls `/me` to know when the session is online, and runs the worker's commands: create room, YouTube login/check, import file, hardware. The window never receives the token.
+- **Window** (`ui/`, plain HTML/JS, strict CSP, no HTML built from outside text): **prepare the computer** (GPU or CPU choice, progress bar, retry), **connect to the server** (address, code, computer name), then the **home**: the update banner (with the note and download link), the session (nickname that guests see, start/end), rooms (create; "Open the TV" and "Open as host" in the browser), **"Import file…"**, YouTube (status and login, browser choice), settings (start with Windows, hardware, unpair) and the log.
+- **Shell** (`src/main.js`, `preload.cjs`): context isolation and sandbox on; the window only gets a fixed list of actions; the browser only opens addresses of the paired server or of the update link; a tray icon (closing the window with a running session only hides it; "Quit" ends the session first); a single instance.
+- **Tests:** 19 of the controller (a stub server and a fake worker as real processes: pairing, engine, agent restart, room, YouTube, import, unpair, token never in the snapshot) and **1 end to end with the real stack**: Electron + the real API + the real worker (pairing with a wrong and then a right code, update banner, nickname, session online, room seen by the server as "Dona Flor", a non-audio file refused with a readable message, hardware, end of session). In CI the unit tests run on Linux and Windows and the window test on Windows.
+
+**Bugs found by the end-to-end test**
+- The controller sent `content-type: application/json` on a `DELETE` with no body and Fastify refused it: **the session was never ended on the server** (the earlier unit test used a stub that accepted it). Fixed (only sets the header when there is a body).
+- Ending the session before killing the process let the worker's heartbeat open **another** session; the order is now: note the session, stop the process, end the session.
+- `ELECTRON_RUN_AS_NODE=1` (exported by VS Code) makes Electron run as plain Node; the test removes it. Playwright's own Electron mode does not handle an ESM `main`, so the window test starts Electron directly and controls it by the debugging protocol.
+
+**Decisions and what is left**
+- The token is stored in `config.json` in the user's profile folder (private to the Windows account); protecting it with the system's encryption (`safeStorage`) can come with the installer.
+- The library folder is fixed (`<data>/library`) for now; choosing another folder is left for later.
+- The pairing code is still generated by the server administrator (`ADMIN_TOKEN`); a friendlier way to pair without asking for a code stays for v2.
+- Not tested on a clean machine: that is the job of M4.
 
 ## 13. Decisions made and open questions
 

@@ -200,7 +200,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | **M0 ✅** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
 | **M1 (M1a ✅, M1b ✅, M1c ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
 | **M2 ✅** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
-| **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
+| **M3 ✅** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
 | **M5** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
 | **M6** | macOS/Linux, GPU AMD/Apple | v3 |
@@ -298,6 +298,25 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - As placas Blackwell (RTX 50) usam a CPU até o motor passar para um torch/CUDA mais novo.
 
 **Fica para o M3/M4:** a interface que chama o `assemble` com barra de progresso e a tela "atualização disponível"; o instalador; o teste numa VM limpa.
+
+### 12.6 M3: o app do dono, interface Electron (Out/2026)
+
+**Feito** (`apps/desktop`)
+- **Controlador sem Electron** (`src/controller.js`): guarda a configuração (`config.json` na pasta de dados do usuário), monta o motor (chama o `apps/engine` e mostra o progresso), pareia (`/pair/complete`), inicia e para o **agente** (o worker em modo serviço, como processo filho, reiniciado se cair e não reiniciado se o servidor recusar o token), consulta o `/me` para saber quando a sessão está online e roda os comandos do worker: criar sala, login/conferência do YouTube, importar arquivo, hardware. A janela nunca recebe o token.
+- **Janela** (`ui/`, HTML/JS simples, CSP restrita, nenhum HTML montado com texto de fora): **preparar o computador** (escolha placa de vídeo ou processador, barra de progresso, tentar de novo), **conectar ao servidor** (endereço, código, nome do computador) e então o **início**: o aviso de atualização (com a nota e o link), a sessão (apelido que os convidados veem, iniciar/encerrar), salas (criar; "Abrir a TV" e "Abrir como anfitrião" no navegador), **"Importar arquivo…"**, YouTube (estado e login, escolha do navegador), configurações (abrir com o Windows, hardware, desparear) e o registro.
+- **Casca** (`src/main.js`, `preload.cjs`): isolamento de contexto e sandbox ligados; a janela só recebe uma lista fixa de ações; o navegador só abre endereços do servidor pareado ou do link de atualização; ícone na bandeja (fechar a janela com a sessão rodando só esconde; "Sair" encerra a sessão antes); uma instância só.
+- **Testes:** 19 do controlador (servidor de mentira e worker de mentira como processos de verdade: pareamento, motor, reinício do agente, sala, YouTube, importar, desparear, token nunca no estado) e **1 de ponta a ponta com a pilha real**: Electron + a API de verdade + o worker de verdade (pareamento com código errado e depois certo, aviso de atualização, apelido, sessão online, sala vista pelo servidor como "Dona Flor", arquivo que não é áudio recusado com mensagem legível, hardware, fim da sessão). Na CI os testes do controlador rodam em Linux e Windows e o da janela no Windows.
+
+**Defeitos achados pelo teste de ponta a ponta**
+- O controlador mandava `content-type: application/json` num `DELETE` sem corpo e o Fastify recusava: **a sessão nunca era encerrada no servidor** (o teste unitário anterior usava um servidor de mentira que aceitava). Corrigido (o cabeçalho só vai quando há corpo).
+- Encerrar a sessão antes de matar o processo deixava o sinal de vida do worker abrir **outra** sessão; a ordem agora é: anotar a sessão, parar o processo, encerrar a sessão.
+- `ELECTRON_RUN_AS_NODE=1` (exportado pelo VS Code) faz o Electron rodar como Node puro; o teste remove isso. O modo "electron" do próprio Playwright não lida com `main` em ESM, então o teste da janela inicia o Electron direto e o controla pelo protocolo de depuração.
+
+**Decisões e o que falta**
+- O token fica no `config.json` da pasta do perfil do usuário (privada à conta do Windows); protegê-lo com a criptografia do sistema (`safeStorage`) pode vir com o instalador.
+- A pasta da biblioteca é fixa (`<dados>/library`) por enquanto; escolher outra pasta fica para depois.
+- O código de pareamento ainda é gerado pelo administrador do servidor (`ADMIN_TOKEN`); um jeito mais amigável de parear sem pedir código fica para a v2.
+- Não testado numa máquina limpa: isso é do M4.
 
 ## 13. Decisões tomadas e perguntas em aberto
 
