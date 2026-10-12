@@ -108,6 +108,7 @@ Para que cada pessoa peça o código pelo próprio app (em vez de você gerar co
    BREVO_API_KEY=a-chave-copiada
    MAIL_FROM=o-email-remetente-verificado@gmail.com
    ```
+   Use `PAIR_ALLOWED_EMAILS=*` (um asterisco) para liberar **qualquer** e-mail; continua limitado a poucos pedidos por IP e por endereço.
 5. Aplique: `./deploy.sh`. Para autorizar mais gente depois, edite `PAIR_ALLOWED_EMAILS` e rode `./deploy.sh` de novo.
 
 A chave do Brevo é um segredo: fica só no `.env` da VM (nunca no repositório nem no chat). As mensagens podem cair na caixa de spam na primeira vez.

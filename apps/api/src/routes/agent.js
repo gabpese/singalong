@@ -83,7 +83,8 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
     const email = request.body.email.trim().toLowerCase();
     if (!EMAIL_SHAPE.test(email)) throw new HttpError(400, 'bad_email', 'Digite um e-mail válido.');
     const limited = limiters.pairEmail.hit(email);
-    if (limited.ok && config.pairAllowedEmails.includes(email)) {
+    // um asterisco na lista = qualquer e-mail pode pedir (os limites por IP e por endereço continuam valendo)
+    if (limited.ok && (config.pairAllowedEmails.includes('*') || config.pairAllowedEmails.includes(email))) {
       const { code, expires_in: seconds } = agents.startPairing();
       const message = pairingEmail({ code, minutes: Math.round(seconds / 60), server: config.publicUrl || '' });
       mailer.send({ to: email, ...message }).catch((error) => request.log.error({ err: error.message }, 'não consegui enviar o código por e-mail'));

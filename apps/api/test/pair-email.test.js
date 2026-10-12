@@ -46,6 +46,21 @@ test('e-mail autorizado recebe um código que de fato pareia', async () => {
   await app.close();
 });
 
+test('com asterisco na lista qualquer e-mail recebe o código (os limites continuam)', async () => {
+  const { app, sent } = await build({ allowed: ['*'] });
+  assert.equal((await ask(app, 'qualquer@exemplo.com')).statusCode, 202);
+  assert.equal((await ask(app, 'outra@exemplo.org')).statusCode, 202);
+  await settle();
+  assert.deepEqual(sent.map((m) => m.to), ['qualquer@exemplo.com', 'outra@exemplo.org']);
+  const limited = await build({ allowed: ['*'], rateLimits: { pairEmail: { max: 1, windowMs: 3_600_000 } } });
+  await ask(limited.app, 'a@exemplo.com');
+  await ask(limited.app, 'a@exemplo.com');
+  await settle();
+  assert.equal(limited.sent.length, 1); // o limite por endereço vale também com asterisco
+  await app.close();
+  await limited.app.close();
+});
+
 test('maiúsculas e espaços no e-mail não atrapalham', async () => {
   const { app, sent } = await build();
   assert.equal((await ask(app, '  Ana@Exemplo.COM ')).statusCode, 202);
