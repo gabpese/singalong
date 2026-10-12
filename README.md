@@ -121,7 +121,7 @@ $env:ADMIN_TOKEN = "any-long-secret"
 docker compose up -d --build api redis          # only the API and Redis: no classic worker, so rooms without a session wait
 curl.exe -X POST http://localhost:3000/agent/v1/pair/start -H "X-Admin-Token: $env:ADMIN_TOKEN"   # {"code":"ABCD2345",...}
 docker compose --profile cpu run --rm worker --pair ABCD2345 --agent-url http://api:3000          # prints AGENT_TOKEN=sga_...
-$env:AGENT_TOKEN = "sga_..."
+$env:AGENT_TOKEN = "sga_..."      # set it again in EVERY terminal you use below ($env: only lives in one terminal); check with: echo $env:AGENT_TOKEN
 # terminal 1: the agent (leave it open; use --profile gpu and worker-gpu for speed)
 docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" worker --consume
 # terminal 2: a room in the agent's session (prints the TV and host links)

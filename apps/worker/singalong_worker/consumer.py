@@ -52,7 +52,12 @@ def run() -> int:
     settings = Settings.from_env()
     storage = LocalStorage(settings.storage_root)
     consumer = os.environ.get("WORKER_NAME", socket.gethostname())
-    backend = make_backend(settings.redis_url, consumer, settings.agent_url, settings.agent_token, settings.agent_name)
+    try:
+        backend = make_backend(settings.redis_url, consumer, settings.agent_url, settings.agent_token, settings.agent_name)
+    except ValueError as exc:
+        # AGENT_URL sem AGENT_TOKEN: quase sempre a variável do token está vazia neste terminal (no PowerShell, $env: vale só por terminal)
+        log.error("configuração do agente incompleta: %s. Confira se AGENT_TOKEN tem valor neste terminal.", exc)
+        return 2
     stopping = False
 
     def stop(signum, _frame):
