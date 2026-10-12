@@ -206,7 +206,7 @@ npm run dist                         # builds dist\singalong_karaoke.exe (+ late
 dist\singalong_karaoke.exe           # installs for your user only; Windows' SmartScreen may warn: "More info" > "Run anyway"
 ```
 
-To publish an update: raise the version in `apps/desktop/package.json`, `apps/desktop/src/controller.js` and `apps/worker/singalong_worker/version.py` (a test checks they match), run `npm run dist`, put `singalong_karaoke.exe` and `latest.yml` in a **private** folder and set on the server `APP_LATEST_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` (that folder's address). Every installed app then shows "Update now". `node scripts/test-update.mjs <installed.exe> <new-version-folder> <data-folder>` tests the whole thing on a computer.
+To publish an update: raise the version in `apps/desktop/package.json`, `apps/desktop/src/controller.js` and `apps/worker/singalong_worker/version.py` (a test checks they match), run `npm run dist`, put `singalong_karaoke.exe` and `latest.yml` in a **private** folder and set on the server `APP_LATEST_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` (that folder's address). Every installed app then shows "Update now". Using a **GitHub Release** as that folder works: attach `singalong_karaoke.exe` and `latest.yml` to the release and set `APP_DOWNLOAD_URL=https://github.com/<owner>/<repo>/releases/latest/download/` (note: the Releases of a public repository are public, so anyone can download the installer). `node scripts/test-update.mjs <installed.exe> <new-version-folder> <data-folder>` tests the whole thing on a computer.
 
 ### Worker CLI (no API, for testing)
 
