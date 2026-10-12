@@ -26,5 +26,13 @@ contextBridge.exposeInMainWorld('karaoke', {
   loginItem: call('loginItem'),
   open: call('open'),
   pickAudio: call('pickAudio'),
+  pickFolder: call('pickFolder'),
+  setLibrary: call('setLibrary'),
+  cancelBusy: call('cancelBusy'),
+  openRoom: call('openRoom'),
+  selectTab: call('selectTab'),
+  layout: call('layout'),
+  fullscreen: call('fullscreen'),
   onState: subscribe('state'),
+  onTabs: subscribe('tabs'),
 });

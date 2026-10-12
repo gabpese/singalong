@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
-import { APP_VERSION, createController, normalizeServer, UserError } from '../src/controller.js';
+import { APP_VERSION, BROWSER_NAMES, createController, detectDefaultBrowser, normalizeServer, UserError } from '../src/controller.js';
 
 const FAKE = fileURLToPath(new URL('./fake-worker.mjs', import.meta.url));
 
@@ -47,6 +47,7 @@ async function make(options = {}) {
     launcher: (root, args, extraEnv) => [process.execPath, [FAKE, ...args], { env: { ...process.env, ...extraEnv, FAKE_MODE: options.mode ?? '' } }],
     assembleImpl: options.assembleImpl ?? (async ({ onProgress }) => { onProgress({ label: 'Baixando python', done: 5, total: 10 }); return { engine: 'cpu', engine_reason: 'sem placa' }; }),
     verifyImpl: options.verifyImpl ?? (async () => ({ ok: true, checks: [] })),
+    detectBrowser: async () => options.browser ?? 'edge',
     pollMs: 40,
     restartMs: 20,
   });
@@ -297,4 +298,68 @@ test('os registros são limitados e o texto do worker nunca é interpretado', as
   const logs = controller.snapshot().logs;
   assert.ok(logs.length <= 80);
   assert.ok(logs.at(-1).line.includes('<img')); // chega como texto puro; a janela usa textContent
+});
+
+test('o navegador padrão do Windows vem do registro (Chrome, Edge ou outro = automático)', async () => {
+  const answer = (progId, error = null) => (command, args, options, callback) => callback(error, `
+    ProgId    REG_SZ    ${progId}
+`);
+  if (process.platform !== 'win32') return; // o registro só existe no Windows: nos outros sistemas a resposta é sempre "auto"
+  assert.equal(await detectDefaultBrowser(answer('ChromeHTML')), 'chrome');
+  assert.equal(await detectDefaultBrowser(answer('MSEdgeHTM')), 'edge');
+  assert.equal(await detectDefaultBrowser(answer('FirefoxURL-308046B0AF4A39CB')), 'auto');
+  assert.equal(await detectDefaultBrowser(answer('', new Error('sem chave'))), 'auto');
+});
+
+test('o login do YouTube usa o navegador padrão e não deixa escolher outro', async () => {
+  const edge = await ready({ browser: 'edge' });
+  assert.equal(edge.controller.snapshot().browser, 'edge');
+  assert.equal(edge.controller.snapshot().browserName, BROWSER_NAMES.edge);
+  await edge.controller.youtubeLogin();
+  assert.ok(edge.controller.snapshot().logs.some((l) => l.line.includes('Abrindo o navegador… edge')));
+  await edge.controller.setSettings({ browser: 'chrome' }); // a escolha do usuário não existe mais
+  assert.equal(edge.controller.snapshot().browser, 'edge');
+
+  const other = await ready({ browser: 'auto' });
+  await other.controller.youtubeLogin();
+  assert.ok(other.controller.snapshot().logs.some((l) => l.line.includes('Abrindo o navegador… padrao'))); // sem argumento: o worker acha o navegador
+});
+
+test('cancelar o login do YouTube enquanto aguarda a conexão', async () => {
+  const { controller } = await ready({ mode: 'yt-hang' });
+  assert.equal(controller.cancelBusy(), false); // nada em andamento
+  const login = controller.youtubeLogin();
+  await until(() => controller.snapshot().busy === 'login do YouTube');
+  await until(() => controller.snapshot().logs.some((l) => l.line.startsWith('Abrindo o navegador')));
+  assert.equal(controller.cancelBusy(), true);
+  await assert.rejects(login, /cancelado/);
+  assert.equal(controller.snapshot().busy, null); // liberou a tela
+  assert.notEqual(controller.snapshot().youtube.status, 'connected');
+});
+
+test('a pasta das músicas: valida, grava, sobrevive ao reinício e não muda com a sessão rodando', async () => {
+  const { controller, dataDir } = await ready();
+  const target = join(await mkdtemp(join(tmpdir(), 'singalong-lib-')), 'minhas musicas');
+  const snap = await controller.setLibraryDir(target);
+  assert.equal(snap.libraryDir, target);
+  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).library_dir, target);
+  await assert.rejects(controller.setLibraryDir(''), /Escolha uma pasta/);
+  await assert.rejects(controller.setLibraryDir(join(dataDir, 'config.json', 'dentro-de-um-arquivo')), /Não consigo gravar/);
+
+  sessionOpen = true;
+  const seen = [];
+  const spy = createController({
+    dataDir,
+    launcher: (root, args, env) => { seen.push(env.STORAGE_ROOT); return [process.execPath, [FAKE, ...args], { env: { ...process.env, ...env } }]; },
+    assembleImpl: async () => ({ engine: 'cpu' }),
+    pollMs: 1000,
+  });
+  await mkdir(join(dataDir, 'engine'), { recursive: true });
+  await writeFile(join(dataDir, 'engine', 'engine.json'), JSON.stringify({ complete: true, engine: 'cpu' }));
+  await spy.init();
+  await spy.startAgent({ nickname: 'G' });
+  assert.equal(seen[0], target); // o agente grava as músicas na pasta escolhida
+  await assert.rejects(spy.setLibraryDir(join(dataDir, 'outra')), /Encerre a sessão/);
+  await spy.stopAgent();
+  sessionOpen = false;
 });

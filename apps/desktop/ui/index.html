@@ -5,22 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
   <title>Singalong Karaoke</title>
+  <link rel="icon" href="icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Singalong Karaoke</h1>
-    <span id="version" class="muted" data-testid="version"></span>
-  </header>
+  <div id="chrome">
+    <header>
+      <img src="icon.png" alt="" class="brand-icon">
+      <h1>Singalong Karaoke</h1>
+      <span id="version" class="muted" data-testid="version"></span>
+    </header>
 
-  <div id="update" class="banner" hidden data-testid="update-banner">
-    <div><strong id="update-title"></strong><div id="update-notes" class="muted"></div></div>
-    <button id="update-open" type="button" data-testid="update-open">Atualizar agora</button>
+    <div id="update" class="banner" hidden data-testid="update-banner">
+      <div><strong id="update-title"></strong><div id="update-notes" class="muted"></div></div>
+      <button id="update-open" type="button" data-testid="update-open">Atualizar agora</button>
+    </div>
+    <div id="error" class="banner error" hidden role="alert" data-testid="error"></div>
+
+    <!-- abas: aparecem com a sessão em andamento -->
+    <nav id="tabs" class="tabs" hidden data-testid="tabs">
+      <button id="tab-session" type="button" class="tab" data-tab="session" data-testid="tab-session">Sessão</button>
+      <button id="tab-host" type="button" class="tab" data-tab="host" data-testid="tab-host" disabled>Anfitrião</button>
+      <button id="tab-tv" type="button" class="tab" data-tab="tv" data-testid="tab-tv" disabled>TV</button>
+      <span id="tab-room" class="muted" data-testid="tab-room"></span>
+      <button id="tab-back" type="button" class="tab back" hidden data-testid="tab-back">← Voltar à sessão</button>
+      <button id="tab-fullscreen" type="button" class="tab" hidden data-testid="tab-fullscreen">Tela cheia</button>
+    </nav>
   </div>
-  <div id="error" class="banner error" hidden role="alert" data-testid="error"></div>
 
-  <main>
-    <!-- 1) preparar o motor -->
+  <main id="main">
+    <!-- 1) instalando os componentes (sem avisos de tempo ou tamanho) -->
     <section id="screen-engine" class="center" hidden data-testid="screen-engine">
       <h2>Instalando componentes…</h2>
       <div id="engine-progress">
@@ -41,25 +55,35 @@
       <button id="pair-go" type="button" class="primary" data-testid="pair-go">Parear</button>
     </section>
 
-    <!-- 3) início: imagem de apresentação e o apelido para começar a sessão -->
+    <!-- 3) início: imagem de apresentação, o login do YouTube e o apelido para começar a sessão -->
     <section id="screen-welcome" class="welcome" hidden data-testid="screen-welcome">
       <div class="welcome-art"><img src="welcome.png" alt="Singalong: karaokê com a TV, o computador e o celular"></div>
       <div class="welcome-form">
         <h2>Vamos cantar?</h2>
-        <p class="muted">Escolha o apelido que os convidados vão ver e comece a sessão. A sua conta do YouTube nunca aparece para eles.</p>
-        <label>Seu apelido
-          <input id="welcome-nickname" type="text" maxlength="40" placeholder="Ex.: Dona Flor" autocomplete="off" data-testid="welcome-nickname">
-        </label>
-        <button id="welcome-start" type="button" class="primary big" data-testid="welcome-start">Começar a sessão</button>
-        <p id="welcome-error" class="error-text" hidden data-testid="welcome-error"></p>
+
+        <div class="step" id="welcome-youtube">
+          <div class="step-head"><strong>1. Entre no YouTube</strong> <span id="yt-pill" class="pill" data-testid="yt-status"></span></div>
+          <p class="muted">Recomendado. O login só é usado quando o YouTube pedir, e nunca aparece para os convidados.</p>
+          <button id="yt-login" type="button" data-testid="yt-login">Entrar no YouTube</button>
+        </div>
+
+        <div class="step">
+          <div class="step-head"><strong>2. Escolha o seu apelido</strong></div>
+          <label>Os convidados vão ver este nome
+            <input id="welcome-nickname" type="text" maxlength="40" placeholder="Ex.: Dona Flor" autocomplete="off" data-testid="welcome-nickname">
+          </label>
+          <button id="welcome-start" type="button" class="primary big" data-testid="welcome-start">Começar a sessão</button>
+          <p id="welcome-error" class="error-text" hidden data-testid="welcome-error"></p>
+        </div>
+
         <div class="welcome-foot muted">
-          <span id="welcome-server" data-testid="welcome-server"></span>
-          <button id="welcome-unpair" type="button" class="link" data-testid="welcome-unpair">Desparear este computador</button>
+          <div class="folder">Músicas em <span id="library-welcome" data-testid="library-welcome"></span> <button id="library-change-welcome" type="button" class="link" data-testid="library-change-welcome">Alterar…</button></div>
+          <div><span id="welcome-server" data-testid="welcome-server"></span> · <button id="welcome-unpair" type="button" class="link" data-testid="welcome-unpair">Desparear</button></div>
         </div>
       </div>
     </section>
 
-    <!-- 4) painel da sessão -->
+    <!-- 4) aba Sessão (a sessão em andamento) -->
     <section id="screen-home" hidden data-testid="screen-home">
       <div class="card" id="card-session">
         <h2>Sessão <span id="agent-pill" class="pill" data-testid="agent-status"></span></h2>
@@ -70,7 +94,7 @@
 
       <div class="card" id="card-rooms">
         <h2>Salas</h2>
-        <button id="room-create" type="button" data-testid="room-create">Criar sala</button>
+        <button id="room-create" type="button" class="primary" data-testid="room-create">Criar sala</button>
         <ul id="rooms" class="list" data-testid="rooms"></ul>
       </div>
 
@@ -89,24 +113,17 @@
         <p id="import-result" class="muted" hidden data-testid="import-result"></p>
       </div>
 
-      <div class="card" id="card-youtube">
-        <h2>YouTube <span id="yt-pill" class="pill" data-testid="yt-status"></span></h2>
-        <p class="muted">O aplicativo baixa sem entrar na conta e só usa o login quando o YouTube pedir. Prefira uma conta secundária.</p>
-        <div class="row">
-          <button id="yt-login" type="button" data-testid="yt-login">Entrar no YouTube</button>
-          <button id="yt-check" type="button" data-testid="yt-check">Conferir</button>
-        </div>
-      </div>
-
       <div class="card" id="card-settings">
         <h2>Configurações</h2>
-        <label>Navegador do login
-          <select id="browser" data-testid="browser">
-            <option value="auto">Automático</option>
-            <option value="chrome">Chrome</option>
-            <option value="edge">Edge</option>
-          </select>
-        </label>
+        <div class="row">
+          <span class="muted">YouTube <span id="yt-pill-home" class="pill" data-testid="yt-status-home"></span></span>
+          <button id="yt-login-home" type="button" data-testid="yt-login-home">Entrar de novo</button>
+          <button id="yt-check" type="button" data-testid="yt-check">Conferir</button>
+        </div>
+        <div class="row">
+          <span class="muted">Músicas em <span id="library-home" data-testid="library-home"></span></span>
+          <button id="library-change-home" type="button" data-testid="library-change-home" title="Encerre a sessão para trocar a pasta">Alterar…</button>
+        </div>
         <label class="check"><input id="login-item" type="checkbox" data-testid="login-item"> Abrir junto com o Windows</label>
         <div class="row">
           <button id="hardware" type="button" data-testid="hardware">Ver o hardware</button>
@@ -114,13 +131,18 @@
         </div>
         <pre id="hardware-out" class="log" hidden data-testid="hardware-out"></pre>
       </div>
-
-      <div class="card" id="card-logs">
-        <h2>Registro</h2>
-        <pre id="logs" class="log" data-testid="logs"></pre>
-      </div>
     </section>
   </main>
+
+  <!-- espera (login do YouTube, importação): dá para cancelar -->
+  <div id="wait" class="overlay" hidden data-testid="wait">
+    <div class="wait-box">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2 id="wait-title">Aguardando conexão…</h2>
+      <p id="wait-text" class="muted"></p>
+      <button id="wait-cancel" type="button" data-testid="wait-cancel">Cancelar</button>
+    </div>
+  </div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

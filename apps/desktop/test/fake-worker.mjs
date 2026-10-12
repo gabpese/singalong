@@ -22,12 +22,13 @@ if (has('--consume')) {
 } else if (has('--youtube-status')) {
   console.log(mode === 'yt-out' ? 'Sem login válido.' : 'Conectado ao YouTube.');
 } else if (has('--youtube-login')) {
-  console.log('Abrindo o navegador…');
+  console.log(`Abrindo o navegador… ${value('--youtube-login') ?? 'padrao'}`);
+  if (mode === 'yt-hang') setInterval(() => {}, 1000); // espera o usuário entrar (os testes cancelam)
   if (mode === 'yt-fail') {
     console.log('Tempo esgotado.');
     process.exit(1);
   }
-  console.log('Conectado ao YouTube.');
+  if (mode !== 'yt-hang') console.log('Conectado ao YouTube.');
 } else if (has('--import')) {
   console.log(`importando ${value('--import')}`);
   if (mode === 'import-fail') {

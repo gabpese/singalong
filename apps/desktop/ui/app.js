@@ -5,6 +5,8 @@ const api = window.karaoke;
 let state = null;
 let importFile = null;
 let autoStarted = false;
+let checkedYoutube = false;
+let tabs = { active: 'session', room: null };
 
 const AGENT_TEXT = {
   stopped: ['Parada', ''],
@@ -13,7 +15,7 @@ const AGENT_TEXT = {
   offline: ['Sem conexão', 'bad'],
   auth_error: ['Acesso recusado', 'bad'],
 };
-const YT_TEXT = { unknown: ['Não conferido', ''], connected: ['Conectado', 'ok'], 'not-logged': ['Sem login', 'warn'] };
+const YT_TEXT = { unknown: ['Não conectado', ''], connected: ['Conectado', 'ok'], 'not-logged': ['Não conectado', 'warn'] };
 
 function showError(message) {
   const box = $('error');
@@ -28,7 +30,7 @@ async function act(name, arg, button) {
   try {
     const result = await api[name](arg);
     if (!result.ok) {
-      showError(result.error.message);
+      if (result.error.code !== 'cancelled') showError(result.error.message);
       return null;
     }
     return result.data;
@@ -46,13 +48,20 @@ function render(s) {
   state = s;
   $('version').textContent = `v${s.version}`;
   const running = s.agent.status !== 'stopped' && s.agent.status !== 'auth_error';
+  const paired = s.phase === 'home';
   $('screen-engine').hidden = s.phase !== 'engine';
   $('screen-pair').hidden = s.phase !== 'pair';
-  $('screen-welcome').hidden = !(s.phase === 'home' && !running);
-  $('screen-home').hidden = !(s.phase === 'home' && running);
+  $('screen-welcome').hidden = !(paired && !running);
+  $('screen-home').hidden = !(paired && running);
+  $('tabs').hidden = !(paired && running);
+  $('main').classList.toggle('full', paired && !running); // a tela de início usa a janela inteira
   if (s.phase === 'engine' && s.engine.status === 'missing' && !autoStarted) { // primeira abertura: começa sozinho, sem perguntar
     autoStarted = true;
     act('buildEngine', { engine: 'auto' });
+  }
+  if (paired && !running && s.youtube.status === 'unknown' && !checkedYoutube) { // já tinha entrado antes? confere em silêncio
+    checkedYoutube = true;
+    api.youtubeStatus();
   }
 
   // atualização
@@ -67,7 +76,7 @@ function render(s) {
     $('update-open').textContent = progress ? `Baixando… ${progress.percent}%` : 'Atualizar agora';
   }
 
-  // motor
+  // instalando componentes
   const building = s.engine.status !== 'error';
   $('engine-build').hidden = building;
   $('engine-progress').hidden = !building;
@@ -80,25 +89,38 @@ function render(s) {
   $('engine-error').hidden = !s.engine.error;
   $('engine-error').textContent = s.engine.error ?? '';
 
-  // início
-  const online = s.agent.status === 'online';
-  setPill($('agent-pill'), AGENT_TEXT[s.agent.status] ?? ['?', '']);
-  $('session-nick').textContent = s.nickname ?? '';
+  // início (sem sessão)
+  setPill($('yt-pill'), YT_TEXT[s.youtube.status] ?? ['?', '']);
+  $('yt-login').textContent = s.youtube.status === 'connected' ? 'Trocar de conta' : 'Entrar no YouTube';
   if (document.activeElement !== $('welcome-nickname') && !$('welcome-nickname').value) $('welcome-nickname').value = s.nickname ?? '';
   $('welcome-server').textContent = s.server ? s.server.replace(/^https?:\/\//, '') : '';
   $('welcome-error').hidden = s.agent.status !== 'auth_error';
   $('welcome-error').textContent = s.agent.status === 'auth_error' ? s.agent.error ?? '' : '';
+  $('library-welcome').textContent = s.libraryDir ?? '';
+
+  // sessão em andamento
+  const online = s.agent.status === 'online';
+  setPill($('agent-pill'), AGENT_TEXT[s.agent.status] ?? ['?', '']);
+  setPill($('yt-pill-home'), YT_TEXT[s.youtube.status] ?? ['?', '']);
+  $('session-nick').textContent = s.nickname ?? '';
   $('agent-error').hidden = !s.agent.error;
   $('agent-error').textContent = s.agent.error ?? '';
   $('room-create').disabled = !online || Boolean(s.busy);
   $('import-pick').disabled = Boolean(s.busy);
   $('import-go').disabled = Boolean(s.busy);
-  $('yt-login').disabled = Boolean(s.busy);
-  setPill($('yt-pill'), YT_TEXT[s.youtube.status] ?? ['?', '']);
-  if (document.activeElement !== $('browser')) $('browser').value = s.browser ?? 'auto';
+  $('library-home').textContent = s.libraryDir ?? '';
+  $('library-change-home').hidden = true; // a pasta só muda com a sessão parada (tela de início)
   renderRooms(s.rooms);
-  renderLogs(s.logs);
-  if (s.busy) $('import-result').textContent = `${s.busy}…`;
+
+  // espera: login do YouTube e importação
+  const waiting = s.busy === 'login do YouTube';
+  $('wait').hidden = !waiting;
+  if (waiting) {
+    $('wait-title').textContent = 'Aguardando conexão…';
+    $('wait-text').textContent = `Entre na sua conta do YouTube na janela do ${s.browserName?.replace(/^o /, '') ?? 'navegador'} que foi aberta. Esta tela fecha sozinha quando a conexão for feita.`;
+  }
+  if (s.busy === 'importando música') $('import-result').textContent = 'Importando… (a primeira vez demora mais)';
+  renderTabs();
 }
 
 function renderRooms(rooms) {
@@ -107,34 +129,49 @@ function renderRooms(rooms) {
   for (const room of rooms) {
     const item = document.createElement('li');
     item.dataset.testid = `room-${room.code}`;
+    item.setAttribute('data-testid', `room-${room.code}`);
     const code = document.createElement('span');
     code.className = 'code';
     code.textContent = room.code;
-    const tv = document.createElement('button');
-    tv.type = 'button';
-    tv.textContent = 'Abrir a TV';
-    tv.addEventListener('click', () => act('open', room.tv));
-    const host = document.createElement('button');
-    host.type = 'button';
-    host.textContent = 'Abrir como anfitrião';
-    host.addEventListener('click', () => act('open', room.host));
-    item.append(code, tv, host);
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = tabs.room === room.code ? 'Aberta' : 'Abrir';
+    open.disabled = tabs.room === room.code;
+    open.setAttribute('data-testid', `open-${room.code}`);
+    open.addEventListener('click', () => act('openRoom', room.code));
+    item.append(code, open);
     list.append(item);
   }
 }
 
-function renderLogs(logs) {
-  const box = $('logs');
-  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
-  box.replaceChildren();
-  for (const entry of logs) {
-    const line = document.createElement('div');
-    if (entry.level === 'error') line.className = 'error';
-    line.textContent = entry.line;
-    box.append(line);
+/** As abas Anfitrião e TV são páginas do servidor dentro da janela: quando uma delas está ativa, a interface só mostra as abas. */
+function renderTabs() {
+  const paired = state?.phase === 'home';
+  const running = state && state.agent.status !== 'stopped' && state.agent.status !== 'auth_error';
+  const web = running && paired && tabs.active !== 'session' && tabs.room;
+  for (const button of document.querySelectorAll('.tab[data-tab]')) {
+    const name = button.dataset.tab;
+    button.classList.toggle('active', tabs.active === name);
+    if (name !== 'session') button.disabled = !tabs.room;
   }
-  if (stick) box.scrollTop = box.scrollHeight;
+  $('tab-room').textContent = tabs.room ? `Sala ${tabs.room}` : '';
+  $('tab-back').hidden = !web;
+  $('tab-fullscreen').hidden = tabs.active !== 'tv' || !web;
+  $('main').hidden = Boolean(web);
+  renderRooms(state?.rooms ?? []);
+  reportLayout();
 }
+
+/** Diz ao processo principal onde a interface termina (as páginas das abas começam logo abaixo). */
+let lastTop = 0;
+function reportLayout() {
+  const top = Math.ceil($('chrome').getBoundingClientRect().bottom);
+  if (top !== lastTop) {
+    lastTop = top;
+    api.layout(top);
+  }
+}
+new ResizeObserver(reportLayout).observe($('chrome'));
 
 // --- ações ---
 $('engine-build').addEventListener('click', (e) => act('buildEngine', { engine: 'auto' }, e.currentTarget));
@@ -147,8 +184,14 @@ $('pair-go').addEventListener('click', async (e) => {
 $('welcome-start').addEventListener('click', (e) => act('startAgent', { nickname: $('welcome-nickname').value }, e.currentTarget));
 $('welcome-nickname').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('welcome-start').click(); });
 $('session-toggle').addEventListener('click', (e) => act('stopAgent', undefined, e.currentTarget));
+$('room-create').addEventListener('click', async (e) => {
+  const room = await act('createRoom', undefined, e.currentTarget);
+  if (room) act('openRoom', room.code); // a sala nova já abre na aba do anfitrião
+});
 
-$('room-create').addEventListener('click', (e) => act('createRoom', undefined, e.currentTarget));
+for (const button of document.querySelectorAll('.tab[data-tab]')) button.addEventListener('click', () => act('selectTab', button.dataset.tab));
+$('tab-back').addEventListener('click', () => act('selectTab', 'session'));
+$('tab-fullscreen').addEventListener('click', () => act('fullscreen'));
 
 $('import-pick').addEventListener('click', async () => {
   const file = await act('pickAudio');
@@ -172,9 +215,18 @@ $('import-go').addEventListener('click', async (e) => {
   }
 });
 
+// o login abre o navegador PADRÃO do Windows, depois de pedir licença (o aviso é do processo principal)
 $('yt-login').addEventListener('click', (e) => act('youtubeLogin', undefined, e.currentTarget));
+$('yt-login-home').addEventListener('click', (e) => act('youtubeLogin', undefined, e.currentTarget));
 $('yt-check').addEventListener('click', (e) => act('youtubeStatus', undefined, e.currentTarget));
-$('browser').addEventListener('change', () => act('settings', { browser: $('browser').value }));
+$('wait-cancel').addEventListener('click', () => act('cancelBusy'));
+
+async function changeLibrary() {
+  const dir = await act('pickFolder');
+  if (dir) await act('setLibrary', dir);
+}
+$('library-change-welcome').addEventListener('click', changeLibrary);
+
 $('login-item').addEventListener('change', (e) => act('loginItem', e.currentTarget.checked));
 $('update-open').addEventListener('click', () => state.update?.url && act('applyUpdate', undefined, $('update-open')));
 
@@ -199,6 +251,10 @@ $('unpair').addEventListener('click', (e) => unpair(e.currentTarget));
 $('welcome-unpair').addEventListener('click', (e) => unpair(e.currentTarget));
 
 api.onState(render);
+api.onTabs((value) => {
+  tabs = value;
+  renderTabs();
+});
 const first = await act('snapshot');
 if (first) render(first);
 api.loginItem().then((r) => { if (r.ok) $('login-item').checked = r.data; });
