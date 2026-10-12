@@ -5,11 +5,15 @@ const value = (flag) => args[args.indexOf(flag) + 1];
 const mode = process.env.FAKE_MODE ?? '';
 
 if (has('--consume')) {
-  console.log('worker consumindo');
-  if (mode === 'crash') process.exit(1);
-  if (mode === 'auth') process.exit(2);
-  setInterval(() => {}, 1000);
-  process.on('SIGTERM', () => process.exit(0));
+  // com stdout em pipe o Node escreve de forma assíncrona: sair antes do fim da escrita perderia a linha (e o teste ficava instável)
+  const leave = (code) => process.stdout.write('worker consumindo\n', () => process.exit(code));
+  if (mode === 'crash') leave(1);
+  else if (mode === 'auth') leave(2);
+  else {
+    console.log('worker consumindo');
+    setInterval(() => {}, 1000);
+    process.on('SIGTERM', () => process.exit(0));
+  }
 } else if (has('--create-room')) {
   if (mode === 'room-fail') {
     console.log('erro: não consegui falar com o servidor');
