@@ -4,7 +4,7 @@
 
 A self-hosted, collaborative karaoke system: search for a song on YouTube and Singalong builds the karaoke version (instrumental, word-by-word synced lyrics, key change, backing vocals, microphone pitch scoring and MP4 export), with a shared queue on everyone's phone and a TV as the player.
 
-Full plan and design decisions: [PLAN.md](PLAN.md) ([Português](PLAN.pt-BR.md)).
+Documentation: [PRD](PRD.md) (product requirements), [TRD](TRD.md) (technical requirements and the installer/agent proposal) and [PLAN](PLAN.md) (design decisions and history). Each one also has a Portuguese version (`*.pt-BR.md`).
 
 > The app's interface is in Brazilian Portuguese. Where this README quotes a button or label, the Portuguese text follows in parentheses.
 
