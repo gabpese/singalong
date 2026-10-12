@@ -156,8 +156,8 @@ export function createController({
     }
     publish();
     if (config.server) checkUpdate().catch(() => {});
-    // o app pode ficar dias aberto na bandeja: confere a cada meia hora se saiu versão nova
-    setInterval(() => refreshUpdate().catch(() => {}), 30 * 60 * 1000).unref?.();
+    // o app pode ficar dias aberto na bandeja: confere a cada 6 horas se saiu versão nova (e quando a janela volta, no máximo 1 vez por hora)
+    setInterval(() => refreshUpdate().catch(() => {}), 6 * 60 * 60 * 1000).unref?.();
     return snapshot();
   }
 
@@ -212,11 +212,11 @@ export function createController({
   }
 
   /**
-   * Pergunta de novo se há versão nova, no máximo a cada 5 minutos (a janela volta do segundo plano, o app fica dias aberto na
+   * Pergunta de novo se há versão nova, no máximo uma vez por hora (a janela volta do segundo plano, o app fica dias aberto na
    * bandeja: só perguntar ao abrir deixaria o aviso para sempre desatualizado).
    */
   async function refreshUpdate() {
-    if (now() - lastUpdateCheck < 5 * 60 * 1000) return state.update;
+    if (now() - lastUpdateCheck < 60 * 60 * 1000) return state.update;
     return checkUpdate();
   }
 
