@@ -57,6 +57,7 @@ const entry = (id = SONG, over = {}) => ({
 });
 
 const publish = (agent, songs) => call('PUT', '/agent/v1/library', { headers: agent.headers, payload: { songs } });
+const claim = (agent) => call('POST', '/agent/v1/jobs/claim', { headers: agent.headers, payload: { wait_ms: 0 } });
 const state = async (r) => (await call('GET', `/api/rooms/${r.code}`, { headers: CLIENT })).json();
 const addSong = (r, id = SONG, payload = {}) => call('POST', `/api/rooms/${r.code}/queue`, { headers: CLIENT, payload: { video_id: id, ...payload } });
 
@@ -236,4 +237,24 @@ test('o dono sair da sessão não apaga o catálogo dele (a biblioteca é do dis
   await call('DELETE', `/agent/v1/sessions/${s1.id}`, { headers: agent.headers });
   const r2 = await room(agent, await session(agent));
   assert.equal((await call('GET', '/api/songs', { headers: { 'x-room': r2.code } })).json().length, 1);
+});
+
+test('música importada que não está no catálogo do dono não vira job do YouTube', async () => {
+  const agent = await pair();
+  const r = await room(agent, await session(agent));
+  const res = await addSong(r, IMPORTED, { artist: 'A', title: 'B' }); // mesmo com artista e nome: não há o que baixar
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.json().error, 'song_not_found');
+  assert.equal((await claim(agent)).statusCode, 204); // nenhum job foi enfileirado para o agente
+  assert.equal((await state(r)).queue.length, 0);
+});
+
+test('a letra de uma música importada não se troca por job (importa-se o arquivo de novo)', async () => {
+  const agent = await pair();
+  const r = await room(agent, await session(agent));
+  await publish(agent, [entry(IMPORTED, { meta: { title: 'Meu arquivo' } })]);
+  const res = await call('PUT', `/api/songs/${IMPORTED}/lyrics`, { headers: { 'x-room': r.code }, payload: { source: 'lrclib', artist: 'A', title: 'B' } });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.json().error, 'imported_lyrics');
+  assert.equal((await claim(agent)).statusCode, 204);
 });

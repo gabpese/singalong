@@ -196,7 +196,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | Marco | Entrega | Critério de pronto |
 |---|---|---|
 | **M0 ✅** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
-| **M1 (M1a ✅, M1b ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
+| **M1 (M1a ✅, M1b ✅, M1c ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
 | **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
@@ -257,7 +257,19 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - **Dois defeitos achados pelos testes:** o filtro de domínios aceitava nomes que só *terminam* igual (`notyoutube.com`, `evilgoogle.com`), o que guardaria o cookie de outro site; e a escolha do navegador não caía para o outro quando o preferido não existe. Os dois foram corrigidos.
 - **Testado com uma conta Google de verdade (pelo dono, no Chrome 155, em Out/2026):** o Google **aceitou** o login na janela aberta com a porta de depuração, o agente guardou 48 cookies e a validação respondeu "Conectado". Se um dia o Google recusar esse login, a alternativa é o Firefox (`YTDLP_COOKIES_BROWSER=firefox`) ou um `cookies.txt` exportado de uma janela anônima. Não testado: o Edge com conta real e a vida útil dos cookies exportados (semanas?), que só o uso mostra.
 
-**Fica para o M1c:** o comando `importar` (arquivo e fontes abertas).
+### 12.4 M1c: importar arquivos e links de fontes abertas (Out/2026)
+
+**Feito**
+- **`--import ARQUIVO --artist A --title T`** (`importer.py`): aceita mp3, flac, wav, m4a, ogg e opus; valida com ffprobe/ffmpeg (texto disfarçado de mp3 é recusado), limites `IMPORT_MAX_MB` (200) e 900 s. O id é `f-` + 12 hex do SHA-256 do áudio: o mesmo conteúdo com outro nome é a mesma música e reimportar é instantâneo. Artista/título vêm das etiquetas ou das opções.
+- **`--import-url LINK`**: só SoundCloud, Bandcamp e Internet Archive (domínio exato ou subdomínio), sem cookies, só faixas avulsas (playlists, álbuns e buscas ficam de fora). Link do YouTube é recusado antes de qualquer download.
+- Com `AGENT_URL`/`AGENT_TOKEN`, a música é publicada no catálogo do agente e aparece na biblioteca da sala. A API nunca cria job do YouTube para um id `f-` (`song_not_found`), e a letra de uma importada muda reimportando (409 `imported_lyrics`).
+- **Testes:** 38+ novos no worker, 2 na API; execução entre linguagens 18/18 (importar pela CLI, catálogo, convidado põe na fila, servidor local de mídia serve, id `f-` desconhecido recusado, nenhum job criado).
+
+**Medido e lições**
+- Validação real na imagem do worker: 6 formatos lidos pelo ffprobe de verdade, importação real com Demucs em 20 a 31 s para um trecho de 12 s, um item real do Internet Archive importado.
+- O `allowed_extractors` do yt-dlp casa com o **IE_NAME** do extrator (`archive.org`, `Bandcamp`), não com a chave; a primeira versão falhou num link real e um teste de contrato contra a lista do próprio yt-dlp agora protege isso.
+- O `check_disk` quebrava quando a pasta da biblioteca ainda não existia (instalação nova); agora mede a pasta existente mais próxima.
+- Os originais importados não são copiados para a biblioteca, só os derivados. O botão "Importar arquivo" fica para o M3.
 
 ## 13. Decisões tomadas e perguntas em aberto
 

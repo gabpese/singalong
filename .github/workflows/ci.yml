@@ -97,7 +97,8 @@ jobs:
           cache: pip
       # os testes não precisam do torch, do Demucs nem do Whisper: só destes dois
       # websockets: o teste do login do YouTube (cliente do protocolo de depuração) roda contra um servidor WebSocket de verdade
-      - run: pip install numpy langdetect websockets
+      # yt-dlp: um teste confere os nomes dos extratores permitidos na importação contra a lista real dele
+      - run: pip install numpy langdetect websockets yt-dlp
       - run: python -I -m unittest discover -s tests -t .
 
   docker-api:

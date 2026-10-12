@@ -196,7 +196,7 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 | Milestone | Deliverable | Definition of done |
 |---|---|---|
 | **M0 ✅** | `JobBackend` + the `/agent/v1` API + **sessions and per-session job routing** + a fake agent in the tests | The full flow passes with the current worker switched to HTTP; a room's job is only claimed by its session's agent |
-| **M1 (M1a ✅, M1b ✅)** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's/Edge's local network prompt was already **tested** (section 5) and a local song plays on the TV from the local media server |
+| **M1 (M1a ✅, M1b ✅, M1c ✅)** | A "headless" agent (command line) with the engine through Docker/venv, **YouTube login through the browser (`--cookies-from-browser`), a local media server and the `file`/`open_url` source (an `import` command)** | Downloads and processes from the cloud on a PC with a residential IP; the login is validated; Chrome's/Edge's local network prompt was already **tested** (section 5) and a local song plays on the TV from the local media server |
 | **M2** | Engine pack (CPU and cu121) + hardware probe | Installs without Python/Docker; GPU tested with a fallback |
 | **M3** | Electron shell: session, "Sign in to YouTube" screen, an "Import file" button, tray, library folder, logs | A layperson starts the session, signs in to YouTube and processes a song without a terminal |
 | **M4** | **Windows** installer + auto-update | A clean install on a VM; update tested |
@@ -257,7 +257,19 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 - **Two defects found by the tests:** the domain filter accepted names that only *end* the same (`notyoutube.com`, `evilgoogle.com`), which would keep another site's cookie; and the browser choice did not fall back to the other one when the preferred one does not exist. Both were fixed.
 - **Tested with a real Google account (by the owner, in Chrome 155, Oct 2026):** Google **accepted** the login in the window opened with the debugging port, the agent kept 48 cookies and the validation answered "Connected". If Google ever refuses that login, the alternative is Firefox (`YTDLP_COOKIES_BROWSER=firefox`) or a `cookies.txt` exported from an incognito window. Not tested: Edge with a real account and the lifetime of the exported cookies (weeks?), which only use will show.
 
-**Left for M1c:** the `import` command (file and open sources).
+### 12.4 M1c: importing files and open-source links (Oct 2026)
+
+**Done**
+- **`--import FILE --artist A --title T`** (`importer.py`): accepts mp3, flac, wav, m4a, ogg and opus; validates with ffprobe/ffmpeg (a text disguised as mp3 is refused), limits `IMPORT_MAX_MB` (200) and 900 s. The id is `f-` + 12 hex of the SHA-256 of the audio, so the same content under another name is the same song and re-importing is instant. Artist/title come from the tags or the flags.
+- **`--import-url LINK`**: only SoundCloud, Bandcamp and Internet Archive (exact domain or subdomain), no cookies, single tracks only (playlists, albums and searches are excluded). A YouTube link is refused before any download.
+- With `AGENT_URL`/`AGENT_TOKEN` set, the song is published to the agent's catalog and shows up in the room library. The API never creates a YouTube job for an `f-` id (`song_not_found`), and lyrics of an imported song change by re-importing (409 `imported_lyrics`).
+- **Tests:** 38+ new in the worker, 2 in the API; cross-language run 18/18 (CLI import, catalog, guest queues it, local media server serves it, unknown `f-` id refused, no job created).
+
+**Measured and lessons**
+- Real validation in the worker image: 6 formats read by the real ffprobe, real Demucs import in 20 to 31 s for a 12 s clip, a real Internet Archive item imported.
+- yt-dlp's `allowed_extractors` matches the extractor **IE_NAME** (`archive.org`, `Bandcamp`), not its key; the first version failed against a real link and a contract test against yt-dlp's own list now guards it.
+- `check_disk` crashed when the library folder did not exist yet (a fresh install); it now measures the nearest existing parent folder.
+- Imported originals are not copied into the library, only the derived files. The "Import file" button is part of M3.
 
 ## 13. Decisions made and open questions
 

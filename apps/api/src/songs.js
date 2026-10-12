@@ -18,6 +18,9 @@ const keys = (id) => ({
 /** Chave do MP4 exportado: o mesmo nome que o worker usa (karaoke.mp4, karaoke_p+2.mp4, karaoke_p-3.mp4). */
 export const exportKey = (id, pitch) => `cache/${id}/karaoke${pitch === 0 ? '' : `_p${pitch > 0 ? '+' : '-'}${Math.abs(pitch)}`}.mp4`;
 
+/** Uma música importada (arquivo ou fonte aberta do dono): "f-" + 12 hexadecimais. Não vem do YouTube, então não há o que baixar. */
+const isImported = (id) => id.startsWith('f-');
+
 export function createSongService({ storage, jobs, agents = null }) {
   /** O catálogo local do contexto (de quem é e onde está a mídia), ou null: a música está no servidor. */
   const localOf = ({ sessionId = null } = {}) => (agents && sessionId ? agents.libraryOfSession(sessionId) : null);
@@ -159,6 +162,8 @@ export function createSongService({ storage, jobs, agents = null }) {
       if ((await isReady(id, ctx)) && !explicitLyrics) {
         return { cached: true, created: false, deduped: false, song: await describe(id, ctx) };
       }
+      // importada e fora da biblioteca: nenhum agente a baixaria (só o dono a tem, no computador dele)
+      if (isImported(id)) return { error: 'imported_not_found' };
       await releaseStale(id, sessionId);
       const { created } = await jobs.enqueue(id, payloadFor(id, body), { replace: Boolean(explicitLyrics), sessionId });
       return { cached: false, created, deduped: !created, song: await describe(id, ctx) };
@@ -168,6 +173,7 @@ export function createSongService({ storage, jobs, agents = null }) {
     async setLyrics(id, lyrics, { artist, title } = {}, { sessionId = null } = {}) {
       const ctx = { sessionId };
       if (!(await describe(id, ctx))) return { error: 'not_found' };
+      if (isImported(id)) return { error: 'imported' }; // a letra de uma importada se troca importando o arquivo de novo
       await releaseStale(id, sessionId);
       const { created } = await jobs.enqueue(id, payloadFor(id, { lyrics, artist, title }), { replace: true, sessionId });
       if (!created) return { error: 'in_progress' };

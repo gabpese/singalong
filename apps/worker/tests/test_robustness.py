@@ -116,6 +116,16 @@ class DiskGuardTests(unittest.TestCase):
         self.assertIn("0.5 GB", ctx.exception.message)
 
 
+class CheckDiskNewFolderTests(unittest.TestCase):
+    def test_pasta_da_biblioteca_que_ainda_nao_existe_nao_derruba_a_primeira_execucao(self):
+        with tempfile.TemporaryDirectory() as d:
+            check_disk(Path(d) / "storage" / "ainda" / "nao" / "existe", 0)  # não levanta FileNotFoundError
+            with mock.patch("shutil.disk_usage", return_value=mock.Mock(free=int(0.5 * 1024**3))):
+                with self.assertRaises(JobError) as ctx:
+                    check_disk(Path(d) / "nova", 2)  # e continua medindo o espaço de verdade
+        self.assertEqual(ctx.exception.code, "disk_full")
+
+
 class FakeBackend:
     """Só o que o runner usa do Backend: o estado do job, o contador de inícios, o ack e o pedido das vozes de apoio."""
 

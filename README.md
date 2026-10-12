@@ -163,6 +163,15 @@ python -m singalong_worker --youtube-status         # "Connected" / "No valid lo
 
 `--youtube-login` opens **your installed Chrome or Edge with a dedicated profile** (your personal browser profile is not touched), waits for you to sign in, asks the browser itself for the cookies through its debugging protocol (it hands them over already decrypted, which is why it works where yt-dlp cannot read the browser) and saves only the YouTube and Google cookies to `~/.singalong/youtube_cookies.txt`, then closes the browser. The cookies never leave the computer. If the login in that window is refused, use Firefox with `YTDLP_COOKIES_BROWSER=firefox` or a `cookies.txt` exported from a private window.
 
+**Importing your own songs (milestone M1c).** Besides YouTube, you can bring audio you already have or a link from an open source. It runs on the worker, stays on this computer and goes through the same pipeline (vocal separation, key, lyrics).
+
+```powershell
+python -m singalong_worker --import "C:\Music\song.mp3" --artist "Artist" --title "Title" [--lyrics lrclib|align|none]
+python -m singalong_worker --import-url "https://archive.org/details/<item>" --artist "Artist" --title "Title"
+```
+
+Formats: mp3, flac, wav, m4a, ogg, opus (size up to `IMPORT_MAX_MB`, 200 by default, and 15 minutes). Links: only SoundCloud, Bandcamp and Internet Archive, single tracks, no cookies. Artist and title are read from the tags when you omit them. If `AGENT_URL` and `AGENT_TOKEN` are set, the song is also published to your agent's catalog and shows up in the room library. The app does not verify where a file comes from: import only what you have the right to use.
+
 ### Worker CLI (no API, for testing)
 
 ```powershell
