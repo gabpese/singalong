@@ -54,12 +54,13 @@ export function gpuSelftest(root, { runImpl = run } = {}) {
 
 /**
  * Monta (ou conclui) o motor em `root`.
- *  engine: "auto" (decide pelo hardware), "cpu" ou "cu121"; forceCpu equivale a "cpu".
+ *  engine: "auto" (decide pelo hardware), "cpu" ou "cu121".
+ *  switchEngine: com o motor já montado, troca para o `engine` pedido (só o torch é reinstalado: o resto fica como está).
  *  workerSource: pasta apps/worker (singalong_worker + requirements.txt) que vai junto no instalador.
  *  onProgress({ step, label, done, total, line }) alimenta a barra de progresso do instalador.
  * Devolve o estado final (engine.json).
  */
-export async function assemble({ root, manifest, engine = 'auto', workerSource = DEFAULT_WORKER_SOURCE, onProgress = () => {}, runImpl = run, fetchImpl = fetch, retryWait }) {
+export async function assemble({ root, manifest, engine = 'auto', switchEngine = false, workerSource = DEFAULT_WORKER_SOURCE, onProgress = () => {}, runImpl = run, fetchImpl = fetch, retryWait }) {
   manifest ??= await loadManifest();
   if (`${process.platform}-${process.arch}` !== manifest.platform && !process.env.SINGALONG_ENGINE_ANY_PLATFORM) {
     throw new Error(`Este motor é para ${manifest.platform}; este computador é ${process.platform}-${process.arch}.`);
@@ -110,8 +111,22 @@ export async function assemble({ root, manifest, engine = 'auto', workerSource =
     await save({ engine: chosen, engine_reason: engine === 'auto' ? probe.reason : `escolhido: ${engine}`, hardware: { gpus: probe.gpus, cpu_cores: probe.cpu_cores, ram_mb: probe.ram_mb } });
   }
 
+  // 3b) o usuário pediu outro motor (configurações): só o torch/torchvision e o teste da GPU são refeitos
+  let switching = false;
+  if (switchEngine && state.engine) {
+    progress('hardware', 'Verificando o computador');
+    const probe = await probeHardware(root, { forceCpu: engine === 'cpu', runImpl });
+    const target = engine === 'auto' ? probe.engine : engine;
+    if (target !== state.engine) {
+      switching = true;
+      const steps = { ...state.steps, selftest: false };
+      manifest.pip.forEach((step, i) => { if (step.torchIndex) steps[`pip:${i}`] = false; });
+      await save({ engine: target, engine_reason: engine === 'auto' ? probe.reason : `escolhido: ${engine}`, fallback_reason: undefined, complete: false, steps });
+    }
+  }
+
   // 4) pacotes pip (torch pelo índice oficial do PyTorch, cpu ou cu121)
-  await installPip({ root, manifest, state, save, done, progress, runImpl, engine: state.engine });
+  await installPip({ root, manifest, state, save, done, progress, runImpl, engine: state.engine, force: switching });
 
   // 5) o teste real da GPU; se falhar, troca o torch para a versão de CPU e registra o motivo
   if (state.engine === 'cu121' && !state.steps.selftest) {

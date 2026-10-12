@@ -201,7 +201,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | **M1 (M1a ✅, M1b ✅, M1c ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
 | **M2 ✅** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3 ✅** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
-| **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
+| **M4 ✅** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
 | **M5** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
 | **M6** | macOS/Linux, GPU AMD/Apple | v3 |
 
@@ -317,6 +317,27 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - A pasta da biblioteca é fixa (`<dados>/library`) por enquanto; escolher outra pasta fica para depois.
 - O código de pareamento ainda é gerado pelo administrador do servidor (`ADMIN_TOKEN`); um jeito mais amigável de parear sem pedir código fica para a v2.
 - Não testado numa máquina limpa: isso é do M4.
+
+### 12.7 M4: o instalador e a atualização automática (Out/2026)
+
+**Feito**
+- **`singalong_karaoke.exe`** (`npm run dist` em `apps/desktop`, electron-builder + NSIS): instalação por usuário (sem administrador, em `%LOCALAPPDATA%\Programs`, com escolha da pasta), atalhos na área de trabalho e no menu Iniciar, ícone próprio, desinstalador limpo (os dados do usuário ficam), **sem assinatura** (decidido). Cerca de **107 MB**; o pacote do motor não vai dentro: o app monta na primeira abertura a partir das fontes oficiais (M2). O código do worker vai nos recursos do instalador e daí para o motor.
+- **Atualização automática** (`electron-updater`): o `APP_DOWNLOAD_URL` do servidor é a pasta que guarda o novo `singalong_karaoke.exe` e o `latest.yml` (gerado pelo build). "Atualizar agora" baixa, **confere o SHA-512 do `latest.yml`**, encerra a sessão no servidor, instala em silêncio e abre a versão nova; sem o `latest.yml` volta a abrir o link. Publicar uma correção é: subir a versão (`package.json`, o controlador e o `version.py`, que um teste mantém iguais), `npm run dist`, subir os dois arquivos na pasta privada e subir o `APP_LATEST_VERSION`.
+- **Testes:** mais dois (as três versões iguais; o nome do instalador e as opções por usuário, sem assinatura) e o `scripts/test-update.mjs`, um teste de máquina com o app instalado de verdade. A CI gera o instalador no Windows (sem publicar em lugar nenhum: o arquivo não é guardado).
+
+**Medido nesta máquina (Windows 11, instalador gerado aqui, instalado com `/S` numa pasta vazia, pasta de dados sem nada)**
+- O app instalado abre, pede para preparar o computador e **montou o motor inteiro sozinho em 8 min 6 s** (RTX 3060: `cu121`, teste da GPU passou); depois pareou, iniciou a sessão com o worker do motor instalado e criou uma sala.
+- **Atualização 0.3.0 → 0.4.0:** anunciada pelo servidor, baixada, hash conferido, instalada em silêncio e reaberta sozinha em cerca de 45 s; a versão nova subiu como `v0.4.0` e **o motor e as configurações continuaram lá** (não pediu para preparar de novo).
+- O desinstalador removeu o app e os atalhos e deixou os dados do usuário.
+
+- **Telas de primeira abertura e de início:** a primeira abertura instala os componentes sozinha (uma barra e "Instalando componentes…", sem avisos de tempo ou tamanho, sem perguntas; se falhar, aparece "Tentar de novo"). Depois do pareamento, a **tela de início** mostra a imagem de apresentação (`ui/welcome.png`) à esquerda e, à direita, o campo do apelido com "Começar a sessão". Só depois de iniciar a sessão aparecem as outras opções (salas, importar, YouTube, configurações, registro); encerrar a sessão volta para a tela de início.
+- **Tela de início e abas (depois da primeira revisão):** a tela de início é a imagem de apresentação (grande, à esquerda) e, à direita, **1. Entrar no YouTube** e depois **2. apelido + Começar a sessão**, mais a **pasta onde as músicas são guardadas** (qualquer pasta que o usuário escolher; só muda com a sessão parada). Entrar no YouTube pede licença ("O Singalong vai abrir o Google Chrome…") e abre o **navegador padrão do Windows** (Chrome ou Edge; outro navegador padrão cai no que dos dois estiver instalado), com uma tela "Aguardando conexão…" que pode ser cancelada. Com a sessão rodando, a janela tem **abas: Sessão, Anfitrião e TV**: as páginas do anfitrião e da TV da sala aparecem **dentro do app** (páginas embutidas com só as licenças de que precisam: microfone, tela cheia e o servidor de mídia local), com os botões "Voltar à sessão" e "Tela cheia"; criar uma sala já abre na aba do anfitrião. O painel de registro e a escolha do navegador foram removidos. O ícone do app é o `singing.svg` (quadrado amarelo arredondado), gerado por `scripts/make-icon.cjs`.
+- **Segunda revisão (abas e configurações):** a janela tem duas abas, **Sessão** (criar sala, entrar numa sala, importar músicas) e **Salas** (as salas abertas, como etiquetas, cada uma com as sub-abas **TV** e **Anfitrião**). Entrar numa sala abre por padrão o **modo TV** e o usuário pode trocar para o Anfitrião e voltar, ou voltar à Sessão para criar ou entrar em outra sala. A sala é criada direto pela API do servidor (sem iniciar o Python) e o botão mostra "Criando a sala…". A **engrenagem** (`settings.svg`) abre as **configurações**: conta do YouTube (entrar / trocar), **placa de vídeo** (automático, placa ou processador: só o torch é reinstalado e o teste da GPU refeito, com a sessão parada), **pasta das músicas**, **microfone** (a página da TV o usa por um preload que define o `deviceId` do `getUserMedia`) e abrir com o Windows.
+
+**Decisões e o que falta**
+- A distribuição continua privada: a CI não envia o instalador para lugar nenhum. A pasta de atualização precisa ser um link privado (seção 7).
+- Não feito: teste numa **máquina virtual limpa** (não há uma aqui; a execução acima usou uma pasta de instalação e uma de dados vazias, mas ainda é este PC, que já tem Chrome, Git e drivers). Quem instalar em outro computador deve anotar o que falhar, se algo falhar.
+- O SmartScreen do Windows avisa sobre o arquivo sem assinatura ("Mais informações, Executar assim mesmo"); as instruções abaixo devem mencionar isso.
 
 ## 13. Decisões tomadas e perguntas em aberto
 

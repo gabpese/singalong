@@ -1,14 +1,14 @@
 // O "cérebro" do app do dono, sem Electron (por isso dá para testar de ponta a ponta com processos de verdade):
 // guarda a configuração, monta o motor, pareia, inicia/para o agente (o worker em modo serviço) e roda os comandos dele
 // (criar sala, login do YouTube, importar música, hardware). A janela só mostra o `snapshot()` e chama estes métodos.
-import { spawn } from 'node:child_process';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { execFile, spawn } from 'node:child_process';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assemble } from '../../engine/src/assemble.js';
-import { paths, readState, workerCommand } from '../../engine/src/engine.js';
-import { verifyEngine } from '../../engine/src/verify.js';
+import { assemble } from '@singalong/engine/src/assemble.js';
+import { paths, readState, workerCommand } from '@singalong/engine/src/engine.js';
+import { verifyEngine } from '@singalong/engine/src/verify.js';
 
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
 const MAX_LOGS = 300;
 const POLL_MS = 5000;
 
@@ -33,25 +33,43 @@ export function normalizeServer(value) {
   return url.origin;
 }
 
+/** O navegador padrão do Windows (o do https): "chrome", "edge" ou "auto" (outro: o worker usa o Chrome/Edge que achar). */
+export function detectDefaultBrowser(run = execFile) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve('auto');
+    run('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice', '/v', 'ProgId'], { windowsHide: true, timeout: 5000 }, (error, stdout) => {
+      const progId = error ? '' : (/ProgId\s+REG_SZ\s+(\S+)/i.exec(String(stdout))?.[1] ?? '');
+      resolve(/^ChromeHTML/i.test(progId) ? 'chrome' : /^MSEdgeHTM/i.test(progId) ? 'edge' : 'auto');
+    });
+  });
+}
+
+export const BROWSER_NAMES = { chrome: 'Google Chrome', edge: 'Microsoft Edge', auto: 'o seu navegador' };
+
 export function createController({
   dataDir,
+  workerSource, // onde está o código do worker que vai para dentro do motor (no app instalado: a pasta de recursos)
+  version = APP_VERSION,
   fetchImpl = fetch,
   spawnImpl = spawn,
   assembleImpl = assemble,
   verifyImpl = verifyEngine,
+  detectBrowser = detectDefaultBrowser,
   launcher = (root, args, extraEnv) => workerCommand(root, args, extraEnv), // [exe, args, options]: os testes trocam por um worker de mentira
   emit = () => {},
   pollMs = POLL_MS,
   restartMs = 3000,
 } = {}) {
   const configFile = join(dataDir, 'config.json');
-  let config = { server: '', token: '', device_name: '', nickname: '', engine_dir: join(dataDir, 'engine'), library_dir: join(dataDir, 'library'), browser: 'auto' };
+  let config = { server: '', token: '', device_name: '', nickname: '', engine_dir: join(dataDir, 'engine'), library_dir: join(dataDir, 'library') };
+  let browser = 'auto'; // o navegador padrão da máquina (detectado ao abrir)
   const state = {
     engine: { status: 'unknown', progress: null, error: null, kind: null, reason: null },
     agent: { status: 'stopped', session: null, error: null },
     rooms: [],
     youtube: { status: 'unknown', detail: null },
     update: null,
+    updateProgress: null, // { percent } enquanto baixa a atualização
     busy: null, // nome da tarefa longa em andamento (importar, login...)
     logs: [],
   };
@@ -78,16 +96,18 @@ export function createController({
 
   function snapshot() {
     return {
-      version: APP_VERSION,
+      version,
       paired: Boolean(config.server && config.token),
       server: config.server,
       deviceName: config.device_name,
       nickname: config.nickname,
-      browser: config.browser,
+      microphone: config.microphone ?? null,
+      browser,
+      browserName: BROWSER_NAMES[browser],
       engineDir: config.engine_dir,
       libraryDir: config.library_dir,
       phase: state.engine.status !== 'ready' ? 'engine' : !config.token ? 'pair' : 'home',
-      ...structuredClone({ engine: state.engine, agent: state.agent, rooms: state.rooms, youtube: state.youtube, update: state.update, busy: state.busy }),
+      ...structuredClone({ engine: state.engine, agent: state.agent, rooms: state.rooms, youtube: state.youtube, update: state.update, updateProgress: state.updateProgress, busy: state.busy }),
       logs: state.logs.slice(-80),
     };
   }
@@ -123,6 +143,7 @@ export function createController({
     } catch {
       /* primeira abertura */
     }
+    browser = await detectBrowser().catch(() => 'auto');
     const engineState = await readState(config.engine_dir);
     if (engineState?.complete) {
       state.engine = { status: 'ready', progress: null, error: null, kind: engineState.engine, reason: engineState.fallback_reason ?? engineState.engine_reason };
@@ -135,14 +156,17 @@ export function createController({
   }
 
   // --- motor ---
-  async function buildEngine({ engine = 'auto' } = {}) {
+  async function buildEngine({ engine = 'auto', switchEngine = false } = {}) {
     if (state.engine.status === 'building') return snapshot();
+    if (switchEngine && agentProcess) throw new UserError('session_running', 'Encerre a sessão para trocar a placa de vídeo.');
     state.engine = { ...state.engine, status: 'building', error: null, progress: { label: 'Preparando…' } };
     publish();
     try {
       const final = await assembleImpl({
         root: config.engine_dir,
         engine,
+        ...(switchEngine ? { switchEngine: true } : {}),
+        ...(workerSource ? { workerSource } : {}),
         onProgress: ({ label, done, total, line }) => {
           state.engine.progress = { label, done: done ?? null, total: total ?? null };
           if (line) log(line);
@@ -197,7 +221,7 @@ export function createController({
   async function checkUpdate() {
     if (!config.server) return null;
     try {
-      const response = await fetchImpl(`${config.server}/agent/v1/version?current=${encodeURIComponent(APP_VERSION)}`, { signal: AbortSignal.timeout(10000) });
+      const response = await fetchImpl(`${config.server}/agent/v1/version?current=${encodeURIComponent(version)}`, { signal: AbortSignal.timeout(10000) });
       state.update = response.ok ? await response.json() : null;
     } catch {
       state.update = null;
@@ -218,10 +242,14 @@ export function createController({
     };
   }
 
-  function runWorker(args, { env = {}, onLine = () => {}, timeoutMs = 0 } = {}) {
+  let busyChild = null; // o processo da tarefa longa em andamento (login, importação): dá para cancelar
+  let cancelled = false;
+
+  function runWorker(args, { env = {}, onLine = () => {}, timeoutMs = 0, cancellable = false } = {}) {
     return new Promise((resolve, reject) => {
       const [exe, argv, options] = launcher(config.engine_dir, args, workerEnv(env));
       const child = spawnImpl(exe, argv, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      if (cancellable) busyChild = child;
       let output = '';
       const timer = timeoutMs ? setTimeout(() => child.kill(), timeoutMs) : null;
       const feed = (data) => {
@@ -234,6 +262,7 @@ export function createController({
       child.on('error', (error) => reject(new UserError('spawn', `Não consegui iniciar o motor: ${error.message}`)));
       child.on('close', (code) => {
         if (timer) clearTimeout(timer);
+        if (busyChild === child) busyChild = null;
         resolve({ code, output });
       });
     });
@@ -242,6 +271,7 @@ export function createController({
   async function withBusy(name, fn) {
     if (state.busy) throw new UserError('busy', `Aguarde: ${state.busy}.`);
     state.busy = name;
+    cancelled = false;
     publish();
     try {
       return await fn();
@@ -253,16 +283,15 @@ export function createController({
 
   async function createRoom() {
     requirePaired();
-    if (state.agent.status !== 'online') throw new UserError('not_online', 'Inicie a sessão antes de criar uma sala.');
-    const { code, output } = await runWorker(['--create-room', '--public-url', config.server], { timeoutMs: 60000 });
-    const first = output.split(/\r?\n/).find((line) => line.startsWith('{'));
-    if (code !== 0 || !first) throw new UserError('create_room', output.split(/\r?\n/).find((l) => l.startsWith('erro')) ?? 'Não consegui criar a sala.');
-    const room = JSON.parse(first);
-    const entry = { code: room.code, tv: `${config.server}/tv.html?room=${room.code}`, host: `${config.server}/room.html?room=${room.code}#host=${room.host_token}` };
-    state.rooms = [entry, ...state.rooms.filter((r) => r.code !== entry.code)];
-    log(`Sala ${entry.code} criada.`);
-    publish();
-    return entry;
+    const session = state.agent.session;
+    if (state.agent.status !== 'online' || !session) throw new UserError('not_online', 'Inicie a sessão antes de criar uma sala.');
+    return withBusy('criando sala', async () => {
+      const room = await api('POST', `/sessions/${session.id}/rooms`, { body: {}, timeout: 20000 });
+      const entry = { code: room.code, tv: `${config.server}/tv.html?room=${room.code}`, host: `${config.server}/room.html?room=${room.code}#host=${room.host_token}` };
+      state.rooms = [entry, ...state.rooms.filter((r) => r.code !== entry.code)];
+      log(`Sala ${entry.code} criada.`);
+      return entry;
+    });
   }
 
   async function youtubeStatus() {
@@ -274,12 +303,13 @@ export function createController({
     return state.youtube;
   }
 
-  async function youtubeLogin(browser = config.browser) {
+  async function youtubeLogin() {
     requirePaired();
     return withBusy('login do YouTube', async () => {
       const args = ['--youtube-login', ...(browser && browser !== 'auto' ? [browser] : [])];
       log('Abrindo o navegador para entrar no YouTube…');
-      const { code, output } = await runWorker(args, { onLine: (line) => log(line), timeoutMs: 6 * 60 * 1000 });
+      const { code, output } = await runWorker(args, { onLine: (line) => log(line), timeoutMs: 6 * 60 * 1000, cancellable: true });
+      if (cancelled) throw new UserError('cancelled', 'Login cancelado.');
       state.youtube = { status: code === 0 ? 'connected' : 'not-logged', detail: output.trim().split(/\r?\n/).pop() ?? '' };
       if (code !== 0) throw new UserError('youtube_login', state.youtube.detail || 'O login do YouTube não foi concluído.');
       return state.youtube;
@@ -292,7 +322,8 @@ export function createController({
     return withBusy('importando música', async () => {
       const args = ['--import', file, ...(artist ? ['--artist', artist] : []), ...(title ? ['--title', title] : [])];
       log(`Importando ${file}…`);
-      const { code, output } = await runWorker(args, { onLine: (line) => log(line), timeoutMs: 30 * 60 * 1000 });
+      const { code, output } = await runWorker(args, { onLine: (line) => log(line), timeoutMs: 30 * 60 * 1000, cancellable: true });
+      if (cancelled) throw new UserError('cancelled', 'Importação cancelada.');
       const done = output.split(/\r?\n/).find((line) => line.startsWith('Pronto:'));
       if (code !== 0 || !done) {
         const reason = output.split(/\r?\n/).reverse().find((line) => line.startsWith('erro') || line.includes('Error')) ?? 'A importação falhou.';
@@ -300,6 +331,14 @@ export function createController({
       }
       return { message: done };
     });
+  }
+
+  /** Interrompe o login ou a importação em andamento ("Cancelar" na tela de espera). */
+  function cancelBusy() {
+    if (!busyChild) return false;
+    cancelled = true;
+    busyChild.kill();
+    return true;
   }
 
   async function hardware() {
@@ -417,12 +456,36 @@ export function createController({
 
   async function setSettings(patch) {
     const allowed = {};
-    if (patch.browser !== undefined && ['auto', 'chrome', 'edge'].includes(patch.browser)) allowed.browser = patch.browser;
     if (patch.nickname !== undefined) allowed.nickname = String(patch.nickname).trim().slice(0, 40);
+    if (patch.microphone !== undefined) { // { id, label } escolhido nas configurações; null = o padrão do sistema
+      const mic = patch.microphone;
+      allowed.microphone = mic && typeof mic.id === 'string' && mic.id ? { id: mic.id.slice(0, 300), label: String(mic.label ?? '').slice(0, 120) } : null;
+    }
     await save(allowed);
     publish();
     return snapshot();
   }
 
-  return { init, snapshot, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
+  const setUpdateProgress = (progress) => { state.updateProgress = progress; publish(); };
+
+  /** A pasta onde as músicas baixadas ficam. Só muda com a sessão parada (o agente está usando a pasta atual). */
+  async function setLibraryDir(dir) {
+    if (agentProcess) throw new UserError('session_running', 'Encerre a sessão para trocar a pasta das músicas.');
+    const target = String(dir ?? '').trim();
+    if (!target) throw new UserError('bad_folder', 'Escolha uma pasta.');
+    const probe = join(target, `.singalong-teste-${process.pid}`);
+    try {
+      await mkdir(target, { recursive: true });
+      await writeFile(probe, 'ok');
+      await rm(probe, { force: true });
+    } catch {
+      throw new UserError('bad_folder', 'Não consigo gravar nessa pasta. Escolha outra.');
+    }
+    await save({ library_dir: target });
+    log(`As músicas agora ficam em ${target}.`);
+    publish();
+    return snapshot();
+  }
+
+  return { init, snapshot, setLibraryDir, cancelBusy, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
 }

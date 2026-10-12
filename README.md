@@ -198,6 +198,16 @@ npm run test:e2e         # the real window + the real API + the real worker
 
 Your data (configuration, engine, library) lives in `%APPDATA%\Singalong Karaoke`. Closing the window with a running session only hides it (the tray icon brings it back; "Quit" ends the session).
 
+**Installer and updates (milestone M4).**
+
+```powershell
+cd apps\desktop
+npm run dist                         # builds dist\singalong_karaoke.exe (+ latest.yml), about 107 MB, not signed
+dist\singalong_karaoke.exe           # installs for your user only; Windows' SmartScreen may warn: "More info" > "Run anyway"
+```
+
+To publish an update: raise the version in `apps/desktop/package.json`, `apps/desktop/src/controller.js` and `apps/worker/singalong_worker/version.py` (a test checks they match), run `npm run dist`, put `singalong_karaoke.exe` and `latest.yml` in a **private** folder and set on the server `APP_LATEST_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` (that folder's address). Every installed app then shows "Update now". `node scripts/test-update.mjs <installed.exe> <new-version-folder> <data-folder>` tests the whole thing on a computer.
+
 ### Worker CLI (no API, for testing)
 
 ```powershell

@@ -7,3 +7,4 @@ secrets/
 test-results/
 playwright-report/
 dist/
+apps/desktop/dist-*/
