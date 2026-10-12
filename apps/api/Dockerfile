@@ -4,7 +4,7 @@ FROM --platform=$BUILDPLATFORM node:24-slim AS web
 WORKDIR /web
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci
-COPY apps/web/index.html apps/web/room.html apps/web/tv.html apps/web/vite.config.mjs ./
+COPY apps/web/index.html apps/web/room.html apps/web/tv.html apps/web/stage.html apps/web/vite.config.mjs ./
 COPY apps/web/public ./public
 COPY apps/web/src ./src
 RUN npx vite build

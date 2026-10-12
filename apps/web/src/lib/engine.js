@@ -1,13 +1,15 @@
 // Motor da TV: toca o instrumental (e, se houver, as vozes de apoio) com troca de tom em tempo real e desenha a letra sincronizada.
 import { SoundTouchNode } from '../vendor/soundtouch/SoundTouchNode.js';
-import { clampBacking, clampPitch, gapDisplay, lineProgress, locate, wordFills, wordProgress, wordSpans } from './lyrics-sync.js';
+import { clampBacking, clampPitch } from './lyrics-sync.js';
+import { createLyricsView } from './lyrics-view.js';
 
 /**
  * @param lyricsEls elementos { prev, current, next, next2 } onde a letra é desenhada
  * @param onEnded   (itemId) => void   chamada quando a música termina
  * @param onError   (itemId, mensagem) => void
+ * @param onLyrics  (itemId, linhas) => void   a letra da música carregou (a TV a repassa ao palco dos cantores)
  */
-export function createEngine({ lyricsEls, onEnded, onError }) {
+export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
   const audio = new Audio();
   audio.crossOrigin = 'anonymous';
   audio.preload = 'auto';
@@ -17,8 +19,7 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
   backing.preload = 'auto';
 
   let itemId = null;
-  let cues = [];
-  let offset = 0;
+  const view = createLyricsView(lyricsEls);
   let pitch = 0;
   let backingUrl = null; // as vozes de apoio da música atual (null = a música não tem)
   let backingLevel = 0; // 0..100 (%)
@@ -28,10 +29,6 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
   let stNode = null;
   let graphReady = null;
   let pitchAvailable = true;
-  let lastKey = '';
-  let words = []; // [{el, span, p}] da linha atual
-  let gapEl = null; // o aviso de pausa longa, quando está na tela
-  let lastDashes = -1;
   let loadToken = 0;
 
   // --- áudio: <audio> -> SoundTouch (tom) -> saída; sem AudioWorklet (página http fora de localhost) toca sem tom ---
@@ -114,74 +111,9 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
     }
   }, 500);
 
-  // --- letra ---
-  function clearLyrics() {
-    for (const el of [lyricsEls.prev, lyricsEls.current, lyricsEls.next, lyricsEls.next2]) el.textContent = '';
-    words = [];
-    lastKey = '';
-  }
-
-  /** Monta a linha atual com um <span> por palavra (cada um com seu preenchimento: a quebra de linha não importa). */
-  function buildCurrentLine(text) {
-    lyricsEls.current.textContent = '';
-    words = wordSpans(text).map((span, i) => {
-      const el = document.createElement('span');
-      el.className = 'w';
-      el.textContent = span.word;
-      if (i) lyricsEls.current.append(' ');
-      lyricsEls.current.append(el);
-      return { el, span, p: -1 };
-    });
-  }
-
-  function paintCurrentLine(lineP, fills) {
-    words.forEach((w, i) => {
-      const p = Math.round((fills ? fills[i] : wordProgress(w.span, lineP)) * 1000) / 10;
-      if (p !== w.p) {
-        w.p = p;
-        w.el.style.setProperty('--p', `${p}%`);
-      }
-    });
-  }
-
-  /** Pausa longa na letra: no lugar da linha atual, "--------------" que some nos últimos 8 s (prepare-se!). */
-  function buildGapLine() {
-    lyricsEls.current.textContent = '';
-    gapEl = document.createElement('span');
-    gapEl.className = 'gap-dashes';
-    lyricsEls.current.append(gapEl);
-    words = [];
-    lastDashes = -1;
-  }
-
-  function paintGap(dashes) {
-    if (dashes === lastDashes) return;
-    lastDashes = dashes;
-    gapEl.textContent = '-'.repeat(dashes);
-  }
-
+  // --- letra: o desenho está em lyrics-view.js; aqui só passa o relógio do áudio ---
   function render() {
-    if (itemId === null) return;
-    const t = audio.currentTime + offset;
-    const gap = gapDisplay(cues, t);
-    let { current, next } = locate(cues, t);
-    if (gap) {
-      current = -1; // dentro de uma pausa longa nenhuma linha está sendo cantada, mesmo que o `end` da anterior diga o contrário
-      next = gap.next;
-    }
-    const text = (i) => cues[i]?.text ?? '';
-    const anchor = current >= 0 ? current : next;
-    const key = `${current}|${anchor}|${gap ? 'gap' : ''}`;
-    if (key !== lastKey) {
-      lastKey = key;
-      lyricsEls.prev.textContent = text(anchor - 1);
-      if (gap) buildGapLine();
-      else buildCurrentLine(current >= 0 ? text(current) : cues.length ? '' : '♪ Sem letra para esta música');
-      lyricsEls.next.textContent = text(current >= 0 ? current + 1 : next);
-      lyricsEls.next2.textContent = text(current >= 0 ? current + 2 : next + 1);
-    }
-    if (gap) paintGap(gap.dashes);
-    else paintCurrentLine(current >= 0 ? lineProgress(cues[current], t) : 0, current >= 0 ? wordFills(cues[current], words.length, t) : null);
+    if (itemId !== null) view.render(audio.currentTime);
   }
 
   function loop() {
@@ -219,9 +151,8 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
       backingUrl = item.song.media.backing ?? null;
       backingLevel = clampBacking(item.backing);
       itemId = item.id;
-      cues = [];
-      clearLyrics();
-      offset = item.lyric_offset ?? 0;
+      view.setCues([]);
+      view.setOffset(item.lyric_offset ?? 0);
       pitch = clampPitch(item.pitch);
       applyPitch();
       try {
@@ -229,7 +160,8 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const loaded = await res.json();
         if (token !== loadToken) return; // outra música foi pedida no meio do caminho
-        cues = loaded;
+        view.setCues(loaded);
+        onLyrics?.(item.id, loaded);
       } catch (err) {
         onError?.(item.id, `Não consegui carregar a letra (${err.message}).`);
         return;
@@ -269,7 +201,7 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
     },
 
     setOffset(seconds) {
-      offset = Number(seconds) || 0;
+      view.setOffset(seconds);
       render();
     },
 
@@ -277,8 +209,7 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
       audio.pause();
       dropBacking();
       itemId = null;
-      cues = [];
-      clearLyrics();
+      view.clear();
     },
 
     get loadedId() { return itemId; },
@@ -300,6 +231,7 @@ export function createEngine({ lyricsEls, onEnded, onError }) {
         gain: backingGain?.gain.value ?? null, ctx: ctx?.state ?? null, graph: Boolean(stNode),
       };
     },
-    get offset() { return offset; },
+    get offset() { return view.offset; },
+    get cues() { return view.cues; },
   };
 }

@@ -1,6 +1,7 @@
 // Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
 import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, setUserName, userName } from '../lib/identity.js';
+import { stageDismissed, stageItemFor } from '../lib/stage.js';
 import type { LibrarySong, QueueItem, RoomState } from '../lib/types';
 import { AddSong, type AddSongHandle } from './AddSong';
 import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast } from './context';
@@ -67,6 +68,10 @@ export function RoomPage({ code }: { code: string }) {
   useEffect(() => {
     document.title = `Singalong — Sala ${code}`;
   }, [code]);
+  // chegou a vez da minha música: o cantor vai da sala para o palco (e volta quando ela acaba)
+  useEffect(() => {
+    if (stageItemFor(state, (itemId: number) => stageDismissed(code, itemId)) !== null) location.replace(`/stage.html?room=${code}`);
+  }, [state, code]);
   // gancho de diagnóstico (testes no navegador)
   useEffect(() => {
     window.room = { get state() { return state; }, preview: preview.player, get previewPitch() { return preview.pitch; } };

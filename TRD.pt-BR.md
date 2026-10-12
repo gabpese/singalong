@@ -204,6 +204,9 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | **M4 ✅** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
 | **M5 ✅** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
 | **M6** | macOS/Linux, GPU AMD/Apple | v3 |
+| **M7** | Palco: `/stage.html` para o cantor, letra no celular no ritmo da TV | v1.0 (1 de 3) |
+| **M8** | O microfone da sala na saída e o controle do volume da voz pelo anfitrião | v1.0 (2 de 3) |
+| **M9** | Dueto: convite, os dois no palco, duas cores, pontuação da dupla | v1.0 (3 de 3) |
 
 ### 12.1 M0: o que foi feito e o que mudou do plano (Out/2026)
 
@@ -380,6 +383,22 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - **Testes:** 6 no servidor (página e CSP, token e bloqueio, e-mails com efeito imediato, `*` e listas fixas, computadores, remover/bloquear/liberar) e 1 no worker (música bloqueada não é reenviada).
 
 **Decisão:** só o dono tira músicas da nuvem e gerencia as listas; o fluxo de pareamento por e-mail e o envio automático continuam como estavam.
+
+### 12.11 Caminho para a 1.0.0: palco, volume da voz e dueto (Out/2026)
+
+Decisões (Out/2026): as três etapas abaixo, **nesta ordem**, formam a **versão 1.0.0**.
+
+- **M7: o palco.** Na vez de um cantor, o celular dele sai da sala para uma página nova, `/stage.html`, e volta quando a música acaba. O celular mostra a letra; a TV também mostra.
+- **M8: a voz na saída da sala e o volume dela.** O microfone da sala (o da TV) entra na saída de áudio junto com a música, e o **anfitrião** controla o volume da voz cantada. **O microfone no celular fica de fora por enquanto** (a latência de mandar o áudio do celular para a TV não compensa agora): então não existe o modo "microfone é de quem cantou" e não há nada a decidir sobre isso.
+- **M9: dueto.** Mais de um cantor na mesma música: o cantor A convida o cantor B (que precisa estar na mesma sala); na vez da música, **os dois vão para o palco**. A letra ganha duas cores, **verde `#3A5A40` para um cantor e vermelho `#541E1B` para o outro, amarelo (a cor de hoje) quando os dois cantam**, sempre com **contorno branco** (as cores são muito escuras). A divisão dos versos é **automática** por enquanto (alternando, com os dois juntos no refrão quando der para reconhecê-lo) e deixa espaço para evoluir. **A pontuação é da dupla**, não por cantor.
+
+### 12.12 M7: o palco (Out/2026)
+
+**Feito**
+- **`/stage.html?room=CÓDIGO`** (celular): a tela do cantor com a música, a letra em letras grandes, avisos de "Em pausa" e "A TV não está conectada", o fim da música (com a nota, quando a sala pontua) e o botão **"Voltar à sala"**. A página da sala leva o cantor para lá na vez dele (a música que toca é dele, a TV está conectada e ele não saiu do palco nesta música); quando a música acaba ou é pulada, o palco mostra o fim por 4 s e o traz de volta. Abrir o palco fora da sua vez volta direto para a sala. O anfitrião também vai ao palco nas próprias músicas e pode sair pelo botão (ele não o traz de volta durante aquela música).
+- **Letra no ritmo da TV:** a TV é quem toca. Ela agora informa a posição **a cada segundo** (antes: 2 s) e o celular tem um relógio próprio entre as mensagens, confiando na mensagem que chegou com menos atraso (`lib/clock.js`), pausando e retomando com a sala e descartando amostras velhas quando o anfitrião pula na música. O desenho da letra (anterior, linha atual com as palavras se preenchendo, próximas e os traços de "prepare-se") saiu do motor de áudio para o `lib/lyrics-view.js`, então a TV e o palco desenham exatamente a mesma coisa a partir de relógios diferentes.
+- **Músicas no computador do dono:** o celular não alcança o servidor local de mídia, então **a TV repassa a letra ao servidor** (mensagem `lyrics`, validada: no máximo 3000 linhas, 400 KB, só da música que toca, só vinda da TV), que a envia aos celulares e a entrega a quem abre o palco no meio da música. Para músicas no servidor ou na nuvem o palco também busca a letra direto.
+- **Testes:** 7 do relógio e 4 das regras do palco (Node), 3 no servidor (repasse, quem pode enviar, validação) e 5 de ponta a ponta no navegador (o cantor vai ao palco e volta, a música de outra pessoa mantém a pessoa na sala, sem TV não há palco, sair do palco não é desfeito, músicas locais recebem a letra pela TV). Os 71 testes do navegador que já existiam continuam passando.
 
 ## 13. Decisões tomadas e perguntas em aberto
 

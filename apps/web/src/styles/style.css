@@ -443,3 +443,19 @@ input[type=range].seek::-moz-range-thumb { width: 14px; height: 14px; border-rad
 .search-block { display: flex; flex-direction: column; gap: 12px; }
 .search-block[hidden] { display: none; }
 .required { color: var(--accent); margin-left: 2px; }
+
+/* palco: a tela de canto do celular (letra grande no ritmo da TV) */
+body.stage { background: #0b0b14; }
+.stage-page { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); }
+.stage-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.stage-where { margin: 0; color: var(--dim); font-size: .85rem; }
+.stage-song { margin: 2px 0; font-size: 1.25rem; line-height: 1.2; }
+.stage-artist { margin: 0; color: var(--dim); font-size: .95rem; }
+.stage-lyrics { min-height: 0; padding: 0; }
+.stage-lyrics .prev { font-size: clamp(1rem, 4.4vw, 1.5rem); }
+.stage-lyrics .current { font-size: clamp(1.8rem, 8.4vw, 3rem); }
+.stage-lyrics .next { font-size: clamp(1.15rem, 5.4vw, 1.9rem); }
+.stage-lyrics .next2 { font-size: clamp(1rem, 4.4vw, 1.5rem); }
+.stage-bottom { min-height: 2.6em; display: grid; place-items: center; color: var(--dim); text-align: center; }
+.stage-end { display: grid; gap: 4px; color: var(--fg); font-size: 1.2rem; }
+.stage-end small { color: var(--dim); font-size: .85rem; }

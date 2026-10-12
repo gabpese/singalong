@@ -68,10 +68,19 @@ export interface RoomState {
   me: { is_host: boolean };
 }
 
+/** Uma linha da letra sincronizada (lyrics.json). `words` = [início, fim] de cada palavra, quando houve alinhamento. */
+export interface LyricCue {
+  start: number;
+  end: number;
+  text: string;
+  words?: [number, number][];
+}
+
 /** Mensagens que o servidor envia pelo WebSocket da sala. */
 export type ServerMessage =
   | { type: 'state'; state: RoomState }
   | { type: 'position'; item_id: number; ms: number }
+  | { type: 'lyrics'; item_id: number; cues: LyricCue[] }
   | { type: 'seek'; item_id: number; seconds?: number; to?: number };
 
 /** Música da biblioteca (meta.json de uma música pronta). */

@@ -68,6 +68,20 @@ export function createHub() {
 }
 
 /** Estado enviado a UMA conexão: sem client_id de ninguém, com `mine`/`can_edit` por item. */
+/** A letra que a TV repassa ao palco: só linhas {start, end, text, words?} bem formadas e de tamanho razoável (ou null). */
+export function sanitizeCues(cues) {
+  if (!Array.isArray(cues) || cues.length > 3000) return null;
+  const clean = [];
+  for (const cue of cues) {
+    if (!Number.isFinite(cue?.start) || !Number.isFinite(cue?.end) || typeof cue?.text !== 'string' || cue.text.length > 400) return null;
+    const words = Array.isArray(cue.words) && cue.words.length <= 120 && cue.words.every((w) => Array.isArray(w) && Number.isFinite(w[0]) && Number.isFinite(w[1]))
+      ? cue.words.map((w) => [w[0], w[1]])
+      : undefined;
+    clean.push({ start: cue.start, end: cue.end, text: cue.text, ...(words ? { words } : {}) });
+  }
+  return JSON.stringify(clean).length <= 400_000 ? clean : null;
+}
+
 export function personalize(base, { clientId, isHost }) {
   return {
     ...base,
@@ -90,6 +104,7 @@ export function createRoomService({
   newToken = () => randomBytes(16).toString('hex'),
 }) {
   const positions = new Map(); // code -> {item_id, ms}  (efêmero: só a TV sabe, e reporta a cada poucos segundos)
+  const lyricsCache = new Map(); // code -> {item_id, cues}: a letra da música que está tocando, enviada pela TV ao palco dos cantores
   const lastKeys = new Map(); // code -> último estado difundido (sem a posição)
   const touched = new Map(); // code -> última vez que gravamos last_active_at
   const locks = new Map(); // code -> cauda da fila de operações da sala
@@ -433,6 +448,16 @@ export function createRoomService({
       hub.broadcast(normalized, (conn) => (conn.role === 'controller' ? { type: 'position', item_id: itemId, ms } : null));
     },
 
+    /** Evento da TV: a letra da música que ela carregou. Vai para os celulares (o palco desenha a letra com ela). */
+    tvLyrics(code, itemId, cues) {
+      const normalized = normalizeCode(code);
+      const room = db.getRoom(normalized);
+      const clean = sanitizeCues(cues);
+      if (!room || room.current_item_id !== itemId || !clean) return;
+      lyricsCache.set(normalized, { item_id: itemId, cues: clean });
+      hub.broadcast(normalized, (conn) => (conn.role === 'controller' ? { type: 'lyrics', item_id: itemId, cues: clean } : null));
+    },
+
     /** Registra uma conexão WebSocket; devolve `leave` para chamar ao fechar. Lança 404 se a sala não existe. */
     connect(code, { socket, role, clientId, hostToken }) {
       const room = requireRoom(code);
@@ -444,6 +469,11 @@ export function createRoomService({
         alive: true,
       };
       const remove = hub.add(room.code, conn);
+      // quem chega no meio da música (o palco do cantor abre depois que ela começou) recebe a letra que a TV já mandou
+      const cached = lyricsCache.get(room.code);
+      if (conn.role === 'controller' && cached && cached.item_id === room.current_item_id && socket.readyState === 1) {
+        socket.send(JSON.stringify({ type: 'lyrics', item_id: cached.item_id, cues: cached.cues }));
+      }
       publish(room.code).catch(() => {});
       return {
         conn,
@@ -467,6 +497,7 @@ export function createRoomService({
       if (message.type === 'score') this.tvScore(code, message.item_id, message.score);
       else if (message.type === 'ended') this.tvEnded(code, message.item_id).catch(() => {});
       else if (message.type === 'position' && Number.isFinite(message.ms)) this.tvPosition(code, message.item_id, message.ms);
+      else if (message.type === 'lyrics') this.tvLyrics(code, message.item_id, message.cues);
     },
 
     /** Passo periódico: avança a fila quando uma música fica pronta e difunde mudanças (progresso do processamento). */

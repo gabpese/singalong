@@ -4,12 +4,12 @@ import { defineConfig } from 'vite';
 
 const page = (name) => fileURLToPath(new URL(name, import.meta.url));
 
-// Três páginas (entrada, sala e TV) com as URLs de sempre: /, /room.html?room=... e /tv.html?room=...
+// Quatro páginas (entrada, sala, TV e palco) com as URLs de sempre: /, /room.html?room=..., /tv.html?room=... e /stage.html?room=...
 export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
-    rollupOptions: { input: { index: page('index.html'), room: page('room.html'), tv: page('tv.html') } },
+    rollupOptions: { input: { index: page('index.html'), room: page('room.html'), tv: page('tv.html'), stage: page('stage.html') } },
   },
   // desenvolvimento: `npm run dev` abre o front-end com recarga rápida e manda a API para o servidor em :3000
   server: {
