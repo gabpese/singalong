@@ -335,6 +335,9 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' })); // links nunca abrem janelas do Electron
   win.webContents.on('will-navigate', (event) => event.preventDefault());
+  // a janela volta da bandeja: confere se saiu versão nova (o app pode ficar dias aberto)
+  win.on('show', () => controller.refreshUpdate().catch(() => {}));
+  win.on('focus', () => controller.refreshUpdate().catch(() => {}));
   win.on('resize', layout);
   win.on('enter-full-screen', layout);
   win.on('leave-full-screen', layout);
