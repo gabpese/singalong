@@ -24,7 +24,7 @@ export function buildApp({ config, storage, jobs, logger = false, mailer = creat
   const limiters = Object.fromEntries(
     Object.entries({ ...DEFAULT_LIMITS, ...(config.rateLimits ?? {}) }).map(([name, options]) => [name, createRateLimiter(options)]),
   );
-  const agents = createAgentService({ db, jobs });
+  const agents = createAgentService({ db, jobs, cloudEmails: config.cloudUploadEmails ?? [] });
   const songs = createSongService({ storage, jobs, agents });
   const rooms = createRoomService({ db, songs, hub: createHub(), agents });
   app.decorate('rooms', rooms);
@@ -62,7 +62,7 @@ export function buildApp({ config, storage, jobs, logger = false, mailer = creat
   app.register(websocket);
   app.register(songRoutes, { prefix: '/api', songs, jobs, limiters, rooms, agents });
   app.register(roomRoutes, { prefix: '/api', rooms, config, limiters });
-  app.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters, mailer });
+  app.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters, mailer, storage });
 
   if (storage.local) {
     app.get('/media/*', (request, reply) => {

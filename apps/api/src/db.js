@@ -89,6 +89,9 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('rooms', 'session_id')) db.exec('ALTER TABLE rooms ADD COLUMN session_id TEXT REFERENCES sessions(id)');
   // onde o navegador busca a mídia da sessão (o servidor local de mídia do agente); nulo = a mídia está no armazenamento do servidor
   if (!hasColumn('sessions', 'media_base')) db.exec('ALTER TABLE sessions ADD COLUMN media_base TEXT');
+  // o e-mail com que o computador foi pareado (pelo código enviado por e-mail): é ele que decide quem pode enviar músicas para a nuvem
+  if (!hasColumn('devices', 'email')) db.exec('ALTER TABLE devices ADD COLUMN email TEXT');
+  if (!hasColumn('pair_codes', 'email')) db.exec('ALTER TABLE pair_codes ADD COLUMN email TEXT');
 
   const one = (sql, ...params) => db.prepare(sql).get(...params) ?? null;
   const all = (sql, ...params) => db.prepare(sql).all(...params);
@@ -158,24 +161,24 @@ export function openDb(path = ':memory:') {
       }),
 
     // --- agente local: dispositivos, pareamento e sessões ---
-    createDevice: ({ id, name, tokenHash, now }) =>
-      run('INSERT INTO devices (id, name, token_hash, created_at, last_seen) VALUES (?, ?, ?, ?, ?)', id, name, tokenHash, now, now),
+    createDevice: ({ id, name, tokenHash, now, email = null }) =>
+      run('INSERT INTO devices (id, name, token_hash, created_at, last_seen, email) VALUES (?, ?, ?, ?, ?, ?)', id, name, tokenHash, now, now, email),
     getDeviceByTokenHash: (tokenHash) => one('SELECT * FROM devices WHERE token_hash = ? AND revoked_at IS NULL', tokenHash),
     getDevice: (id) => one('SELECT * FROM devices WHERE id = ?', id),
     touchDevice: (id, now) => run('UPDATE devices SET last_seen = ? WHERE id = ?', now, id),
     revokeDevice: (id, now) => run('UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL', now, id).changes > 0,
 
-    savePairCode: (codeHash, expiresAt, now) =>
+    savePairCode: (codeHash, expiresAt, now, email = null) =>
       transaction(() => {
         run('DELETE FROM pair_codes WHERE expires_at <= ?', now); // não acumula códigos vencidos
-        run('INSERT OR REPLACE INTO pair_codes (code_hash, expires_at) VALUES (?, ?)', codeHash, expiresAt);
+        run('INSERT OR REPLACE INTO pair_codes (code_hash, expires_at, email) VALUES (?, ?, ?)', codeHash, expiresAt, email);
       }),
-    /** Gasta o código (uso único): true só se existia e não tinha vencido. */
+    /** Gasta o código (uso único): { email } (o e-mail a que foi enviado, se houve) só se existia e não tinha vencido; senão null. */
     consumePairCode: (codeHash, now) =>
       transaction(() => {
-        const row = one('SELECT expires_at FROM pair_codes WHERE code_hash = ?', codeHash);
+        const row = one('SELECT expires_at, email FROM pair_codes WHERE code_hash = ?', codeHash);
         run('DELETE FROM pair_codes WHERE code_hash = ?', codeHash);
-        return Boolean(row) && row.expires_at > now;
+        return row && row.expires_at > now ? { email: row.email ?? null } : null;
       }),
 
     createSession: ({ id, deviceId, displayName, now }) =>

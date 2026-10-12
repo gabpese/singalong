@@ -51,6 +51,8 @@ services:
       TRUST_PROXY: "1"
       # código de pareamento por e-mail (opcional): quem estiver em PAIR_ALLOWED_EMAILS pede o código no app e recebe por e-mail
       PAIR_ALLOWED_EMAILS: "${PAIR_ALLOWED_EMAILS:-}"
+      # modo híbrido: os computadores pareados com estes e-mails enviam as músicas deles para a nuvem sozinhos
+      ENABLED_TO_SEND_TO_CLOUD: "${ENABLED_TO_SEND_TO_CLOUD:-}"
       BREVO_API_KEY: "${BREVO_API_KEY:-}"
       MAIL_FROM: "${MAIL_FROM:-}"
       MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Singalong}"

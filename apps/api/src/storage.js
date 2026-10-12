@@ -1,8 +1,8 @@
 // Driver de storage local. Mesmo contrato do worker (PLAN.md, seção 14):
 // exists / read / getUrl / list / delete. O resto do código só conhece chaves lógicas
 // ("cache/<video_id>/instrumental.mp3"). O driver S3/R2 futuro implementa esta mesma interface.
-import { readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
-import { join, normalize, resolve, sep } from 'node:path';
+import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { dirname, join, normalize, resolve, sep } from 'node:path';
 
 /** Resolve `rel` dentro de `root`; null se escapar da pasta (path traversal). */
 export function safeJoin(root, rel) {
@@ -35,6 +35,20 @@ export class LocalStorage {
 
   async read(key) {
     return readFile(this.#path(key));
+  }
+
+  /** Grava o arquivo inteiro de uma vez: escreve num .tmp e renomeia, então ninguém lê um arquivo pela metade. */
+  async write(key, data) {
+    const path = this.#path(key);
+    await mkdir(dirname(path), { recursive: true });
+    const temp = `${path}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await writeFile(temp, data);
+      await rename(temp, path);
+    } catch (error) {
+      await unlink(temp).catch(() => {});
+      throw error;
+    }
   }
 
   getUrl(key) {

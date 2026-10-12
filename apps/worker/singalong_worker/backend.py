@@ -149,6 +149,19 @@ class RedisBackend:
     def publish_all(self) -> int:
         return 0
 
+    # a nuvem só existe para o agente (o worker clássico já grava na pasta que a API lê)
+    cloud_enabled = False
+
+    def cloud_sync(self, video_id: str) -> bool:
+        return False
+
+    def cloud_backfill(self) -> int:
+        return 0
+
+    def cloud_next(self, block_seconds: float) -> str | None:
+        time.sleep(min(block_seconds, 1.0))
+        return None
+
     @staticmethod
     def _job(msg_id: str, fields: dict) -> Job:
         return Job(video_id=fields["video_id"], payload=json.loads(fields["payload"]), ref=msg_id)
@@ -234,6 +247,9 @@ class _Shared:
     media_base: str | None = None  # o endereço do servidor local de mídia (o que o navegador usa)
     storage: Any = None  # o armazenamento local, para publicar o catálogo
     unpublished: set = field(default_factory=set)  # músicas que não deu para publicar (rede): tenta de novo na batida de coração
+    cloud: bool = False  # o servidor autorizou este computador a enviar as músicas para a nuvem (ENABLED_TO_SEND_TO_CLOUD)
+    cloud_queue: Any = field(default_factory=queue.Queue)  # ids de músicas esperando para subir
+    cloud_sent: dict = field(default_factory=dict)  # id → assinatura dos arquivos já enviados (não repete o que não mudou)
     backing: "queue.Queue[str]" = field(default_factory=queue.Queue)
     lock: threading.Lock = field(default_factory=threading.Lock)
     update: dict = field(default_factory=dict)  # o último aviso de versão do servidor (para a interface mostrar)
@@ -309,6 +325,7 @@ class HttpBackend:
         """Entra no servidor: valida o token e inicia a sessão (ou retoma a que já estava ativa, se o agente reiniciou).
         `keep_name`: ao retomar, mantém o apelido que a sessão já tem (outro comando, como --create-room, não deve renomeá-la)."""
         me = self._call("GET", "/me") or {}
+        self._shared.cloud = bool(me.get("cloud"))
         current = me.get("session") or {}
         resume = current.get("id")
         name = current.get("display_name") if keep_name and resume else self.session_name
@@ -364,11 +381,86 @@ class HttpBackend:
                 return None
             raise
 
+    # --- nuvem (modo híbrido) ---
+    @property
+    def cloud_enabled(self) -> bool:
+        return bool(self._shared.cloud and self._shared.storage is not None)
+
+    def refresh_cloud(self) -> bool:
+        """Pergunta ao servidor se este computador envia para a nuvem (usado pelos comandos curtos, como --import)."""
+        self._shared.cloud = bool((self._call("GET", "/me") or {}).get("cloud"))
+        return self._shared.cloud
+
+    def _upload(self, video_id: str, name: str, data: bytes) -> None:
+        request = urllib.request.Request(f"{self.base}/cloud/{video_id}/{name}", data=data, method="PUT", headers={
+            "Authorization": f"Bearer {self.token}", "Content-Type": "application/octet-stream", "Accept": "application/json",
+            "User-Agent": f"singalong-agent/{AGENT_VERSION}",
+        })
+        try:
+            with self._open(request, timeout=300) as response:
+                response.read()
+        except urllib.error.HTTPError as exc:
+            detail = _error_detail(exc)
+            if exc.code == 401:
+                raise AuthError(detail.get("message") or "token do agente recusado") from exc
+            if exc.code >= 500 or exc.code == 429:
+                raise BackendUnavailable(f"servidor respondeu {exc.code}") from exc
+            raise Rejected(exc.code, str(detail.get("error", "")), str(detail.get("message", ""))) from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+            raise BackendUnavailable(str(getattr(exc, "reason", exc))) from exc
+
+    def cloud_sync(self, video_id: str) -> bool:
+        """Sobe os arquivos da música para a nuvem (o meta.json por último: só com ele a música conta como pronta lá).
+        Não repete o que já subiu e não mudou. True se enviou alguma coisa."""
+        storage = self._shared.storage
+        if not self.cloud_enabled or storage is None or catalog.entry_for(storage, video_id) is None:
+            return False
+        base = f"cache/{video_id}"
+        names = ["instrumental.mp3", "lyrics.json", *[n for n in ("melody.json", "backing.mp3") if storage.exists(f"{base}/{n}")], "meta.json"]
+        sent = self._shared.cloud_sent.setdefault(video_id, {})
+        uploaded = False
+        for name in names:
+            data = storage.read(f"{base}/{name}")
+            signature = (len(data), hash(data))
+            if sent.get(name) == signature:
+                continue
+            self._retry(lambda: self._upload(video_id, name, data), tries=3)
+            sent[name] = signature
+            uploaded = True
+        if uploaded:
+            log.info("música enviada para a nuvem", extra={"job": video_id})
+        return uploaded
+
+    def cloud_backfill(self) -> int:
+        """Envia o que a nuvem ainda não tem da biblioteca deste computador. Devolve quantas músicas subiram."""
+        storage = self._shared.storage
+        if not self.cloud_enabled or storage is None:
+            return 0
+        ids = [entry["id"] for entry in catalog.scan(storage)]
+        sent = 0
+        for start in range(0, len(ids), 100):
+            batch = ids[start:start + 100]
+            missing = (self._retry(lambda: self._call("POST", "/cloud/missing", {"ids": batch})) or {}).get("missing", [])
+            for video_id in missing:
+                if self.cloud_sync(video_id):
+                    sent += 1
+        if sent:
+            log.info("biblioteca enviada para a nuvem", extra={"songs": sent, "total": len(ids)})
+        return sent
+
+    def cloud_next(self, block_seconds: float) -> str | None:
+        try:
+            return self._shared.cloud_queue.get(timeout=max(0.1, block_seconds))
+        except queue.Empty:
+            return None
+
     # --- catálogo local ---
     def publish_song(self, video_id: str, force: bool = False) -> None:
         """Publica (ou atualiza) uma música no catálogo da nuvem. Uma falha de rede não derruba o job: fica para a próxima batida.
         `force`: publica mesmo sem servidor local de mídia neste processo (o comando de importar roda fora do agente)."""
         storage = self._shared.storage
+        if self._shared.cloud:
+            self._shared.cloud_queue.put(video_id)  # computador autorizado: a música (ou a atualização dela) também sobe para a nuvem
         if storage is None or (not force and not self._shared.media_base):
             return  # sem servidor local de mídia, a nuvem usa o armazenamento dela
         entry = catalog.entry_for(storage, video_id)

@@ -55,6 +55,11 @@ def _publish_import(storage, video_id: str) -> None:
     backend = HttpBackend(url, token)
     backend.attach_storage(storage)
     backend.publish_song(video_id, force=True)
+    try:
+        if backend.refresh_cloud() and backend.cloud_sync(video_id):
+            print("Enviada para a nuvem: qualquer sala já pode tocar sem baixar de novo.")
+    except Exception as exc:  # noqa: BLE001 - o envio é um bônus: a música já está na biblioteca local
+        print(f"aviso: não consegui enviar para a nuvem agora ({exc})")
     if video_id in backend._shared.unpublished:
         print("aviso: não consegui publicar no catálogo agora; o agente a publica quando iniciar")
     else:

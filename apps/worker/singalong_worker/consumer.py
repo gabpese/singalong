@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from .backend import AuthError, BackendUnavailable, HttpBackend, make_backend
 from .cookies import as_policy
+from .cloud import serve as cloud_serve
 from .backing import serve as backing_serve
 from .export import serve as export_serve
 from .key import backfill as key_backfill
@@ -125,6 +126,8 @@ def run() -> int:
     # músicas processadas antes do recurso de tom ganham o tom em segundo plano (uma vez cada)
     # (o título do vídeo vem primeiro: é instantâneo e as duas atualizações reescrevem o mesmo meta.json, então não rodam juntas)
     threading.Thread(target=lambda: (titles_backfill(storage), key_backfill(storage)), name="backfill", daemon=True).start()
+    # computador autorizado pelo servidor (ENABLED_TO_SEND_TO_CLOUD): as músicas dele também sobem para a nuvem, em segundo plano
+    threading.Thread(target=cloud_serve, args=(backend.clone(), storage, stop_threads), name="cloud", daemon=True).start()
     threading.Thread(target=_heartbeat, args=(settings.heartbeat_file, backend.clone(), stop_threads), name="heartbeat", daemon=True).start()
 
     log.info("worker consumindo", extra={"consumer": consumer, "transport": "http" if settings.agent_url else "redis",

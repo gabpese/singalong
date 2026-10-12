@@ -202,7 +202,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | **M2 ✅** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3 ✅** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4 ✅** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
-| **M5** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
+| **M5 ✅** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
 | **M6** | macOS/Linux, GPU AMD/Apple | v3 |
 
 ### 12.1 M0: o que foi feito e o que mudou do plano (Out/2026)
@@ -350,6 +350,24 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 **Decisões**
 - A lista de e-mails autorizados é uma variável de ambiente (mudar exige `./deploy.sh`); uma página para gerenciá-la pode vir depois.
 - Para usar, o dono cria uma conta gratuita no Brevo, verifica o e-mail remetente e coloca a chave no `.env` do servidor (`deploy/README.md`).
+
+### 12.9 M5: modo híbrido, músicas enviadas para a nuvem (Out/2026)
+
+**Decisão:** as músicas de **e-mails escolhidos** vão para a nuvem **automaticamente**. O dono os lista no `.env` do servidor: `ENABLED_TO_SEND_TO_CLOUD=ana@exemplo.com,bia@exemplo.com`. O mesmo e-mail que pareou o computador é o que decide.
+
+**Feito**
+- **Quem envia:** um computador pareado pelo código do e-mail (ou por um código do administrador que informa o e-mail: `POST /pair/start {"email": ...}`) fica ligado a esse e-mail (`devices.email`). O `GET /me` responde `cloud: true` quando o e-mail está em `ENABLED_TO_SEND_TO_CLOUD`. Computadores pareados sem e-mail, ou com um e-mail fora da lista, usam o app mas **nunca** enviam.
+- **O que sobe:** `instrumental.mp3`, `lyrics.json`, `melody.json`, `backing.mp3` (se existir) e, **por último**, o `meta.json`. A voz isolada, o `source.json` e os MP4 ficam no computador. As músicas importadas (`f-…`) também sobem.
+- **API:** `POST /agent/v1/cloud/missing {ids}` (o que a nuvem ainda não tem) e `PUT /agent/v1/cloud/:id/:file` (corpo cru). O servidor confere os nomes permitidos, os tamanhos (80 MB para áudio, 10 MB para JSON, 1 MB para o meta), se o áudio parece um MP3, se o JSON é válido, se o `meta.json` é daquela música e se ele só chega depois do instrumental e da letra (`409` se não). A gravação é atômica (`.tmp` e renomear), então ninguém toca um arquivo pela metade; uma música só conta como pronta quando o `meta.json` está lá.
+- **O agente** (`cloud.py`, thread própria): ao iniciar, envia o que a nuvem não tem da biblioteca que já existia; depois, cada música que fica pronta (e cada atualização: letra corrigida, vozes de apoio) sobe; o que não mudou não é reenviado; falha de rede tenta de novo um minuto depois. O comando `--import` também envia a música.
+- **Quem usa:** uma sala sem app e uma sala do app de **outra pessoa** enxergam as músicas da nuvem como prontas (a biblioteca local vem primeiro, a nuvem é o reserva), sem job de download. Elas também aparecem na biblioteca de todas as salas.
+- **App:** a aba Sessão avisa quando as músicas deste computador também vão para a nuvem.
+- **Testes:** 6 no servidor (autorização pelo e-mail, ordem, validação, uma sala comum toca da nuvem, a sessão local de outra pessoa toca da nuvem, substituição), 10 no worker, 1 no app; e uma execução de ponta a ponta com a API e o agente reais (6/6): a biblioteca existente sobe sozinha, uma música importada sobe, um computador não autorizado não envia nada e uma sala comum toca as duas sem nenhum job.
+
+**Falta**
+- Um jeito de **remover** uma música da nuvem e uma página para gerenciar a lista de e-mails (hoje: editar o `.env` e rodar `./deploy.sh`).
+- O disco: a limpeza de cache que já existe (`CACHE_MAX_GB`) apaga as menos tocadas quando passa do limite.
+- Direitos autorais: uma música que sobe é servida a todas as salas do servidor. Mantenha a lista curta e de confiança.
 
 ## 13. Decisões tomadas e perguntas em aberto
 

@@ -113,6 +113,20 @@ Para que cada pessoa peça o código pelo próprio app (em vez de você gerar co
 
 A chave do Brevo é um segredo: fica só no `.env` da VM (nunca no repositório nem no chat). As mensagens podem cair na caixa de spam na primeira vez.
 
+## Modo híbrido: músicas na nuvem (opcional)
+
+Para que as músicas preparadas por certas pessoas passem a existir no servidor (e qualquer sala as toque sem baixar de novo):
+
+1. A pessoa instala o app e pareia **pelo e-mail** (a tela de conectar pede o e-mail e envia o código).
+2. Na VM, edite o `.env` (`nano /opt/singalong/.env`) e liste os e-mails que enviam para a nuvem, separados por vírgula:
+
+   ```
+   ENABLED_TO_SEND_TO_CLOUD=ana@exemplo.com,bia@exemplo.com
+   ```
+3. Aplique: `./deploy.sh`. Se o `docker-compose.prod.yml` da VM for antigo, copie o novo deste repositório antes (ele repassa essa variável).
+
+Quem já estava pareado **antes desta versão** precisa parear de novo pelo e-mail (o servidor só passou a guardar o e-mail do pareamento agora); o mesmo vale para quem pareou com um código do administrador sem e-mail. A biblioteca que o computador já tinha sobe sozinha na próxima vez que o app iniciar a sessão. As músicas ficam em `storage/cache` no volume da API; a limpeza automática (`CACHE_MAX_GB`) apaga as menos tocadas quando passa do limite.
+
 ## Segurança
 
 - A API não tem login: quem souber o endereço e o código de uma sala entra nela. Não divulgue o endereço.
