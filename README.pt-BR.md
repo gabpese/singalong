@@ -201,7 +201,7 @@ $env:SINGALONG_TEST_PYTHON = "C:\caminho\para\python.exe"   # um Python com nump
 npm run test:e2e         # a janela de verdade + a API de verdade + o worker de verdade
 ```
 
-Os seus dados (configuração, motor, biblioteca) ficam em `%APPDATA%\@singalong\desktop`. Fechar a janela com a sessão rodando só a esconde (o ícone da bandeja a traz de volta; "Sair" encerra a sessão).
+Os seus dados (configuração, motor, biblioteca) ficam em `%APPDATA%\Singalong Karaoke`. Fechar a janela com a sessão rodando só a esconde (o ícone da bandeja a traz de volta; "Sair" encerra a sessão).
 
 ### CLI do worker (sem API, para testes)
 

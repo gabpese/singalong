@@ -196,7 +196,7 @@ $env:SINGALONG_TEST_PYTHON = "C:\path\to\python.exe"   # a Python with numpy, la
 npm run test:e2e         # the real window + the real API + the real worker
 ```
 
-Your data (configuration, engine, library) lives in `%APPDATA%\@singalong\desktop`. Closing the window with a running session only hides it (the tray icon brings it back; "Quit" ends the session).
+Your data (configuration, engine, library) lives in `%APPDATA%\Singalong Karaoke`. Closing the window with a running session only hides it (the tray icon brings it back; "Quit" ends the session).
 
 ### Worker CLI (no API, for testing)
 
