@@ -26,6 +26,8 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-}
       # limite do cache de músicas em GB: acima disso apaga as menos cantadas (0 desliga)
       CACHE_MAX_GB: ${CACHE_MAX_GB:-20}
+      # segredo do administrador: liga o pareamento do agente local (/agent/v1); vazio = desligado
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./storage:/storage

@@ -88,6 +88,32 @@ Rooms and the queue live in a SQLite database in the Docker volume `api-data`.
 Requests carry `X-Client-Id` (the browser's id) and, for the host, `X-Host-Token`.
 The contract between the API and the worker (Redis Streams) is documented in [apps/api/src/jobs.js](apps/api/src/jobs.js).
 
+### Local agent (milestone M0: server side and worker transport)
+
+A **local agent** is the worker running on the owner's computer and talking to the server over **outbound HTTP only** (`/agent/v1`), with no Redis access. The owner starts a **session** (with a nickname the guests see), creates the rooms of that session, and every song request made from a guest's phone in those rooms is routed to **that owner's agent** (never to another session's). Design and plan: [TRD](TRD.md).
+
+| Route (`/agent/v1`, `Authorization: Bearer <device token>`) | Purpose |
+|---|---|
+| `POST /pair/start` (header `X-Admin-Token`) · `POST /pair/complete {code, name}` | pairing: the admin generates an 8-character one-time code (10 min); the agent trades it for a device token |
+| `GET /me` · `DELETE /devices/me` | the device and its active session · revoke this device |
+| `POST /sessions {display_name, resume_id?}` · `DELETE /sessions/:id` · `POST /sessions/:id/rooms` | start/resume/end the session · create a room in it |
+| `POST /heartbeat` | proof of life (the owner shows as "online" for 45 s) |
+| `POST /jobs/claim {wait_ms}` · `POST /jobs/:id/progress` · `POST /jobs/:id/complete` | processing jobs (long-poll, up to 25 s) |
+| `POST /search/claim` · `POST /search/:id/result` | YouTube search done by the agent |
+| `POST /exports/claim` · `POST /exports/:id/:pitch/state` | MP4 export |
+
+Pages send the room code in `X-Room` so the search, the lyrics change and the export of a room go to its session's agent. The room state carries `owner: {nickname, online}` (and `null` for rooms without a session, which keep using the classic Redis worker).
+
+```bash
+# on the server (set ADMIN_TOKEN; without it pairing is off): generate a one-time code
+curl -X POST https://YOUR_HOST/agent/v1/pair/start -H "X-Admin-Token: $ADMIN_TOKEN"
+# on the owner's computer (the worker package; Python):
+python -m singalong_worker --pair CODE --agent-url https://YOUR_HOST          # prints AGENT_TOKEN=...
+export AGENT_URL=https://YOUR_HOST AGENT_TOKEN=... AGENT_SESSION_NAME="My nickname"
+python -m singalong_worker --consume        # the agent: starts the session and pulls jobs, searches and exports
+python -m singalong_worker --create-room    # prints the TV and host links of a new room in the session
+```
+
 ### Worker CLI (no API, for testing)
 
 ```powershell

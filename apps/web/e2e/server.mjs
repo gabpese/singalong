@@ -1,7 +1,7 @@
 // Servidor dos testes de ponta a ponta: a API de verdade (rotas, salas, WebSocket) com fila de jobs em memória, um
 // storage temporário com músicas prontas e o front-end de `E2E_PUBLIC` (a pasta `dist` do build; padrão: `dist`).
 // Rotas /__test/* só existem aqui: deixam o teste fingir o worker (resultados de busca, andamento de jobs).
-import { copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,10 +53,32 @@ async function seed(root) {
 const root = process.env.E2E_STORAGE ? resolve(process.env.E2E_STORAGE) : await mkdtemp(join(tmpdir(), 'singalong-e2e-'));
 if (!process.env.E2E_STORAGE) await seed(root);
 const jobs = createMemoryJobStore();
-const app = buildApp({ config: { publicDir, publicUrl: '', rateLimits: { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } } }, storage: new LocalStorage(root), jobs });
+const BIG = { max: 1e6, windowMs: 60_000 };
+// adminToken liga o pareamento do agente local (/agent/v1): os testes de agente.spec.mjs fazem o papel do app do dono
+const app = buildApp({ config: { publicDir, publicUrl: '', adminToken: 'e2e-admin', rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG } }, storage: new LocalStorage(root), jobs });
 
 app.post('/__test/search-results', async (request) => {
   jobs.searchResults = request.body;
+  return { ok: true };
+});
+// o agente falso "grava os arquivos" da música como o agente de verdade faria ao terminar o processamento
+app.post('/__test/seed-song', async (request) => {
+  const { id, title, artist } = request.body;
+  const dir = join(root, 'cache', id);
+  await mkdir(dir, { recursive: true });
+  await copyFile(join(here, 'fixtures', 'tone.mp3'), join(dir, 'instrumental.mp3'));
+  await writeFile(join(dir, 'lyrics.json'), JSON.stringify(LYRICS));
+  await writeFile(join(dir, 'meta.json'), JSON.stringify({ video_id: id, title, artist, duration: 30, lyrics_source: 'none' }));
+  return { ok: true };
+});
+// apaga a música semeada: a biblioteca é compartilhada entre os testes e não pode ganhar músicas que eles não esperam
+app.post('/__test/remove-song', async (request) => {
+  await rm(join(root, 'cache', request.body.id), { recursive: true, force: true });
+  return { ok: true };
+});
+// derruba o sinal de vida do dono da sessão (o app dele fechou sem avisar)
+app.post('/__test/session-offline', async (request) => {
+  app.db.touchSession(request.body.id, Date.now() - 3_600_000);
   return { ok: true };
 });
 app.get('/__test/state', async () => ({ queue: jobs.queue, exportQueue: jobs.exportQueue, searchQueries: jobs.searchQueries }));

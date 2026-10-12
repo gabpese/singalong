@@ -191,13 +191,28 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 
 | Marco | Entrega | Critério de pronto |
 |---|---|---|
-| **M0** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
+| **M0 ✅** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
 | **M1** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; **testado** o aviso de rede local do Chrome com a TV em `localhost` |
 | **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
 | **M5** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
 | **M6** | macOS/Linux, GPU AMD/Apple | v3 |
+
+### 12.1 M0: o que foi feito e o que mudou do plano (Out/2026)
+
+**Feito.** O worker fala com um `Backend` (`backend.py`): `RedisBackend` (o worker clássico, sem mudança de comportamento) e `HttpBackend` (o agente local, por HTTP de saída). A API ganhou `/agent/v1` (pareamento, dispositivos, sessões, salas da sessão, jobs, busca e exportação), o roteamento por sessão e o estado `owner` da sala. Testes novos: API (25 em memória e 11 com Redis de verdade, ligados na CI), worker (31) e ponta a ponta com um agente falso no Playwright (3). Verificado também com a API em Node, o Redis e o worker em Python por HTTP, do pareamento à música pronta, à busca e ao MP4 (14 de 14 verificações).
+
+**Mudou ou ficou decidido no caminho**
+- **Pareamento sem tela ainda:** o código é gerado pelo administrador (`ADMIN_TOKEN` + `POST /agent/v1/pair/start`) e o agente o troca por um token com `--pair`. A tela web para isso fica para o M3.
+- **A sala diz de onde vem o pedido pelo cabeçalho `X-Room`** (busca, troca de letra e exportação não eram "da sala"). O front-end passa o código da sala; sem ele (ou numa sala sem sessão) vale o worker clássico.
+- **O estado de um job continua por `video_id`** (um só `job:<id>` no Redis). Se dois donos pedem a mesma música ao mesmo tempo, o segundo espera o primeiro (dedupe). No M0 o armazenamento ainda é uma pasta compartilhada; bibliotecas por sessão virão com o armazenamento local (M1).
+- **Pedido preso com um dono que sumiu:** se outro dono pede a mesma música e o primeiro está sem sinal, o pedido antigo é liberado (falha "o dono saiu") e a mensagem velha é descartada quando o dono antigo voltar. Com o dono online, o pedido continua com ele.
+- **`claim` do mesmo agente devolve primeiro o que ficou com ele** (é assim que um agente que reiniciou retoma o job; a contagem de tentativas sobe). Por isso o agente só chama `claim` quando está ocioso. Um job sem sinal por 30 min vai para outro agente da mesma sessão.
+- **Retomar a sessão (`resume_id`):** o agente que reinicia continua a mesma sessão (as salas e os pedidos seguem); sem isso, a sessão antiga é encerrada e os pedidos pendentes dela viram falha "o dono saiu".
+- **O Fastify descarta campos extras do corpo** (não os rejeita); por isso o servidor só aceita uma lista fixa de campos em cada rota do agente.
+
+**Fica para os próximos marcos:** o servidor local de mídia, o login do YouTube, a origem `file`/`open_url` (M1); a tela de pareamento e o aviso "o dono está desconectado" na interface (M3).
 
 ## 13. Decisões tomadas e perguntas em aberto
 
