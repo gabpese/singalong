@@ -211,7 +211,7 @@ npm run dist                         # gera dist\singalong_karaoke.exe (+ latest
 dist\singalong_karaoke.exe           # instala só para o seu usuário; o SmartScreen do Windows pode avisar: "Mais informações" > "Executar assim mesmo"
 ```
 
-Para publicar uma atualização: suba a versão em `apps/desktop/package.json`, `apps/desktop/src/controller.js` e `apps/worker/singalong_worker/version.py` (um teste confere que são iguais), rode `npm run dist`, ponha `singalong_karaoke.exe` e `latest.yml` numa pasta **privada** e defina no servidor `APP_LATEST_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` (o endereço dessa pasta). Todo app instalado passa a mostrar "Atualizar agora". `node scripts/test-update.mjs <instalado.exe> <pasta-da-versao-nova> <pasta-de-dados>` testa tudo isso num computador.
+Para publicar uma atualização: suba a versão em `apps/desktop/package.json`, `apps/desktop/src/controller.js` e `apps/worker/singalong_worker/version.py` (um teste confere que são iguais), rode `npm run dist`, ponha `singalong_karaoke.exe` e `latest.yml` numa pasta **privada** e defina no servidor `APP_LATEST_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` (o endereço dessa pasta). Todo app instalado passa a mostrar "Atualizar agora". Dá para usar uma **Release do GitHub** como essa pasta: anexe `singalong_karaoke.exe` e `latest.yml` à release e defina `APP_DOWNLOAD_URL=https://github.com/<dono>/<repositório>/releases/latest/download/` (atenção: as Releases de um repositório público são públicas, então qualquer pessoa pode baixar o instalador). `node scripts/test-update.mjs <instalado.exe> <pasta-da-versao-nova> <pasta-de-dados>` testa tudo isso num computador.
 
 ### CLI do worker (sem API, para testes)
 
