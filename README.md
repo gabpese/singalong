@@ -118,10 +118,13 @@ python -m singalong_worker --create-room    # prints the TV and host links of a 
 
 ```powershell
 $env:ADMIN_TOKEN = "any-long-secret"
-docker compose up -d --build api redis          # only the API and Redis: no classic worker, so rooms without a session wait
-curl.exe -X POST http://localhost:3000/agent/v1/pair/start -H "X-Admin-Token: $env:ADMIN_TOKEN"   # {"code":"ABCD2345",...}
-docker compose --profile cpu run --rm worker --pair ABCD2345 --agent-url http://api:3000          # prints AGENT_TOKEN=sga_...
-$env:AGENT_TOKEN = "sga_..."      # set it again in EVERY terminal you use below ($env: only lives in one terminal); check with: echo $env:AGENT_TOKEN
+docker compose up -d --build --wait api redis  # only the API and Redis (no classic worker); --wait returns when the API is ready
+# generate the one-time code, trade it for a device token and keep it in $env:AGENT_TOKEN
+$resp = curl.exe -s -X POST http://localhost:3000/agent/v1/pair/start -H "X-Admin-Token: $env:ADMIN_TOKEN"; $resp   # {"code":"ABCD2345",...}
+$code = ($resp | ConvertFrom-Json).code
+$out = docker compose --profile cpu run --rm -T worker --pair $code --agent-url http://api:3000
+$env:AGENT_TOKEN = ($out | Select-String '^AGENT_TOKEN=').Line.Split('=', 2)[1].Trim()
+echo $env:AGENT_TOKEN   # sga_... (47 characters). $env: only lives in ONE terminal: set it again in each terminal you use below
 # terminal 1: the agent (leave it open; use --profile gpu and worker-gpu for speed)
 docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" worker --consume
 # terminal 2: a room in the agent's session (prints the TV and host links)
