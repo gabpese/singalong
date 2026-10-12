@@ -114,6 +114,22 @@ python -m singalong_worker --consume        # the agent: starts the session and 
 python -m singalong_worker --create-room    # prints the TV and host links of a new room in the session
 ```
 
+**Trying the agent by hand with Docker** (PowerShell, from the project root; the interface does not show the owner's nickname or the "owner disconnected" notice yet, only the API does):
+
+```powershell
+$env:ADMIN_TOKEN = "any-long-secret"
+docker compose up -d --build api redis          # only the API and Redis: no classic worker, so rooms without a session wait
+curl.exe -X POST http://localhost:3000/agent/v1/pair/start -H "X-Admin-Token: $env:ADMIN_TOKEN"   # {"code":"ABCD2345",...}
+docker compose --profile cpu run --rm worker --pair ABCD2345 --agent-url http://api:3000          # prints AGENT_TOKEN=sga_...
+$env:AGENT_TOKEN = "sga_..."
+# terminal 1: the agent (leave it open; use --profile gpu and worker-gpu for speed)
+docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN -e AGENT_SESSION_NAME="Gabriel" worker --consume
+# terminal 2: a room in the agent's session (prints the TV and host links)
+docker compose --profile cpu run --rm -e AGENT_URL=http://api:3000 -e AGENT_TOKEN=$env:AGENT_TOKEN worker --create-room --agent-url http://api:3000 --public-url http://localhost:3000
+```
+
+Then open the TV link, join the room as a guest in another window, search and add a song: the search and the processing happen on the agent. Stop the agent with Ctrl+C and the next search says the owner is disconnected. `curl.exe -H "x-client-id: guest-0001" http://localhost:3000/api/rooms/CODE` shows `owner: {nickname, online}`. When the agent starts it also analyzes the backing vocals of songs already in `storage/` (slow on CPU), as the classic worker does.
+
 ### Worker CLI (no API, for testing)
 
 ```powershell

@@ -278,6 +278,19 @@ class HttpBackendTests(unittest.TestCase):
         self.assertEqual(self.b.session_id, "nova")
         self.assertEqual(self.sent("/sessions")[1]["body"], {"display_name": "Gabriel"})
 
+    def test_connect_com_keep_name_nao_renomeia_a_sessao_retomada(self):
+        # outro comando (--create-room) retoma a sessão do agente em execução sem trocar o apelido que o dono escolheu
+        self.server.reply({"device": {"id": "d"}, "session": {"id": "viva", "display_name": "Gabriel"}}, path="/me")
+        self.server.reply({"id": "viva", "display_name": "Gabriel"}, path="/sessions")
+        other = HttpBackend("https://sing.example.org", "sga_token", "Meu computador", opener=self.server)
+        other.connect(keep_name=True)
+        self.assertEqual(self.sent("/sessions")[0]["body"], {"display_name": "Gabriel", "resume_id": "viva"})
+        # sem sessão ativa, usa o nome pedido (mesmo com keep_name)
+        self.server.reply({"device": {"id": "d"}, "session": None}, path="/me")
+        self.server.reply({"id": "nova", "display_name": "Meu computador"}, path="/sessions")
+        other.connect(keep_name=True)
+        self.assertEqual(self.sent("/sessions")[1]["body"], {"display_name": "Meu computador"})
+
     def test_sem_sessao_ativa_o_claim_inicia_outra_e_tenta_depois(self):
         self.server.reply({"error": "no_active_session"}, status=409, path="/jobs/claim")
         self.server.reply({"device": {"id": "d"}, "session": None}, path="/me")

@@ -37,7 +37,7 @@ def _create_room(args) -> int:
         return 2
     backend = HttpBackend(args.agent_url, token, args.agent_name)
     try:
-        backend.connect()  # retoma a sessão do agente em execução (ou inicia uma)
+        backend.connect(keep_name=True)  # retoma a sessão do agente em execução, sem trocar o apelido dela (ou inicia uma)
         room = backend.create_room()
     except (AuthError, Rejected) as exc:
         print(f"erro: {exc}")
@@ -45,7 +45,8 @@ def _create_room(args) -> int:
     except BackendUnavailable as exc:
         print(f"erro: não consegui falar com o servidor ({exc})")
         return 4
-    base = args.agent_url.rstrip("/")
+    # os links são para o NAVEGADOR: em Docker o servidor se chama http://api:3000 por dentro e http://localhost:3000 por fora
+    base = (args.public_url or args.agent_url).rstrip("/")
     print(json.dumps({"code": room["code"], "host_token": room["host_token"]}))
     print(f"TV:        {base}/tv.html?room={room['code']}")
     print(f"Anfitrião: {base}/room.html?room={room['code']}#host={room['host_token']}")
@@ -60,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--pair", metavar="CODIGO", help="agente local: troca o código de pareamento por um token (use com --agent-url); imprime o token")
     p.add_argument("--agent-url", default=os.environ.get("AGENT_URL") or None, help="endereço do servidor (ex.: https://singalong.exemplo.org)")
     p.add_argument("--agent-name", default=os.environ.get("AGENT_SESSION_NAME") or "Meu computador", help="nome deste computador no pareamento / apelido da sessão")
+    p.add_argument("--public-url", default=os.environ.get("PUBLIC_URL") or None, help="endereço que o navegador usa para abrir a sala (padrão: o mesmo de --agent-url); com Docker, http://localhost:3000")
     p.add_argument("--create-room", action="store_true", help="agente local: cria uma sala na sua sessão (AGENT_URL + AGENT_TOKEN) e imprime o link de anfitrião")
     p.add_argument("--lyrics", choices=["auto", "video", "lrclib", "file", "text", "align", "none"], default="auto")
     p.add_argument("--loose", action="store_true", help="aceita letra online de versão com duração diferente da do vídeo")

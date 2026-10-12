@@ -264,11 +264,14 @@ class HttpBackend:
                 time.sleep(self.retry_wait * attempt)
 
     # --- sessão ---
-    def connect(self) -> None:
-        """Entra no servidor: valida o token e inicia a sessão (ou retoma a que já estava ativa, se o agente reiniciou)."""
+    def connect(self, keep_name: bool = False) -> None:
+        """Entra no servidor: valida o token e inicia a sessão (ou retoma a que já estava ativa, se o agente reiniciou).
+        `keep_name`: ao retomar, mantém o apelido que a sessão já tem (outro comando, como --create-room, não deve renomeá-la)."""
         me = self._call("GET", "/me") or {}
-        resume = (me.get("session") or {}).get("id")
-        session = self._call("POST", "/sessions", {"display_name": self.session_name, **({"resume_id": resume} if resume else {})}) or {}
+        current = me.get("session") or {}
+        resume = current.get("id")
+        name = current.get("display_name") if keep_name and resume else self.session_name
+        session = self._call("POST", "/sessions", {"display_name": name or self.session_name, **({"resume_id": resume} if resume else {})}) or {}
         self._shared.session_id = session.get("id")
         log.info("sessão do agente ativa", extra={"session": self._shared.session_id, "resumed": bool(resume)})
 
