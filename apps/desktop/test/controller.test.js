@@ -431,7 +431,7 @@ test('o app mostra que as músicas deste computador vão para a nuvem quando o s
   sessionOpen = false;
 });
 
-test('o aviso de atualização é conferido de novo (no máximo uma vez por hora) e não só ao abrir', async () => {
+test('o aviso de atualização é conferido de novo (no máximo uma vez por dia) e não só ao abrir', async () => {
   let clock = 1_000_000;
   const dataDir = await mkdtemp(join(tmpdir(), 'singalong-desk-'));
   const controller = createController({
@@ -449,10 +449,10 @@ test('o aviso de atualização é conferido de novo (no máximo uma vez por hora
   assert.equal(controller.snapshot().update.status, 'ok');
 
   versionAnswer = { status: 'update_available', latest: '9.0.0', notes: 'Novidade', url: `${base}/baixar` }; // o servidor anuncia depois
-  clock += 10 * 60_000; // 10 minutos depois: ainda é cedo, não pergunta de novo
+  clock += 23 * 60 * 60_000; // 23 horas depois: ainda é cedo, não pergunta de novo
   await controller.refreshUpdate();
   assert.equal(controller.snapshot().update.status, 'ok');
-  clock += 51 * 60_000; // passou de 1 hora: pergunta e o aviso aparece
+  clock += 2 * 60 * 60_000; // passou de 24 horas: pergunta e o aviso aparece
   await controller.refreshUpdate();
   assert.equal(controller.snapshot().update.status, 'update_available');
   versionAnswer = { status: 'ok' };
