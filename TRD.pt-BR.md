@@ -196,7 +196,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 | Marco | Entrega | Critério de pronto |
 |---|---|---|
 | **M0 ✅** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
-| **M1 (M1a ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
+| **M1 (M1a ✅, M1b ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
 | **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
@@ -236,6 +236,28 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - **Limites:** a prévia do instrumental no celular não existe para músicas locais; o MP4 de uma música local só baixa no computador do dono (o celular não alcança o servidor local); Firefox e Safari não foram testados.
 
 **Fica para o M1b e o M1c:** baixar sem cookie primeiro e o login do YouTube pelo navegador; o comando `importar` (arquivo e fontes abertas).
+
+### 12.3 M1b: baixar sem cookie primeiro e o login do YouTube (Out/2026)
+
+**Medido nesta máquina (Windows, Chrome 155 e Edge 155 instalados)**
+- **`--cookies-from-browser` não serve como caminho principal:** com o Chrome aberto o banco de cookies fica bloqueado ("Could not copy Chrome cookie database") e com o Edge a leitura falha ("Failed to decrypt with DPAPI"), por causa da criptografia de cookies dos navegadores Chromium. O Firefox funcionaria, mas não estava instalado.
+- **O protocolo de depuração entrega os cookies descriptografados:** abrindo o Chrome e o Edge com um perfil dedicado e uma porta de depuração, `Storage.getCookies` devolve os cookies da conta sem passar pela criptografia. É a base do login.
+- **O pedido de validação:** a playlist "Assistir mais tarde" (`WL`) só existe para uma conta logada. Sem cookie o YouTube responde "The playlist does not exist"; com um cookie válido, devolve a playlist.
+- **Sem cookie primeiro funciona pelo IP de casa:** 3 de 3 downloads reais na imagem do worker, com o `cookies.txt` disponível, não usaram a conta nenhuma vez.
+
+**Feito**
+- **Política de cookies** (`cookies.py`): `YTDLP_COOKIES_POLICY` = `when-asked` (padrão), `always` ou `never`. O download e a busca tentam sem cookie e, se o YouTube pedir login (confirmação de "não sou um robô", restrição de idade ou 403), repetem com a conta. Falhas que a conta não resolve (vídeo privado, removido, rede) sobem sem gastá-la. Um erro novo, `forbidden` (403), é repetido sozinho.
+- **Fontes de cookies**, em ordem: `YTDLP_COOKIES` (arquivo), `YTDLP_COOKIES_BROWSER` (yt-dlp; serve ao Firefox) e o login do próprio agente.
+- **Login pelo navegador** (`youtube_login.py`, `--youtube-login [chrome|edge]`): abre o Chrome ou o Edge instalado com um **perfil dedicado**, espera o login, lê os cookies pelo protocolo de depuração (cliente `websockets`), guarda só os do YouTube e do Google e fecha o navegador. `--youtube-status` valida com o pedido acima.
+- **Testes:** 42 novos no worker (política, fontes, formato do `cookies.txt`, fluxo do login com navegador falso e com um servidor WebSocket de verdade). Verificado com o **Chrome e o Edge reais**: login detectado, só os cookies do YouTube/Google guardados, navegador fechado, perfil dedicado criado, validação com sessão inválida.
+
+**Decisões e aprendizados**
+- **O login não é pedido a cada download:** a conta fica **pronta** (login feito uma vez) e só entra quando o YouTube pede. É a decisão de reduzir o risco à conta.
+- **O perfil é dedicado ao agente:** o perfil pessoal do usuário não é tocado, e fechar o navegador depois de exportar evita que o YouTube gire os cookies exportados.
+- **Dois defeitos achados pelos testes:** o filtro de domínios aceitava nomes que só *terminam* igual (`notyoutube.com`, `evilgoogle.com`), o que guardaria o cookie de outro site; e a escolha do navegador não caía para o outro quando o preferido não existe. Os dois foram corrigidos.
+- **Limite conhecido:** não foi possível testar o login com uma conta Google de verdade nesta sessão (não uso a conta do usuário). O Google pode recusar o login numa janela com porta de depuração; se isso acontecer, a alternativa é o Firefox (`YTDLP_COOKIES_BROWSER=firefox`) ou um `cookies.txt` exportado de uma janela anônima.
+
+**Fica para o M1c:** o comando `importar` (arquivo e fontes abertas).
 
 ## 13. Decisões tomadas e perguntas em aberto
 

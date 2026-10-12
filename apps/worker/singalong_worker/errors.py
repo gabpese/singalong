@@ -33,8 +33,8 @@ class _Rule:
 # A ordem importa: a primeira regra que casa vence. Os textos vêm do yt-dlp, do ffmpeg e do Demucs.
 _RULES = (
     _Rule("cookies", MANUAL,
-          "O YouTube pediu para confirmar que não sou um robô: os cookies do YouTube venceram. "
-          "Renove o arquivo secrets/youtube_cookies.txt e tente de novo.",
+          "O YouTube pediu para confirmar que não sou um robô e a conta do agente não resolveu. "
+          "Entre de novo com o YouTube (comando --youtube-login) ou renove o arquivo youtube_cookies.txt e tente de novo.",
           ("not a bot", "use --cookies-from-browser", "cookies are no longer valid", "login required")),
     _Rule("private", NEVER, "Este vídeo é privado. Escolha outro vídeo.",
           ("private video", "this video is private")),
@@ -54,6 +54,9 @@ _RULES = (
     _Rule("rate_limited", AUTO,
           "O YouTube limitou os pedidos por excesso de requisições. Vou tentar de novo; se continuar, espere alguns minutos.",
           ("http error 429", "too many requests")),
+    _Rule("forbidden", AUTO,
+          "O YouTube recusou o download (erro 403). Vou tentar de novo; se continuar, entre com o YouTube no agente (comando --youtube-login).",
+          ("http error 403", "403: forbidden")),
     _Rule("network", AUTO, "Falha de conexão com o YouTube. Vou tentar de novo.",
           ("temporary failure in name resolution", "connection reset", "connection refused", "connection aborted",
            "network is unreachable", "timed out", "remote end closed", "unable to download webpage", "http error 5",

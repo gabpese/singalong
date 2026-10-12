@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import lyrics as lyr
 from .align import align_lyrics, attach_words
+from .cookies import CookiePolicy, as_policy, run_with_policy
 from .errors import JobError, format_duration, NEVER, MANUAL
 from .ids import extract_video_id
 from .key import detect_key
@@ -120,9 +121,17 @@ def check_disk(path, min_free_gb: float) -> None:
 
 
 def download(
-    url: str, workdir: Path, langs: list[str], cookies: Path | None = None, max_duration: float | None = None
+    url: str, workdir: Path, langs: list[str], cookies: "CookiePolicy | Path | None" = None, max_duration: float | None = None
 ) -> dict:
-    """Baixa o áudio e as legendas MANUAIS (auto-legendas ficam de fora de propósito)."""
+    """Baixa o áudio e as legendas MANUAIS (auto-legendas ficam de fora de propósito).
+
+    `cookies`: a política de cookies (cookies.py): sem cookie primeiro e, se o YouTube pedir login, com a conta. Um caminho de
+    cookies.txt vale como "sempre"; None, como "nunca".
+    """
+    return run_with_policy(as_policy(cookies), lambda opts: _download(url, workdir, langs, opts, max_duration), workdir)
+
+
+def _download(url: str, workdir: Path, langs: list[str], cookie_opts: dict, max_duration: float | None) -> dict:
     import yt_dlp  # import tardio: só quem baixa precisa dele (testes e consumo do cache não)
 
     base = {
@@ -131,12 +140,8 @@ def download(
         "quiet": True,
         "noprogress": True,
         "no_warnings": True,
+        **cookie_opts,
     }
-    if cookies:
-        # yt-dlp regrava o arquivo ao fechar; usa uma cópia para o original poder ser somente leitura
-        cookie_copy = workdir / "cookies.txt"
-        shutil.copyfile(cookies, cookie_copy)
-        base["cookiefile"] = str(cookie_copy)
 
     # 1) o áudio é essencial: se falhar, o job falha
     audio_opts = {**base, "format": "bestaudio/best", "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}]}

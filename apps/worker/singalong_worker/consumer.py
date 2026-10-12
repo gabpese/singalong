@@ -15,6 +15,7 @@ import time
 from urllib.parse import urlsplit
 
 from .backend import AuthError, BackendUnavailable, HttpBackend, make_backend
+from .cookies import as_policy
 from .backing import serve as backing_serve
 from .export import serve as export_serve
 from .key import backfill as key_backfill
@@ -84,6 +85,10 @@ def run() -> int:
         # AGENT_URL sem AGENT_TOKEN: quase sempre a variável do token está vazia neste terminal (no PowerShell, $env: vale só por terminal)
         log.error("configuração do agente incompleta: %s. Confira se AGENT_TOKEN tem valor neste terminal.", exc)
         return 2
+    policy = as_policy(settings.cookies)
+    log.info("cookies do YouTube", extra={"policy": policy.mode, "source": policy.source.describe() if policy.source else None})
+    if policy.mode != "never" and policy.source is None:
+        log.warning("sem login do YouTube: o agente baixa só sem cookie. Se o YouTube pedir login, rode: python -m singalong_worker --youtube-login")
     media = _start_media_server(settings, settings.storage_root, backend)
     backend.attach_storage(storage)
     stopping = False

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .backend import Job
+from .cookies import CookiePolicy, load_policy
 from .errors import AUTO, MANUAL, JobError, classify
 from .pipeline import Limits, NeedsLyrics, process
 from .storage import LocalStorage
@@ -21,7 +22,7 @@ log = logging.getLogger("worker.job")
 class Settings:
     redis_url: str
     storage_root: str
-    cookies: Path | None
+    cookies: "CookiePolicy | Path | None"  # a política de cookies do YouTube (cookies.py); um caminho vale como "sempre"
     device: str | None
     langs: list[str]
     stale_seconds: int
@@ -46,7 +47,7 @@ class Settings:
         return cls(
             redis_url=env.get("REDIS_URL", "redis://localhost:6379/0"),
             storage_root=env.get("STORAGE_ROOT", "./storage"),
-            cookies=Path(env["YTDLP_COOKIES"]) if env.get("YTDLP_COOKIES") else None,
+            cookies=load_policy(env),
             device=env.get("DEMUCS_DEVICE") or None,
             langs=env.get("LANGS", "pt,en").split(","),
             stale_seconds=int(env.get("WORKER_STALE_SECONDS", "1800")),
