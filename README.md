@@ -154,6 +154,8 @@ Then open the TV link, join the room as a guest in another window, search and ad
 The sources are tried in that order: `YTDLP_COOKIES`, `YTDLP_COOKIES_BROWSER`, then the agent's own login:
 
 ```powershell
+cd apps\worker                                      # the module lives here
+pip install websockets "yt-dlp[default]"            # the only packages the login and the check need
 python -m singalong_worker --youtube-login          # opens Chrome or Edge with a profile only for the agent; sign in to the YouTube account
 python -m singalong_worker --youtube-login edge     # choose the browser
 python -m singalong_worker --youtube-status         # "Connected" / "No valid login" (one request that only works when logged in)

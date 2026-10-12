@@ -159,6 +159,8 @@ Depois abra o link da TV, entre na sala como convidado em outra janela, busque e
 As fontes são tentadas nessa ordem: `YTDLP_COOKIES`, `YTDLP_COOKIES_BROWSER` e, por fim, o login do próprio agente:
 
 ```powershell
+cd apps\worker                                      # o módulo fica aqui
+pip install websockets "yt-dlp[default]"            # só o que o login e a verificação precisam
 python -m singalong_worker --youtube-login          # abre o Chrome ou o Edge com um perfil só do agente; entre na conta do YouTube
 python -m singalong_worker --youtube-login edge     # escolhe o navegador
 python -m singalong_worker --youtube-status         # "Conectado" / "Sem login válido" (um pedido que só funciona logado)
