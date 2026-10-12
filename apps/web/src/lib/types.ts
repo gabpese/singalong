@@ -30,6 +30,14 @@ export interface QueueItem {
   title: string | null;
   artist: string | null;
   added_by: string;
+  /** Quem canta: o nome de quem adicionou, ou "Ana & Bia" num dueto já aceito. */
+  singers: string;
+  /** Dueto: o convidado e se já aceitou (o client_id dele nunca chega ao navegador). */
+  guest: { name: string; status: 'pending' | 'accepted' } | null;
+  /** Eu vou cantar junto nesta música (aceitei o convite). */
+  guest_me: boolean;
+  /** Me convidaram para esta música e ainda não respondi. */
+  invite_for_me: boolean;
   pitch: number;
   /** Nível das vozes de apoio (0..100 %); só vale se a música tem o arquivo de apoio. */
   backing: number;
@@ -68,7 +76,9 @@ export interface RoomState {
   /** As músicas da sala estão no computador do dono: sem prévia do instrumental no celular. */
   local_media: boolean;
   queue: QueueItem[];
-  me: { is_host: boolean };
+  me: { is_host: boolean; pid: string | null };
+  /** Quem está na sala agora (para convidar para um dueto): nome e uma identificação que não revela o client_id. */
+  people: { pid: string; name: string }[];
 }
 
 /** Uma linha da letra sincronizada (lyrics.json). `words` = [início, fim] de cada palavra, quando houve alinhamento. */

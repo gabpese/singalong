@@ -5,7 +5,7 @@
 // removem/ajustam as próprias. Comandos chegam por REST; o WebSocket só empurra o estado e recebe os eventos da TV.
 //
 // Estado único por processo (hub em memória). Com várias réplicas da API, o hub passaria a usar Redis pub/sub.
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { clampBacking, clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
 import { extractVideoId } from './youtube.js';
 
@@ -22,6 +22,12 @@ export class HttpError extends Error {
     this.code = code;
   }
 }
+
+/** Identificação de uma pessoa NA SALA para os convites: um resumo do client_id (que nunca sai do servidor) que não dá para desfazer. */
+export const pidOf = (clientId) => createHash('sha256').update(`pessoa:${clientId}`).digest('hex').slice(0, 10);
+
+/** O nome que a pessoa digitou (ou "Alguém"), no tamanho que a fila aceita. */
+export const cleanName = (name) => String(name ?? '').trim().slice(0, 30) || 'Alguém';
 
 export const normalizeCode = (code) => String(code ?? '').trim().toUpperCase();
 
@@ -43,6 +49,14 @@ export function createHub() {
       };
     },
     count: (code, role) => [...(rooms.get(code) ?? [])].filter((c) => c.role === role).length,
+    /** Os celulares conectados agora, uma entrada por pessoa (o mesmo client_id em duas abas conta uma vez). */
+    people(code) {
+      const byClient = new Map();
+      for (const conn of rooms.get(code) ?? []) {
+        if (conn.role === 'controller' && conn.clientId) byClient.set(conn.clientId, { clientId: conn.clientId, name: cleanName(conn.name) });
+      }
+      return [...byClient.values()];
+    },
     codes: () => [...rooms.keys()],
     /** `build(conn)` devolve o objeto a enviar para aquela conexão (ou null para pular). */
     broadcast(code, build) {
@@ -85,11 +99,13 @@ export function sanitizeCues(cues) {
 export function personalize(base, { clientId, isHost }) {
   return {
     ...base,
-    me: { is_host: Boolean(isHost) },
-    queue: base.queue.map(({ client_id: owner, ...item }) => ({
+    me: { is_host: Boolean(isHost), pid: clientId ? pidOf(clientId) : null },
+    queue: base.queue.map(({ client_id: owner, guest_client_id: guestOwner, ...item }) => ({
       ...item,
       mine: owner === clientId,
       can_edit: Boolean(isHost) || owner === clientId,
+      guest_me: Boolean(clientId) && guestOwner === clientId && item.guest?.status === 'accepted', // vou cantar junto nesta música
+      invite_for_me: Boolean(clientId) && guestOwner === clientId && item.guest?.status === 'pending', // me convidaram: aceitar ou recusar
     })),
   };
 }
@@ -216,7 +232,9 @@ export function createRoomService({
       scoring: Boolean(room.scoring),
       voice: Boolean(room.voice),
       voice_volume: room.voice_volume ?? 40,
-      scoreboard: db.listScored(room.code).map((r) => ({ id: r.id, name: r.added_by, title: r.title, score: r.score })),
+      scoreboard: db.listScored(room.code).map((r) => ({ id: r.id, name: r.guest_status === 'accepted' ? `${r.added_by} & ${r.guest_name}` : r.added_by, title: r.title, score: r.score })),
+      // quem está na sala agora (para convidar para um dueto): só o nome e uma identificação que não revela o client_id
+      people: hub.people(room.code).map((p) => ({ pid: pidOf(p.clientId), name: p.name })),
       play_order: playOrder(waiting, { fair: Boolean(room.fair), lastClientId: room.last_client_id }).map((i) => i.id),
       playback: room.playback,
       current_item_id: room.current_item_id,
@@ -235,6 +253,10 @@ export function createRoomService({
           title: song?.meta?.title ?? item.title,
           artist: song?.meta?.artist ?? item.artist,
           added_by: item.added_by,
+          // dueto: quem canta junto e se já aceitou; `singers` é o que aparece na TV e no placar ("Ana & Bia")
+          guest: item.guest_status ? { name: item.guest_name, status: item.guest_status } : null,
+          guest_client_id: item.guest_status ? item.guest_client_id : null,
+          singers: item.guest_status === 'accepted' ? `${item.added_by} & ${item.guest_name}` : item.added_by,
           client_id: item.client_id,
           pitch: item.pitch,
           backing: item.backing,
@@ -335,6 +357,43 @@ export function createRoomService({
           now: now(),
         });
         return { item_id: itemId, cached: song.cached, deduped: song.deduped };
+      });
+    },
+
+    /**
+     * Dueto: o dono da música (ou o anfitrião) convida alguém que está NA SALA agora (`pid`, da lista `people`) para cantar junto.
+     * A pessoa precisa aceitar. Só um convidado por música; convidar de novo troca o convidado.
+     */
+    invite(code, itemId, pid, actor) {
+      return mutate(code, actor, (room) => {
+        const item = requireItem(room, itemId);
+        requireEditable(room, item, actor);
+        if (item.status !== 'queued') throw new HttpError(409, 'not_queued', 'O convite só vale para músicas que ainda aguardam.');
+        const guest = hub.people(room.code).find((p) => pidOf(p.clientId) === pid);
+        if (!guest) throw new HttpError(404, 'person_not_found', 'Essa pessoa não está mais na sala.');
+        if (guest.clientId === item.client_id) throw new HttpError(400, 'invite_self', 'Você não pode convidar a si mesmo.');
+        db.updateItem(item.id, { guest_client_id: guest.clientId, guest_name: guest.name, guest_status: 'pending' });
+      });
+    },
+
+    /** O dono (ou o anfitrião) desfaz o convite ou tira o convidado. */
+    cancelInvite(code, itemId, actor) {
+      return mutate(code, actor, (room) => {
+        const item = requireItem(room, itemId);
+        requireEditable(room, item, actor);
+        db.updateItem(item.id, { guest_client_id: null, guest_name: null, guest_status: null });
+      });
+    },
+
+    /** O convidado aceita (vai cantar junto) ou recusa (o convite some). */
+    respondInvite(code, itemId, accept, actor) {
+      return mutate(code, actor, (room) => {
+        const item = requireItem(room, itemId);
+        if (!actor.clientId || item.guest_client_id !== actor.clientId || item.guest_status !== 'pending') {
+          throw new HttpError(404, 'invite_not_found', 'Este convite não existe mais.');
+        }
+        if (accept) db.updateItem(item.id, { guest_status: 'accepted' });
+        else db.updateItem(item.id, { guest_client_id: null, guest_name: null, guest_status: null });
       });
     },
 
@@ -466,12 +525,13 @@ export function createRoomService({
     },
 
     /** Registra uma conexão WebSocket; devolve `leave` para chamar ao fechar. Lança 404 se a sala não existe. */
-    connect(code, { socket, role, clientId, hostToken }) {
+    connect(code, { socket, role, clientId, hostToken, name }) {
       const room = requireRoom(code);
       const conn = {
         socket,
         role: role === 'tv' ? 'tv' : 'controller',
         clientId: clientId ?? '',
+        name: name ? cleanName(name) : '',
         isHost: hostCheck(room, hostToken),
         alive: true,
       };
@@ -493,13 +553,22 @@ export function createRoomService({
 
     /** Mensagem recebida por WebSocket (só a TV envia comandos). */
     onMessage(code, conn, raw) {
-      if (conn.role !== 'tv') return;
       let message;
       try {
         message = JSON.parse(String(raw));
       } catch {
         return;
       }
+      // o celular diz o nome da pessoa (para a lista de quem está na sala, usada nos convites de dueto)
+      if (conn.role === 'controller' && message?.type === 'hello' && typeof message.name === 'string') {
+        const name = cleanName(message.name);
+        if (name !== conn.name) {
+          conn.name = name;
+          publish(code).catch(() => {});
+        }
+        return;
+      }
+      if (conn.role !== 'tv') return;
       if (!Number.isInteger(message?.item_id)) return;
       if (message.type === 'score') this.tvScore(code, message.item_id, message.score);
       else if (message.type === 'ended') this.tvEnded(code, message.item_id).catch(() => {});

@@ -78,7 +78,8 @@ export async function api(method, path, body, code) {
 export function roomSocketUrl(code, role) {
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   const host = role === 'controller' ? hostToken(code) : '';
-  return `${scheme}://${location.host}/api/rooms/${code}/ws?role=${role}&client=${clientId()}${host ? `&host=${host}` : ''}`;
+  const name = role === 'controller' && userName() ? `&name=${encodeURIComponent(userName())}` : '';
+  return `${scheme}://${location.host}/api/rooms/${code}/ws?role=${role}&client=${clientId()}${host ? `&host=${host}` : ''}${name}`;
 }
 
 /**

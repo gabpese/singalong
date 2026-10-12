@@ -39,3 +39,8 @@ test('sem armazenamento (navegador bloqueado) nada quebra', () => {
   assert.doesNotThrow(() => dismissStage('ABCD', 7, broken));
   assert.equal(stageDismissed('ABCD', 7, broken), false);
 });
+
+test('no dueto o convidado que aceitou também vai ao palco, mas quem só foi convidado (ainda não aceitou) não', () => {
+  assert.equal(stageItemFor(state({ queue: [{ id: 7, mine: false, guest_me: true }] })), 7);
+  assert.equal(stageItemFor(state({ queue: [{ id: 7, mine: false, guest_me: false, invite_for_me: true }] })), null);
+});

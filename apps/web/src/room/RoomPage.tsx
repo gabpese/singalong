@@ -4,6 +4,7 @@ import { api, setUserName, userName } from '../lib/identity.js';
 import { stageDismissed, stageItemFor } from '../lib/stage.js';
 import type { LibrarySong, QueueItem, RoomState } from '../lib/types';
 import { AddSong, type AddSongHandle } from './AddSong';
+import { InviteBanner } from './Duet';
 import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast } from './context';
 import { Library } from './Library';
 import { NowPlaying } from './NowPlaying';
@@ -19,7 +20,7 @@ declare global {
 }
 
 export function RoomPage({ code }: { code: string }) {
-  const { state, setState, status, gone, position } = useRoomConnection(code);
+  const { state, setState, status, gone, position, send } = useRoomConnection(code);
   const { toast, show } = useToast();
   const act = useAct(code, setState, show);
   const [tab, setTab] = useState<Tab>('queue');
@@ -68,6 +69,10 @@ export function RoomPage({ code }: { code: string }) {
   useEffect(() => {
     document.title = `Singalong — Sala ${code}`;
   }, [code]);
+  // o nome da pessoa vai para a sala (a lista de quem está aqui, usada nos convites de dueto); de novo quando ela o muda
+  useEffect(() => {
+    if (status === 'connected') send({ type: 'hello', name });
+  }, [name, status, send]);
   // chegou a vez da minha música: o cantor vai da sala para o palco (e volta quando ela acaba)
   useEffect(() => {
     if (stageItemFor(state, (itemId: number) => stageDismissed(code, itemId)) !== null) location.replace(`/stage.html?room=${code}`);
@@ -125,6 +130,7 @@ export function RoomPage({ code }: { code: string }) {
         <section className="tab" hidden={tab !== 'queue'}>
           {state && (
             <>
+              <InviteBanner />
               <NowPlaying state={state} position={position} />
               <QueueList
                 state={state}

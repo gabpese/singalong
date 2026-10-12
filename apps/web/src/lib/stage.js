@@ -20,13 +20,13 @@ export function stageDismissed(code, itemId, storage = globalThis.sessionStorage
 }
 
 /**
- * O item que está tocando agora é meu? Então é a minha vez de ir para o palco: devolve o id dele, ou null.
+ * O item que está tocando agora é meu (ou eu vou cantar junto, no dueto)? Então é a minha vez de ir para o palco: devolve o id dele, ou null.
  * Só vale com a TV conectada (é ela que toca a música) e se eu não saí do palco nesta música.
  */
 export function stageItemFor(state, dismissed = (/** @type {number} */ _itemId) => false) {
   if (!state || state.playback === 'idle' || !state.tv_connected) return null;
   const current = state.queue.find((item) => item.id === state.current_item_id);
-  return current?.mine && !dismissed(current.id) ? current.id : null;
+  return (current?.mine || current?.guest_me) && !dismissed(current.id) ? current.id : null;
 }
 
 export const STAGE_END_SECONDS = 4; // depois que a música acaba, o palco mostra o fim por um instante e devolve o cantor à sala

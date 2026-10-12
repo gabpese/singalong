@@ -19,7 +19,7 @@ export function NextSinger({ state }: { state: RoomState }) {
   if (!next) return null;
   return (
     <p className="next-singer">
-      Próximo: <strong>{next.item.added_by}</strong>
+      Próximo: <strong>{next.item.singers}</strong>
       <span className="muted">{` — ${next.item.title ?? next.item.video_id}${next.preparing ? ' (preparando…)' : ''}`}</span>
     </p>
   );
@@ -122,7 +122,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
                 {current.artist && <span className="muted">{current.artist}</span>}
                 <span className="now-singer">
                   <Icon name="singing" />
-                  {` ${current.added_by} está cantando`}
+                  {` ${current.singers} ${current.guest?.status === 'accepted' ? 'estão cantando' : 'está cantando'}`}
                 </span>
                 {current.song.key && <span className="muted small">{keySummary(current.song.key, current.pitch)}</span>}
                 <span className="muted small">{`Letra: ${describeLyricsSource(current.song.lyrics_source)}`}</span>

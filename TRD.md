@@ -433,6 +433,26 @@ Noted for the future (decision of Oct 2026): besides production we will have **t
 - A **feedback detector** (to lower the volume by itself): not done; the notice, the low default volume and the echo cancellation are the protection for now.
 - Not tested with real speakers and microphones (only the browser's fake microphone): the real feeling (latency, whistle) needs the owner's test.
 
+### 12.15 M9: duet, and the 1.0.0 (Oct 2026)
+
+**Decision:** the invitation works with a **notice for the guest** ("Ana invited you to sing X as a duet" with **Accept** and **Decline**), so nobody is taken to the stage without wanting to.
+
+**Done**
+- **Who is in the room:** the phones tell the server the person's name (in the connection and in a `hello` message when it changes) and the state carries `people` (name and a `pid`, a one-way digest of the `client_id`, which still never leaves the server).
+- **The invitation** (`POST /rooms/:code/queue/:id/invite {pid}`, `DELETE .../invite`, `POST .../invite/respond {accept}`): the song's owner (or the host) invites someone who is in the room **now**; only songs still waiting; one guest per song (inviting again swaps the guest); only the guest answers; declining or cancelling clears it. The state carries `guest`, `singers` ("Ana & Bia"), and, personalised, `invite_for_me` and `guest_me`. On the phone: **"Convidar para cantar junto"** in the song's row (a list of who is in the room; with nobody else, a notice), the invitation as a banner with **Aceitar/Recusar** for the guest, and "Dueto com Bia ✓" for both.
+- **Both go to the stage:** the rule that takes a singer from the room to the stage (M7) also applies to the guest who accepted; the TV, the queue and the scoreboard show "Ana & Bia".
+- **The lyrics in two colors** (`lib/duet.js` and `lib/lyrics-view.js`): **green `#3A5A40`** for the one who added the song, **red `#541E1B`** for the guest, **yellow** (the usual color) when both sing, always with a **white outline** (the two colors are very dark) while the line is filled in; the lines still to come get a dot in the color of who sings them. Each singer sees on the stage which color is theirs ("Você canta nas partes verdes/vermelhas") and the TV shows a legend with the two names.
+- **The automatic split:** the lines that **repeat** (the chorus; ignoring case, accents and punctuation; very short ones such as "oh oh" do not count) are sung by both; the others alternate one line for each (a, b, a, b...), starting with the owner; empty lines are skipped. It is one function (`splitParts`), so a hand-made split can replace it later.
+- **The score is for the pair:** it is the same score of the song (one microphone), shown with both names.
+- **Tests:** 6 on the server (who is in the room and no `client_id` leak, name changes, invite/accept, decline/cancel and who can do what, swapping and playing songs, the pair's score), 8 for the split and the stage rules (Node) and 3 end to end (invite → accept → both on the stage with the right colors, outline and legend, back to the room; decline and cancel; nobody to invite). The 80 earlier browser tests still pass.
+
+**Note:** with the three steps done (stage, voice volume and duet) this is the content of **version 1.0.0**. What is left before releasing it: your tests with real devices (the stage on phones, the voice with speakers and microphones, a duet with two people), a new installer and the Release.
+
+**Left for later**
+- A split chosen by hand by the two singers (the automatic one stays as the suggestion).
+- More than two singers, and a microphone per singer.
+- The fair rotation does not consider the guest (only the owner's turn counts).
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**

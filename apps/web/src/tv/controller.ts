@@ -168,7 +168,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   function reportScore(itemId: number) {
     if (!scorer || scorerFor !== itemId || scorer.evaluated < MIN_SCORED_FRAMES) return;
     const score = scorer.score() as number;
-    const singer = latest?.queue.find((item) => item.id === itemId)?.added_by ?? '';
+    const singer = latest?.queue.find((item) => item.id === itemId)?.singers ?? '';
     // depuração: descomente para ver a nota final e a tabela com todos os blocos
     // console.log(`[pontuação] fim da música: ${score} pontos`);
     // console.table(scorer.report());

@@ -23,7 +23,7 @@ function QueueRow({ item, badge, isCurrent = false }: { item: QueueItem; badge: 
     <li className={isCurrent ? 'is-current' : ''}>
       <span className="mark">{badge}</span>
       <span className="text">
-        <strong>{item.added_by}</strong>
+        <strong>{item.singers}</strong>
         <small>
           {titleOf(item)}
           {item.song.ready ? '' : ` · ${songChip(item.song).label.toLowerCase()}`}
@@ -117,6 +117,17 @@ function useLocalMediaNotice(room: RoomState | null): string {
   return accessMessage(status, elapsed);
 }
 
+/** Dueto: quem canta em cada cor (verde, vermelho e amarelo quando os dois cantam). */
+function DuetLegend({ first, second }: { first: string; second: string }) {
+  return (
+    <p className="duet-legend" aria-label="Cores do dueto">
+      <span data-part="a">{first}</span>
+      <span data-part="b">{second}</span>
+      <span data-part="both">os dois</span>
+    </p>
+  );
+}
+
 export function TvPage({ code }: { code: string }) {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [notice, setNotice] = useState('');
@@ -181,7 +192,7 @@ export function TvPage({ code }: { code: string }) {
             <>
               <span className="label">Cantando agora</span>
               <strong className="who">
-                <Icon name="singing" /> {current.added_by}
+                <Icon name="singing" /> {current.singers}
               </strong>
               <span className="what">{trackName(current)}</span>
               <span className="key">{keySummary(current.song.key, current.pitch)}</span>
@@ -193,7 +204,7 @@ export function TvPage({ code }: { code: string }) {
             <>
               <span className="label">Próximo</span>
               <strong className="who">
-                <Icon name="singing" /> {next.item.added_by}
+                <Icon name="singing" /> {next.item.singers}
               </strong>
               <span className="what">{nextLabel}</span>
             </>
@@ -215,6 +226,7 @@ export function TvPage({ code }: { code: string }) {
           <p className="line current" ref={lyricsRefs.current} />
           <p className="line next" ref={lyricsRefs.next} />
           <p className="line next2" ref={lyricsRefs.next2} />
+          {current?.guest?.status === 'accepted' && <DuetLegend first={current.added_by} second={current.guest.name} />}
         </section>
         <ScoreHud hud={hud} />
         <QueueBox current={current} upcoming={upcoming} />
@@ -242,7 +254,7 @@ export function TvPage({ code }: { code: string }) {
         </p>
         <QrCode code={code} />
         <p className="idle-msg">
-          {next ? `Próximo: ${next.item.added_by} — ${nextLabel}` : 'Adicione músicas pelo celular para começar.'}
+          {next ? `Próximo: ${next.item.singers} — ${nextLabel}` : 'Adicione músicas pelo celular para começar.'}
         </p>
       </section>
 
