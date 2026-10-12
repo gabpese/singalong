@@ -255,7 +255,7 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 - **The login is not asked on every download:** the account is **ready** (login done once) and only enters when YouTube asks. It is the decision to reduce the risk to the account.
 - **The profile is dedicated to the agent:** the user's personal profile is not touched, and closing the browser after exporting keeps YouTube from rotating the exported cookies.
 - **Two defects found by the tests:** the domain filter accepted names that only *end* the same (`notyoutube.com`, `evilgoogle.com`), which would keep another site's cookie; and the browser choice did not fall back to the other one when the preferred one does not exist. Both were fixed.
-- **Known limit:** the login with a real Google account could not be tested in this session (I do not use the user's account). Google may refuse the login in a window with a debugging port; if that happens, the alternatives are Firefox (`YTDLP_COOKIES_BROWSER=firefox`) or a `cookies.txt` exported from an incognito window.
+- **Tested with a real Google account (by the owner, in Chrome 155, Oct 2026):** Google **accepted** the login in the window opened with the debugging port, the agent kept 48 cookies and the validation answered "Connected". If Google ever refuses that login, the alternative is Firefox (`YTDLP_COOKIES_BROWSER=firefox`) or a `cookies.txt` exported from an incognito window. Not tested: Edge with a real account and the lifetime of the exported cookies (weeks?), which only use will show.
 
 **Left for M1c:** the `import` command (file and open sources).
 

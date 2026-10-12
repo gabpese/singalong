@@ -255,7 +255,7 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - **O login não é pedido a cada download:** a conta fica **pronta** (login feito uma vez) e só entra quando o YouTube pede. É a decisão de reduzir o risco à conta.
 - **O perfil é dedicado ao agente:** o perfil pessoal do usuário não é tocado, e fechar o navegador depois de exportar evita que o YouTube gire os cookies exportados.
 - **Dois defeitos achados pelos testes:** o filtro de domínios aceitava nomes que só *terminam* igual (`notyoutube.com`, `evilgoogle.com`), o que guardaria o cookie de outro site; e a escolha do navegador não caía para o outro quando o preferido não existe. Os dois foram corrigidos.
-- **Limite conhecido:** não foi possível testar o login com uma conta Google de verdade nesta sessão (não uso a conta do usuário). O Google pode recusar o login numa janela com porta de depuração; se isso acontecer, a alternativa é o Firefox (`YTDLP_COOKIES_BROWSER=firefox`) ou um `cookies.txt` exportado de uma janela anônima.
+- **Testado com uma conta Google de verdade (pelo dono, no Chrome 155, em Out/2026):** o Google **aceitou** o login na janela aberta com a porta de depuração, o agente guardou 48 cookies e a validação respondeu "Conectado". Se um dia o Google recusar esse login, a alternativa é o Firefox (`YTDLP_COOKIES_BROWSER=firefox`) ou um `cookies.txt` exportado de uma janela anônima. Não testado: o Edge com conta real e a vida útil dos cookies exportados (semanas?), que só o uso mostra.
 
 **Fica para o M1c:** o comando `importar` (arquivo e fontes abertas).
 
