@@ -136,14 +136,13 @@ test('pareamento: guarda o token, o código errado é recusado com a mensagem do
 
 test('a configuração sobrevive a reiniciar o app', async () => {
   const { controller, dataDir } = await ready();
-  await controller.setSettings({ nickname: 'Gabriel', browser: 'edge' });
+  await controller.setSettings({ nickname: 'Gabriel' });
   const again = createController({ dataDir, assembleImpl: async () => ({ engine: 'cpu' }) });
   await mkdir(join(dataDir, 'engine'), { recursive: true });
   await writeFile(join(dataDir, 'engine', 'engine.json'), JSON.stringify({ complete: true, engine: 'cpu' }));
   const snap = await again.init();
   assert.equal(snap.paired, true);
   assert.equal(snap.nickname, 'Gabriel');
-  assert.equal(snap.browser, 'edge');
   assert.equal(snap.phase, 'home');
 });
 
