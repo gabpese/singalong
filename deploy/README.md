@@ -129,13 +129,22 @@ Quem já estava pareado **antes desta versão** precisa parear de novo pelo e-ma
 
 ## Página do administrador
 
-Em `https://SEU_ENDERECO/admin` (só com o `ADMIN_TOKEN` do `.env`; sem ele a página não existe). Ali você:
+Não existe um `/admin` fixo (é o primeiro caminho que um atacante testa). A página fica num **endereço secreto que só você conhece**, definido no `.env` da VM:
+
+```bash
+# gere um endereço aleatório e grave no .env (não cole o resultado em nenhum chat):
+echo "ADMIN_PATH=$(openssl rand -hex 16)" >> /opt/singalong/.env
+cd /opt/singalong && ./deploy.sh
+grep ADMIN_PATH .env        # o valor é o seu endereço: https://SEU_ENDERECO/<valor>/
+```
+
+Sem `ADMIN_PATH` (ou com menos de 16 caracteres) e sem `ADMIN_TOKEN`, a página não existe e qualquer tentativa de adivinhar o endereço dá 404. Ao abrir, a página pede o `ADMIN_TOKEN`, que fica só naquela aba do navegador. Ali você:
 
 - **autoriza e-mails**: quem recebe o código de pareamento e quem envia músicas para a nuvem (muda na hora, sem `deploy.sh`);
 - **vê e desconecta os computadores** pareados;
 - **remove músicas da nuvem** (elas ficam bloqueadas: nenhum computador as envia de novo até você liberar).
 
-O token é digitado ao abrir e fica só naquela aba do navegador. Não compartilhe o endereço com o token, e use sempre `https`.
+Guarde o endereço e o token só com você (gerenciador de senhas) e use sempre `https`. Para trocar o endereço, mude o `ADMIN_PATH` e rode `./deploy.sh`.
 
 ## Segurança
 

@@ -10,6 +10,7 @@ import { LocalStorage } from '../src/storage.js';
 
 const LOOSE = { max: 1e6, windowMs: 60_000 };
 const ADMIN = { 'x-admin-token': 'segredo-do-admin' };
+const PATH = 'gestao-secreta-9f3k2x7q1m4z8p5a'; // o endereço secreto da página (ADMIN_PATH)
 const SONG = 'abcdefghijk';
 const MP3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(300, 1)]);
 const meta = Buffer.from(JSON.stringify({ video_id: SONG, title: 'Tempo Perdido', artist: 'Legião Urbana' }));
@@ -18,7 +19,7 @@ async function build({ config = {}, rateLimits = {} } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'singalong-admin-'));
   const sent = [];
   const app = buildApp({
-    config: { publicDir: root, adminToken: 'segredo-do-admin', pairAllowedEmails: [], cloudUploadEmails: [], brevoApiKey: 'k', mailFrom: 'a@b.com', rateLimits: { pair: LOOSE, pairRequest: LOOSE, pairEmail: LOOSE, admin: LOOSE, adminFail: LOOSE, ...rateLimits }, ...config },
+    config: { publicDir: root, adminToken: 'segredo-do-admin', adminPath: PATH, pairAllowedEmails: [], cloudUploadEmails: [], brevoApiKey: 'k', mailFrom: 'a@b.com', rateLimits: { pair: LOOSE, pairRequest: LOOSE, pairEmail: LOOSE, admin: LOOSE, adminFail: LOOSE, ...rateLimits }, ...config },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),
     mailer: { enabled: true, send: async (message) => { sent.push(message); } },
@@ -27,7 +28,7 @@ async function build({ config = {}, rateLimits = {} } = {}) {
   return { app, sent };
 }
 
-const admin = (app, method, url, payload) => app.inject({ method, url: `/admin/api${url}`, headers: ADMIN, payload });
+const admin = (app, method, url, payload) => app.inject({ method, url: `/${PATH}/api${url}`, headers: ADMIN, payload });
 
 async function pairByEmail(app, sent, email) {
   sent.length = 0;
@@ -46,30 +47,50 @@ async function uploadSong(app, agent) {
   assert.equal((await put(app, agent, SONG, 'meta.json', meta)).statusCode, 204);
 }
 
-test('a página só existe com ADMIN_TOKEN, não traz o token e tem uma CSP restrita', async () => {
+test('a página só existe no endereço SECRETO, não traz o token e tem uma CSP restrita', async () => {
   const { app } = await build();
-  const page = await app.inject({ method: 'GET', url: '/admin' });
+  const redirect = await app.inject({ method: 'GET', url: `/${PATH}` });
+  assert.equal(redirect.statusCode, 302);
+  assert.equal(redirect.headers.location, `/${PATH}/`);
+  const page = await app.inject({ method: 'GET', url: `/${PATH}/` });
   assert.equal(page.statusCode, 200);
   assert.match(page.headers['content-type'], /text\/html/);
   assert.match(page.headers['content-security-policy'], /default-src 'none'/);
   assert.equal(page.headers['x-frame-options'], 'DENY');
   assert.equal(page.body.includes('segredo-do-admin'), false);
-  assert.equal((await app.inject({ method: 'GET', url: '/admin/admin.js' })).statusCode, 200);
-  assert.equal((await app.inject({ method: 'GET', url: '/admin/admin.css' })).statusCode, 200);
+  assert.equal(page.body.includes(PATH), false); // nem o endereço secreto aparece dentro da página
+  assert.equal((await app.inject({ method: 'GET', url: `/${PATH}/admin.js` })).statusCode, 200);
+  assert.equal((await app.inject({ method: 'GET', url: `/${PATH}/admin.css` })).statusCode, 200);
+  // os caminhos que um atacante tenta primeiro não existem
+  for (const guess of ['/admin', '/admin/', '/admin/api/state', '/administrator', '/painel', '/manage', '/dashboard', '/admin.js']) {
+    assert.equal((await app.inject({ method: 'GET', url: guess, headers: ADMIN })).statusCode, 404, guess);
+  }
   await app.close();
+});
 
-  const { app: off } = await build({ config: { adminToken: '' } });
-  assert.equal((await off.inject({ method: 'GET', url: '/admin' })).statusCode, 404);
-  assert.equal((await off.inject({ method: 'GET', url: '/admin/api/state', headers: { 'x-admin-token': '' } })).statusCode, 404);
-  await off.close();
+test('sem ADMIN_TOKEN, sem ADMIN_PATH ou com um ADMIN_PATH curto/inválido a administração não existe', async () => {
+  for (const config of [{ adminToken: '' }, { adminPath: '' }, { adminPath: 'admin' }, { adminPath: 'curto-demais' }, { adminPath: 'tem espaco e passa de dezesseis' }]) {
+    const { app } = await build({ config });
+    const path = config.adminPath || PATH;
+    assert.equal((await app.inject({ method: 'GET', url: `/${path}/` })).statusCode, 404, JSON.stringify(config));
+    assert.equal((await app.inject({ method: 'GET', url: `/${path}/api/state`, headers: ADMIN })).statusCode, 404, JSON.stringify(config));
+    await app.close();
+  }
+});
+
+test('o ADMIN_PATH do ambiente só vale com 16 a 64 letras, números, _ ou -', async () => {
+  const { loadConfig } = await import('../src/config.js');
+  assert.equal(loadConfig({ ADMIN_PATH: 'gestao-secreta-9f3k2x7q1m4z8p5a' }).adminPath, 'gestao-secreta-9f3k2x7q1m4z8p5a');
+  for (const bad of ['', 'admin', 'a'.repeat(15), 'a'.repeat(65), 'com/barra/barra/barra', '../../etc/passwd-passwd', 'com espaço no meio....']) assert.equal(loadConfig({ ADMIN_PATH: bad }).adminPath, '', bad);
+  assert.equal(loadConfig({}).adminPath, '');
 });
 
 test('a API recusa sem o token ou com token errado, e trava quem insiste', async () => {
   const { app } = await build({ rateLimits: { adminFail: { max: 3, windowMs: 600_000 } } });
-  assert.equal((await app.inject({ method: 'GET', url: '/admin/api/state' })).statusCode, 403);
-  assert.equal((await app.inject({ method: 'GET', url: '/admin/api/state', headers: { 'x-admin-token': 'errado' } })).statusCode, 403);
-  assert.equal((await app.inject({ method: 'PUT', url: '/admin/api/emails', payload: { email: 'a@b.com', can_pair: true, can_cloud: true } })).statusCode, 403);
-  assert.equal((await app.inject({ method: 'GET', url: '/admin/api/state', headers: { 'x-admin-token': 'errado' } })).statusCode, 429); // passou da cota de erros
+  assert.equal((await app.inject({ method: 'GET', url: `/${PATH}/api/state` })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'GET', url: `/${PATH}/api/state`, headers: { 'x-admin-token': 'errado' } })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'PUT', url: `/${PATH}/api/emails`, payload: { email: 'a@b.com', can_pair: true, can_cloud: true } })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'GET', url: `/${PATH}/api/state`, headers: { 'x-admin-token': 'errado' } })).statusCode, 429); // passou da cota de erros
   assert.equal((await admin(app, 'GET', '/state')).statusCode, 200); // quem tem o token certo não é afetado
   await app.close();
 });

@@ -371,7 +371,8 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 
 ### 12.10 Administrator page (Oct 2026)
 
-**Done** (`/admin`, only for whoever has the `ADMIN_TOKEN`)
+**Done** (secret address `ADMIN_PATH`, only for whoever has the `ADMIN_TOKEN`)
+- **Hidden address:** there is **no fixed `/admin`**: the page lives at an address only the owner knows (`ADMIN_PATH`, 16 to 64 random letters, numbers, `_` or `-`). Without `ADMIN_PATH` (or with a short or invalid one) or without `ADMIN_TOKEN`, no admin route exists at all and every guess (`/admin`, `/painel`, `/dashboard`...) is a plain `404`. The address is one layer; the real protection is still the token.
 - **Access:** the page is static and carries no secret; whoever opens it types the token, which stays only in that browser tab (`sessionStorage`). Every call sends it in the `X-Admin-Token` header (no cookies, so no CSRF), compared in constant time. Wrong tokens spend a small quota per IP (8 per 10 minutes, then `429`). The page has a strict CSP, `X-Frame-Options: DENY`, `noindex`, and without `ADMIN_TOKEN` it does not exist (`404`).
 - **E-mails:** add, change and remove who **receives the pairing code** and who **sends songs to the cloud** (`*` in "receives the code" frees any e-mail; it never frees sending). The effect is immediate, with no restart. The lists in the `.env` (`PAIR_ALLOWED_EMAILS`, `ENABLED_TO_SEND_TO_CLOUD`) still count and appear as fixed.
 - **Computers:** each paired computer with its e-mail, whether it sends songs and when it was last seen; **Disconnect** revokes it (its app must pair again).

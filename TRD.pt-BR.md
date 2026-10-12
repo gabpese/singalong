@@ -371,7 +371,8 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 
 ### 12.10 Página do administrador (Out/2026)
 
-**Feito** (`/admin`, só para quem tem o `ADMIN_TOKEN`)
+**Feito** (endereço secreto `ADMIN_PATH`, só para quem tem o `ADMIN_TOKEN`)
+- **Endereço escondido:** **não existe um `/admin` fixo**: a página fica num endereço que só o dono conhece (`ADMIN_PATH`, 16 a 64 letras, números, `_` ou `-` aleatórios). Sem `ADMIN_PATH` (ou com um curto ou inválido) ou sem `ADMIN_TOKEN`, nenhuma rota de administração existe e todo palpite (`/admin`, `/painel`, `/dashboard`...) é um `404` comum. O endereço é uma camada; a proteção de verdade continua sendo o token.
 - **Acesso:** a página é estática e não carrega segredo; quem a abre digita o token, que fica só naquela aba do navegador (`sessionStorage`). Toda chamada o manda no cabeçalho `X-Admin-Token` (sem cookies, então sem CSRF), comparado em tempo constante. Token errado gasta uma cota pequena por IP (8 a cada 10 minutos, depois `429`). A página tem CSP restrita, `X-Frame-Options: DENY`, `noindex` e, sem `ADMIN_TOKEN`, ela não existe (`404`).
 - **E-mails:** adicionar, alterar e remover quem **recebe o código de pareamento** e quem **envia músicas para a nuvem** (`*` em "recebe o código" libera qualquer e-mail; nunca libera o envio). O efeito é imediato, sem reiniciar. As listas do `.env` (`PAIR_ALLOWED_EMAILS`, `ENABLED_TO_SEND_TO_CLOUD`) continuam valendo e aparecem como fixas.
 - **Computadores:** cada computador pareado com o e-mail dele, se envia músicas e quando foi visto pela última vez; **Desconectar** o revoga (o app dele precisa parear de novo).

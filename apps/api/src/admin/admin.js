@@ -19,7 +19,7 @@ function remember(value) {
 }
 
 async function api(method, path, body) {
-  const response = await fetch(`/admin/api${path}`, {
+  const response = await fetch(`api${path}`, {
     method,
     headers: { 'x-admin-token': token, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),

@@ -214,7 +214,7 @@ export function openDb(path = ':memory:') {
         }
       }),
     getAgentSong: (deviceId, videoId) => one('SELECT * FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId),
-    // --- administração (página /admin) ---
+    // --- administração (página em ADMIN_PATH) ---
     listEmailRules: () => all('SELECT email, can_pair, can_cloud, created_at FROM email_rules ORDER BY email'),
     getEmailRule: (email) => one('SELECT email, can_pair, can_cloud FROM email_rules WHERE email = ?', email),
     upsertEmailRule: (email, canPair, canCloud, now) =>

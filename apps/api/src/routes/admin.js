@@ -1,5 +1,5 @@
 // Página e API do administrador (só o dono do servidor): e-mails autorizados, computadores pareados e músicas da nuvem.
-// Tudo exige o ADMIN_TOKEN no cabeçalho `X-Admin-Token`. A página (/admin) é estática e não traz o token: quem a abre digita o
+// O endereço é secreto (ADMIN_PATH) e tudo exige o ADMIN_TOKEN no cabeçalho `X-Admin-Token`. A página é estática e não traz o token: quem a abre digita o
 // segredo, que fica só na aba do navegador (sessionStorage). Sem cookies, então não há CSRF; as tentativas erradas são limitadas.
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -9,16 +9,20 @@ import { HttpError } from '../rooms.js';
 import { rateLimited } from '../rate-limit.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ASSETS = { '/admin': ['index.html', 'text/html; charset=utf-8'], '/admin/admin.js': ['admin.js', 'text/javascript; charset=utf-8'], '/admin/admin.css': ['admin.css', 'text/css; charset=utf-8'] };
+const ASSETS = { '/': ['index.html', 'text/html; charset=utf-8'], '/admin.js': ['admin.js', 'text/javascript; charset=utf-8'], '/admin.css': ['admin.css', 'text/css; charset=utf-8'] };
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 // a página só carrega o que é dela e não conversa com mais ninguém
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 export async function adminRoutes(app, { agents, db, storage, config, limiters, now = Date.now }) {
-  // --- a página ---
-  for (const [url, [file, type]] of Object.entries(ASSETS)) {
-    app.get(url, async (request, reply) => {
-      if (!config.adminToken) return reply.code(404).send({ error: 'not_found' }); // sem ADMIN_TOKEN a administração não existe
+  // Sem o token E sem o endereço secreto (ADMIN_PATH) a administração não existe: nenhuma rota é registrada (tudo é 404).
+  if (!config.adminToken || !/^[A-Za-z0-9_-]{16,64}$/.test(config.adminPath ?? '')) return; // (o config.js já filtra; aqui também, por garantia)
+  const base = `/${config.adminPath}`;
+
+  // --- a página (o endereço termina em "/", para os arquivos ao lado carregarem por caminho relativo) ---
+  app.get(base, async (request, reply) => reply.redirect(`${base}/`));
+  for (const [path, [file, type]] of Object.entries(ASSETS)) {
+    app.get(`${base}${path}`, async (request, reply) => {
       const body = await readFile(join(here, '..', 'admin', file));
       return reply.header('content-type', type).header('content-security-policy', CSP).header('x-frame-options', 'DENY').header('cache-control', 'no-store').header('x-robots-tag', 'noindex').send(body);
     });
@@ -28,7 +32,6 @@ export async function adminRoutes(app, { agents, db, storage, config, limiters, 
   app.register(async (api) => {
     api.addHook('preHandler', rateLimited(limiters.admin));
     api.addHook('preHandler', async (request) => {
-      if (!config.adminToken) throw new HttpError(404, 'not_found', 'Não encontrado.');
       if (!safeEqual(request.headers['x-admin-token'], config.adminToken)) {
         // errar o segredo gasta uma cota pequena por IP: depois dela, 429 (protege contra adivinhação do token)
         const attempt = limiters.adminFail.hit(`bad|${request.ip}`);
@@ -114,5 +117,5 @@ export async function adminRoutes(app, { agents, db, storage, config, limiters, 
       if (!db.unblockSong(request.params.id)) throw new HttpError(404, 'not_found', 'Esta música não estava bloqueada.');
       return { ok: true };
     });
-  }, { prefix: '/admin/api' });
+  }, { prefix: `${base}/api` });
 }
