@@ -17,6 +17,7 @@ from .align import align_lyrics, attach_words
 from .cookies import CookiePolicy, as_policy, run_with_policy
 from .errors import JobError, format_duration, NEVER, MANUAL
 from .ids import extract_video_id
+from .importer import ImportedSong
 from .key import detect_key
 from .melody import extract_melody
 from .storage import LocalStorage
@@ -114,8 +115,14 @@ def validate_video_info(info: dict, max_duration: float | None) -> None:
 
 
 def check_disk(path, min_free_gb: float) -> None:
-    """Não começa um processamento sem espaço: separar a voz gera centenas de MB de arquivos temporários."""
-    free = shutil.disk_usage(path).free / 1024**3
+    """Não começa um processamento sem espaço: separar a voz gera centenas de MB de arquivos temporários.
+
+    A pasta da biblioteca pode ainda não existir (primeira execução de uma instalação nova): mede a pasta existente mais próxima.
+    """
+    probe = Path(path)
+    while not probe.exists() and probe.parent != probe:
+        probe = probe.parent
+    free = shutil.disk_usage(probe).free / 1024**3
     if min_free_gb and free < min_free_gb:
         raise JobError("disk_full", f"Pouco espaço em disco ({free:.1f} GB livres; o mínimo é {min_free_gb:g} GB). Libere espaço e tente de novo.", MANUAL)
 
@@ -327,14 +334,17 @@ def process(
     on_stage: Callable[[str], None] | None = None,
     lyrics_loose: bool = False,
     limits: Limits | None = None,
+    imported: "ImportedSong | None" = None,
 ) -> dict:
     """Etapas informadas em on_stage: downloading, separating, lyrics, aligning.
 
     lyrics_source: auto | video | lrclib | file | text | align | none ('align' sincroniza `lyrics_text` com a voz, por IA).
+    imported: uma música que NÃO vem do YouTube (arquivo do usuário ou fonte aberta; importer.py): o áudio já está pronto, então
+    não há download e `url` é ignorada. O resto do caminho é o mesmo.
     """
     notify = on_stage or (lambda stage: None)
     limits = limits or Limits.from_env()
-    video_id = extract_video_id(url)
+    video_id = imported.video_id if imported else extract_video_id(url)
     if not video_id:
         raise ValueError(f"URL do YouTube inválida: {url!r}")
     k = keys(video_id)
@@ -359,6 +369,9 @@ def process(
         if storage.exists(k["source"]) and not need_separation:
             log.info("%s: metadados do vídeo no cache, sem baixar", video_id)
             info = json.loads(storage.read(k["source"]))
+        elif imported:
+            info = dict(imported.info)  # o áudio já veio de fora (arquivo ou fonte aberta): não há o que baixar
+            audio = imported.audio
         else:
             notify("downloading")
             t = time.monotonic()
@@ -396,6 +409,8 @@ def process(
                 vocals_file = work / "vocals.mp3"
                 vocals_file.write_bytes(storage.read(k["vocals"]))
                 return vocals_file
+            if imported:  # o áudio de origem não está mais aqui para separar de novo: importe o arquivo outra vez
+                raise JobError("no_vocals", "A voz isolada desta música não está na biblioteca. Importe o arquivo de novo (com --force).", MANUAL)
             notify("downloading")
             fresh = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies, limits.max_duration)
             notify("separating")
@@ -457,6 +472,7 @@ def process(
             "artist": info["artist"],
             "video_title": info.get("video_title"),  # o Jukebox também procura por ele
             "duration": info["duration"],
+            **({"origin": info["origin"]} if info.get("origin") else {}),  # file | url:<site>: música que não veio do YouTube
             "lyrics_source": source,
             "lyrics_lines": len(cues),
             "lyrics_word_timing": words_lines > 0,

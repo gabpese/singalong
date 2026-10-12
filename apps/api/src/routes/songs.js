@@ -130,6 +130,9 @@ export async function songRoutes(app, { songs, jobs, limiters, rooms, agents }) 
     }
     const result = await songs.setLyrics(request.params.id, lyrics, { artist, title }, { sessionId: sessionOf(request) });
     if (result.error === 'not_found') return reply.code(404).send({ error: 'not_found' });
+    if (result.error === 'imported') {
+      return reply.code(409).send({ error: 'imported_lyrics', message: 'Música importada: para trocar a letra, importe o arquivo de novo escolhendo a letra.' });
+    }
     if (result.error === 'in_progress') {
       return reply.code(409).send({ error: 'job_in_progress', message: 'A música ainda está sendo processada.' });
     }

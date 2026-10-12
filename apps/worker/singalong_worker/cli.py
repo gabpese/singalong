@@ -10,6 +10,57 @@ from .pipeline import NeedsLyrics, process
 from .storage import LocalStorage
 
 
+def _import(args) -> int:
+    """Importa um arquivo ou um link de fonte aberta e, se o agente está configurado, publica a música no catálogo da nuvem."""
+    from .errors import JobError
+    from .importer import import_song
+
+    if args.import_file and args.import_url:
+        print("erro: use --import OU --import-url, não os dois")
+        return 2
+    storage = LocalStorage(args.storage_root)
+    lyrics_text = args.lyrics_file.read_text(encoding="utf-8") if args.lyrics_file else None
+    try:
+        meta = import_song(
+            storage, file=args.import_file, url=args.import_url, artist=args.artist, title=args.title, lyrics_source=args.lyrics,
+            lyrics_text=lyrics_text, device=args.device, langs=args.langs.split(","), force=args.force, lyrics_loose=args.loose,
+            on_stage=lambda stage: print(f"... {stage}", flush=True),
+        )
+    except ValueError as exc:
+        print(f"erro: {exc}")
+        return 2
+    except NeedsLyrics as exc:
+        print(f"needs_lyrics: {exc}")
+        return 3
+    except JobError as exc:
+        print(f"erro ({exc.code}): {exc.message}")
+        return 4
+    except Exception as exc:  # noqa: BLE001 - na CLI toda falha vira uma mensagem clara, como no worker
+        err = classify(exc)
+        print(f"erro ({err.code}): {err.message}")
+        return 4
+    print(f"Pronto: {meta.get('artist')} - {meta.get('title')}  ({meta['video_id']}, letra: {meta.get('lyrics_source')})")
+    _publish_import(storage, meta["video_id"])
+    return 0
+
+
+def _publish_import(storage, video_id: str) -> None:
+    """Com AGENT_URL e AGENT_TOKEN, a música entra já no catálogo da nuvem (o agente em execução não precisa reiniciar)."""
+    url, token = os.environ.get("AGENT_URL"), os.environ.get("AGENT_TOKEN")
+    if not (url and token):
+        print("(sem AGENT_URL/AGENT_TOKEN: a música fica só na biblioteca local; o agente a publica quando iniciar)")
+        return
+    from .backend import HttpBackend
+
+    backend = HttpBackend(url, token)
+    backend.attach_storage(storage)
+    backend.publish_song(video_id, force=True)
+    if video_id in backend._shared.unpublished:
+        print("aviso: não consegui publicar no catálogo agora; o agente a publica quando iniciar")
+    else:
+        print("Publicada no catálogo do agente: já aparece na biblioteca das suas salas.")
+
+
 def _youtube_login(args) -> int:
     from .youtube_login import LoginError, check_login, login
 
@@ -93,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--langs", default="pt,en", help="idiomas de legenda, separados por vírgula")
     p.add_argument("--storage-root", default=os.environ.get("STORAGE_ROOT", "./storage"))
     p.add_argument("--cookies", type=Path, default=None, help="cookies.txt (formato Netscape) para o yt-dlp: com ele, sempre usa a conta (sem ele vale YTDLP_COOKIES_POLICY)")
+    p.add_argument("--import", dest="import_file", type=Path, metavar="ARQUIVO", help="importa um arquivo de áudio SEU (mp3, flac, wav, m4a, ogg, opus) para a biblioteca, sem passar pelo YouTube; use com --artist e --title (se as etiquetas não tiverem)")
+    p.add_argument("--import-url", metavar="LINK", help="importa a faixa de um link de SoundCloud, Bandcamp ou Internet Archive (sem cookies; só quando o autor permite baixar)")
     p.add_argument("--youtube-login", nargs="?", const="auto", metavar="NAVEGADOR", help="entra no YouTube pelo Chrome ou pelo Edge (perfil só do agente) e guarda os cookies; NAVEGADOR: chrome, edge ou auto")
     p.add_argument("--youtube-status", action="store_true", help="confere se o login do YouTube do agente está valendo")
     p.add_argument("--artist", help="artista para buscar a letra (sobrescreve a detecção)")
@@ -101,6 +154,8 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     setup_logging(level="INFO")
 
+    if args.import_file or args.import_url:
+        return _import(args)
     if args.youtube_login:
         return _youtube_login(args)
     if args.youtube_status:

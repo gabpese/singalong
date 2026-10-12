@@ -137,7 +137,7 @@ class RedisBackend:
     def attach_storage(self, storage) -> None:
         return None
 
-    def publish_song(self, video_id: str) -> None:
+    def publish_song(self, video_id: str, force: bool = False) -> None:
         return None
 
     def publish_all(self) -> int:
@@ -340,10 +340,11 @@ class HttpBackend:
             raise
 
     # --- catálogo local ---
-    def publish_song(self, video_id: str) -> None:
-        """Publica (ou atualiza) uma música no catálogo da nuvem. Uma falha de rede não derruba o job: fica para a próxima batida."""
+    def publish_song(self, video_id: str, force: bool = False) -> None:
+        """Publica (ou atualiza) uma música no catálogo da nuvem. Uma falha de rede não derruba o job: fica para a próxima batida.
+        `force`: publica mesmo sem servidor local de mídia neste processo (o comando de importar roda fora do agente)."""
         storage = self._shared.storage
-        if storage is None or not self._shared.media_base:
+        if storage is None or (not force and not self._shared.media_base):
             return  # sem servidor local de mídia, a nuvem usa o armazenamento dela
         entry = catalog.entry_for(storage, video_id)
         if entry is None:

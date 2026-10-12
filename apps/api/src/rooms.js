@@ -306,6 +306,7 @@ export function createRoomService({
           throw new HttpError(409, 'too_many', `Cada pessoa pode ter até ${MAX_PER_CLIENT} músicas na fila.`);
         }
         const song = await songs.request(videoId, { lyrics: params.lyrics, artist, title }, { sessionId: room.session_id ?? null });
+        if (song.error === 'imported_not_found') throw new HttpError(404, 'song_not_found', 'Esta música importada não está na biblioteca do dono.');
         const itemId = db.addItem({
           roomCode: room.code,
           videoId,
