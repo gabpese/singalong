@@ -4,7 +4,7 @@
 
 Karaokê próprio e colaborativo: pesquise uma música no YouTube e o Singalong gera a versão karaokê (instrumental, letra sincronizada palavra a palavra, troca de tom, vozes de apoio, pontuação pelo microfone e exportação em MP4), com fila compartilhada pelo celular e a TV como player.
 
-Plano completo e decisões: [PLAN.pt-BR.md](PLAN.pt-BR.md) ([English](PLAN.md)).
+Documentação: [PRD](PRD.pt-BR.md) (requisitos do produto), [TRD](TRD.pt-BR.md) (requisitos técnicos e a proposta do instalador/agente) e [PLAN](PLAN.pt-BR.md) (decisões e histórico). Cada um tem também a versão em inglês.
 
 ## Como rodar
 
