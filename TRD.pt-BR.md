@@ -69,7 +69,8 @@ Prefixo `/agent/v1`, autenticada por **token de dispositivo** (`Authorization: B
 | `PUT /library/:id/:file` | **Só no modo híbrido (M5):** envia um artefato para a nuvem quando a música é publicada (seção 5); atômico (`.tmp` + rename), limite de tamanho, só nomes permitidos |
 | `POST /search/claim` · `POST /search/:id/result` | Busca no YouTube feita pelo agente (substitui `search:req/res`) |
 | `POST /exports/claim` · `POST /exports/:id/result` | Exportação de MP4 |
-| `POST /heartbeat` | Versão do agente, hardware detectado, fila local; a página web mostra "agente conectado" |
+| `POST /heartbeat` | Versão do agente, hardware detectado, fila local; a página web mostra "agente conectado"; a resposta traz o aviso `update` (seção 7) |
+| `GET /version?current=X` | Aberto (sem token): `ok`, `update_available` ou `update_required`, com as versões mais recente/mínima, uma nota e o link de download |
 | `DELETE /devices/:id` | O dono revoga um dispositivo |
 
 No agente, a mudança de código é pequena: `runner.process` já é independente do cliente Redis. Cria-se uma interface `JobBackend` com duas implementações (`RedisBackend`, a atual, e `HttpBackend`, nova). O Redis continua existindo no servidor e no modo Docker de desenvolvimento.
@@ -198,7 +199,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 |---|---|---|
 | **M0 ✅** | `JobBackend` + API `/agent/v1` + **sessões e roteamento de jobs por sessão** + agente falso nos testes | Fluxo completo passa com o worker atual trocado para HTTP; um job de uma sala só é reivindicado pelo agente da sessão dela |
 | **M1 (M1a ✅, M1b ✅, M1c ✅)** | Agente "sem interface" (linha de comando) com motor via Docker/venv, **login do YouTube pelo navegador (`--cookies-from-browser`), servidor local de mídia e a origem `file`/`open_url` (comando `importar`)** | Baixa e processa a partir da nuvem num PC com IP residencial; o login é validado; o aviso de rede local do Chrome/Edge já foi **testado** (seção 5) e a música local toca na TV a partir do servidor local de mídia |
-| **M2** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
+| **M2 ✅** | Pacote do motor (CPU e cu121) + sondagem de hardware | Instala sem Python/Docker; GPU testada com fallback |
 | **M3** | Casca Electron: sessão, tela "Entrar com o YouTube", botão "Importar arquivo", bandeja, pasta da biblioteca, logs | Um leigo inicia a sessão, entra com o YouTube e processa uma música sem terminal |
 | **M4** | Instalador **Windows** + auto-update | Instalação limpa em VM; atualização testada |
 | **M5** | Modo híbrido ("Levar para a nuvem") (v2.1) | Música publicada toca em outro computador |
@@ -271,6 +272,32 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - O `allowed_extractors` do yt-dlp casa com o **IE_NAME** do extrator (`archive.org`, `Bandcamp`), não com a chave; a primeira versão falhou num link real e um teste de contrato contra a lista do próprio yt-dlp agora protege isso.
 - O `check_disk` quebrava quando a pasta da biblioteca ainda não existia (instalação nova); agora mede a pasta existente mais próxima.
 - Os originais importados não são copiados para a biblioteca, só os derivados. O botão "Importar arquivo" fica para o M3.
+
+### 12.5 M2: aviso de versão, verificação do hardware e pacote do motor (Out/2026)
+
+**Feito**
+- **Versão e aviso de atualização:** um número só (`singalong_worker/version.py`). O `GET /agent/v1/version?current=X` (aberto, usável antes de parear) e o campo `update` da resposta do `/heartbeat` dizem `ok`, `update_available` ou `update_required`, com a versão mais recente e a mínima, uma nota e o link de download; o servidor lê tudo de `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL`. Abaixo da mínima, o servidor responde `426` aos jobs; o agente trata como falha passageira (espera e registra no log) e volta a trabalhar sozinho depois da atualização. Linha de comando: `--version`, `--check-update`.
+- **Verificação do hardware** (`hardware.py`, só biblioteca padrão): `--hardware` lê o `nvidia-smi` (nome, driver, memória, capacidade de computação) e recomenda `cu121` ou `cpu` com o motivo: driver abaixo de 527.41, placa sem kernels no torch 2.5.1/cu121 (Kepler, **Blackwell/RTX 50**) ou com menos de 3 GB de memória vão para a CPU. `--hardware --selftest` roda uma convolução pequena na GPU. O resumo (motor, núcleos, RAM, placa) vai no heartbeat.
+- **Pacote do motor** (`apps/engine`, Node sem dependências, para ser chamado pela interface Electron): o `manifest.json` fixa o Python 3.11 (python-build-standalone), o ffmpeg 8.1 **GPL** (BtbN) e o deno, cada um com a URL oficial e o **SHA-256**; o torch 2.5.1 e os demais pacotes vêm do pip (índice do PyTorch `cpu` ou `cu121`). O `assemble` baixa com retomada e hash obrigatório, extrai com o `tar.exe` do próprio Windows, copia o worker, pergunta à verificação qual motor usar, instala, roda o teste da GPU e, se falhar, **troca só o torch pela versão de CPU** e registra o motivo. Cada etapa concluída fica no `engine.json`: app fechado ou conexão caída continua de onde parou; um manifesto novo refaz só o que mudou. O `verify` confere ffmpeg (GPL, `libx264`, `aac`, `libmp3lame`, `rubberband`, `subtitles`), ffprobe, deno e os imports do Python. O worker roda com `launchEnv`: o ffmpeg e o deno do motor entram no PATH **só daquele processo**.
+- **Testes:** 27 no worker (versão, hardware com `nvidia-smi` e torch falsos), 5 na API, 19 no motor (download contra um servidor HTTP de verdade: retomada, queda, hash errado, 404; montagem com dublês: ordem, escolha CPU/GPU, volta para a CPU, retomada, download adulterado), que também rodam num runner Windows na CI.
+
+**Medido nesta máquina (Windows 11, RTX 3060, driver 617.42; a partir de uma pasta vazia, sem Docker nem Python do sistema)**
+- A verificação escolheu `cu121`; o teste real da GPU passou. O mesmo teste dentro da imagem Docker passou com a GPU e falhou de forma limpa ("o torch não enxerga uma GPU CUDA") sem ela.
+- O motor `cu121` ocupa **5,6 GB** (mais ~0,26 GB de downloads em cache que podem ser apagados); as 7 verificações do `verify` passaram.
+- Uma música de verdade passou só pelo pacote (importar, Demucs na GPU, melodia, tom): 1 min 18 s na primeira vez, incluindo baixar os pesos do Demucs.
+
+**Defeitos encontrados rodando de verdade**
+- Um `tar` do Git/MSYS no PATH lê `D:\pasta` como máquina remota: o motor agora chama o `System32\tar.exe` do Windows.
+- O nome do arquivo do componente chegava codificado (`%2B`) e precisou ser decodificado.
+- As mensagens de conflito do pip sobre o `audio-separator` (instalado com `--no-deps` de propósito) também aparecem aqui e são inofensivas.
+
+**Decisões**
+- **O yt-dlp vem do pip, não como `.exe`**: o worker o usa como biblioteca e atualizá-lo é um `pip install -U` na abertura. Não há binário separado do yt-dlp no pacote.
+- **O ffmpeg está fixado numa versão datada da BtbN.** A BtbN apaga versões antigas depois de um tempo: se a URL parar de funcionar, o `manifest.json` recebe uma URL e um SHA-256 mais novos (o teste confere só o formato, não a rede). A alternativa é hospedarmos esse arquivo.
+- Os pacotes do pip são fixados por versão, não por hash; travar com hashes pode vir com o instalador (M4).
+- As placas Blackwell (RTX 50) usam a CPU até o motor passar para um torch/CUDA mais novo.
+
+**Fica para o M3/M4:** a interface que chama o `assemble` com barra de progresso e a tela "atualização disponível"; o instalador; o teste numa VM limpa.
 
 ## 13. Decisões tomadas e perguntas em aberto
 

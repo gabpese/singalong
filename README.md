@@ -172,6 +172,19 @@ python -m singalong_worker --import-url "https://archive.org/details/<item>" --a
 
 Formats: mp3, flac, wav, m4a, ogg, opus (size up to `IMPORT_MAX_MB`, 200 by default, and 15 minutes). Links: only SoundCloud, Bandcamp and Internet Archive, single tracks, no cookies. Artist and title are read from the tags when you omit them. If `AGENT_URL` and `AGENT_TOKEN` are set, the song is also published to your agent's catalog and shows up in the room library. The app does not verify where a file comes from: import only what you have the right to use.
 
+**Version, hardware and engine pack (milestone M2).**
+
+```powershell
+python -m singalong_worker --version                                       # installed version
+python -m singalong_worker --check-update --agent-url https://your-server  # is there a newer one?
+python -m singalong_worker --hardware [--selftest]                         # GPU/CPU and the recommended engine; --selftest runs a real test on the GPU
+cd apps\engine
+node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121]   # builds the engine (Python, ffmpeg, deno, torch...) from the official sources
+node src\cli.js verify   --dir D:\Singalong\engine
+```
+
+`assemble` needs only Node 22+ and Windows 10/11 (it uses Windows' own `tar.exe`); nothing is installed on the system, and it continues where it stopped if interrupted. The `cu121` engine takes about 5.6 GB. On the server, `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` define the update notice (below the minimum, the agent stops receiving jobs until it is updated).
+
 ### Worker CLI (no API, for testing)
 
 ```powershell

@@ -22,5 +22,10 @@ export function loadConfig(env = process.env) {
     publicBaseUrl: (env.PUBLIC_BASE_URL ?? '').replace(/\/$/, ''),
     // segredo do administrador do servidor: só com ele dá para gerar códigos de pareamento do agente local (vazio = desligado)
     adminToken: env.ADMIN_TOKEN ?? '',
+    // versões do app instalado (agente): a mais recente, a mínima que ainda recebe trabalho, o que mudou e onde baixar (vazio = não avisa)
+    appLatestVersion: env.APP_LATEST_VERSION ?? '',
+    appMinVersion: env.APP_MIN_VERSION ?? '',
+    appNotes: (env.APP_NOTES ?? '').slice(0, 500),
+    appDownloadUrl: env.APP_DOWNLOAD_URL ?? '',
   };
 }

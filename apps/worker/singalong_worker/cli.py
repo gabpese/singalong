@@ -77,6 +77,27 @@ def _youtube_login(args) -> int:
     return 0 if state in ("connected", "error") else 1
 
 
+def _check_update(args) -> int:
+    from .version import check_update, current_version
+
+    print(f"Versão instalada: {current_version()}")
+    if not args.agent_url:
+        print("erro: informe --agent-url (ou AGENT_URL) com o endereço do servidor")
+        return 2
+    info = check_update(args.agent_url)
+    if info is None:
+        print("Não consegui consultar o servidor agora.")
+        return 4
+    messages = {"ok": "Você está com a versão mais recente.", "update_available": f"Há uma versão nova: {info.get('latest')}.",
+                "update_required": f"Esta versão é antiga demais; atualize para {info.get('minimum') or info.get('latest')} ou mais nova.",
+                "unknown": "O servidor não informou versões."}
+    print(messages.get(info.get("status"), "Resposta inesperada do servidor."))
+    for key, label in (("notes", "O que mudou"), ("url", "Onde baixar")):
+        if info.get(key):
+            print(f"{label}: {info[key]}")
+    return 1 if info.get("status") == "update_required" else 0
+
+
 def _youtube_status() -> int:
     from .youtube_login import main_status
 
@@ -148,12 +169,27 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--import-url", metavar="LINK", help="importa a faixa de um link de SoundCloud, Bandcamp ou Internet Archive (sem cookies; só quando o autor permite baixar)")
     p.add_argument("--youtube-login", nargs="?", const="auto", metavar="NAVEGADOR", help="entra no YouTube pelo Chrome ou pelo Edge (perfil só do agente) e guarda os cookies; NAVEGADOR: chrome, edge ou auto")
     p.add_argument("--youtube-status", action="store_true", help="confere se o login do YouTube do agente está valendo")
+    p.add_argument("--hardware", action="store_true", help="mostra o hardware detectado e o motor recomendado (cu121 ou cpu)")
+    p.add_argument("--selftest", action="store_true", help="com --hardware: roda uma convolução na GPU para confirmar que ela funciona")
+    p.add_argument("--version", action="store_true", help="mostra a versão instalada do app")
+    p.add_argument("--check-update", action="store_true", help="pergunta ao servidor (--agent-url) se há versão nova do app")
     p.add_argument("--artist", help="artista para buscar a letra (sobrescreve a detecção)")
     p.add_argument("--title", help="título da música para buscar a letra (sobrescreve a detecção)")
     p.add_argument("--force", action="store_true", help="ignora e refaz o cache")
     args = p.parse_args(argv)
     setup_logging(level="INFO")
 
+    if args.hardware:
+        from .hardware import main as hardware_main
+
+        return hardware_main(["--selftest"] if args.selftest else [])
+    if args.version:
+        from .version import current_version
+
+        print(current_version())
+        return 0
+    if args.check_update:
+        return _check_update(args)
     if args.import_file or args.import_url:
         return _import(args)
     if args.youtube_login:

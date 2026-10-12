@@ -101,6 +101,23 @@ jobs:
       - run: pip install numpy langdetect websockets yt-dlp
       - run: python -I -m unittest discover -s tests -t .
 
+  engine:
+    name: Motor (montagem, em ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest] # o instalador é de Windows: lá roda o tar.exe de verdade
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+
   docker-api:
     name: Imagem da API (build)
     runs-on: ubuntu-latest

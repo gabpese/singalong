@@ -19,7 +19,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import catalog
+from . import catalog, hardware
+from .version import current_version
 
 log = logging.getLogger("worker.backend")
 
@@ -37,7 +38,7 @@ TERMINAL = ("ready", "needs_lyrics", "failed")
 JOB_FIELDS = ("stage", "error", "error_code", "retry")
 CATALOG_BATCH = 50  # músicas por pedido de catálogo (o servidor aceita até 100)
 MAX_FIELD = 500  # o servidor recusa textos maiores que isso
-AGENT_VERSION = os.environ.get("SINGALONG_AGENT_VERSION", "0.0.0-m0")
+AGENT_VERSION = current_version()
 
 
 class BackendUnavailable(Exception):
@@ -46,6 +47,11 @@ class BackendUnavailable(Exception):
 
 class AuthError(Exception):
     """O servidor não reconhece mais o token do agente (revogado): não adianta insistir."""
+
+
+class UpdateRequired(BackendUnavailable):
+    """O servidor exige uma versão mais nova do app. Parece uma falha passageira: o agente espera e tenta de novo, e volta a
+    trabalhar sozinho assim que o app for atualizado."""
 
 
 class Rejected(Exception):
@@ -230,6 +236,7 @@ class _Shared:
     unpublished: set = field(default_factory=set)  # músicas que não deu para publicar (rede): tenta de novo na batida de coração
     backing: "queue.Queue[str]" = field(default_factory=queue.Queue)
     lock: threading.Lock = field(default_factory=threading.Lock)
+    update: dict = field(default_factory=dict)  # o último aviso de versão do servidor (para a interface mostrar)
 
 
 class HttpBackend:
@@ -240,6 +247,11 @@ class HttpBackend:
         self._shared = shared or _Shared()
         self._open = opener or urllib.request.urlopen
         self.retry_wait = retry_wait
+
+    @property
+    def update(self) -> dict:
+        """O aviso de versão do servidor: { status: ok|update_available|update_required|unknown, latest, minimum, notes, url }."""
+        return self._shared.update
 
     def clone(self) -> "HttpBackend":
         return HttpBackend(self.base[: -len("/agent/v1")], self.token, self.session_name, self._shared, self._open, self.retry_wait)
@@ -274,6 +286,8 @@ class HttpBackend:
             detail = _error_detail(exc)
             if exc.code == 401:
                 raise AuthError(detail.get("message") or "token do agente recusado") from exc
+            if exc.code == 426:
+                raise UpdateRequired(str(detail.get("message") or "atualize o aplicativo")) from exc
             if exc.code >= 500 or exc.code == 429:
                 raise BackendUnavailable(f"servidor respondeu {exc.code}") from exc
             raise Rejected(exc.code, str(detail.get("error", "")), str(detail.get("message", ""))) from exc
@@ -317,12 +331,23 @@ class HttpBackend:
             self._shared.session_id = None
 
     def heartbeat(self) -> None:
-        reply = self._call("POST", "/heartbeat", {"version": AGENT_VERSION, **({"media_base": self.media_base} if self.media_base else {})}, timeout=15) or {}
+        reply = self._call("POST", "/heartbeat", {"version": AGENT_VERSION, "hardware": hardware.summary(), **({"media_base": self.media_base} if self.media_base else {})}, timeout=15) or {}
+        self._note_update(reply.get("update") or {})
         if not reply.get("session_id"):  # o servidor encerrou a sessão (varredura): inicia outra
             self.connect()
             self.publish_all()  # a sessão nova começa sem saber das músicas: o catálogo é do dispositivo, mas confere
         for video_id in list(self._shared.unpublished):  # o que não deu para publicar antes (rede caiu)
             self.publish_song(video_id)
+
+    def _note_update(self, info: dict) -> None:
+        """Guarda o aviso de versão do servidor (para a interface) e registra no log só quando ele muda."""
+        status = info.get("status")
+        if status != self._shared.update.get("status"):
+            if status == "update_required":
+                log.error("esta versão do app é antiga demais: atualize para continuar", extra={"current": AGENT_VERSION, "minimum": info.get("minimum"), "notes": info.get("notes")})
+            elif status == "update_available":
+                log.warning("há uma versão nova do app", extra={"current": AGENT_VERSION, "latest": info.get("latest"), "notes": info.get("notes")})
+        self._shared.update = info
 
     def _reconnect_if_no_session(self, exc: Rejected) -> bool:
         if exc.code == "no_active_session":

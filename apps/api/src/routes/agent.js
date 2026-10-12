@@ -7,6 +7,7 @@ import { MAX_LIBRARY_BATCH, MAX_NAME, VIDEO_ID_PATTERN, safeEqual } from '../age
 import { MAX_WAIT_MS } from '../jobs.js';
 import { HttpError } from '../rooms.js';
 import { rateLimited } from '../rate-limit.js';
+import { updateInfo } from '../version.js';
 
 const JOB_ID = { type: 'string', pattern: '^[A-Za-z0-9_-]{11,14}$' };
 const WAIT = { type: 'object', additionalProperties: false, properties: { wait_ms: { type: 'integer', minimum: 0, maximum: MAX_WAIT_MS } } };
@@ -36,12 +37,25 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters }
   }
   const auth = { preHandler: authenticate };
 
+  const versionConfig = () => ({ latest: config.appLatestVersion, minimum: config.appMinVersion, notes: config.appNotes, url: config.appDownloadUrl });
+  const reportedVersion = new Map(); // dispositivo → versão do último heartbeat (só em memória: o agente reenvia ao abrir)
+
   /** A sessão ativa do dispositivo (e já conta como sinal de vida); 409 se ele ainda não iniciou uma. */
   function activeSession(request) {
+    if (updateInfo(reportedVersion.get(request.device.id), versionConfig()).status === 'update_required') {
+      throw new HttpError(426, 'update_required', 'Esta versão do aplicativo é antiga demais. Atualize para continuar.');
+    }
     const session = agents.touch(request.device);
     if (!session) throw new HttpError(409, 'no_active_session', 'Inicie uma sessão antes de pedir trabalho.');
     return session;
   }
+
+  // --- versão ---
+
+  // Aberto (sem token): o app confere antes mesmo de parear. `?current=1.2.3` → o que fazer.
+  app.get('/version', { schema: { querystring: { type: 'object', properties: { current: { type: 'string', maxLength: 60 } } } } }, async (request) => {
+    return updateInfo(request.query.current, versionConfig());
+  });
 
   // --- pareamento ---
 
@@ -124,9 +138,10 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters }
       },
     },
   }, async (request) => {
+    if (request.body?.version) reportedVersion.set(request.device.id, request.body.version);
     const session = agents.touch(request.device);
     if (session && request.body?.media_base !== undefined) agents.setMediaBase(session, request.body.media_base);
-    return { ok: true, session_id: session?.id ?? null, server_time: Date.now() };
+    return { ok: true, session_id: session?.id ?? null, server_time: Date.now(), update: updateInfo(request.body?.version, versionConfig()) };
   });
 
   // --- catálogo local: as músicas que estão no computador do dono ---
