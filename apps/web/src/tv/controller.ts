@@ -74,6 +74,10 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       reportScore(itemId);
       connection.send({ type: 'ended', item_id: itemId });
     },
+    // a letra também vai para o palco dos cantores (no celular): com as músicas no computador do dono, só a TV a alcança
+    onLyrics(itemId: number, cues: unknown[]) {
+      connection.send({ type: 'lyrics', item_id: itemId, cues });
+    },
     onError(itemId: number, message: string) {
       // não deixa a sala travada numa música que não carrega: avisa, espera um pouco e passa para a próxima
       notify(`${message} Pulando…`, 5000);
@@ -258,12 +262,12 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     ui.setProgress(engine.loadedId !== null && duration ? Math.min(100, (engine.currentTime / duration) * 100) : 0);
   }, 250);
 
-  // posição da música para os celulares (barra de progresso)
+  // posição da música para os celulares (barra de progresso e a letra do palco, que anda sozinha entre uma mensagem e outra)
   const positionTimer = setInterval(() => {
     if (engine.playing && engine.loadedId !== null) {
       connection.send({ type: 'position', item_id: engine.loadedId, ms: Math.round(engine.currentTime * 1000) });
     }
-  }, 2000);
+  }, 1000);
 
   return {
     engine,

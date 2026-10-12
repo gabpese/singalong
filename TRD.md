@@ -204,6 +204,9 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 | **M4 ✅** | **Windows** installer + auto-update | A clean install on a VM; update tested |
 | **M5 ✅** | Hybrid mode ("Take to the cloud") (v2.1) | A published song plays on another computer |
 | **M6** | macOS/Linux, AMD/Apple GPU | v3 |
+| **M7** | Stage: `/stage.html` for the singer, lyrics on the phone at the TV's pace | v1.0 (1 of 3) |
+| **M8** | The room microphone in the output and the host's control of the voice volume | v1.0 (2 of 3) |
+| **M9** | Duet: invite, both on stage, two colors, score for the pair | v1.0 (3 of 3) |
 
 ### 12.1 M0: what was done and what changed from the plan (Oct 2026)
 
@@ -380,6 +383,22 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 - **Tests:** 6 on the server (page and CSP, token and lock-out, e-mails with immediate effect, `*` and fixed lists, computers, remove/block/release) and 1 on the worker (a blocked song is not insisted on).
 
 **Decision:** only the owner removes songs from the cloud and manages the lists; the pairing e-mail flow and the automatic upload stay as they were.
+
+### 12.11 Road to 1.0.0: stage, voice volume and duet (Oct 2026)
+
+Decisions (Oct 2026): the three steps below, **in this order**, make **version 1.0.0**.
+
+- **M7: the stage.** When it is a singer's turn, the singer's phone leaves the room for a new page, `/stage.html`, and comes back when the song ends. The phone shows the lyrics; the TV shows them too.
+- **M8: the voice in the room's output and its volume.** The room's microphone (the TV's) is mixed into the audio output together with the song, and the **host** controls the volume of the sung voice. **The phone microphone is out for now** (the latency of sending audio from the phone to the TV is not worth it yet): so there is no "microphone belongs to the singer" mode and nothing to decide about it.
+- **M9: duet.** More than one singer in the same song: singer A invites singer B (who must be in the same room); on the song's turn **both go to the stage**. The lyrics get two colors, **green `#3A5A40` for one singer and red `#541E1B` for the other, yellow (today's color) when both sing**, always with a **white outline** (the colors are very dark). The split of the lines is **automatic** for now (alternating, with the two together on the chorus when it can be recognised) and leaves room to evolve. **The score is for the pair**, not per singer.
+
+### 12.12 M7: the stage (Oct 2026)
+
+**Done**
+- **`/stage.html?room=CODE`** (phone): the singer's screen with the song, the lyrics in large type, "In pause" and "TV not connected" notices, the end of the song (with the score, when the room scores) and a **"Back to the room"** button. The room page sends the singer there on his turn (the playing song is his, the TV is connected, and he did not leave the stage for this song); when the song ends or is skipped, the stage shows the end for 4 s and brings him back. Opening the stage when it is not your turn goes straight back to the room. The host also goes to the stage on his own songs and can leave with the button (it does not bring him back during that song).
+- **Lyrics at the pace of the TV:** the TV is the player. It now reports the position **every second** (before: every 2 s) and the phone runs its own clock between messages, trusting the message that arrived with the least delay (`lib/clock.js`), pausing and resuming with the room and discarding old samples when the host jumps in the song. The drawing of the lyrics (previous, current line with the words filling in, next ones and the "get ready" dashes) was taken out of the audio engine into `lib/lyrics-view.js`, so the TV and the stage draw exactly the same thing from different clocks.
+- **Songs on the owner's computer:** the phone cannot reach the owner's local media server, so **the TV passes the lyrics to the server** (`lyrics` message, validated: at most 3000 lines, 400 KB, only for the song playing, only from the TV), which relays them to the phones and gives them to whoever opens the stage in the middle of the song. For songs on the server or in the cloud the stage also fetches the lyrics directly.
+- **Tests:** 7 for the clock and 4 for the stage rules (Node), 3 on the server (relay, who can send, validation) and 5 end-to-end in the browser (the singer goes to the stage and back, someone else's song keeps the person in the room, no TV means no stage, leaving the stage is not undone, local songs get the lyrics through the TV). The 71 existing browser tests still pass.
 
 ## 13. Decisions made and open questions
 
