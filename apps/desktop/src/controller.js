@@ -57,6 +57,7 @@ export function createController({
   assembleImpl = assemble,
   verifyImpl = verifyEngine,
   detectBrowser = detectDefaultBrowser,
+  now = Date.now,
   launcher = (root, args, extraEnv) => workerCommand(root, args, extraEnv), // [exe, args, options]: os testes trocam por um worker de mentira
   emit = () => {},
   pollMs = POLL_MS,
@@ -155,6 +156,8 @@ export function createController({
     }
     publish();
     if (config.server) checkUpdate().catch(() => {});
+    // o app pode ficar dias aberto na bandeja: confere se saiu versão nova uma vez por dia (e quando a janela volta, se já passou um dia)
+    setInterval(() => refreshUpdate().catch(() => {}), 60 * 60 * 1000).unref?.();
     return snapshot();
   }
 
@@ -208,6 +211,15 @@ export function createController({
     return snapshot();
   }
 
+  /**
+   * Pergunta de novo se há versão nova, no máximo uma vez por dia (a janela volta do segundo plano, o app fica dias aberto na
+   * bandeja: só perguntar ao abrir deixaria o aviso para sempre desatualizado).
+   */
+  async function refreshUpdate() {
+    if (now() - lastUpdateCheck < 24 * 60 * 60 * 1000) return state.update;
+    return checkUpdate();
+  }
+
   /** Pede ao servidor que envie o código de pareamento para o e-mail (só chega se o e-mail estiver autorizado). */
   async function requestCode({ server, email }) {
     const url = normalizeServer(server || DEFAULT_SERVER);
@@ -230,8 +242,10 @@ export function createController({
     return snapshot();
   }
 
+  let lastUpdateCheck = 0;
   async function checkUpdate() {
     if (!config.server) return null;
+    lastUpdateCheck = now();
     try {
       const response = await fetchImpl(`${config.server}/agent/v1/version?current=${encodeURIComponent(version)}`, { signal: AbortSignal.timeout(10000) });
       state.update = response.ok ? await response.json() : null;
@@ -499,5 +513,5 @@ export function createController({
     return snapshot();
   }
 
-  return { init, snapshot, requestCode, setLibraryDir, cancelBusy, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
+  return { init, snapshot, refreshUpdate, requestCode, setLibraryDir, cancelBusy, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
 }

@@ -430,3 +430,30 @@ test('o app mostra que as músicas deste computador vão para a nuvem quando o s
   await controller.stopAgent();
   sessionOpen = false;
 });
+
+test('o aviso de atualização é conferido de novo (no máximo uma vez por dia) e não só ao abrir', async () => {
+  let clock = 1_000_000;
+  const dataDir = await mkdtemp(join(tmpdir(), 'singalong-desk-'));
+  const controller = createController({
+    dataDir,
+    now: () => clock,
+    detectBrowser: async () => 'edge',
+    assembleImpl: async () => ({ engine: 'cpu' }),
+    verifyImpl: async () => ({ ok: true, checks: [] }),
+  });
+  await controller.init();
+  await controller.buildEngine();
+  await controller.pair({ server: base, code: 'BOM-CODIGO', name: 'PC' });
+  versionAnswer = { status: 'ok' };
+  await controller.checkUpdate();
+  assert.equal(controller.snapshot().update.status, 'ok');
+
+  versionAnswer = { status: 'update_available', latest: '9.0.0', notes: 'Novidade', url: `${base}/baixar` }; // o servidor anuncia depois
+  clock += 23 * 60 * 60_000; // 23 horas depois: ainda é cedo, não pergunta de novo
+  await controller.refreshUpdate();
+  assert.equal(controller.snapshot().update.status, 'ok');
+  clock += 2 * 60 * 60_000; // passou de 24 horas: pergunta e o aviso aparece
+  await controller.refreshUpdate();
+  assert.equal(controller.snapshot().update.status, 'update_available');
+  versionAnswer = { status: 'ok' };
+});
