@@ -3,29 +3,32 @@
 O transporte (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.js.
 """
 import logging
-import shutil
 import tempfile
 import threading
 from pathlib import Path
+
+from .cookies import CookiePolicy, as_policy, run_with_policy
 
 log = logging.getLogger("worker.search")
 
 MAX_RESULTS = 8
 
 
-def search_youtube(query: str, cookies: Path | None = None, limit: int = MAX_RESULTS) -> list[dict]:
-    """Resultados da busca, sem baixar nada (extract_flat): id, título, canal e duração."""
+def search_youtube(query: str, cookies: "CookiePolicy | Path | None" = None, limit: int = MAX_RESULTS) -> list[dict]:
+    """Resultados da busca, sem baixar nada (extract_flat): id, título, canal e duração.
+
+    `cookies`: a política de cookies (cookies.py): sem cookie primeiro e, se o YouTube pedir login, com a conta.
+    """
     import yt_dlp  # import tardio, como no pipeline
 
-    with tempfile.TemporaryDirectory(prefix="singalong-search-") as tmp:
-        opts = {"quiet": True, "no_warnings": True, "skip_download": True, "extract_flat": True, "socket_timeout": 15}
-        if cookies:
-            cookie_copy = Path(tmp) / "cookies.txt"
-            shutil.copyfile(cookies, cookie_copy)
-            opts["cookiefile"] = str(cookie_copy)
+    def attempt(cookie_opts: dict) -> list[dict]:
+        opts = {"quiet": True, "no_warnings": True, "skip_download": True, "extract_flat": True, "socket_timeout": 15, **cookie_opts}
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
-    return parse_entries(info.get("entries") or [])
+        return parse_entries(info.get("entries") or [])
+
+    with tempfile.TemporaryDirectory(prefix="singalong-search-") as tmp:
+        return run_with_policy(as_policy(cookies), attempt, Path(tmp))
 
 
 def parse_entries(entries: list) -> list[dict]:

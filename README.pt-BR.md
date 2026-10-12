@@ -147,6 +147,27 @@ Depois abra o link da TV, entre na sala como convidado em outra janela, busque e
 | `AGENT_MEDIA_PUBLIC` | — | o endereço que o **navegador** usa quando não é `http://127.0.0.1:<porta>` (Docker: `http://127.0.0.1:8765`) |
 | `AGENT_ALLOWED_ORIGINS` | a origem de `AGENT_URL` | origens (a página da nuvem) que podem ler a mídia, separadas por vírgula; com Docker a página é `http://localhost:3000` |
 
+**Login do YouTube e cookies (marco M1b).** O worker (o agente e o clássico) baixa **sem cookie primeiro**, pela sua própria internet, e usa a conta do YouTube **só quando o YouTube pedir login** (confirmação de "não sou um robô", restrição de idade ou um 403): aí repete com os cookies da conta. Vários downloads seguidos pelo IP de casa funcionaram sem a conta; usar uma conta com o yt-dlp pode levá-la a ser restringida, então prefira uma **conta secundária**.
+
+| Variável | Padrão | Função |
+|---|---|---|
+| `YTDLP_COOKIES_POLICY` | `when-asked` | `when-asked` (conta só quando o YouTube pedir), `always` ou `never` |
+| `YTDLP_COOKIES` | — | um `cookies.txt` (formato Netscape) para usar como a conta |
+| `YTDLP_COOKIES_BROWSER` | — | lê os cookies de um navegador pelo yt-dlp (`firefox`, `chrome:Profile 1`). **No Windows o Chrome e o Edge não funcionam** (a criptografia dos cookies bloqueia o yt-dlp); o Firefox funciona |
+| `AGENT_DATA_DIR` | `~/.singalong` | onde o agente guarda o login dele (`youtube_cookies.txt` e o perfil do navegador) |
+
+As fontes são tentadas nessa ordem: `YTDLP_COOKIES`, `YTDLP_COOKIES_BROWSER` e, por fim, o login do próprio agente:
+
+```powershell
+cd apps\worker                                      # o módulo fica aqui
+pip install websockets "yt-dlp[default]"            # só o que o login e a verificação precisam
+python -m singalong_worker --youtube-login          # abre o Chrome ou o Edge com um perfil só do agente; entre na conta do YouTube
+python -m singalong_worker --youtube-login edge     # escolhe o navegador
+python -m singalong_worker --youtube-status         # "Conectado" / "Sem login válido" (um pedido que só funciona logado)
+```
+
+O `--youtube-login` abre o **seu Chrome ou Edge instalado com um perfil dedicado** (o seu perfil pessoal não é tocado), espera você entrar, pede os cookies ao próprio navegador pelo protocolo de depuração (ele os entrega já descriptografados, por isso funciona onde o yt-dlp não consegue ler o navegador) e guarda só os cookies do YouTube e do Google em `~/.singalong/youtube_cookies.txt`, depois fecha o navegador. Os cookies nunca saem do computador. Se o login nessa janela for recusado, use o Firefox com `YTDLP_COOKIES_BROWSER=firefox` ou um `cookies.txt` exportado de uma janela anônima.
+
 ### CLI do worker (sem API, para testes)
 
 ```powershell

@@ -3,10 +3,33 @@ import json
 import os
 from pathlib import Path
 
+from .cookies import load_policy
 from .errors import classify
 from .logsetup import setup_logging
 from .pipeline import NeedsLyrics, process
 from .storage import LocalStorage
+
+
+def _youtube_login(args) -> int:
+    from .youtube_login import LoginError, check_login, login
+
+    try:
+        file = login(None if args.youtube_login == "auto" else args.youtube_login)
+    except LoginError as exc:
+        print(f"erro: {exc}")
+        return 2
+    from .cookies import CookieSource
+
+    state, detail = check_login(CookieSource(file=file))
+    print({"connected": "Conectado ao YouTube.", "not-logged": "Os cookies foram guardados, mas o YouTube não reconheceu a sessão: tente o login de novo.",
+           "error": f"Cookies guardados; não consegui verificar agora ({detail})."}.get(state, state))
+    return 0 if state in ("connected", "error") else 1
+
+
+def _youtube_status() -> int:
+    from .youtube_login import main_status
+
+    return main_status(load_policy().source)
 
 
 def _pair(args) -> int:
@@ -69,13 +92,19 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--device", choices=["cpu", "cuda"], default=os.environ.get("DEMUCS_DEVICE") or None, help="dispositivo do demucs (padrão: automático)")
     p.add_argument("--langs", default="pt,en", help="idiomas de legenda, separados por vírgula")
     p.add_argument("--storage-root", default=os.environ.get("STORAGE_ROOT", "./storage"))
-    p.add_argument("--cookies", type=Path, default=os.environ.get("YTDLP_COOKIES") or None, help="cookies.txt (formato Netscape) para o yt-dlp")
+    p.add_argument("--cookies", type=Path, default=None, help="cookies.txt (formato Netscape) para o yt-dlp: com ele, sempre usa a conta (sem ele vale YTDLP_COOKIES_POLICY)")
+    p.add_argument("--youtube-login", nargs="?", const="auto", metavar="NAVEGADOR", help="entra no YouTube pelo Chrome ou pelo Edge (perfil só do agente) e guarda os cookies; NAVEGADOR: chrome, edge ou auto")
+    p.add_argument("--youtube-status", action="store_true", help="confere se o login do YouTube do agente está valendo")
     p.add_argument("--artist", help="artista para buscar a letra (sobrescreve a detecção)")
     p.add_argument("--title", help="título da música para buscar a letra (sobrescreve a detecção)")
     p.add_argument("--force", action="store_true", help="ignora e refaz o cache")
     args = p.parse_args(argv)
     setup_logging(level="INFO")
 
+    if args.youtube_login:
+        return _youtube_login(args)
+    if args.youtube_status:
+        return _youtube_status()
     if args.pair:
         return _pair(args)
     if args.create_room:
@@ -91,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
     lyrics_text = args.lyrics_file.read_text(encoding="utf-8") if args.lyrics_file else None
     try:
         meta = process(
-            args.url, storage, args.lyrics, lyrics_text, args.device, args.langs.split(","), args.force, args.cookies,
+            args.url, storage, args.lyrics, lyrics_text, args.device, args.langs.split(","), args.force, args.cookies or load_policy(),
             args.artist, args.title, lyrics_loose=args.loose,
         )
     except ValueError as e:

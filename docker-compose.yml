@@ -55,6 +55,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       STORAGE_ROOT: /storage
       YTDLP_COOKIES: /secrets/youtube_cookies.txt
+      # when-asked (padrão): sem cookie primeiro, com a conta só quando o YouTube pedir login; always; never
+      YTDLP_COOKIES_POLICY: ${YTDLP_COOKIES_POLICY:-when-asked}
       DEMUCS_DEVICE: cpu
       # limites e robustez (0 desliga o limite)
       MAX_DURATION_SECONDS: ${MAX_DURATION_SECONDS:-900}
@@ -94,6 +96,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       STORAGE_ROOT: /storage
       YTDLP_COOKIES: /secrets/youtube_cookies.txt
+      YTDLP_COOKIES_POLICY: ${YTDLP_COOKIES_POLICY:-when-asked}
       DEMUCS_DEVICE: cuda
       # limites e robustez (0 desliga o limite)
       MAX_DURATION_SECONDS: ${MAX_DURATION_SECONDS:-900}

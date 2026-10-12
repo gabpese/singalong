@@ -96,7 +96,8 @@ jobs:
           python-version: "3.11"
           cache: pip
       # os testes não precisam do torch, do Demucs nem do Whisper: só destes dois
-      - run: pip install numpy langdetect
+      # websockets: o teste do login do YouTube (cliente do protocolo de depuração) roda contra um servidor WebSocket de verdade
+      - run: pip install numpy langdetect websockets
       - run: python -I -m unittest discover -s tests -t .
 
   docker-api:
