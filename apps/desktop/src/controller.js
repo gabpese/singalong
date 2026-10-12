@@ -44,6 +44,8 @@ export function detectDefaultBrowser(run = execFile) {
   });
 }
 
+export const DEFAULT_SERVER = 'https://singalong.duckdns.org'; // o servidor padrão (o dono pode trocar na tela de conectar)
+
 export const BROWSER_NAMES = { chrome: 'Google Chrome', edge: 'Microsoft Edge', auto: 'o seu navegador' };
 
 export function createController({
@@ -97,6 +99,7 @@ export function createController({
   function snapshot() {
     return {
       version,
+      defaultServer: DEFAULT_SERVER,
       paired: Boolean(config.server && config.token),
       server: config.server,
       deviceName: config.device_name,
@@ -113,10 +116,10 @@ export function createController({
   }
 
   // --- servidor ---
-  async function api(method, path, { body, token = config.token, timeout = 15000 } = {}) {
+  async function api(method, path, { body, token = config.token, timeout = 15000, base = config.server } = {}) {
     let response;
     try {
-      response = await fetchImpl(`${config.server}/agent/v1${path}`, {
+      response = await fetchImpl(`${base}/agent/v1${path}`, {
         method,
         headers: { accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...(token ? { authorization: `Bearer ${token}` } : {}) }, // o Fastify recusa content-type JSON com corpo vazio
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -203,6 +206,15 @@ export function createController({
     checkUpdate().catch(() => {});
     publish();
     return snapshot();
+  }
+
+  /** Pede ao servidor que envie o código de pareamento para o e-mail (só chega se o e-mail estiver autorizado). */
+  async function requestCode({ server, email }) {
+    const url = normalizeServer(server || DEFAULT_SERVER);
+    const clean = String(email ?? '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(clean)) throw new UserError('bad_email', 'Digite um e-mail válido.');
+    const answer = await api('POST', '/pair/request', { body: { email: clean }, token: '', base: url });
+    return { message: answer?.message ?? 'Pedido enviado.' };
   }
 
   async function unpair() {
@@ -487,5 +499,5 @@ export function createController({
     return snapshot();
   }
 
-  return { init, snapshot, setLibraryDir, cancelBusy, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
+  return { init, snapshot, requestCode, setLibraryDir, cancelBusy, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
 }

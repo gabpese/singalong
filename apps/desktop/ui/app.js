@@ -99,6 +99,7 @@ function render(s) {
   setPill($('yt-pill'), YT_TEXT[s.youtube.status] ?? ['?', '']);
   $('yt-login').textContent = s.youtube.status === 'connected' ? 'Trocar de conta' : 'Entrar no YouTube';
   if (document.activeElement !== $('welcome-nickname') && !$('welcome-nickname').value) $('welcome-nickname').value = s.nickname ?? '';
+  if (!$('pair-server').value) $('pair-server').value = s.defaultServer ?? '';
   $('welcome-server').textContent = s.server ? s.server.replace(/^https?:\/\//, '') : '';
   $('welcome-error').hidden = s.agent.status !== 'auth_error';
   $('welcome-error').textContent = s.agent.status === 'auth_error' ? s.agent.error ?? '' : '';
@@ -180,7 +181,6 @@ function renderTabs() {
   $('subtabs').hidden = !inRooms;
   $('sub-tv').classList.toggle('active', tabs.sub === 'tv');
   $('sub-host').classList.toggle('active', tabs.sub === 'host');
-  $('tab-fullscreen').hidden = tabs.sub !== 'tv';
   const chips = $('room-chips');
   chips.replaceChildren();
   for (const code of tabs.rooms) {
@@ -268,6 +268,18 @@ async function openSettings() {
 // --- ações ---
 $('engine-build').addEventListener('click', (e) => act('buildEngine', { engine: 'auto' }, e.currentTarget));
 
+$('pair-send').addEventListener('click', async (e) => {
+  $('pair-sent').hidden = true;
+  const data = await act('requestCode', { server: $('pair-server').value, email: $('pair-email').value }, e.currentTarget);
+  if (data) {
+    $('pair-sent').hidden = false;
+    $('pair-sent').textContent = data.message;
+    $('pair-code').focus();
+  }
+});
+$('pair-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('pair-send').click(); });
+$('pair-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('pair-go').click(); });
+
 $('pair-go').addEventListener('click', async (e) => {
   const data = await act('pair', { server: $('pair-server').value, code: $('pair-code').value, name: $('pair-name').value }, e.currentTarget);
   if (data) $('pair-code').value = '';
@@ -283,7 +295,6 @@ $('room-create').addEventListener('click', async (e) => {
 
 for (const button of document.querySelectorAll('.tab[data-tab]')) button.addEventListener('click', () => act('selectTab', button.dataset.tab));
 for (const button of document.querySelectorAll('.subtab[data-sub]')) button.addEventListener('click', () => act('selectSub', button.dataset.sub));
-$('tab-fullscreen').addEventListener('click', () => act('fullscreen'));
 $('gear').addEventListener('click', () => (tabs.settings ? act('settingsOpen', false) : openSettings()));
 $('settings-back').addEventListener('click', () => act('settingsOpen', false));
 

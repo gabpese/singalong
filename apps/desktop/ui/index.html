@@ -33,7 +33,6 @@
       <div id="room-chips" class="chips" data-testid="room-chips"></div>
       <button id="sub-tv" type="button" class="subtab" data-sub="tv" data-testid="sub-tv">TV</button>
       <button id="sub-host" type="button" class="subtab" data-sub="host" data-testid="sub-host">Anfitrião</button>
-      <button id="tab-fullscreen" type="button" class="subtab right" data-testid="tab-fullscreen">Tela cheia</button>
     </nav>
   </div>
 
@@ -50,13 +49,25 @@
     </section>
 
     <!-- 2) parear -->
-    <section id="screen-pair" hidden data-testid="screen-pair">
-      <h2>Conectar ao servidor</h2>
-      <p>Peça o código de pareamento a quem administra o servidor. Ele só é usado uma vez.</p>
-      <label>Endereço do servidor <input id="pair-server" type="url" placeholder="https://singalong.exemplo.org" autocomplete="off" data-testid="pair-server"></label>
-      <label>Código de pareamento <input id="pair-code" type="text" maxlength="20" autocomplete="off" data-testid="pair-code"></label>
-      <label>Nome deste computador <input id="pair-name" type="text" maxlength="60" value="Meu computador" data-testid="pair-name"></label>
-      <button id="pair-go" type="button" class="primary" data-testid="pair-go">Parear</button>
+    <section id="screen-pair" class="pair" hidden data-testid="screen-pair">
+      <h2>Conectar este computador</h2>
+      <p class="muted">Digite o seu e-mail para receber um código de acesso. Só e-mails autorizados recebem o código.</p>
+      <div class="step">
+        <div class="step-head"><strong>1. Seu e-mail</strong></div>
+        <label>E-mail autorizado <input id="pair-email" type="email" placeholder="voce@exemplo.com" autocomplete="email" data-testid="pair-email"></label>
+        <button id="pair-send" type="button" data-testid="pair-send">Enviar o código por e-mail</button>
+        <p id="pair-sent" class="ok-text" hidden data-testid="pair-sent"></p>
+      </div>
+      <div class="step">
+        <div class="step-head"><strong>2. O código</strong></div>
+        <label>Código recebido <input id="pair-code" type="text" maxlength="20" autocomplete="off" data-testid="pair-code"></label>
+        <label>Nome deste computador <input id="pair-name" type="text" maxlength="60" value="Meu computador" data-testid="pair-name"></label>
+        <button id="pair-go" type="button" class="primary" data-testid="pair-go">Conectar</button>
+      </div>
+      <details class="advanced">
+        <summary>Servidor</summary>
+        <label>Endereço do servidor <input id="pair-server" type="url" placeholder="https://singalong.exemplo.org" autocomplete="off" data-testid="pair-server"></label>
+      </details>
     </section>
 
     <!-- 3) início: imagem de apresentação, o login do YouTube e o apelido para começar a sessão -->

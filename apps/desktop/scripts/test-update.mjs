@@ -76,6 +76,7 @@ try {
   log(`app instalado abriu, versão ${before}`);
   await id('screen-pair').waitFor({ timeout: 30000 });
   const code = (await api.inject({ method: 'POST', url: '/agent/v1/pair/start', headers: { 'x-admin-token': 'adm' }, payload: {} })).json().code;
+  await first.page.locator('details.advanced summary').click();
   await id('pair-server').fill(base);
   await id('pair-code').fill(code);
   await id('pair-go').click();

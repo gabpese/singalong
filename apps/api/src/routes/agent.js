@@ -7,6 +7,7 @@ import { MAX_LIBRARY_BATCH, MAX_NAME, VIDEO_ID_PATTERN, safeEqual } from '../age
 import { MAX_WAIT_MS } from '../jobs.js';
 import { HttpError } from '../rooms.js';
 import { rateLimited } from '../rate-limit.js';
+import { pairingEmail } from '../mailer.js';
 import { updateInfo } from '../version.js';
 
 const JOB_ID = { type: 'string', pattern: '^[A-Za-z0-9_-]{11,14}$' };
@@ -25,7 +26,7 @@ const SEARCH_ITEM = {
   required: ['video_id', 'title'],
 };
 
-export async function agentRoutes(app, { agents, jobs, rooms, config, limiters }) {
+export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, mailer }) {
   app.decorateRequest('device', null);
 
   /** Exige o token de dispositivo; deixa o dispositivo em `request.device`. */
@@ -66,6 +67,29 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters }
       throw new HttpError(403, 'forbidden', 'Token de administrador inválido.');
     }
     return reply.code(201).send(agents.startPairing());
+  });
+
+  // A pessoa pede o código e informa o e-mail: ele só é enviado se o endereço estiver na lista do administrador
+  // (PAIR_ALLOWED_EMAILS). A resposta é a mesma para qualquer e-mail, para ninguém descobrir quem está na lista; o envio roda
+  // em segundo plano (o tempo de resposta também não revela nada).
+  const EMAIL_SHAPE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+  app.post('/pair/request', {
+    preHandler: rateLimited(limiters.pairRequest, { keyOf: (request) => request.ip }),
+    schema: { body: { type: 'object', additionalProperties: false, properties: { email: { type: 'string', maxLength: 254 } }, required: ['email'] } },
+  }, async (request, reply) => {
+    if (!mailer?.enabled || config.pairAllowedEmails.length === 0) {
+      throw new HttpError(503, 'email_disabled', 'Este servidor não envia códigos por e-mail. Peça o código a quem administra o servidor.');
+    }
+    const email = request.body.email.trim().toLowerCase();
+    if (!EMAIL_SHAPE.test(email)) throw new HttpError(400, 'bad_email', 'Digite um e-mail válido.');
+    const limited = limiters.pairEmail.hit(email);
+    // um asterisco na lista = qualquer e-mail pode pedir (os limites por IP e por endereço continuam valendo)
+    if (limited.ok && (config.pairAllowedEmails.includes('*') || config.pairAllowedEmails.includes(email))) {
+      const { code, expires_in: seconds } = agents.startPairing();
+      const message = pairingEmail({ code, minutes: Math.round(seconds / 60), server: config.publicUrl || '' });
+      mailer.send({ to: email, ...message }).catch((error) => request.log.error({ err: error.message }, 'não consegui enviar o código por e-mail'));
+    }
+    return reply.code(202).send({ ok: true, message: 'Se este e-mail estiver autorizado, o código chega em instantes. Olhe também a caixa de spam.' });
   });
 
   app.post('/pair/complete', {

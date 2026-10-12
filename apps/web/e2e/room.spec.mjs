@@ -258,6 +258,7 @@ test('adicionar música: link colado, letra para colar e erros', async ({ page, 
   const room = await createRoom(request);
   await page.goto(room.guestUrl);
   await tab(page, 'Adicionar').click();
+  await page.getByLabel('Seu nome').fill('Carla'); // o nome é obrigatório para adicionar
   await page.getByText('Já tenho o link do vídeo').click();
   await page.getByLabel('Link do vídeo do YouTube').fill('https://youtu.be/dQw4w9WgXcQ?si=x');
   await expect(page.getByText('Link reconhecido: dQw4w9WgXcQ')).toBeVisible();
@@ -414,6 +415,7 @@ test('adicionar música: com várias versões prontas, escolhe uma delas', async
   const room = await createRoom(request);
   await page.goto(room.guestUrl);
   await tab(page, 'Adicionar').click();
+  await page.getByLabel('Seu nome').fill('Carla'); // o nome é obrigatório para adicionar
   await page.getByLabel('Artista').fill('Faouzia');
   await page.getByLabel('Nome da música').fill('Unethical');
   await page.getByRole('button', { name: 'Buscar no YouTube' }).click();
@@ -482,6 +484,7 @@ test('adicionar música: acha a versão também pelo título original do vídeo 
   const room = await createRoom(request);
   await page.goto(room.guestUrl);
   await tab(page, 'Adicionar').click();
+  await page.getByLabel('Seu nome').fill('Carla'); // o nome é obrigatório para adicionar
   // a música foi guardada como "Faouzia — Unethical (Acoustic)", mas o vídeo se chama "Faouzia - Unethical (MAPHRA Vocal Cover)"
   await page.getByLabel('Artista').fill('Maphra');
   await page.getByLabel('Nome da música').fill('Unethical');

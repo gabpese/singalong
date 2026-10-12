@@ -105,6 +105,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   const [submitting, setSubmitting] = useState(false);
   const [matches, setMatches] = useState<LibrarySong[] | null>(null); // versões prontas encontradas (abre o aviso)
   const [declinedFor, setDeclinedFor] = useState(''); // busca em que a pessoa preferiu o YouTube ao Jukebox
+  const nameRef = useRef<HTMLInputElement>(null);
   const artistRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -200,10 +201,20 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
     if (preview && preview.id !== id) setPreview(null);
   }
 
+  /** Sem o nome a fila fica cheia de "Alguém": antes de aceitar uma música, o nome é obrigatório. */
+  function nameMissing(): boolean {
+    if (userName.trim()) return false;
+    setStatus('Digite o seu nome antes de adicionar uma música.', true);
+    nameRef.current?.focus();
+    nameRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    return true;
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     // Enter nos campos de busca, sem vídeo escolhido ainda: busca o vídeo
     if (!lyricsFor && !selected) return runSearch();
+    if (nameMissing()) return;
     setSubmitting(true);
     try {
       let message: string;
@@ -232,6 +243,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   }
 
   async function useJukeboxSong(song: LibrarySong) {
+    if (nameMissing()) return;
     setSubmitting(true);
     try {
       const message = await onPickJukebox(song);
@@ -271,8 +283,11 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
       <h2>Adicionar música</h2>
       <form autoComplete="off" onSubmit={onSubmit}>
         <label className="field">
-          Seu nome
+          <span>
+            Seu nome <span className="required" aria-hidden="true">*</span>
+          </span>
           <input
+            ref={nameRef}
             type="text"
             maxLength={30}
             placeholder="Como você quer aparecer na fila?"

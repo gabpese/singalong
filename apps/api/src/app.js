@@ -1,6 +1,7 @@
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { createAgentService } from './agents.js';
+import { createMailer } from './mailer.js';
 import { openDb } from './db.js';
 import { sendFile } from './files.js';
 import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.js';
@@ -15,8 +16,8 @@ import { safeJoin } from './storage.js';
  * Monta a aplicação com dependências injetadas (config, storage, jobs) para facilitar os testes.
  * `config.dbPath` ausente = banco em memória. O relógio das salas (`app.rooms.start()`) é ligado só pelo server.js.
  */
-export function buildApp({ config, storage, jobs, logger = false }) {
-  const app = Fastify({ logger, bodyLimit: 256 * 1024 });
+export function buildApp({ config, storage, jobs, logger = false, mailer = createMailer({ apiKey: config.brevoApiKey, fromEmail: config.mailFrom, fromName: config.mailFromName }) }) {
+  const app = Fastify({ logger, bodyLimit: 256 * 1024, trustProxy: Boolean(config.trustProxy) });
 
   const db = openDb(config.dbPath ?? ':memory:');
   // limites de requisições por pessoa (config.rateLimits sobrescreve o padrão; os testes usam isso)
@@ -61,7 +62,7 @@ export function buildApp({ config, storage, jobs, logger = false }) {
   app.register(websocket);
   app.register(songRoutes, { prefix: '/api', songs, jobs, limiters, rooms, agents });
   app.register(roomRoutes, { prefix: '/api', rooms, config, limiters });
-  app.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters });
+  app.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters, mailer });
 
   if (storage.local) {
     app.get('/media/*', (request, reply) => {

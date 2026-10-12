@@ -25,6 +25,7 @@ before(async () => {
       calls.push({ method: req.method, url: req.url, auth: req.headers.authorization ?? null, body: body ? JSON.parse(body) : null });
       const json = (status, data) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(data));
       if (req.url === '/agent/v1/pair/complete') return body.includes('BOM-CODIGO') ? json(201, { token: 'tok-1', device_id: 'd1' }) : json(400, { error: 'invalid_code', message: 'Código inválido ou expirado.' });
+      if (req.url === '/agent/v1/pair/request') return body.includes('sem-servico') ? json(503, { error: 'email_disabled', message: 'Este servidor não envia códigos por e-mail.' }) : json(202, { ok: true, message: 'Se este e-mail estiver autorizado, o código chega em instantes.' });
       if (req.url.startsWith('/agent/v1/version')) return json(200, versionAnswer);
       if (req.headers.authorization !== 'Bearer tok-1') return json(401, { error: 'unauthorized', message: 'Dispositivo não autorizado.' });
       if (req.url === '/agent/v1/me') return json(200, { device: { id: 'd1', name: 'PC' }, session: sessionOpen ? { id: 's1', display_name: 'Gabriel' } : null });
@@ -394,4 +395,20 @@ test('o microfone escolhido fica guardado, é limpo ao voltar ao padrão e entra
   assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).microphone.id, 'abc123');
   assert.equal((await controller.setSettings({ microphone: { id: '', label: 'x' } })).microphone, null);
   assert.equal((await controller.setSettings({ microphone: null })).microphone, null);
+});
+
+test('pedir o código por e-mail: valida o e-mail, usa o servidor informado e mostra a resposta', async () => {
+  const { controller } = await make();
+  await controller.init();
+  const before = calls.length;
+  const answer = await controller.requestCode({ server: base, email: '  Dona@Exemplo.com ' });
+  assert.match(answer.message, /instantes/);
+  const call = calls.slice(before).find((c) => c.url === '/agent/v1/pair/request');
+  assert.deepEqual(call.body, { email: 'Dona@Exemplo.com' });
+  assert.equal(call.auth, null); // sem token: ainda não está pareado
+  assert.equal(controller.snapshot().server, ''); // pedir o código não "pareia" nem grava o servidor
+  for (const bad of ['', 'lixo', 'a@b']) await assert.rejects(controller.requestCode({ server: base, email: bad }), /e-mail válido/);
+  await assert.rejects(controller.requestCode({ server: 'http://exemplo.org', email: 'a@b.com' }), /https/);
+  await assert.rejects(controller.requestCode({ server: base, email: 'sem-servico@exemplo.com' }), /não envia códigos/);
+  assert.equal(controller.snapshot().defaultServer, 'https://singalong.duckdns.org');
 });
