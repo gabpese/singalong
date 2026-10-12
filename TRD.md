@@ -51,7 +51,7 @@ Principles:
 - **Phones join the room through the QR code, as today.** When a guest requests a song, the API creates the job and **routes it to the room's session**: only the agent that owns that session can claim it (`claim` filters by `session_id`). The guest never sees or uses the owner's account.
 - **Owner offline:** the job stays in the queue and the room shows "the session owner is disconnected" (detected through the `heartbeat`). Songs that are already local keep playing on the owner's own TV.
 - **End of session:** when the app is closed, the session ends; rooms follow the current rule (deleted after 24 h idle).
-- **What the cloud knows about the account:** only a **display nickname** and whether the session is "connected". Never cookies, email or password.
+- **What the cloud knows about the account:** only a **display nickname**, chosen by the owner when starting the session (it is what guests see), and whether the session is "connected". Never cookies, email or password.
 - **Server:** new tables `sessions(id, device_id, display_name, created_at, last_seen)` and the `rooms.session_id` column; the jobs stream now carries `session_id`.
 - **The cloud's role:** with local storage (section 5), the cloud becomes the **meeting point**: rooms, queue, phones, WebSocket and the agent API. It keeps no songs.
 
@@ -123,10 +123,10 @@ Proposed minimum requirements (**to be measured** with real tests before publish
 | PyInstaller of everything | A single `.exe` | Torch + CUDA is huge and fragile | Discarded |
 | Docker for the user | Already works | WSL2 + Docker Desktop: heavy and confusing for a layperson | Discarded |
 
-- **Installer** (Windows, NSIS or MSI through `electron-builder`): small (~100 MB), per-user install (no administrator) into `%LOCALAPPDATA%`.
-- **Engine pack** (downloaded on first run, with a progress bar, resumable, with a **SHA-256 checksum**): embedded Python (python-build-standalone) + torch (cpu **or** cu121) + dependencies + `ffmpeg` + `yt-dlp` + `deno` (required by yt-dlp to solve YouTube's challenges). Hosted on **GitHub Releases** (free).
+- **Installer** (Windows, NSIS or MSI through `electron-builder`): small (~100 MB), per-user install (no administrator) into `%LOCALAPPDATA%`. **It is not public**: the installer is delivered through a **private link**. Releases of a public repository are public, so we do **not** use them for it. Free options: serve the file from the Oracle VM itself (an unlisted link with a token) or a personal cloud-storage link.
+- **Engine pack** (downloaded on first run, with a progress bar, resumable, with a **SHA-256 checksum**): embedded Python (python-build-standalone) + torch (cpu **or** cu121) + dependencies + `ffmpeg` + `yt-dlp` + `deno` (required by yt-dlp to solve YouTube's challenges). **Proposal: assembled on the user's computer.** The installer downloads each component from its **official source** (PyTorch, yt-dlp, ffmpeg, deno, python-build-standalone), in **pinned versions and checksums**, instead of us hosting and redistributing a multi-GB pack. That way we neither pay for nor maintain hosting of the pack, and the license obligations (ffmpeg's GPL) get simpler. Trade-off: it depends on the official sources being up (mitigated by pinned versions, checksums and retries).
 - **Updates:** the agent (auto-update) and **yt-dlp** (checked at every start; it is what breaks most) update themselves, with a minimum version required by the server (`/heartbeat` answers "update").
-- **Code signing:** without a certificate, Windows (SmartScreen) warns. Free paths: SignPath Foundation (open source projects) or accepting the warning at first. A paid certificate goes against the zero-cost rule.
+- **Code signing:** since the installer **will not be publicly distributed** and the cost is zero, **we do not sign**. The few people who receive it will see Windows' (SmartScreen) warning and choose "More info → Run anyway"; the installation guide explains this.
 - **ffmpeg ships inside the engine pack** (the user installs nothing and the app **does not depend** on an ffmpeg they may already have). It is used by: yt-dlp (extracting the audio), vocal separation (reading and writing audio, MP3 through `libmp3lame`), alignment and key/melody analysis (decoding audio) and the **MP4 export** (`libx264`, `aac`, the `rubberband` filter for the key and `libass` to burn in the lyrics). It sits in the app's folder, **off the PATH**, and the engine calls it by full path. Size: ~80 to 190 MB, depending on the build.
 - **Which build:** since we need `libx264`, `libass` and `rubberband`, the build must be **GPL** (LGPL lacks them). Use a prebuilt GPL build for Windows (gyan.dev or BtbN on GitHub, both free), **pin the version and SHA-256** and check when assembling the pack that it contains those codecs and filters (`ffmpeg -encoders`, `-filters`). Running as a **separate program** (not linked to our code), ffmpeg stays GPL and our code keeps its own license; we must include the license notice and a link to the source code. If we ever want to avoid the GPL, the alternative is an LGPL build with OpenH264 or the hardware encoder (losing `rubberband` and `libass`, which would force changing how we do the key change and the subtitles).
 - **Licenses:** yt-dlp (Unlicense), Demucs (MIT), model weights have their own licenses: **review them one by one** before redistributing.
@@ -176,7 +176,7 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 - A long device token, stored in the OS vault; revocable; valid only for its owner. The server rate-limits and size-limits every agent route.
 - TLS is mandatory; no inbound ports on the user's computer.
 - Upload (`PUT /library`): an allowed-names list, a size limit, `..` blocking, atomic writes.
-- No secrets in the installer; the repository stays **without music** (`storage/` ignored); the engine and installer go only to Releases.
+- No secrets in the installer; the repository stays **without music** (`storage/` ignored); the installer is delivered through a private link and the engine is downloaded from the official sources, so none of it goes to the public Releases.
 - Main threat model: a **compromised server** (it cannot run code on the agent: section 8, item 4) and a **third-party agent** (it cannot read another library's jobs: a token per owner).
 
 ## 11. Testing
@@ -210,9 +210,13 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 6. **Importing the user's files and links from open sources enters v2** (section 8.1).
 7. **Only the session owner imports files**, through the app; a guest does not upload a file from the phone.
 8. The app **does not verify the origin** of an imported file: responsibility lies with whoever imports it (personal use), and this appears in the terms of use.
+9. Guests see only a **nickname** chosen by the owner at the start of the session, never the YouTube account.
+10. **The TV runs on the owner's computer** (where the microphones are). The phone: join rooms, pick songs, change the key of the chosen song, yield a turn and adjust the backing vocals; **no instrumental preview on the phone** in v2.
+11. The installer **will not be publicly distributed** (only for the owner and people close to them) and **will not be signed**.
 
 **Open**
-1. **Nickname or real account** shown to guests (showing the real account exposes the owner's identity).
-2. Is a **TV on the owner's computer** (and no instrumental preview on the phone) acceptable in v2? Checking Chrome's local network prompt (M1) may force serving the TV page from the agent.
-3. **Public distribution?** It defines the stance on copyright, the warning about the account and the code signing.
-4. **RTX 50 and others:** confirm on your machine and on a new card whether the current torch works (or raise the torch version, which forces a review of Demucs, today pinned to 2.5.1).
+1. **Where to host the installer privately** (the Oracle VM with an unlisted link, or personal cloud storage) and whether the **engine pack is assembled on the user's PC** from the official sources (the section 7 proposal).
+2. **Chrome's local network prompt** with the TV on `localhost`: test in M1; it may force the agent to serve the TV page.
+3. **Name and identity** of the installer and the agent (postponed).
+
+**No means of testing at the moment:** RTX 50 (Blackwell) and other vendors' GPUs. The current torch (2.5.1/cu121) probably does not support the RTX 50; the installer tests the GPU and falls back to the CPU, but that was **not validated** on those cards. Raising the torch version would force a review of Demucs, today pinned to 2.5.1.

@@ -127,19 +127,19 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 
 ## 9. Risks and constraints
 
-- **Copyright and YouTube's terms.** Downloading and separating protected music may violate YouTube's terms and copyright. The project is for personal, private use. Distributing an installer to third parties that downloads from YouTube increases the project's exposure: decide before publicizing it (see open questions).
+- **Copyright and YouTube's terms.** Downloading and separating protected music may violate YouTube's terms and copyright. The project is for personal, private use. Distributing an installer to third parties that downloads from YouTube would increase the project's exposure; so **the installer will not be publicly distributed** (decided).
 - **YouTube blocks datacenter IPs** and changes often; that is why the download happens on the user's computer.
 - **Risk to the YouTube account.** yt-dlp itself warns that using an account with it can get the account restricted or banned, and there are reports of IP blocks tied to using cookies. Since the account is only used when YouTube blocks (the default), the risk is lower, but it exists: the recommendation at sign-in is to use a **secondary account just for this**.
 - **The login cannot happen in a window embedded in the app.** Google blocks sign-in in embedded browsers (Electron and similar: "This browser or app may not be secure"). The login happens in the user's **regular browser**, and the app reads the session from it. YouTube's cookies rotate often; the app must detect an expired session and ask for the login again.
 - **Varied hardware:** very new cards or other vendors' cards may lack acceleration; the CPU fallback is mandatory.
-- **Code signing:** without a certificate, Windows shows an "unknown app" warning; paid certificates go against the zero-cost rule.
+- **Code signing:** the installer **will not be signed** (zero cost and private distribution); whoever receives it sees the Windows warning ("More info → Run anyway").
 - **Storage:** the local library grows (measured: ~16 MB per song on the PC, with the isolated vocals; ~7 MB in the cloud, without them); the AI engine takes a few GB.
 
 ## 10. Open questions
 
-**Decided (Oct 2026):** the download account is **one per session**, asked at the start, and applies to every room in the session; storage is **local first** (hybrid later); the first version is **Windows only**; downloads try **without cookies first**; **importing the user's own files and links from open sources enters v2** (F32, F33); **only the session owner imports files, through the app** (guests do not upload from the phone); **the app does not verify the origin of an imported file**, and that responsibility lies with whoever imports it (personal use), stated in the terms of use.
+**Decided (Oct 2026):** the download account is **one per session**, asked at the start, and applies to every room in the session; storage is **local first** (hybrid later); the first version is **Windows only**; downloads try **without cookies first**; **importing the user's own files and links from open sources enters v2** (F32, F33); **only the session owner imports files, through the app** (guests do not upload from the phone); **the app does not verify the origin of an imported file**, and that responsibility lies with whoever imports it (personal use), stated in the terms of use; **the session shows guests only a nickname**, chosen by the owner who signed in at the start (never the YouTube account); **the TV runs on the owner's computer**, where the microphones will be; **the phone is used to** join rooms, pick songs, change the key of the chosen song, yield a turn in the queue and raise or lower the backing vocals (no instrumental preview on the phone in v2); **the installer will not be publicly distributed**, only for the owner and people close to them, with no code signing.
 
-1. **What does the session show guests?** The YouTube account's name or just a nickname chosen by the owner? (showing the real account exposes their identity)
-2. **How does a guest play the local song?** With local storage, the **TV must run on the owner's computer** (or be connected to it by HDMI); the instrumental preview on the phone does not work in this mode. Is that acceptable for v2?
-3. **Will it be distributed publicly?** It changes the stance on copyright, the warning about the account and the kind of code signing.
-4. **Name and identity** of the installer and the agent.
+1. **Name and identity** of the installer and the agent (postponed).
+2. **Where to host the installer privately?** Releases of a public repository are public; options in the TRD, section 7.
+
+**No means of testing at the moment:** NVIDIA RTX 50 GPUs and other vendors' GPUs. The installer tests the GPU and falls back to the CPU if it fails, but that was **not validated** on those cards.

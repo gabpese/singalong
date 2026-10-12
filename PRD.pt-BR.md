@@ -127,19 +127,19 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 
 ## 9. Riscos e restrições
 
-- **Direitos autorais e termos do YouTube.** Baixar e separar música protegida pode violar os termos do YouTube e direitos autorais. O projeto é para uso pessoal e privado. Distribuir um instalador para terceiros que baixa do YouTube aumenta a exposição do projeto: decidir antes de divulgar (ver perguntas em aberto).
+- **Direitos autorais e termos do YouTube.** Baixar e separar música protegida pode violar os termos do YouTube e direitos autorais. O projeto é para uso pessoal e privado. Distribuir um instalador a terceiros que baixa do YouTube aumentaria a exposição do projeto; por isso **o instalador não será distribuído publicamente** (decidido).
 - **O YouTube bloqueia IPs de datacenter** e muda com frequência; por isso o download acontece no computador do usuário.
 - **Risco para a conta do YouTube.** O próprio yt-dlp avisa que usar uma conta com ele pode levá-la a ser restringida ou banida, e há relatos de bloqueio de IP ligado ao uso de cookies. Como a conta só é usada quando o YouTube bloqueia (padrão), o risco é menor, mas existe: a recomendação ao entrar é usar uma **conta secundária, só para isso**.
 - **O login não pode ser feito numa janela embutida do app.** O Google bloqueia o login em navegadores embutidos (Electron e similares: "Este navegador ou app pode não ser seguro"). O login acontece no **navegador normal** do usuário, e o app lê dele a sessão. Os cookies do YouTube giram com frequência; o app precisa detectar a sessão vencida e pedir o login de novo.
 - **Hardware variado:** placas muito novas ou de outros fabricantes podem não ter aceleração; o fallback para CPU é obrigatório.
-- **Assinatura de código:** sem certificado, o Windows mostra aviso de "app desconhecido"; certificados pagos vão contra a regra de custo zero.
+- **Assinatura de código:** o instalador **não será assinado** (custo zero e distribuição privada); quem o receber vê o aviso do Windows ("Mais informações → Executar assim mesmo").
 - **Armazenamento:** a biblioteca local cresce (medido: ~16 MB por música no PC, com a voz isolada; ~7 MB na nuvem, sem ela); o motor de IA ocupa alguns GB.
 
 ## 10. Perguntas em aberto
 
-**Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**; o download tenta **sem cookie primeiro**; **importar arquivos do próprio usuário e links de fontes abertas entra na v2** (F32, F33); **só o dono da sessão importa arquivos, pelo app** (o convidado não envia arquivo pelo celular); **o app não verifica a origem de um arquivo importado**, e a responsabilidade é de quem importa (uso pessoal), o que consta no aviso de uso.
+**Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**; o download tenta **sem cookie primeiro**; **importar arquivos do próprio usuário e links de fontes abertas entra na v2** (F32, F33); **só o dono da sessão importa arquivos, pelo app** (o convidado não envia arquivo pelo celular); **o app não verifica a origem de um arquivo importado**, e a responsabilidade é de quem importa (uso pessoal), o que consta no aviso de uso; **a sessão mostra aos convidados só um apelido**, escolhido pelo dono que entrou no início (nunca a conta do YouTube); **a TV roda no computador do dono**, onde estarão os microfones; **o celular serve para** entrar em salas, escolher músicas, mudar o tom da música escolhida, passar a vez na fila e aumentar ou diminuir a voz de apoio (sem prévia do instrumental no celular na v2); **o instalador não será distribuído publicamente**, só para o dono e pessoas próximas, sem assinatura de código.
 
-1. **O que a sessão mostra aos convidados?** O nome da conta do YouTube ou só um apelido escolhido pelo dono? (mostrar a conta real expõe a identidade dele)
-2. **Como o convidado toca a música local?** Com armazenamento local, a **TV tem de rodar no computador do dono** (ou ligada a ele por HDMI); a prévia do instrumental no celular não funciona nesse modo. Isso é aceitável para a v2?
-3. **Vai ser distribuído publicamente?** Muda a postura sobre direitos autorais, o aviso sobre a conta e o tipo de assinatura de código.
-4. **Nome e identidade** do instalador e do agente.
+1. **Nome e identidade** do instalador e do agente (adiado).
+2. **Onde hospedar o instalador em privado?** As Releases de um repositório público são públicas; opções no TRD, seção 7.
+
+**Sem meios de teste no momento:** GPUs NVIDIA RTX 50 e de outros fabricantes. O instalador testa a GPU e cai para a CPU se falhar, mas isso **não foi validado** nessas placas.

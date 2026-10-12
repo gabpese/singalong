@@ -51,7 +51,7 @@ Princípios:
 - **Os celulares entram na sala pelo QR code, como hoje.** Quando um convidado pede uma música, a API cria o job e o **roteia para a sessão da sala**: só o agente dono dessa sessão consegue reivindicá-lo (`claim` filtra por `session_id`). O convidado nunca vê nem usa a conta do dono.
 - **Dono offline:** o job fica na fila e a sala mostra "o dono da sessão está desconectado" (detectado pelo `heartbeat`). Músicas já locais continuam tocando na TV do próprio dono.
 - **Fim da sessão:** ao sair do app, a sessão é encerrada; as salas seguem a regra atual (apagadas após 24 h paradas).
-- **O que a nuvem sabe da conta:** só um **apelido de exibição** e se a sessão está "conectada". Nunca cookies, e-mail ou senha.
+- **O que a nuvem sabe da conta:** só um **apelido de exibição**, escolhido pelo dono ao iniciar a sessão (é o que os convidados veem), e se a sessão está "conectada". Nunca cookies, e-mail ou senha.
 - **Servidor:** novas tabelas `sessions(id, device_id, display_name, created_at, last_seen)` e a coluna `rooms.session_id`; o stream de jobs passa a levar `session_id`.
 - **Papel da nuvem:** com o armazenamento local (seção 5), a nuvem vira o **ponto de encontro**: salas, fila, celulares, WebSocket e a API do agente. Ela não guarda músicas.
 
@@ -123,10 +123,10 @@ Requisitos mínimos propostos (**a medir** com testes reais antes de publicar): 
 | PyInstaller de tudo | Um `.exe` | Torch + CUDA gigante e frágil | Descartada |
 | Docker para o usuário | Já funciona | WSL2 + Docker Desktop: pesado e confuso para leigo | Descartada |
 
-- **Instalador** (Windows, NSIS ou MSI via `electron-builder`): pequeno (~100 MB), instala por usuário (sem administrador) em `%LOCALAPPDATA%`.
-- **Pacote do motor** (baixado na 1ª execução, com barra de progresso, retomável, com **checksum SHA-256**): Python embutido (python-build-standalone) + torch (cpu **ou** cu121) + dependências + `ffmpeg` + `yt-dlp` + `deno` (exigido pelo yt-dlp para resolver os desafios do YouTube). Hospedado nas **GitHub Releases** (gratuito).
+- **Instalador** (Windows, NSIS ou MSI via `electron-builder`): pequeno (~100 MB), instala por usuário (sem administrador) em `%LOCALAPPDATA%`. **Não é público**: o instalador é entregue por **link privado**. As Releases de um repositório público são públicas, então **não** as usamos para ele. Opções gratuitas: servir o arquivo pela própria VM da Oracle (link não listado, com token) ou um link de armazenamento pessoal em nuvem.
+- **Pacote do motor** (baixado na 1ª execução, com barra de progresso, retomável, com **checksum SHA-256**): Python embutido (python-build-standalone) + torch (cpu **ou** cu121) + dependências + `ffmpeg` + `yt-dlp` + `deno` (exigido pelo yt-dlp para resolver os desafios do YouTube). **Proposta: montado no computador do usuário.** O instalador baixa cada componente da **fonte oficial** (PyTorch, yt-dlp, ffmpeg, deno, python-build-standalone), em versões e **checksums fixados**, em vez de nós hospedarmos e redistribuirmos o pacote de GBs. Assim não pagamos nem mantemos hospedagem do pacote, e as obrigações de licença (a GPL do ffmpeg) ficam mais simples. Contrapartida: depende de as fontes oficiais estarem no ar (mitigado pelas versões fixas, checksum e novas tentativas).
 - **Atualização:** o agente (auto-update) e o **yt-dlp** (verificado a cada início; é o que mais quebra) atualizam sozinhos, com versão mínima exigida pelo servidor (`/heartbeat` responde "atualize").
-- **Assinatura de código:** sem certificado, o Windows (SmartScreen) avisa. Caminhos gratuitos: SignPath Foundation (projetos open source) ou aceitar o aviso no começo. Certificado pago contraria a regra de custo zero.
+- **Assinatura de código:** como o instalador **não será distribuído publicamente** e o custo é zero, **não assinamos**. As poucas pessoas que o receberem verão o aviso do Windows (SmartScreen) e escolhem "Mais informações → Executar assim mesmo"; o guia de instalação explica isso.
 - **ffmpeg vai dentro do pacote do motor** (o usuário não instala nada e o app **não depende** de um ffmpeg que ele já tenha). É usado por: o yt-dlp (extrair o áudio), a separação de voz (ler e gravar áudio, MP3 com `libmp3lame`), o alinhamento e a análise de tom/melodia (decodificar áudio) e a **exportação de MP4** (`libx264`, `aac`, o filtro `rubberband` para o tom e `libass` para queimar a letra). Fica na pasta do app, **fora do PATH**, e o motor o chama pelo caminho completo. Tamanho: ~80 a 190 MB, conforme a build.
 - **Qual build:** como precisamos de `libx264`, `libass` e `rubberband`, a build tem de ser **GPL** (a LGPL não os inclui). Usar uma build GPL já compilada para Windows (gyan.dev ou BtbN, no GitHub, gratuitas), **fixar a versão e o SHA-256** e conferir na montagem do pacote que ela contém esses codecs e filtros (`ffmpeg -encoders`, `-filters`). Rodando como **programa separado** (não ligado ao nosso código), o ffmpeg continua GPL e o nosso código mantém a sua licença; é preciso incluir o aviso de licença e o link do código-fonte. Se um dia quisermos evitar a GPL, a alternativa é uma build LGPL com OpenH264 ou o encoder de hardware (perdendo `rubberband` e `libass`, o que obrigaria a trocar o jeito de fazer o tom e a legenda).
 - **Licenças:** yt-dlp (Unlicense), Demucs (MIT), pesos de modelos com licenças próprias: **revisar uma a uma** antes de redistribuir.
@@ -176,7 +176,7 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 - Token de dispositivo longo, guardado no cofre do sistema; revogável; só vale para o seu dono. O servidor limita taxa e tamanho em todas as rotas do agente.
 - TLS obrigatório; sem portas de entrada no computador do usuário.
 - Upload (`PUT /library`): lista de nomes permitidos, limite de tamanho, bloqueio de `..`, escrita atômica.
-- Nenhum segredo no instalador; o repositório continua **sem músicas** (`storage/` ignorado); o motor e o instalador só vão para as Releases.
+- Nenhum segredo no instalador; o repositório continua **sem músicas** (`storage/` ignorado); o instalador é entregue por link privado e o motor é baixado das fontes oficiais, então nada disso vai para as Releases públicas.
 - Modelo de ameaça principal: **servidor comprometido** (não pode executar código no agente: seção 8, item 4) e **agente de terceiros** (não lê jobs de outra biblioteca: token por dono).
 
 ## 11. Testes
@@ -210,9 +210,13 @@ Bandeja do sistema + janela simples: **Parear** (código de 8 caracteres, uma ve
 6. **Importar arquivos do usuário e links de fontes abertas entra na v2** (seção 8.1).
 7. **Só o dono da sessão importa arquivos**, pelo app; o convidado não envia arquivo pelo celular.
 8. O app **não verifica a origem** de um arquivo importado: a responsabilidade é de quem importa (uso pessoal), e isso consta no aviso de uso.
+9. Os convidados veem só um **apelido** escolhido pelo dono no início da sessão, nunca a conta do YouTube.
+10. **A TV roda no computador do dono** (onde ficam os microfones). O celular: entrar em salas, escolher músicas, mudar o tom da música escolhida, passar a vez e ajustar a voz de apoio; **sem prévia do instrumental no celular** na v2.
+11. O instalador **não será distribuído publicamente** (só para o dono e pessoas próximas) e **não será assinado**.
 
 **Em aberto**
-1. **Apelido ou conta real** exibido aos convidados (mostrar a conta real expõe a identidade do dono).
-2. **TV no computador do dono** (e sem prévia do instrumental no celular) é aceitável na v2? A verificação do aviso de rede local do Chrome (M1) pode obrigar a servir a página da TV pelo agente.
-3. **Distribuição pública?** Define a postura sobre direitos autorais, o aviso sobre a conta e a assinatura de código.
-4. **RTX 50 e outras:** confirmar com a sua máquina e uma placa nova se o torch atual funciona (ou subir a versão do torch, o que obriga a revisar o Demucs, hoje fixado em 2.5.1).
+1. **Onde hospedar o instalador em privado** (VM da Oracle com link não listado, ou nuvem pessoal) e se o **pacote do motor é montado no PC do usuário** a partir das fontes oficiais (proposta da seção 7).
+2. **Aviso de rede local do Chrome** com a TV em `localhost`: testar no M1; pode obrigar o agente a servir a página da TV.
+3. **Nome e identidade** do instalador e do agente (adiado).
+
+**Sem meios de teste no momento:** RTX 50 (Blackwell) e GPUs de outros fabricantes. O torch atual (2.5.1/cu121) provavelmente não tem suporte à RTX 50; o instalador testa a GPU e cai para a CPU, mas isso **não foi validado** nessas placas. Subir a versão do torch obrigaria a revisar o Demucs, hoje fixado em 2.5.1.
