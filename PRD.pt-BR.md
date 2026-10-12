@@ -92,7 +92,7 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 |---|---|---|
 | F27 | O usuário **inicia uma sessão** no software e **entra com o YouTube logo no início**; a sessão tem **uma única conta**, escolhida por ele | 🔧 |
 | F28 | Todas as salas criadas na sessão usam **essa mesma conta** para baixar. Quando alguém pede uma música pelo celular, **quem baixa é o dono da sessão** a que aquele celular está conectado, com o padrão definido | 🔧 |
-| F29 | O login é pedido **antes** de qualquer download (não se tenta, falha e só então se pede), e o app mostra se a conta está conectada | 🔧 |
+| F29 | O login é pedido **antes** de qualquer download (não se tenta, falha e só então se pede), e o app mostra se a conta está conectada. O download tenta **sem cookie primeiro** e usa o login só quando o YouTube bloquear (opção "sempre usar" nas configurações) | 🔧 |
 | F30 | Os cookies da conta **ficam só no computador do dono**, nunca vão para a nuvem nem para os convidados | 🔧 |
 | F31 | Se o dono da sessão está offline, a sala avisa "o dono da sessão está desconectado" e o pedido espera na fila | 🔧 |
 
@@ -127,7 +127,7 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 
 - **Direitos autorais e termos do YouTube.** Baixar e separar música protegida pode violar os termos do YouTube e direitos autorais. O projeto é para uso pessoal e privado. Distribuir um instalador para terceiros que baixa do YouTube aumenta a exposição do projeto: decidir antes de divulgar (ver perguntas em aberto).
 - **O YouTube bloqueia IPs de datacenter** e muda com frequência; por isso o download acontece no computador do usuário.
-- **Risco para a conta do YouTube.** O próprio yt-dlp avisa que usar uma conta com ele pode levá-la a ser restringida ou banida, e há relatos de bloqueio de IP ligado ao uso de cookies. Como a sessão baixa **sempre com a conta escolhida**, o uso de uma **conta secundária, só para isso**, deve ser a recomendação padrão ao entrar.
+- **Risco para a conta do YouTube.** O próprio yt-dlp avisa que usar uma conta com ele pode levá-la a ser restringida ou banida, e há relatos de bloqueio de IP ligado ao uso de cookies. Como a conta só é usada quando o YouTube bloqueia (padrão), o risco é menor, mas existe: a recomendação ao entrar é usar uma **conta secundária, só para isso**.
 - **O login não pode ser feito numa janela embutida do app.** O Google bloqueia o login em navegadores embutidos (Electron e similares: "Este navegador ou app pode não ser seguro"). O login acontece no **navegador normal** do usuário, e o app lê dele a sessão. Os cookies do YouTube giram com frequência; o app precisa detectar a sessão vencida e pedir o login de novo.
 - **Hardware variado:** placas muito novas ou de outros fabricantes podem não ter aceleração; o fallback para CPU é obrigatório.
 - **Assinatura de código:** sem certificado, o Windows mostra aviso de "app desconhecido"; certificados pagos vão contra a regra de custo zero.
@@ -138,7 +138,7 @@ Estados: ✅ pronto · 🔧 planejado · 💡 ideia.
 **Decidido (Out/2026):** a conta de download é **uma por sessão**, pedida no início, e vale para todas as salas da sessão; o armazenamento é **local primeiro** (híbrido depois); a primeira versão é **só para Windows**.
 
 1. **O que a sessão mostra aos convidados?** O nome da conta do YouTube ou só um apelido escolhido pelo dono? (mostrar a conta real expõe a identidade dele)
-2. **Uso do login:** em **todo** download (como decidido) ou, opcionalmente, **só quando o YouTube pedir**, para reduzir o risco à conta? Proposta: padrão "sempre", com a opção disponível.
+2. **Importar arquivos de áudio do próprio usuário** (e fontes abertas, como Jamendo e Internet Archive) como alternativa que não passa pelo YouTube: entra na v2?
 3. **Como o convidado toca a música local?** Com armazenamento local, a **TV tem de rodar no computador do dono** (ou ligada a ele por HDMI); a prévia do instrumental no celular não funciona nesse modo. Isso é aceitável para a v2?
 4. **Vai ser distribuído publicamente?** Muda a postura sobre direitos autorais, o aviso sobre a conta e o tipo de assinatura de código.
 5. **Nome e identidade** do instalador e do agente.

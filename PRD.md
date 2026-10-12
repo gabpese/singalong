@@ -92,7 +92,7 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 |---|---|---|
 | F27 | The user **starts a session** in the software and **signs in to YouTube right at the start**; a session has **a single account**, chosen by them | 🔧 |
 | F28 | Every room created in the session uses **that same account** to download. When someone requests a song from their phone, **the session owner downloads it**, the owner of the session that phone is connected to, with the defined defaults | 🔧 |
-| F29 | The login is asked **before** any download (we do not try, fail and only then ask), and the app shows whether the account is connected | 🔧 |
+| F29 | The login is asked **before** any download (we do not try, fail and only then ask), and the app shows whether the account is connected. Downloads try **without cookies first** and use the login only when YouTube blocks (an "always use" option in settings) | 🔧 |
 | F30 | The account's cookies **stay only on the owner's computer**, never going to the cloud or to the guests | 🔧 |
 | F31 | If the session owner is offline, the room says "the session owner is disconnected" and the request waits in the queue | 🔧 |
 
@@ -127,7 +127,7 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 
 - **Copyright and YouTube's terms.** Downloading and separating protected music may violate YouTube's terms and copyright. The project is for personal, private use. Distributing an installer to third parties that downloads from YouTube increases the project's exposure: decide before publicizing it (see open questions).
 - **YouTube blocks datacenter IPs** and changes often; that is why the download happens on the user's computer.
-- **Risk to the YouTube account.** yt-dlp itself warns that using an account with it can get the account restricted or banned, and there are reports of IP blocks tied to using cookies. Since the session downloads **always with the chosen account**, using a **secondary account just for this** should be the default recommendation at sign-in.
+- **Risk to the YouTube account.** yt-dlp itself warns that using an account with it can get the account restricted or banned, and there are reports of IP blocks tied to using cookies. Since the account is only used when YouTube blocks (the default), the risk is lower, but it exists: the recommendation at sign-in is to use a **secondary account just for this**.
 - **The login cannot happen in a window embedded in the app.** Google blocks sign-in in embedded browsers (Electron and similar: "This browser or app may not be secure"). The login happens in the user's **regular browser**, and the app reads the session from it. YouTube's cookies rotate often; the app must detect an expired session and ask for the login again.
 - **Varied hardware:** very new cards or other vendors' cards may lack acceleration; the CPU fallback is mandatory.
 - **Code signing:** without a certificate, Windows shows an "unknown app" warning; paid certificates go against the zero-cost rule.
@@ -138,7 +138,7 @@ Status: ✅ done · 🔧 planned · 💡 idea.
 **Decided (Oct 2026):** the download account is **one per session**, asked at the start, and applies to every room in the session; storage is **local first** (hybrid later); the first version is **Windows only**.
 
 1. **What does the session show guests?** The YouTube account's name or just a nickname chosen by the owner? (showing the real account exposes their identity)
-2. **Use of the login:** on **every** download (as decided) or, optionally, **only when YouTube asks**, to reduce the risk to the account? Proposal: default "always", with the option available.
+2. **Importing the user's own audio files** (and open sources, such as Jamendo and the Internet Archive) as an alternative that does not go through YouTube: does it enter v2?
 3. **How does a guest play the local song?** With local storage, the **TV must run on the owner's computer** (or be connected to it by HDMI); the instrumental preview on the phone does not work in this mode. Is that acceptable for v2?
 4. **Will it be distributed publicly?** It changes the stance on copyright, the warning about the account and the kind of code signing.
 5. **Name and identity** of the installer and the agent.

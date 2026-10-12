@@ -127,11 +127,15 @@ Proposed minimum requirements (**to be measured** with real tests before publish
 - **Engine pack** (downloaded on first run, with a progress bar, resumable, with a **SHA-256 checksum**): embedded Python (python-build-standalone) + torch (cpu **or** cu121) + dependencies + `ffmpeg` + `yt-dlp` + `deno` (required by yt-dlp to solve YouTube's challenges). Hosted on **GitHub Releases** (free).
 - **Updates:** the agent (auto-update) and **yt-dlp** (checked at every start; it is what breaks most) update themselves, with a minimum version required by the server (`/heartbeat` answers "update").
 - **Code signing:** without a certificate, Windows (SmartScreen) warns. Free paths: SignPath Foundation (open source projects) or accepting the warning at first. A paid certificate goes against the zero-cost rule.
-- **Licenses:** yt-dlp (Unlicense), ffmpeg (use an LGPL build, no GPL), Demucs (MIT), model weights have their own licenses: **review them one by one** before redistributing.
+- **ffmpeg ships inside the engine pack** (the user installs nothing and the app **does not depend** on an ffmpeg they may already have). It is used by: yt-dlp (extracting the audio), vocal separation (reading and writing audio, MP3 through `libmp3lame`), alignment and key/melody analysis (decoding audio) and the **MP4 export** (`libx264`, `aac`, the `rubberband` filter for the key and `libass` to burn in the lyrics). It sits in the app's folder, **off the PATH**, and the engine calls it by full path. Size: ~80 to 190 MB, depending on the build.
+- **Which build:** since we need `libx264`, `libass` and `rubberband`, the build must be **GPL** (LGPL lacks them). Use a prebuilt GPL build for Windows (gyan.dev or BtbN on GitHub, both free), **pin the version and SHA-256** and check when assembling the pack that it contains those codecs and filters (`ffmpeg -encoders`, `-filters`). Running as a **separate program** (not linked to our code), ffmpeg stays GPL and our code keeps its own license; we must include the license notice and a link to the source code. If we ever want to avoid the GPL, the alternative is an LGPL build with OpenH264 or the hardware encoder (losing `rubberband` and `libass`, which would force changing how we do the key change and the subtitles).
+- **Licenses:** yt-dlp (Unlicense), Demucs (MIT), model weights have their own licenses: **review them one by one** before redistributing.
 
 ## 8. YouTube download and the session login
 
 **Decision (Oct 2026):** the YouTube login is asked **at the start of the session**, before any download, so we never try, fail and only then ask. The chosen account downloads for **all** rooms in the session (section 3.1).
+
+**Login-use policy (decided after a test):** the agent downloads **without cookies first**, through the user's residential internet, and uses the login **only when YouTube blocks** (asks for a login or answers 403). In a test on the owner's PC, without cookies, yt-dlp 2026.08.19 resolved 6 of 6 videos and downloaded 3 of 3 with the default client (there was one isolated 403; it is intermittent). So the login is **ready from the start** (interrupting nobody), but the account stays barely exposed. It can be changed in settings to "always use the login".
 
 **Login flow ("Sign in to YouTube")**
 1. The app opens the user's **default browser** at YouTube's sign-in page. It **cannot be a window embedded in the app:** Google **blocks sign-in in embedded browsers**, Electron included ("This browser or app may not be secure"; [Google's policy](https://www.bleepingcomputer.com/news/security/google-to-block-logins-from-embedded-browser-frameworks), [guide on Electron](https://www.todesktop.com/docs/application/google-oauth-screen)).
@@ -142,7 +146,7 @@ Proposed minimum requirements (**to be measured** with real tests before publish
 
 **Cautions and limitations**
 - **Risk to the account.** yt-dlp warns that using an account with it can get it restricted or banned, and recommends a low request rate and, if possible, a throwaway account ([yt-dlp wiki](https://lab.trianta.dev/mirrors/yt-dlp.yt-dlp/wiki/Extractors)); there are also reports of IP blocks tied to cookies ([Pinchflat](https://github.com/kieraneglin/pinchflat/wiki/YouTube-Cookies)). **Recommendation at sign-in: use a secondary account.** The agent limits the rate (one download at a time, with a pause between them).
-- **An option to reduce the risk:** in settings, "use the login: **always** (default, as decided) or **only when YouTube asks**" (no cookies first, through the residential internet, and with cookies only on a login error). Both require the login done at the start.
+- **Setting:** "use the login: **only when YouTube asks** (default) or **always**". Both require the login done at the start. "Always" raises the risk to the account.
 - Recent Chrome/Edge on Windows **encrypt cookies in a way yt-dlp often cannot read** (even when not admin); **Firefox** usually works. The alternative is for the user to export a `cookies.txt`. The app must **test the reading** on the login screen and say which browser worked.
 - Opening a Chromium with Playwright just for the login is **not necessary** and also runs into Google's protections against automation: it adds ~150 MB without being more reliable than reading the browser the user already has.
 
@@ -153,7 +157,7 @@ Proposed minimum requirements (**to be measured** with real tests before publish
 
 ## 9. Agent interface
 
-System tray + a simple window: **Pair** (8-character code, once), **Start session / Sign in to YouTube** (pick the browser and profile, with the "Connected" test), **status** (connected, processing, queue, the session's rooms), **library folder**, **detected hardware** (GPU/CPU, a "use CPU" button), **use of the login** (always / only when YouTube asks), **logs**, **start with Windows**, **version and update**. No telemetry.
+System tray + a simple window: **Pair** (8-character code, once), **Start session / Sign in to YouTube** (pick the browser and profile, with the "Connected" test), **status** (connected, processing, queue, the session's rooms), **library folder**, **detected hardware** (GPU/CPU, a "use CPU" button), **use of the login** (only when YouTube asks, default / always), **logs**, **start with Windows**, **version and update**. No telemetry.
 
 ## 10. Security
 
@@ -189,10 +193,12 @@ System tray + a simple window: **Pair** (8-character code, once), **Start sessio
 1. The download account is **one per session**, asked at the start, and applies to every room in the session (sections 3.1 and 8).
 2. **Local storage first** (mode A); hybrid later (M5).
 3. First platform: **Windows only**.
+4. Downloads use the login **only when YouTube blocks** (no cookies first); "always" is an option.
+5. **ffmpeg (a GPL build)** ships inside the engine pack (section 7).
 
 **Open**
 1. **Nickname or real account** shown to guests (showing the real account exposes the owner's identity).
-2. **Use of the login:** default "always" with the option "only when YouTube asks"; confirm.
+2. **Importing the user's own audio files** (and open sources) as a YouTube-free alternative: does it enter v2?
 3. Is a **TV on the owner's computer** (and no instrumental preview on the phone) acceptable in v2? Checking Chrome's local network prompt (M1) may force serving the TV page from the agent.
 4. **Public distribution?** It defines the stance on copyright, the warning about the account and the code signing.
 5. **RTX 50 and others:** confirm on your machine and on a new card whether the current torch works (or raise the torch version, which forces a review of Demucs, today pinned to 2.5.1).
