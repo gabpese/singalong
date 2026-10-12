@@ -28,17 +28,18 @@ let base;
 let app;
 let userData;
 let sample;
+const mails = [];
 let musicFolder;
 
-const adminCode = async () => (await api.inject({ method: 'POST', url: '/agent/v1/pair/start', headers: { 'x-admin-token': 'adm' }, payload: {} })).json().code;
 
 before(async () => {
   if (skip) return;
   const root = await mkdtemp(join(tmpdir(), 'singalong-e2e-api-'));
   api = buildApp({
-    config: { publicDir: existsSync(WEB_DIST) ? WEB_DIST : root, adminToken: 'adm', rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG }, appLatestVersion: '9.0.0', appNotes: 'Corrige o login do YouTube', appDownloadUrl: 'http://127.0.0.1/baixar' },
+    config: { publicDir: existsSync(WEB_DIST) ? WEB_DIST : root, adminToken: 'adm', pairAllowedEmails: ['dona@exemplo.com'], rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG, pairRequest: BIG, pairEmail: BIG }, appLatestVersion: '9.0.0', appNotes: 'Corrige o login do YouTube', appDownloadUrl: 'http://127.0.0.1/baixar' },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),
+    mailer: { enabled: true, send: async (message) => { mails.push(message); } }, // o "e-mail" cai numa lista, que o teste lê
   });
   await api.listen({ port: 0, host: '127.0.0.1' });
   base = `http://127.0.0.1:${api.server.address().port}`;
@@ -103,16 +104,33 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   assert.equal(await id('screen-engine').isHidden(), true);
   assert.match(await id('version').textContent(), /^v\d+\.\d+\.\d+$/);
 
-  // código errado: a mensagem do servidor aparece e a tela continua
+  // o servidor padrão já vem preenchido; aqui ele aponta para o servidor de teste
+  await page.locator('details.advanced summary').click();
   await id('pair-server').fill(base);
+
+  // e-mail que não está na lista: a mesma mensagem e nenhum código enviado
+  await id('pair-email').fill('intruso@exemplo.com');
+  await id('pair-send').click();
+  await id('pair-sent').waitFor();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(mails.length, 0);
+
+  // código errado: a mensagem do servidor aparece e a tela continua
   await id('pair-code').fill('CODIGO-ERRADO');
   await id('pair-go').click();
   await id('error').waitFor();
   assert.match(await id('error').textContent(), /.+/);
   assert.equal(await id('screen-pair').isVisible(), true);
 
-  // código certo
-  await id('pair-code').fill(await adminCode());
+  // e-mail autorizado: o código chega por e-mail e é usado no app
+  await id('pair-email').fill('dona@exemplo.com');
+  await id('pair-send').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="pair-sent"]').textContent.includes('instantes'), null, { timeout: 15_000 });
+  for (let i = 0; i < 50 && mails.length === 0; i++) await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(mails.length, 1);
+  assert.equal(mails[0].to, 'dona@exemplo.com');
+  const pairCode = /código[^:]*: ([A-Z0-9]{8})/.exec(mails[0].text)[1];
+  await id('pair-code').fill(pairCode);
   await id('pair-name').fill('PC da sala');
   await id('pair-go').click();
   await id('screen-welcome').waitFor(); // depois de parear: a tela de início (imagem + apelido)

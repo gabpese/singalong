@@ -47,6 +47,13 @@ services:
       CACHE_MAX_GB: "0"
       # segredo do administrador: liga o pareamento do agente local (/agent/v1); vazio = desligado
       ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
+      # atrás do Caddy: o IP de quem chama vem no X-Forwarded-For (limites de pedidos por IP)
+      TRUST_PROXY: "1"
+      # código de pareamento por e-mail (opcional): quem estiver em PAIR_ALLOWED_EMAILS pede o código no app e recebe por e-mail
+      PAIR_ALLOWED_EMAILS: "${PAIR_ALLOWED_EMAILS:-}"
+      BREVO_API_KEY: "${BREVO_API_KEY:-}"
+      MAIL_FROM: "${MAIL_FROM:-}"
+      MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Singalong}"
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./storage:/storage # precisa ser gravável pelo usuário 1000 (o /readyz grava um arquivo de teste); veja o README

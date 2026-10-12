@@ -23,6 +23,12 @@ export function loadConfig(env = process.env) {
     // segredo do administrador do servidor: só com ele dá para gerar códigos de pareamento do agente local (vazio = desligado)
     adminToken: env.ADMIN_TOKEN ?? '',
     // versões do app instalado (agente): a mais recente, a mínima que ainda recebe trabalho, o que mudou e onde baixar (vazio = não avisa)
+    // pareamento por e-mail: a pessoa pede o código e ele só é enviado se o e-mail estiver na lista (separada por vírgulas)
+    pairAllowedEmails: (env.PAIR_ALLOWED_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+    trustProxy: env.TRUST_PROXY === '1', // atrás do Caddy o IP de verdade vem no X-Forwarded-For (limites por IP)
+    brevoApiKey: env.BREVO_API_KEY ?? '',
+    mailFrom: env.MAIL_FROM ?? '',
+    mailFromName: env.MAIL_FROM_NAME ?? 'Singalong',
     appLatestVersion: env.APP_LATEST_VERSION ?? '',
     appMinVersion: env.APP_MIN_VERSION ?? '',
     appNotes: (env.APP_NOTES ?? '').slice(0, 500),

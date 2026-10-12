@@ -35,9 +35,9 @@ export function createRateLimiter({ max, windowMs, now = Date.now }) {
 export const keyOf = (request) => String(request.headers['x-client-id'] || request.ip);
 
 /** preHandler do Fastify: responde 429 (com Retry-After) quando a pessoa passou do limite. */
-export function rateLimited(limiter, { message = 'Muitas tentativas seguidas. Espere alguns segundos e tente de novo.' } = {}) {
+export function rateLimited(limiter, { message = 'Muitas tentativas seguidas. Espere alguns segundos e tente de novo.', keyOf: customKey = keyOf } = {}) {
   return async function rateLimitHook(request, reply) {
-    const result = limiter.hit(`${request.routeOptions?.url ?? request.url}|${keyOf(request)}`);
+    const result = limiter.hit(`${request.routeOptions?.url ?? request.url}|${customKey(request)}`);
     if (!result.ok) {
       reply.header('Retry-After', String(result.retryAfterSec));
       return reply.code(429).send({ error: 'rate_limited', message, retry_after: result.retryAfterSec });
@@ -51,5 +51,7 @@ export const DEFAULT_LIMITS = {
   search: { max: 12, windowMs: 60_000 }, // cada busca vira uma consulta ao YouTube
   addToQueue: { max: 30, windowMs: 60_000 },
   createRoom: { max: 10, windowMs: 60_000 },
+  pairRequest: { max: 5, windowMs: 10 * 60_000 }, // pedidos de código por e-mail, por IP
+  pairEmail: { max: 3, windowMs: 60 * 60_000 }, // e por endereço de e-mail (ninguém é bombardeado de mensagens)
   pair: { max: 10, windowMs: 60_000 }, // tentativas de pareamento do agente (o código tem 8 caracteres e vence em 10 min)
 };

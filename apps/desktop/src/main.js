@@ -249,6 +249,7 @@ function registerIpc() {
   handle('snapshot', () => controller.snapshot());
   handle('buildEngine', (arg) => controller.buildEngine(arg));
   handle('pair', (arg) => controller.pair(arg));
+  handle('requestCode', (arg) => controller.requestCode(arg));
   handle('unpair', () => controller.unpair());
   handle('startAgent', (arg) => controller.startAgent(arg));
   handle('stopAgent', () => controller.stopAgent());

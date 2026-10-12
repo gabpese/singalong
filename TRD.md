@@ -339,6 +339,18 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 - Not done: a test on a **clean virtual machine** (there is none here; the installed-app run above used an empty install folder and an empty data folder, but it is still this PC, which already has Chrome, Git and drivers). Whoever installs it on another computer should note what failed, if anything.
 - Windows' SmartScreen warns about the unsigned file ("More info, Run anyway"); the instructions above should mention it.
 
+### 12.8 Pairing code by e-mail and review adjustments (Oct 2026)
+
+**Done**
+- **Code by e-mail** (`POST /agent/v1/pair/request {email}`): the person types an e-mail in the app and the server sends the one-time code (valid for 10 minutes) **only if the address is in `PAIR_ALLOWED_EMAILS`**. The answer is always the same (`202`), whether the address is allowed or not, and the sending runs in the background, so nobody can find out who is on the list. Limits: 5 requests per IP per 10 minutes and 3 messages per address per hour. The message has the code and the deadline, no links. If the server has no mail configured it answers `503` with a clear text. Sending uses the **Brevo HTTP API** (`BREVO_API_KEY`, `MAIL_FROM`): no library, no SMTP (Oracle blocks the outgoing port).
+- **App:** the connect screen asks for the e-mail, sends the code and takes the code; the server address comes filled in (`https://singalong.duckdns.org`) and can be changed under "Server". `TRUST_PROXY=1` makes the limits use the real IP behind Caddy.
+- **Guest page:** the name is **required** before a song is accepted (the field is focused and a message explains it), the "Search on YouTube" button no longer touches the fields, and the TV's own full-screen icon now makes the whole window full screen (the extra button next to TV/Host was removed).
+- **Tests:** 8 on the server (authorized and not authorized get the same answer, normalization, rate limits, mail failure, the Brevo call) and 1 on the controller; the end-to-end test pairs through the e-mail with a fake mailer. 1 new browser test for the required name.
+
+**Decisions**
+- The list of authorized e-mails is an environment variable (a change means `./deploy.sh`); a page to manage it can come later.
+- To use it, the owner creates a free Brevo account, verifies the sender e-mail and puts the key in the server's `.env` (`deploy/README.md`).
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**

@@ -94,6 +94,24 @@ A partir daí, cada merge na `main` com CI verde publica a imagem e atualiza a V
 - Salas e fila ficam no volume `api-data`; os certificados no `caddy-data` (não apague).
 - A Oracle pode reclamar VMs gratuitas **ociosas** por muito tempo; um uso ocasional costuma bastar. Se ela for removida, é só recriar e repetir os passos 3 a 5.
 
+## Pareamento por e-mail (opcional)
+
+Para que cada pessoa peça o código pelo próprio app (em vez de você gerar com o `curl`), o servidor envia o código por e-mail só para quem você autorizar.
+
+1. Crie uma conta gratuita em <https://www.brevo.com> (300 e-mails por dia no plano grátis).
+2. Em *Senders, Domains & Dedicated IPs → Senders*, adicione o **e-mail remetente** (pode ser o seu Gmail) e confirme pelo link que o Brevo envia para ele.
+3. Em *SMTP & API → API keys*, crie uma chave e copie (ela só aparece uma vez).
+4. Na VM, edite o `.env` (`nano /opt/singalong/.env`) e preencha, sem espaços ao redor do `=`:
+
+   ```
+   PAIR_ALLOWED_EMAILS=ana@exemplo.com,bia@exemplo.com
+   BREVO_API_KEY=a-chave-copiada
+   MAIL_FROM=o-email-remetente-verificado@gmail.com
+   ```
+5. Aplique: `./deploy.sh`. Para autorizar mais gente depois, edite `PAIR_ALLOWED_EMAILS` e rode `./deploy.sh` de novo.
+
+A chave do Brevo é um segredo: fica só no `.env` da VM (nunca no repositório nem no chat). As mensagens podem cair na caixa de spam na primeira vez.
+
 ## Segurança
 
 - A API não tem login: quem souber o endereço e o código de uma sala entra nela. Não divulgue o endereço.

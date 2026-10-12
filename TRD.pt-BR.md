@@ -339,6 +339,18 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - Não feito: teste numa **máquina virtual limpa** (não há uma aqui; a execução acima usou uma pasta de instalação e uma de dados vazias, mas ainda é este PC, que já tem Chrome, Git e drivers). Quem instalar em outro computador deve anotar o que falhar, se algo falhar.
 - O SmartScreen do Windows avisa sobre o arquivo sem assinatura ("Mais informações, Executar assim mesmo"); as instruções abaixo devem mencionar isso.
 
+### 12.8 Código de pareamento por e-mail e ajustes da revisão (Out/2026)
+
+**Feito**
+- **Código por e-mail** (`POST /agent/v1/pair/request {email}`): a pessoa digita um e-mail no app e o servidor envia o código de uso único (vale 10 minutos) **só se o endereço estiver em `PAIR_ALLOWED_EMAILS`**. A resposta é sempre a mesma (`202`), esteja o endereço autorizado ou não, e o envio roda em segundo plano, então ninguém descobre quem está na lista. Limites: 5 pedidos por IP a cada 10 minutos e 3 mensagens por endereço por hora. A mensagem tem o código e o prazo, sem links. Sem e-mail configurado o servidor responde `503` com um texto claro. O envio usa a **API HTTP do Brevo** (`BREVO_API_KEY`, `MAIL_FROM`): sem biblioteca e sem SMTP (a Oracle bloqueia a porta de saída).
+- **App:** a tela de conectar pede o e-mail, envia o código e recebe o código; o endereço do servidor já vem preenchido (`https://singalong.duckdns.org`) e pode ser trocado em "Servidor". `TRUST_PROXY=1` faz os limites usarem o IP verdadeiro atrás do Caddy.
+- **Página do convidado:** o nome é **obrigatório** antes de aceitar uma música (o campo recebe o foco e uma mensagem explica), o botão "Buscar no YouTube" não encosta mais nos campos e o ícone de tela cheia da própria TV agora deixa a janela inteira em tela cheia (o botão extra ao lado de TV/Anfitrião saiu).
+- **Testes:** 8 no servidor (autorizado e não autorizado recebem a mesma resposta, normalização, limites, falha do e-mail, a chamada ao Brevo) e 1 no controlador; o teste de ponta a ponta pareia pelo e-mail com um envio de mentira. 1 teste novo no navegador para o nome obrigatório.
+
+**Decisões**
+- A lista de e-mails autorizados é uma variável de ambiente (mudar exige `./deploy.sh`); uma página para gerenciá-la pode vir depois.
+- Para usar, o dono cria uma conta gratuita no Brevo, verifica o e-mail remetente e coloca a chave no `.env` do servidor (`deploy/README.md`).
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

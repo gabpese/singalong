@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('karaoke', {
   snapshot: call('snapshot'),
   buildEngine: call('buildEngine'),
   pair: call('pair'),
+  requestCode: call('requestCode'),
   unpair: call('unpair'),
   startAgent: call('startAgent'),
   stopAgent: call('stopAgent'),
