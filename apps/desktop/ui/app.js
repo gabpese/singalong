@@ -55,6 +55,9 @@ function render(s) {
     $('update-title').textContent = u.status === 'update_required' ? `Atualização necessária (versão ${u.minimum ?? u.latest} ou mais nova)` : `Há uma versão nova: ${u.latest}`;
     $('update-notes').textContent = u.notes ?? '';
     $('update-open').hidden = !u.url;
+    const progress = s.updateProgress;
+    $('update-open').disabled = Boolean(progress);
+    $('update-open').textContent = progress ? `Baixando… ${progress.percent}%` : 'Atualizar agora';
   }
 
   // motor
@@ -170,7 +173,7 @@ $('yt-login').addEventListener('click', (e) => act('youtubeLogin', undefined, e.
 $('yt-check').addEventListener('click', (e) => act('youtubeStatus', undefined, e.currentTarget));
 $('browser').addEventListener('change', () => act('settings', { browser: $('browser').value }));
 $('login-item').addEventListener('change', (e) => act('loginItem', e.currentTarget.checked));
-$('update-open').addEventListener('click', () => state.update?.url && act('open', state.update.url));
+$('update-open').addEventListener('click', () => state.update?.url && act('applyUpdate', undefined, $('update-open')));
 
 $('hardware').addEventListener('click', async (e) => {
   const data = await act('hardware', undefined, e.currentTarget);

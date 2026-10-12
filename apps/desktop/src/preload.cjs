@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('karaoke', {
   hardware: call('hardware'),
   settings: call('settings'),
   checkUpdate: call('checkUpdate'),
+  applyUpdate: call('applyUpdate'),
   loginItem: call('loginItem'),
   open: call('open'),
   pickAudio: call('pickAudio'),

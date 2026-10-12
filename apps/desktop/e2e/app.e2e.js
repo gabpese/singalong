@@ -96,7 +96,7 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   const shot = (name) => process.env.SINGALONG_SHOT_DIR && page.screenshot({ path: join(process.env.SINGALONG_SHOT_DIR, `${name}.png`) });
   await shot('1-parear');
   assert.equal(await id('screen-engine').isHidden(), true);
-  assert.match(await id('version').textContent(), /^v0\.3\.0$/);
+  assert.match(await id('version').textContent(), /^v\d+\.\d+\.\d+$/);
 
   // código errado: a mensagem do servidor aparece e a tela continua
   await id('pair-server').fill(base);

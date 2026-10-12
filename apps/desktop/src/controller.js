@@ -4,11 +4,11 @@
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assemble } from '../../engine/src/assemble.js';
-import { paths, readState, workerCommand } from '../../engine/src/engine.js';
-import { verifyEngine } from '../../engine/src/verify.js';
+import { assemble } from '@singalong/engine/src/assemble.js';
+import { paths, readState, workerCommand } from '@singalong/engine/src/engine.js';
+import { verifyEngine } from '@singalong/engine/src/verify.js';
 
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
 const MAX_LOGS = 300;
 const POLL_MS = 5000;
 
@@ -35,6 +35,8 @@ export function normalizeServer(value) {
 
 export function createController({
   dataDir,
+  workerSource, // onde está o código do worker que vai para dentro do motor (no app instalado: a pasta de recursos)
+  version = APP_VERSION,
   fetchImpl = fetch,
   spawnImpl = spawn,
   assembleImpl = assemble,
@@ -52,6 +54,7 @@ export function createController({
     rooms: [],
     youtube: { status: 'unknown', detail: null },
     update: null,
+    updateProgress: null, // { percent } enquanto baixa a atualização
     busy: null, // nome da tarefa longa em andamento (importar, login...)
     logs: [],
   };
@@ -78,7 +81,7 @@ export function createController({
 
   function snapshot() {
     return {
-      version: APP_VERSION,
+      version,
       paired: Boolean(config.server && config.token),
       server: config.server,
       deviceName: config.device_name,
@@ -87,7 +90,7 @@ export function createController({
       engineDir: config.engine_dir,
       libraryDir: config.library_dir,
       phase: state.engine.status !== 'ready' ? 'engine' : !config.token ? 'pair' : 'home',
-      ...structuredClone({ engine: state.engine, agent: state.agent, rooms: state.rooms, youtube: state.youtube, update: state.update, busy: state.busy }),
+      ...structuredClone({ engine: state.engine, agent: state.agent, rooms: state.rooms, youtube: state.youtube, update: state.update, updateProgress: state.updateProgress, busy: state.busy }),
       logs: state.logs.slice(-80),
     };
   }
@@ -143,6 +146,7 @@ export function createController({
       const final = await assembleImpl({
         root: config.engine_dir,
         engine,
+        ...(workerSource ? { workerSource } : {}),
         onProgress: ({ label, done, total, line }) => {
           state.engine.progress = { label, done: done ?? null, total: total ?? null };
           if (line) log(line);
@@ -197,7 +201,7 @@ export function createController({
   async function checkUpdate() {
     if (!config.server) return null;
     try {
-      const response = await fetchImpl(`${config.server}/agent/v1/version?current=${encodeURIComponent(APP_VERSION)}`, { signal: AbortSignal.timeout(10000) });
+      const response = await fetchImpl(`${config.server}/agent/v1/version?current=${encodeURIComponent(version)}`, { signal: AbortSignal.timeout(10000) });
       state.update = response.ok ? await response.json() : null;
     } catch {
       state.update = null;
@@ -424,5 +428,7 @@ export function createController({
     return snapshot();
   }
 
-  return { init, snapshot, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
+  const setUpdateProgress = (progress) => { state.updateProgress = progress; publish(); };
+
+  return { init, snapshot, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
 }

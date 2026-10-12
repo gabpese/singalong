@@ -1,5 +1,6 @@
 // Processo principal do Electron: abre a janela, a bandeja e liga a interface ao controlador (src/controller.js).
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } from 'electron';
+import electronUpdater from 'electron-updater';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createController, UserError } from './controller.js';
@@ -23,8 +24,13 @@ const launcher = process.env.SINGALONG_TEST_PYTHON
     ]
   : undefined;
 
+const { autoUpdater } = electronUpdater;
+
 const controller = createController({
   dataDir: app.getPath('userData'),
+  version: app.getVersion(),
+  // instalado: o código do worker vai nos recursos do instalador; em desenvolvimento vale o padrão (apps/worker)
+  ...(app.isPackaged ? { workerSource: join(process.resourcesPath, 'worker') } : {}),
   emit: (event, payload) => win?.webContents.send(`sg:${event}`, payload),
   ...(launcher ? { launcher } : {}),
 });
@@ -53,6 +59,45 @@ function handle(channel, fn) {
   });
 }
 
+/**
+ * Atualiza o app: `update.url` (APP_DOWNLOAD_URL do servidor) é a pasta que tem o instalador e o latest.yml. Baixa, confere o
+ * hash do latest.yml, encerra a sessão e instala. Sem latest.yml (ou em desenvolvimento) abre o link no navegador.
+ */
+async function applyUpdate() {
+  const info = controller.snapshot().update;
+  if (!info?.url || !allowedExternal(info.url)) throw new UserError('no_update', 'Não há atualização para baixar.');
+  if (!app.isPackaged && !process.env.SINGALONG_UPDATER_DEV) {
+    await shell.openExternal(info.url);
+    return { opened: true };
+  }
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowDowngrade = false;
+  if (process.env.SINGALONG_UPDATER_DEV) autoUpdater.forceDevUpdateConfig = true;
+  autoUpdater.setFeedURL({ provider: 'generic', url: info.url.endsWith('/') ? info.url : `${info.url}/` });
+  autoUpdater.on('download-progress', (progress) => controller.setUpdateProgress({ percent: Math.round(progress.percent) }));
+  let found;
+  try {
+    found = await autoUpdater.checkForUpdates();
+  } catch {
+    await shell.openExternal(info.url); // sem o arquivo de atualização automática: o download manual continua valendo
+    return { opened: true };
+  }
+  if (!found?.isUpdateAvailable) throw new UserError('no_update', 'Você já está com a versão mais recente.');
+  controller.setUpdateProgress({ percent: 0 });
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (error) {
+    controller.setUpdateProgress(null);
+    throw new UserError('update_failed', `Não consegui baixar a atualização (${error.message}).`);
+  }
+  await controller.stopAgent(); // encerra a sessão no servidor antes de o instalador fechar o app
+  quitting = true;
+  if (process.env.SINGALONG_UPDATER_DEV) return { downloaded: true }; // os testes conferem o download sem reiniciar
+  autoUpdater.quitAndInstall(true, true);
+  return { installing: true };
+}
+
 function registerIpc() {
   handle('snapshot', () => controller.snapshot());
   handle('buildEngine', (arg) => controller.buildEngine(arg));
@@ -67,6 +112,7 @@ function registerIpc() {
   handle('hardware', () => controller.hardware());
   handle('settings', (arg) => controller.setSettings(arg));
   handle('checkUpdate', () => controller.checkUpdate());
+  handle('applyUpdate', () => applyUpdate());
   handle('loginItem', (enabled) => {
     if (typeof enabled === 'boolean') app.setLoginItemSettings({ openAtLogin: enabled });
     return app.getLoginItemSettings().openAtLogin;

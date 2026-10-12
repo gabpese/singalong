@@ -1,7 +1,7 @@
 {
   "name": "@singalong/desktop",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "productName": "Singalong Karaoke",
   "description": "Singalong Karaoke: a interface do computador do dono (pareia, monta o motor, inicia a sessão e o agente)",
   "type": "module",
@@ -12,10 +12,73 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test \"test/*.test.js\"",
-    "test:e2e": "node --test \"e2e/*.e2e.js\""
+    "test:e2e": "node --test \"e2e/*.e2e.js\"",
+    "dist": "node scripts/build-installer.mjs",
+    "dist:dir": "node scripts/build-installer.mjs --dir"
   },
   "devDependencies": {
     "electron": "^44.7.0",
-    "playwright-core": "^1.50.0"
+    "playwright-core": "^1.50.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "@singalong/engine": "file:../engine",
+    "electron-updater": "^6.8.9"
+  },
+  "author": "Singalong",
+  "build": {
+    "appId": "org.singalong.karaoke",
+    "productName": "Singalong Karaoke",
+    "executableName": "singalong_karaoke",
+    "copyright": "Singalong",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**",
+      "ui/**",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "../worker",
+        "to": "worker",
+        "filter": [
+          "singalong_worker/**",
+          "requirements.txt",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "singalong_karaoke.${ext}",
+      "icon": "build/icon.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Singalong Karaoke",
+      "artifactName": "singalong_karaoke.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "publish": null
   }
 }

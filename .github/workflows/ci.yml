@@ -157,6 +157,28 @@ jobs:
           npm run test:e2e
         shell: pwsh
 
+  installer:
+    name: Instalador do Windows (gera, sem publicar)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      # o instalador NÃO é guardado nem publicado (fica só na máquina do dono): aqui só se confere que ele é gerado
+      - run: npm run dist
+      - name: Conferir o arquivo gerado
+        shell: pwsh
+        run: |
+          $exe = Get-Item dist/singalong_karaoke.exe
+          if ($exe.Length -lt 50MB) { throw "instalador pequeno demais: $($exe.Length)" }
+          if (-not (Test-Path dist/latest.yml)) { throw "faltou o latest.yml" }
+          "instalador: {0:N0} MB" -f ($exe.Length / 1MB)
+
   docker-api:
     name: Imagem da API (build)
     runs-on: ubuntu-latest

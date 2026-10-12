@@ -203,6 +203,16 @@ npm run test:e2e         # a janela de verdade + a API de verdade + o worker de 
 
 Os seus dados (configuração, motor, biblioteca) ficam em `%APPDATA%\Singalong Karaoke`. Fechar a janela com a sessão rodando só a esconde (o ícone da bandeja a traz de volta; "Sair" encerra a sessão).
 
+**Instalador e atualizações (marco M4).**
+
+```powershell
+cd apps\desktop
+npm run dist                         # gera dist\singalong_karaoke.exe (+ latest.yml), cerca de 107 MB, sem assinatura
+dist\singalong_karaoke.exe           # instala só para o seu usuário; o SmartScreen do Windows pode avisar: "Mais informações" > "Executar assim mesmo"
+```
+
+Para publicar uma atualização: suba a versão em `apps/desktop/package.json`, `apps/desktop/src/controller.js` e `apps/worker/singalong_worker/version.py` (um teste confere que são iguais), rode `npm run dist`, ponha `singalong_karaoke.exe` e `latest.yml` numa pasta **privada** e defina no servidor `APP_LATEST_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` (o endereço dessa pasta). Todo app instalado passa a mostrar "Atualizar agora". `node scripts/test-update.mjs <instalado.exe> <pasta-da-versao-nova> <pasta-de-dados>` testa tudo isso num computador.
+
 ### CLI do worker (sem API, para testes)
 
 ```powershell
