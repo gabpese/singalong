@@ -492,8 +492,6 @@ body.stage { background: #0b0b14; }
 .duet-row { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .duet-note { margin: 4px 0 0; color: var(--dim); font-size: .9rem; }
 .duet-note.ok { color: var(--ok, #6fe3a0); }
-.invites { display: grid; gap: 10px; margin-bottom: 12px; }
-.invite { border-color: var(--accent); }
 .invite p { margin: 0 0 10px; }
 .invite-actions { display: flex; gap: 10px; }
 .invite-actions button { flex: 1; }
@@ -501,8 +499,8 @@ body.stage { background: #0b0b14; }
 .people button { width: 100%; text-align: left; }
 
 /* o convite aparece em qualquer tela: preso ao topo da sala, sobre o palco e sobre a TV */
-.invites { position: sticky; top: 0; z-index: 60; padding: 8px 12px 0; }
-.invite { box-shadow: 0 8px 28px #000a; }
+.invites { position: sticky; top: 0; z-index: 60; padding: 8px 12px 0; display: grid; gap: 10px; }
+.invite { border-color: var(--accent); box-shadow: 0 8px 28px #000a; }
 .stage-page .invites { position: static; padding: 0; }
 .stage-duet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tv-invites { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 70; width: min(640px, 92vw); }
