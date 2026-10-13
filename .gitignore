@@ -8,3 +8,6 @@ test-results/
 playwright-report/
 dist/
 apps/desktop/dist-*/
+brag-output*
+.agents*
+skills-lock.json
