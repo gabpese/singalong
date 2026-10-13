@@ -169,7 +169,7 @@ test('agente: sem apelido não inicia; com apelido sobe o processo e fica online
   sessionOpen = true; // o worker de verdade cria a sessão no servidor
   await until(() => controller.snapshot().agent.status === 'online');
   assert.equal(controller.snapshot().agent.session.display_name, 'Gabriel');
-  assert.ok(controller.snapshot().logs.some((l) => l.line === 'worker consumindo'));
+  await until(() => controller.snapshot().logs.some((l) => l.line === 'worker consumindo')); // a linha pode chegar um instante depois do 'online'
   await controller.stopAgent();
   assert.equal(controller.snapshot().agent.status, 'stopped');
   assert.ok(calls.some((c) => c.method === 'DELETE' && c.url === '/agent/v1/sessions/s1')); // encerrou a sessão no servidor
