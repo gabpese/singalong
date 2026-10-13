@@ -182,6 +182,25 @@
     </section>
   </main>
 
+  <!-- primeira sessão neste computador: escolher a placa de vídeo e o microfone -->
+  <div id="setup" class="overlay" hidden data-testid="setup" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="wait-box setup-box">
+      <h2 id="setup-title">Antes da primeira sessão</h2>
+      <p class="muted">Escolha o que este computador vai usar. Dá para mudar depois na engrenagem.</p>
+      <label class="setup-field">Placa de vídeo
+        <select id="setup-gpu" data-testid="setup-gpu" aria-label="Placa de vídeo"></select>
+      </label>
+      <p id="setup-gpu-info" class="muted" data-testid="setup-gpu-info"></p>
+      <label class="setup-field">Microfone da TV (pontuação)
+        <select id="setup-mic" data-testid="setup-mic" aria-label="Microfone"></select>
+      </label>
+      <div class="row">
+        <button id="setup-cancel" type="button" data-testid="setup-cancel">Voltar</button>
+        <button id="setup-go" type="button" class="primary" data-testid="setup-go">Continuar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- espera (login do YouTube): dá para cancelar -->
   <div id="wait" class="overlay" hidden data-testid="wait">
     <div class="wait-box">

@@ -253,7 +253,13 @@ body.tv { overflow: hidden; height: 100vh; }
 /* corpo da TV: a letra e, ao lado, a fila (atual + próximas 5) */
 .tv-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--queue-w); gap: 28px; min-height: 0; }
 .tv-stage:not(.has-queue) .tv-body { grid-template-columns: minmax(0, 1fr); }
-.tv-queue { align-self: center; max-height: 100%; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
+.tv-side { align-self: center; display: grid; gap: 16px; max-height: 100%; min-height: 0; justify-items: stretch; }
+.tv-join { display: grid; justify-items: center; gap: 8px; padding: 14px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); text-align: center; }
+.tv-join .qr { width: min(18vh, 170px, 100%); padding: 6px; }
+.tv-join p { margin: 0; color: var(--dim); font-size: clamp(.8rem, 1.2vw, 1.05rem); }
+.tv-join strong { color: var(--accent); letter-spacing: .12em; }
+.tv-join[hidden] { display: none; }
+.tv-queue { max-height: 100%; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
 .tv-queue[hidden] { display: none; }
 .tv-queue h2 { margin: 0 0 10px; color: var(--dim); font-size: clamp(.8rem, 1.1vw, 1rem); text-transform: uppercase; letter-spacing: .12em; font-weight: 600; }
 .tv-queue ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -323,7 +329,7 @@ body.tv { overflow: hidden; height: 100vh; }
 
 @media (max-width: 900px) {
   .tv-body, .tv-stage:not(.has-queue) .tv-body { grid-template-columns: minmax(0, 1fr); }
-  .tv-queue { display: none; }
+  .tv-side { display: none; }
   .tv-stage.has-queue .idle { right: 0; }
   .tv-top { grid-template-columns: 1fr; gap: 6px; }
   .singer.is-next { padding-left: 0; border-left: 0; }
@@ -451,14 +457,14 @@ input[type=range].seek::-moz-range-thumb { width: 14px; height: 14px; border-rad
 
 /* palco: a tela de canto do celular (letra grande no ritmo da TV) */
 body.stage { background: #0b0b14; }
-.stage-page { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); }
+.stage-page { min-height: 100dvh; display: flex; flex-direction: column; gap: 10px; /* o cartão da letra fica centrado no que sobra, com ou sem os avisos de dueto */ padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); }
 .stage-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .stage-where { margin: 0; color: var(--dim); font-size: .85rem; }
 .stage-song { margin: 2px 0; font-size: 1.25rem; line-height: 1.2; }
 .stage-artist { margin: 0; color: var(--dim); font-size: .95rem; }
-.stage-lyrics { min-height: 0; padding: 18px 14px; margin: 0; border-radius: 22px; }
+.stage-lyrics { flex: 0 1 auto; min-height: 0; padding: 28px 16px; margin: auto 0; border-radius: 22px; } /* a altura do conteúdo, centrada no espaço livre */
 .stage-lyrics .prev { font-size: clamp(1rem, 4.4vw, 1.5rem); }
-.stage-lyrics .current { font-size: clamp(1.8rem, 8.4vw, 3rem); }
+.stage-lyrics .current { font-size: clamp(1.9rem, 9vw, 3.2rem); }
 .stage-lyrics .next { font-size: clamp(1.15rem, 5.4vw, 1.9rem); }
 .stage-lyrics .next2 { font-size: clamp(1rem, 4.4vw, 1.5rem); }
 .stage-bottom { min-height: 2.6em; display: grid; place-items: center; color: var(--dim); text-align: center; }
@@ -489,7 +495,8 @@ body.stage { background: #0b0b14; }
   content: var(--shape, '●'); margin-right: .4em; font-size: .8em; color: var(--part);
 }
 .duet-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 1.2vh 0 0; font-size: clamp(.8rem, 1.4vw, 1.1rem); color: var(--dim); }
-.stage-legend { font-size: .9rem; margin: 0; }
+.stage-legend { font-size: .9rem; margin: 0 0 auto; } /* a legenda fica colada no cartão da letra, os dois centrados juntos */
+.stage-lyrics:has(+ .stage-legend) { margin-bottom: 0; }
 
 /* dueto: convidar, o convite recebido e a dupla na fila */
 .duet-row { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }

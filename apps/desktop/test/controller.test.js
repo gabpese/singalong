@@ -169,7 +169,7 @@ test('agente: sem apelido não inicia; com apelido sobe o processo e fica online
   sessionOpen = true; // o worker de verdade cria a sessão no servidor
   await until(() => controller.snapshot().agent.status === 'online');
   assert.equal(controller.snapshot().agent.session.display_name, 'Gabriel');
-  assert.ok(controller.snapshot().logs.some((l) => l.line === 'worker consumindo'));
+  await until(() => controller.snapshot().logs.some((l) => l.line === 'worker consumindo')); // a linha pode chegar um instante depois do 'online'
   await controller.stopAgent();
   assert.equal(controller.snapshot().agent.status, 'stopped');
   assert.ok(calls.some((c) => c.method === 'DELETE' && c.url === '/agent/v1/sessions/s1')); // encerrou a sessão no servidor
@@ -456,4 +456,14 @@ test('o aviso de atualização é conferido de novo (no máximo uma vez por dia)
   await controller.refreshUpdate();
   assert.equal(controller.snapshot().update.status, 'update_available');
   versionAnswer = { status: 'ok' };
+});
+
+test('a escolha da primeira sessão (placa de vídeo e microfone) é lembrada e só vale como feita quando marcada', async () => {
+  const { controller, dataDir } = await ready();
+  assert.equal(controller.snapshot().setupDone, false);
+  assert.equal((await controller.setSettings({ setupDone: 'sim' })).setupDone, false); // só `true` vale
+  const snap = await controller.setSettings({ microphone: { id: 'abc', label: 'USB' }, setupDone: true });
+  assert.equal(snap.setupDone, true);
+  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).setup_done, true);
+  assert.equal((await controller.setSettings({ nickname: 'Ana' })).setupDone, true); // outras mudanças não a desfazem
 });

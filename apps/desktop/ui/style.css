@@ -136,3 +136,7 @@ section.pair { max-width: 520px; margin: 0 auto; }
 details.advanced { color: var(--muted); font-size: 13px; }
 details.advanced summary { cursor: pointer; }
 details.advanced label { margin-top: 8px; }
+.setup-box { align-items: stretch; text-align: left; width: min(460px, 92vw); }
+.setup-box h2, .setup-box p { text-align: left; justify-content: flex-start; }
+.setup-field { display: grid; gap: 6px; font-weight: 600; }
+.setup-box .row { justify-content: flex-end; }

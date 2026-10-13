@@ -471,6 +471,13 @@ Pedido do dono depois do segundo teste:
 - **Legibilidade, segunda rodada (Out/2026):** o contorno era desenhado por cima do preenchimento e comia as letras. A letra do dueto agora tem duas camadas: um halo preto grosso por baixo e o preenchimento colorido inteiro por cima (`data-text` + `::after`), em negrito.
 - **Cartão de vidro para a letra e correção da biblioteca (Out/2026):** o halo não ajudou o bastante, então a letra agora passa dentro de um cartão de vidro (glassmorphism: vidro escuro translúcido com desfoque, na TV e no palco) e o preenchimento colorido voltou a ser simples. Também corrigido: a sala pedia a biblioteca sem o código da sala, então as músicas do catálogo do computador do dono nunca apareciam (um teste protege o cabeçalho `x-room`).
 
+### 12.18 Versão 1.1: QR code na TV, modal do nome, escolha da primeira sessão, layout do palco em dupla (Out/2026)
+
+- **QR code sempre na TV:** enquanto uma música toca, um cartão pequeno com o QR code e o código da sala fica abaixo da fila (o grande da tela de espera continua). Some em telas estreitas, como a fila.
+- **Modal do nome na chegada:** quem entra numa sala sem nome salvo vê um modal que o pede (sem Esc, sem nome vazio); o nome vai para a fila, os convites de dueto e a pontuação. Só é pedido na chegada: apagar o campo depois, na aba "Adicionar", não o traz de volta.
+- **Primeira sessão numa máquina (app do dono):** na primeira vez que "Começar a sessão" é apertado, um modal pede a placa de vídeo (as mesmas opções das configurações) e o microfone. Escolher outra placa reinstala o motor e a sessão começa no clique seguinte. A escolha fica guardada (`setup_done` na configuração).
+- **Layout do palco em dupla:** o cartão da letra agora tem a altura do conteúdo e fica centrado no espaço livre, com a legenda logo abaixo (a grade antiga dava a linha flexível ao elemento errado quando os avisos de dueto existiam, e a letra ia para a base).
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

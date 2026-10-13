@@ -8,6 +8,7 @@ import { InviteBanner } from './Duet';
 import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast } from './context';
 import { Library } from './Library';
 import { NowPlaying } from './NowPlaying';
+import { NameDialog } from './NameDialog';
 import { QueueList, Scoreboard } from './QueueList';
 import { PreviewBar, usePreview } from './usePreview';
 import { TabBar, TopBar } from './TopBar';
@@ -25,6 +26,8 @@ export function RoomPage({ code }: { code: string }) {
   const act = useAct(code, setState, show);
   const [tab, setTab] = useState<Tab>('queue');
   const [name, setName] = useState<string>(() => userName());
+  // o modal do nome só na chegada (quem apaga o campo depois, para digitar outro, não leva um modal na cara)
+  const [askName, setAskName] = useState(() => !userName().trim());
   const [library, setLibrary] = useState<LibrarySong[]>([]);
   const addSong = useRef<AddSongHandle>(null);
   const preview = usePreview(state, act);
@@ -164,6 +167,16 @@ export function RoomPage({ code }: { code: string }) {
         </section>
       </main>
 
+      {askName && (
+        <NameDialog
+          code={code}
+          onName={(value) => {
+            setName(value);
+            setUserName(value);
+            setAskName(false);
+          }}
+        />
+      )}
       <PreviewBar preview={preview} />
       <TabBar tab={tab} onTab={showTab} queueCount={state?.queue.length ?? 0} hidden={false} />
       <p className={`toast${toast.show ? ' show' : ''}${toast.isError ? ' error' : ''}`} role="status">
