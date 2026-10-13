@@ -465,34 +465,43 @@ body.stage { background: #0b0b14; }
 .voice-tips { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; color: var(--dim); }
 .menu-panel .voice-row { margin-top: 2px; }
 
-/* dueto: verde para um cantor, vermelho para o outro, amarelo (a cor de sempre) quando cantam juntos; a letra ganha um contorno branco */
+/* dueto: turquesa para um cantor, violeta para o outro e amarelo (a cor de sempre) quando cantam juntos. Pares escolhidos para
+   se distinguirem em todos os tipos de daltonismo (testados por simulação), sem azul nem rosa. A cor nunca é a única pista:
+   cada parte tem também uma forma (círculo, quadrado, losango). A letra ganha um contorno PRETO, que a deixa legível. */
 [data-part] { --part: var(--accent); }
-[data-part="a"] { --part: #3A5A40; }
-[data-part="b"] { --part: #541E1B; }
-[data-part="both"] { --part: var(--accent); }
+[data-part="a"] { --part: #10B8C8; --shape: '●'; }
+[data-part="b"] { --part: #8B5CF6; --shape: '■'; }
+[data-part="both"] { --part: var(--accent); --shape: '◆'; }
 .current[data-part] .w {
   background: linear-gradient(90deg, var(--part) var(--p), var(--fg) var(--p));
   -webkit-background-clip: text;
   background-clip: text;
-  -webkit-text-stroke: 0.045em #fff; /* o contorno branco: as duas cores são escuras */
+  -webkit-text-stroke: 0.07em #000; /* o contorno preto; só a metade de fora aparece (paint-order) */
   paint-order: stroke fill;
 }
-/* as linhas que ainda vêm: um ponto na cor de quem canta */
-.line[data-part]:not(.current):not(:empty)::before {
-  content: '●'; margin-right: .4em; font-size: .8em; color: var(--part); -webkit-text-stroke: 1px #fff; paint-order: stroke fill;
+/* as linhas que ainda vêm e a legenda: a forma e a cor de quem canta */
+.line[data-part]:not(.current):not(:empty)::before,
+.duet-legend span::before {
+  content: var(--shape, '●'); margin-right: .4em; font-size: .8em; color: var(--part);
+  -webkit-text-stroke: 0.12em #000; paint-order: stroke fill;
 }
 .duet-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 1.2vh 0 0; font-size: clamp(.8rem, 1.4vw, 1.1rem); color: var(--dim); }
-.duet-legend span::before { content: '●'; margin-right: .4em; color: var(--part); -webkit-text-stroke: 1px #fff; paint-order: stroke fill; }
 .stage-legend { font-size: .9rem; margin: 0; }
 
 /* dueto: convidar, o convite recebido e a dupla na fila */
 .duet-row { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .duet-note { margin: 4px 0 0; color: var(--dim); font-size: .9rem; }
 .duet-note.ok { color: var(--ok, #6fe3a0); }
-.invites { display: grid; gap: 10px; margin-bottom: 12px; }
-.invite { border-color: var(--accent); }
 .invite p { margin: 0 0 10px; }
 .invite-actions { display: flex; gap: 10px; }
 .invite-actions button { flex: 1; }
 .people { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .people button { width: 100%; text-align: left; }
+
+/* o convite aparece em qualquer tela: preso ao topo da sala, sobre o palco e sobre a TV */
+.invites { position: sticky; top: 0; z-index: 60; padding: 8px 12px 0; display: grid; gap: 10px; }
+.invite { border-color: var(--accent); box-shadow: 0 8px 28px #000a; }
+.stage-page .invites { position: static; padding: 0; }
+.stage-duet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tv-invites { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 70; width: min(640px, 92vw); }
+.tv-invites .invites { position: static; padding: 0; }

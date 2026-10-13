@@ -126,12 +126,19 @@ test('recusar ou cancelar desfaz o convite; só o dono (ou o anfitrião) convida
   assert.equal((await call('DELETE', `/rooms/${code}/queue/${itemId}/invite`, BIA)).status, 403);
 });
 
-test('convidar de novo troca o convidado; música que já está tocando não recebe convite; o convite some com a música', async () => {
+test('convidar de novo troca o convidado; a música que já está tocando também recebe convite; o convite some com a música', async () => {
   const { code, itemId, playingId } = await setup();
   await call('POST', `/rooms/${code}/queue/${itemId}/invite`, ANA, { pid: pidOf(BIA) });
   const swapped = await call('POST', `/rooms/${code}/queue/${itemId}/invite`, ANA, { pid: pidOf(CAIO) });
   assert.deepEqual(item(swapped.body, itemId).guest, { name: 'Caio', status: 'pending' });
-  assert.equal((await call('POST', `/rooms/${code}/queue/${playingId}/invite`, CAIO, { pid: pidOf(BIA) })).status, 409); // já está tocando
+  // a música que já está tocando também pode ter dueto: quem aceitar entra no meio dela
+  const live = await call('POST', `/rooms/${code}/queue/${playingId}/invite`, CAIO, { pid: pidOf(BIA) });
+  assert.equal(live.status, 200);
+  assert.equal(item(live.body, playingId).status, 'playing');
+  assert.deepEqual(item(live.body, playingId).guest, { name: 'Bia', status: 'pending' });
+  const joined = await call('POST', `/rooms/${code}/queue/${playingId}/invite/respond`, BIA, { accept: true });
+  assert.deepEqual([item(joined.body, playingId).guest_me, item(joined.body, playingId).singers], [true, 'Caio & Bia']);
+  assert.equal((await call('POST', `/rooms/${code}/queue/${playingId}/invite`, ANA, { pid: pidOf(BIA) })).status, 403); // só o dono (ou o anfitrião) convida
   await call('DELETE', `/rooms/${code}/queue/${itemId}`, ANA);
   assert.equal(item((await call('GET', `/rooms/${code}`, ANA)).body, itemId), undefined);
 });

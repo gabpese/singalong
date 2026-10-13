@@ -453,6 +453,22 @@ Anotado para o futuro (decisão de Out/2026): além da produção teremos **mais
 - Mais de dois cantores, e um microfone por cantor.
 - O rodízio justo não considera o convidado (só a vez do dono conta).
 
+### 12.16 Ajustes depois do primeiro teste do dueto (Out/2026)
+
+Retorno do primeiro teste do dono com aparelhos de verdade: a voz nas caixas ficou boa; a letra estava difícil de ler; verde e vermelho se confundem para quem tem daltonismo; e a TV nem sempre mostrava a cor certa de quem canta (o palco mostrava).
+
+- **Contorno:** preto em vez de branco (o contorno branco em volta de preenchimentos escuros parecia vazado).
+- **Cores novas, seguras para daltonismo e neutras:** as duas partes agora são **turquesa `#10B8C8`** (quem adicionou a música) e **violeta `#8B5CF6`** (o convidado); **amarelo** (a cor de sempre) quando os dois cantam. Foram escolhidas **simulando protanopia, deuteranopia e tritanopia** (matrizes de Viénot/Machado, distância no Lab) e ficando com os pares que continuam bem separados em todas, sem azul e rosa para que nenhuma parte soe como "o homem" ou "a mulher". O par verde/vermelho antigo saiu.
+- **A cor nunca é a única pista:** cada parte também tem uma **forma**, um círculo para o turquesa, um quadrado para o violeta e um losango para os dois, na legenda e no ponto antes das linhas que ainda vêm; o palco diz "Você canta nas partes turquesa/violeta".
+- **Defeito na TV:** a TV decidia "é um dueto" só ao carregar a música, então uma mudança depois disso não aparecia; agora vale a cada atualização do estado (`engine.setDuet`). Um segundo defeito achado no caminho: em músicas **sem** dueto as linhas ganhavam um ponto amarelo, porque o atributo ficava vazio em vez de sumir; agora ele some (um teste protege isso).
+
+### 12.17 Convite de dueto com a música já tocando, e o aviso em qualquer tela (Out/2026)
+
+Pedido do dono depois do segundo teste:
+- **Uma música que já está tocando também pode ter dueto:** o dono da música (ou o anfitrião) convida alguém da sala enquanto ela toca, e quem aceitar **entra no meio dela**: o convidado vai para o palco, as telas mostram "Ana & Bia" e a TV pinta a letra com as duas cores a partir daquele momento (a TV acompanha o dueto a cada atualização). O servidor deixou de exigir que a música esteja aguardando. O dono da música pode convidar no próprio palco ("Convidar para cantar junto") e no cartão "tocando agora" da sala.
+- **O aviso chega ao convidado em qualquer tela:** um aviso com **Aceitar/Recusar** que fica preso ao topo da **sala (abas fila, adicionar e Jukebox)**, sobre o **palco** e sobre a **TV** (para quem usa aquele navegador como a própria tela, como no app do dono, onde as abas TV e Anfitrião dividem a identidade). Nos celulares que permitem, um convite novo também **vibra**. O aviso diz quando a música já está tocando.
+- **Testes:** o teste do servidor agora cobre o convite na música que toca; 3 testes novos de ponta a ponta: uma música tocando recebe o convite pelo palco e o aviso aparece nas abas fila, adicionar e Jukebox, aceitar na Jukebox leva o convidado ao palco e a TV começa a pintar; o aviso chega a quem está no palco (recusar não o tira dele); e o aviso na página da TV.
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

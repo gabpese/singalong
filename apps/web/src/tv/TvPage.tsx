@@ -5,6 +5,7 @@ import { keySummary } from '../lib/music.js';
 import { nextUp, playOrder, songChip, splitQueue } from '../lib/queue-view.js';
 import type { QueueItem, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
+import { InviteNotice, respondInvite } from '../room/Duet';
 import { createTvController, type FinalResult, type HudState, type TvController } from './controller';
 import { QrCode } from './QrCode';
 
@@ -186,6 +187,9 @@ export function TvPage({ code }: { code: string }) {
 
   return (
     <main className={`tv-stage${hasQueue ? ' has-queue' : ''}`} ref={stageRef}>
+      <div className="tv-invites">
+        <InviteNotice state={room} onRespond={(item, accept) => void respondInvite(code, item, accept)} />
+      </div>
       <header className="tv-top">
         <div className="singer is-now" hidden={!current}>
           {current && (

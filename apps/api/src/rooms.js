@@ -362,13 +362,14 @@ export function createRoomService({
 
     /**
      * Dueto: o dono da música (ou o anfitrião) convida alguém que está NA SALA agora (`pid`, da lista `people`) para cantar junto.
-     * A pessoa precisa aceitar. Só um convidado por música; convidar de novo troca o convidado.
+     * A pessoa precisa aceitar. Só um convidado por música; convidar de novo troca o convidado. Vale para músicas que aguardam
+     * e para a que já está tocando.
      */
     invite(code, itemId, pid, actor) {
       return mutate(code, actor, (room) => {
         const item = requireItem(room, itemId);
         requireEditable(room, item, actor);
-        if (item.status !== 'queued') throw new HttpError(409, 'not_queued', 'O convite só vale para músicas que ainda aguardam.');
+        // vale também para a música que já está tocando: quem aceitar entra no dueto no meio dela
         const guest = hub.people(room.code).find((p) => pidOf(p.clientId) === pid);
         if (!guest) throw new HttpError(404, 'person_not_found', 'Essa pessoa não está mais na sala.');
         if (guest.clientId === item.client_id) throw new HttpError(400, 'invite_self', 'Você não pode convidar a si mesmo.');

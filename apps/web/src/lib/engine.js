@@ -241,6 +241,12 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
       render();
     },
 
+    /** Dueto ligado ou desligado para a música atual (vale também no meio dela). */
+    setDuet(on) {
+      view.setDuet(on);
+      render();
+    },
+
     clear() {
       audio.pause();
       dropBacking();

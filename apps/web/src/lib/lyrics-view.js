@@ -3,6 +3,12 @@
 import { splitParts } from './duet.js';
 import { gapDisplay, lineProgress, locate, wordFills, wordProgress, wordSpans } from './lyrics-sync.js';
 
+/** Põe (ou tira) o dono da linha: sem dono o atributo SOME (vazio ainda casaria com o CSS do dueto). */
+function mark(el, part) {
+  if (part) el.dataset.part = part;
+  else el.removeAttribute('data-part');
+}
+
 /** @param els elementos { prev, current, next, next2 } onde a letra é desenhada */
 export function createLyricsView(els) {
   let cues = [];
@@ -104,10 +110,10 @@ export function createLyricsView(els) {
         els.next2.textContent = text(current >= 0 ? current + 2 : next + 1);
         // dueto: quem canta cada linha (o CSS pinta de verde, vermelho ou amarelo); fora do dueto o atributo some
         const part = (i) => (duet && cues[i] ? parts[i] ?? '' : '');
-        els.prev.dataset.part = part(anchor - 1);
-        els.current.dataset.part = gap ? '' : part(current);
-        els.next.dataset.part = part(current >= 0 ? current + 1 : next);
-        els.next2.dataset.part = part(current >= 0 ? current + 2 : next + 1);
+        mark(els.prev, part(anchor - 1));
+        mark(els.current, gap ? '' : part(current));
+        mark(els.next, part(current >= 0 ? current + 1 : next));
+        mark(els.next2, part(current >= 0 ? current + 2 : next + 1));
       }
       if (gap) paintGap(gap.dashes);
       else paintCurrentLine(current >= 0 ? lineProgress(cues[current], t) : 0, current >= 0 ? wordFills(cues[current], words.length, t) : null);

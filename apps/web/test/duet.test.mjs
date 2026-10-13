@@ -31,9 +31,9 @@ test('letra vazia ou inválida não quebra', () => {
   assert.deepEqual(splitParts([{ start: 0, end: 1 }, null]), [null, null]);
 });
 
-test('o dono da música é o verde e o convidado o vermelho', () => {
+test('o dono da música é o turquesa e o convidado o violeta', () => {
   assert.equal(myPart({ mine: true, guest_me: false }), 'a');
   assert.equal(myPart({ mine: false, guest_me: true }), 'b');
   assert.equal(myPart(null), 'a');
-  assert.deepEqual(PART_NAMES, { a: 'verde', b: 'vermelho', both: 'os dois' });
+  assert.deepEqual(PART_NAMES, { a: 'turquesa', b: 'violeta', both: 'os dois' });
 });

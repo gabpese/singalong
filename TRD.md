@@ -453,6 +453,22 @@ Noted for the future (decision of Oct 2026): besides production we will have **t
 - More than two singers, and a microphone per singer.
 - The fair rotation does not consider the guest (only the owner's turn counts).
 
+### 12.16 Adjustments after the first test of the duet (Oct 2026)
+
+Feedback from the owner's first test with real devices: the voice in the speakers was good; the lyrics were hard to read; green and red are confused by people with colour blindness; and the TV did not always show the right colour of who sings (the stage did).
+
+- **Outline:** black instead of white (the white outline around dark fills looked hollow).
+- **New colors, safe for colour blindness and neutral:** the two parts are now **turquoise `#10B8C8`** (who added the song) and **violet `#8B5CF6`** (the guest); **yellow** (the usual color) when both sing. They were chosen by **simulating protanopia, deuteranopia and tritanopia** (Viénot/Machado matrices, distance in Lab) and keeping the pairs that stay clearly apart in all of them, without blue and pink so that no part reads as "the man" or "the woman". The old green/red pair is gone.
+- **The color is never the only clue:** each part also has a **shape**, a circle for turquoise, a square for violet and a diamond for both, in the legend and in the dot before the lines still to come; the stage says "Você canta nas partes turquesa/violeta".
+- **Bug on the TV:** the TV decided "it is a duet" only when it loaded the song, so a change after that was not shown; now it is applied on every state update (`engine.setDuet`). A second defect found along the way: in songs **without** a duet the lines got a yellow dot, because the attribute stayed empty instead of disappearing; it now disappears (a test guards it).
+
+### 12.17 Duet invitation on a song already playing, and the notice on every screen (Oct 2026)
+
+Request from the owner after the second test:
+- **A song that is already playing can also get a duet:** the owner of the song (or the host) invites someone from the room while it plays, and whoever accepts **joins in the middle of it**: the guest goes to the stage, the screens show "Ana & Bia" and the TV colors the lyrics from that moment (the TV follows the duet on every update). The server no longer asks for the song to be waiting. The song's owner can invite from the stage itself ("Convidar para cantar junto") and from the "now playing" card in the room.
+- **The notice reaches the guest on any screen:** a banner with **Aceitar/Recusar** that sticks to the top of the **room (queue, add and Jukebox tabs)**, over the **stage** and over the **TV** (for whoever uses that browser as their own screen, as in the owner's app, where the TV and host tabs share an identity). On phones that allow it, a new invitation also **vibrates**. The notice says when the song is already playing.
+- **Tests:** the server test now covers the invitation on the playing song; 3 new end-to-end tests: a playing song is invited from the stage and the notice shows in the queue, add and Jukebox tabs, accepting from the Jukebox sends the guest to the stage and the TV starts coloring; the notice reaches someone who is on the stage (declining does not take them out); and the notice on the TV page.
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**
