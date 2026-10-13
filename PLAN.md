@@ -481,3 +481,57 @@ A before everything (safe releases and the base for text and tabs) → B (one au
 - **Server messages:** the API still answers in Portuguese; the client translates the error codes guests see (`apierr.*` keys) and falls back to the server's text for the others.
 - **Accessibility (done):** automatic checks with axe-core on every screen and dialog (WCAG 2.1 A/AA, in the end-to-end suite); **lyrics size** buttons (A−/A+, also `+`/`−` on the TV) shared by the TV, the stage and the TV tab; a "skip to content" link; a screen-reader announcement of who is singing; `aria-current` on the tabs; `prefers-reduced-motion` and `prefers-contrast` support; a contrast fix on the TV queue.
 - **Left:** the homologation/staging environments.
+
+## 18. Plan: homologation (`hml`) and staging (`stg`) environments
+
+Design behind TRD 12.13. Nothing below is built yet; the open decisions are at the end and the plan assumes the recommended answer to each.
+
+### Goal
+A version is tried first on `hml`, then on `stg`, and only then promoted to production **by a person**, with the **same image** at every step (the tag is the commit; nothing is rebuilt).
+
+### Path of a version (recommended)
+| Event | Goes to | How |
+|---|---|---|
+| Push to `release/**` (CI green) | `hml` | automatic; the owner tries it with real phones and the TV **before** merging |
+| Merge into `main` (CI green) | `stg` | automatic; a copy of production with the exact commit that will be released |
+| "Promote" button (manual workflow, with an approval) | production | `workflow_dispatch` with the environment and the tag; GitHub **Environments** (`hml`, `stg`, `production`) with a required reviewer give the approval step |
+
+Today every merge into `main` goes straight to production; that changes in the last step (production stops following `main`).
+
+### Infrastructure (same free VM)
+- **Three stacks, one VM:** one Docker Compose project per environment (`sg-hml`, `sg-stg`, `sg-prod`), each with its own API, Redis, volumes and `storage/` folder. The free Ampere VM (2 OCPU, 12 GB) fits the three; the 1 GB AMD fallback does **not**.
+- **One entrance (Caddy) in a separate "edge" stack:** Caddy listens on 80/443 and routes three host names to `api` containers on a shared Docker network (`singalong-net`). Today Caddy lives inside the production stack, so a production deploy restarts it; moving it out also removes that coupling. The certificates volume (`caddy-data`) is **kept** (moved, not recreated) to avoid Let's Encrypt limits.
+- **DNS:** `singalong-hml.duckdns.org` and `singalong-stg.duckdns.org` point to the same IP as production.
+- **Directories:** `/opt/singalong` stays production (no move); `/opt/singalong-hml`, `/opt/singalong-stg` and `/opt/singalong-edge` are new.
+
+### Isolation (what must never be shared)
+- **Data:** each environment has its own volumes, database, Redis, `ADMIN_TOKEN` and `ADMIN_PATH`.
+- **E-mail:** `hml`/`stg` have **no** `BREVO_API_KEY` (the server already answers `email_disabled`) and a test-only `PAIR_ALLOWED_EMAILS`, so nobody gets a test e-mail by mistake.
+- **Cloud library:** `ENABLED_TO_SEND_TO_CLOUD` is empty in `hml`/`stg`; their `storage/` is separate from production's. `hml` gets a small library of the owner's own songs; `stg` may receive a read-only copy of production's library (decision 4).
+- **Visible marker:** a new `APP_ENV` variable (`hml` | `stg` | empty = production) goes out in `/api/config`; the web pages show a colored ribbon and a `[HML]`/`[STG]` title prefix, so nobody mistakes one environment for another.
+
+### Deploy and rollback
+- `deploy.sh <env> <tag>` replaces the current `deploy.sh`: it uses the environment's folder, sets `IMAGE_TAG`, pulls that exact tag and waits for the API to be healthy.
+- `deploy.yml` stops moving `latest` by itself: it publishes `ghcr.io/…/singalong-api:<sha>`, deploys to `hml`/`stg` according to the table above, and a second workflow, **Promote**, deploys a chosen tag to any environment (also used for **rollback**: promote the previous tag).
+- Keep the last 5 tags on the VM (`docker image prune` keeps recent ones).
+
+### The owner's app
+The server address is already a setting of the app: for `hml`/`stg` the installer is pointed at their address by hand, and the update-notice variables (`APP_LATEST_VERSION`, `APP_MIN_VERSION`, …) are per environment, which allows testing the update flow with a fake newer version before publishing the Release.
+
+### Milestones
+1. **H1 – Compose parametrized** (project name, `IMAGE_TAG`, shared `singalong-net`), production unchanged. Test: production still deploys the same way.
+2. **H2 – Edge stack** (Caddy outside production) with the production host only; a short, planned production downtime to move it.
+3. **H3 – `APP_ENV` and the ribbon** (API, web, tests).
+4. **H4 – `deploy.sh <env> <tag>`, `deploy.yml` and the Promote workflow**, with GitHub Environments.
+5. **H5 – Create `hml`** on the VM (DNS, `.env`, small library) and deploy a `release/**` branch to it.
+6. **H6 – Create `stg`** and make `main` feed it; production stops following `main`.
+7. **H7 – Documentation** (`deploy/README.md`, TRD 12.13 becomes a "done" record).
+
+### Open decisions (to confirm)
+1. **Which VM do you have?** `VM.Standard.A1.Flex` with 12 GB (fits) or the 1 GB AMD fallback (does not fit three stacks; then `hml` and `stg` would have to share one smaller stack).
+2. **The path of a version:** `release/**` → `hml`, `main` → `stg`, manual → production (recommended), or `main` → `hml` → manual → `stg` → manual → production (as in TRD 12.13, one more approval).
+3. **Approvals:** use GitHub Environments with you as the required reviewer (recommended), or only a manual workflow without approval.
+4. **Library in `stg`:** a read-only copy of production's songs (realistic, but copies copyrighted files to a second place on the same VM) or only a few of your own songs, as in `hml`.
+5. **Edge stack:** accept a short planned production downtime to move Caddy out (recommended), or keep Caddy inside production and let `hml`/`stg` join its network.
+6. **Names:** keep `singalong-hml.duckdns.org` and `singalong-stg.duckdns.org`.
+7. **Transition:** keep production following `main` until H6 is done (recommended), so nothing changes before the new path is proven.
