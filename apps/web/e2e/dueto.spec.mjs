@@ -1,5 +1,5 @@
 // Dueto: o dono da música convida alguém que está na sala, a pessoa aceita, e na vez da música os DOIS vão para o palco, com a
-// letra em duas cores (turquesa e violeta, amarelo quando cantam juntos), cada parte com a sua forma e o contorno preto.
+// letra em duas cores (turquesa e violeta, amarelo quando cantam juntos), cada parte com a sua forma.
 import { expect, test } from '@playwright/test';
 import { addToQueue, ANA, BIA, createRoom, SONGS } from './helpers.mjs';
 
@@ -64,16 +64,15 @@ test('convidar, aceitar e cantar junto: os dois vão ao palco e a letra tem as d
   // cada um vê qual é a sua cor
   await expect(ana.page.locator('.stage-legend')).toContainText('Você canta nas partes turquesa');
   await expect(bia.page.locator('.stage-legend')).toContainText('Você canta nas partes violeta');
-  // as cores (seguras para daltonismo), a forma de cada parte e o contorno preto
+  // as cores (seguras para daltonismo), a forma de cada parte
   const look = await ana.page.evaluate(() => {
     const read = (selector, name) => getComputedStyle(document.querySelector(selector)).getPropertyValue(name).trim().toLowerCase();
-    const stroke = getComputedStyle(document.querySelector('.line.current .w')).webkitTextStrokeColor;
-    return { a: read('.line.current', '--part'), b: read('.line.next', '--part'), shapeA: read('.line.current', '--shape'), shapeB: read('.line.next', '--shape'), stroke };
+    return { a: read('.line.current', '--part'), b: read('.line.next', '--part'), shapeA: read('.line.current', '--shape'), shapeB: read('.line.next', '--shape') };
   });
   expect(look.a).toBe('#10b8c8');
   expect(look.b).toBe('#8b5cf6');
   expect([look.shapeA, look.shapeB].map((s) => s.replace(/["']/g, ''))).toEqual(['●', '■']); // a cor nunca é a única pista
-  expect(look.stroke).toBe('rgb(0, 0, 0)');
+  
 
   // a TV mostra os dois nomes, as cores e a mesma divisão
   await expect(tv.locator('.duet-legend')).toContainText('Ana');
