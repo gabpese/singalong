@@ -471,6 +471,13 @@ Request from the owner after the second test:
 - **Legibility, second pass (Oct 2026):** the outline used to be drawn over the fill and ate into the letters. The duet lyrics now use two layers: a thick black halo underneath and the full colored fill on top (`data-text` + `::after`), in bolder type.
 - **Lyrics card and library fix (Oct 2026):** the halo did not help enough, so the lyrics now pass inside a glassmorphism card (translucent dark glass with blur, on TV and stage) and the colored fill is plain again. Also fixed: the room asked for the library without the room code, so the songs in the owner's computer catalog never showed (a test guards the `x-room` header).
 
+### 12.18 Version 1.1: join QR on the TV, name modal, first-session setup, duet stage layout (Oct 2026)
+
+- **QR code always on the TV:** while a song plays, a small card with the room QR code and the room code sits under the queue (the big one on the waiting screen stays). Hidden on narrow screens, like the queue.
+- **Name modal on arrival:** a person who enters a room without a saved name sees a modal asking for it (no Esc, no empty name); the name goes to the queue, duet invites and scoreboard. It is asked only on arrival: clearing the field later in the "Add" tab does not bring it back.
+- **First session on a machine (owner's app):** the first time "Começar a sessão" is pressed, a modal asks for the video card (same options as the settings) and the microphone. Choosing a different card reinstalls the engine and the session starts on the next click. The choice is remembered (`setup_done` in the config).
+- **Duet stage layout:** the lyrics card is now as tall as its content and centered in the free space, with the legend right below it (the old grid put the flexible row on the wrong element when the duet notices were present, collapsing the lyrics to the bottom).
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**

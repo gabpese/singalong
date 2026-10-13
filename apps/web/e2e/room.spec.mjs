@@ -511,3 +511,31 @@ test('a biblioteca é pedida junto com o código da sala (assim as músicas do c
   await page.goto(room.guestUrl);
   expect((await header).headers()['x-room']).toBe(room.code);
 });
+
+test.describe('quem chega sem nome', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('um modal pede o nome antes de tudo, não fecha sem ele e o nome vai para a fila e para a sala', async ({ page, request }) => {
+    const room = await createRoom(request);
+    await page.goto(room.guestUrl);
+    const dialog = page.getByRole('dialog', { name: /Bem-vindo à sala/ });
+    await expect(dialog).toBeVisible();
+    const enter = dialog.getByRole('button', { name: 'Entrar na sala' });
+    await expect(enter).toBeDisabled(); // sem nome não entra
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible(); // Esc não fecha
+    await dialog.getByLabel('Seu nome').fill('   ');
+    await expect(enter).toBeDisabled(); // só espaços também não vale
+    await dialog.getByLabel('Seu nome').fill('Dora');
+    await enter.click();
+    await expect(dialog).toBeHidden();
+    await expect.poll(async () => (await roomState(request, room.code)).people.map((p) => p.name)).toContain('Dora');
+    // a próxima visita já sabe o nome
+    await page.reload();
+    await expect(page.getByRole('dialog', { name: /Bem-vindo à sala/ })).toHaveCount(0);
+    // e apagar o campo para digitar outro nome não traz o modal de volta
+    await page.getByRole('navigation', { name: 'Seções' }).getByRole('button', { name: 'Adicionar' }).click();
+    await page.getByLabel('Seu nome').fill('');
+    await expect(page.getByRole('dialog', { name: /Bem-vindo à sala/ })).toHaveCount(0);
+  });
+});

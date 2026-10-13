@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/identity.js';
 import qrcode from '../vendor/qrcode/qrcode.mjs';
 
-export function QrCode({ code }: { code: string }) {
+/** `compact`: o cartão pequeno que fica na TV enquanto toca (sem o endereço escrito). */
+export function QrCode({ code, compact = false }: { code: string; compact?: boolean }) {
   const [join, setJoin] = useState<{ url: string; svg: string; localhostWarning: boolean } | null>(null);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export function QrCode({ code }: { code: string }) {
   return (
     <>
       <div className="qr" aria-label="QR code para entrar na sala" dangerouslySetInnerHTML={{ __html: join?.svg ?? '' }} />
-      <p className="hint">
+      <p className="hint" hidden={compact}>
         {join?.url}
         {join?.localhostWarning ? '  —  para o QR funcionar nos celulares, defina PUBLIC_URL (ex.: http://192.168.0.10:3000)' : ''}
       </p>

@@ -64,6 +64,15 @@ test('convidar, aceitar e cantar junto: os dois vão ao palco e a letra tem as d
   // cada um vê qual é a sua cor
   await expect(ana.page.locator('.stage-legend')).toContainText('Você canta nas partes turquesa');
   await expect(bia.page.locator('.stage-legend')).toContainText('Você canta nas partes violeta');
+  // o layout: o cartão da letra não fica colado na base; tem espaço livre acima e abaixo e a legenda vem logo depois dele
+  const box = await ana.page.evaluate(() => {
+    const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
+    const card = rect('.stage-lyrics');
+    return { above: card.top - rect('.stage-duet').bottom, legendGap: rect('.stage-legend').top - card.bottom, height: card.height, viewport: innerHeight };
+  });
+  expect(box.above).toBeGreaterThan(40);
+  expect(box.legendGap).toBeLessThan(40);
+  expect(box.height).toBeLessThan(box.viewport * 0.6);
   // as cores (seguras para daltonismo), a forma de cada parte
   const look = await ana.page.evaluate(() => {
     const read = (selector, name) => getComputedStyle(document.querySelector(selector)).getPropertyValue(name).trim().toLowerCase();

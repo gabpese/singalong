@@ -219,16 +219,22 @@ function reportLayout() {
 new ResizeObserver(reportLayout).observe($('chrome'));
 
 // --- configurações ---
-function renderGpu() {
-  const select = $('gpu-select');
-  if (!state || $('screen-settings').hidden) return;
-  if (document.activeElement === select) return;
+/** As opções de placa de vídeo (a das configurações e a da primeira sessão usam a mesma lista). */
+function gpuChoices() {
   const gpu = hardwareInfo?.gpus?.[0];
   const options = [['auto', hardwareInfo ? `Automático (recomendado: ${hardwareInfo.engine === 'cu121' ? 'placa de vídeo' : 'processador'})` : 'Automático']];
   if (gpu) options.push(['cu121', `Placa de vídeo: ${gpu.name}`]);
   options.push(['cpu', 'Processador (mais lento)']);
   const current = state.engine.kind;
   const wanted = current === 'cu121' ? 'cu121' : current === 'cpu' ? 'cpu' : 'auto';
+  return { gpu, options, current, wanted };
+}
+
+function renderGpu() {
+  const select = $('gpu-select');
+  if (!state || $('screen-settings').hidden) return;
+  if (document.activeElement === select) return;
+  const { gpu, options, current, wanted } = gpuChoices();
   if (select.dataset.signature !== JSON.stringify(options) + wanted) {
     select.replaceChildren(...options.map(([value, label]) => Object.assign(document.createElement('option'), { value, textContent: label })));
     select.value = options.some(([value]) => value === wanted) ? wanted : 'auto';
@@ -238,8 +244,7 @@ function renderGpu() {
   $('gpu-info').textContent = `Em uso: ${current === 'cu121' ? 'placa de vídeo' : 'processador'}${state.engine.reason ? ` (${state.engine.reason})` : ''}. ${machine}`;
 }
 
-async function loadMicrophones() {
-  const select = $('mic-select');
+async function loadMicrophones(select = $('mic-select')) {
   let devices = [];
   try {
     const probe = await navigator.mediaDevices.getUserMedia({ audio: true }); // só para o navegador mostrar os nomes dos microfones
@@ -286,7 +291,42 @@ $('pair-go').addEventListener('click', async (e) => {
   if (data) $('pair-code').value = '';
 });
 
-$('welcome-start').addEventListener('click', (e) => act('startAgent', { nickname: $('welcome-nickname').value }, e.currentTarget));
+// primeira sessão neste computador: antes de começar, a pessoa escolhe a placa de vídeo e o microfone
+async function openSetup() {
+  hardwareInfo ??= await act('hardware');
+  const { gpu, options, wanted } = gpuChoices();
+  const select = $('setup-gpu');
+  select.replaceChildren(...options.map(([value, label]) => Object.assign(document.createElement('option'), { value, textContent: label })));
+  select.value = wanted;
+  $('setup-gpu-info').textContent = hardwareInfo ? `${hardwareInfo.cpu_cores} núcleos · ${gpu ? `${gpu.name} (driver ${gpu.driver})` : 'sem placa NVIDIA'}. Trocar a placa reinstala parte dos componentes e leva alguns minutos.` : '';
+  $('setup').hidden = false;
+  await loadMicrophones($('setup-mic'));
+}
+
+$('welcome-start').addEventListener('click', async (e) => {
+  const nickname = $('welcome-nickname').value;
+  if (state.setupDone || !nickname.trim()) return act('startAgent', { nickname }, e.currentTarget); // sem apelido o controlador explica
+  e.currentTarget.disabled = true;
+  try {
+    await openSetup();
+  } finally {
+    e.currentTarget.disabled = false;
+  }
+});
+$('setup-cancel').addEventListener('click', () => { $('setup').hidden = true; });
+$('setup-go').addEventListener('click', async (e) => {
+  const mic = $('setup-mic');
+  const option = mic.selectedOptions[0];
+  const kind = $('setup-gpu').value;
+  const { current } = gpuChoices();
+  await act('settings', { microphone: mic.value ? { id: mic.value, label: option.textContent } : null, setupDone: true }, e.currentTarget);
+  $('setup').hidden = true;
+  if (kind !== 'auto' && kind !== (current === 'cu121' ? 'cu121' : 'cpu')) {
+    await act('buildEngine', { engine: kind, switchEngine: true }); // reinstala o motor; a sessão começa no próximo clique
+    return;
+  }
+  await act('startAgent', { nickname: $('welcome-nickname').value });
+});
 $('welcome-nickname').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('welcome-start').click(); });
 $('session-toggle').addEventListener('click', (e) => act('stopAgent', undefined, e.currentTarget));
 $('room-create').addEventListener('click', async (e) => {

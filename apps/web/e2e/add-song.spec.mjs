@@ -141,6 +141,7 @@ test('o aviso do Jukebox também vale com só o artista ou só o nome', async ({
 test('sem o nome da pessoa a música não entra na fila (e o campo recebe o foco)', async ({ page, request }) => {
   await searchResults(request, BAD_GUY);
   const room = await openAddTab(page, request);
+  await page.getByLabel('Seu nome').fill(''); // a pessoa apagou o nome que o modal pediu na entrada
   await artistField(page).fill('billie');
   await searchButton(page).click(); // buscar continua livre
   await page.locator('.results .result').first().click();

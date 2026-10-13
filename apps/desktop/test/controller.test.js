@@ -457,3 +457,13 @@ test('o aviso de atualização é conferido de novo (no máximo uma vez por dia)
   assert.equal(controller.snapshot().update.status, 'update_available');
   versionAnswer = { status: 'ok' };
 });
+
+test('a escolha da primeira sessão (placa de vídeo e microfone) é lembrada e só vale como feita quando marcada', async () => {
+  const { controller, dataDir } = await ready();
+  assert.equal(controller.snapshot().setupDone, false);
+  assert.equal((await controller.setSettings({ setupDone: 'sim' })).setupDone, false); // só `true` vale
+  const snap = await controller.setSettings({ microphone: { id: 'abc', label: 'USB' }, setupDone: true });
+  assert.equal(snap.setupDone, true);
+  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).setup_done, true);
+  assert.equal((await controller.setSettings({ nickname: 'Ana' })).setupDone, true); // outras mudanças não a desfazem
+});

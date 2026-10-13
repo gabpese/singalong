@@ -168,6 +168,12 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   // inicia a sessão com o worker de verdade
   await id('welcome-nickname').fill('Dona Flor');
   await id('welcome-start').click();
+  // primeira sessão neste computador: antes de começar, o modal pede a placa de vídeo e o microfone
+  await id('setup').waitFor();
+  assert.ok((await id('setup-gpu').locator('option').count()) >= 2);
+  await id('setup-mic').waitFor();
+  await shot('1d-primeira-sessao');
+  await id('setup-go').click();
   await id('screen-home').waitFor();
   assert.equal(await id('screen-welcome').isHidden(), true);
   assert.equal(await id('session-nick').textContent(), 'Dona Flor');

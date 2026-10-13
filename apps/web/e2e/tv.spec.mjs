@@ -52,7 +52,7 @@ test('toca: mostra quem canta, o tom, a fila, a letra sincronizada e a barra de 
   await expect(page.locator('.singer.is-next')).toContainText('Unethical');
   await expect(page.getByLabel('Fila de cantores')).toContainText('Ana');
   await expect(page.getByLabel('Fila de cantores')).toContainText('Bia');
-  await expect(page.getByText('Entre na sala')).toBeHidden(); // a tela de espera sai
+  await expect(page.locator('.idle')).toBeHidden(); // a tela de espera sai
 
   await expect.poll(() => playing(page)).toBe(true);
   // a letra acompanha o relógio: a 1ª linha entra em ~1 s e a 2ª em ~5 s
@@ -165,4 +165,15 @@ test('sem pontuação ligada o quadro não aparece', async ({ page, request }) =
   await page.goto(room.tvUrl);
   await expect(page.locator('.singer.is-now')).toBeVisible();
   await expect(page.locator('.score-hud')).toBeHidden();
+});
+
+test('o QR code da sala continua na TV com a música tocando (cartão ao lado da fila)', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await page.goto(room.tvUrl);
+  await expect.poll(() => page.evaluate(() => window.tv.engine.playing)).toBe(true);
+  const card = page.getByRole('complementary', { name: 'Entrar na sala' });
+  await expect(card).toBeVisible();
+  await expect(card.getByLabel('QR code para entrar na sala').locator('svg')).toBeVisible();
+  await expect(card).toContainText(room.code);
 });

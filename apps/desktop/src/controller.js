@@ -106,6 +106,7 @@ export function createController({
       deviceName: config.device_name,
       nickname: config.nickname,
       microphone: config.microphone ?? null,
+      setupDone: Boolean(config.setup_done), // a escolha de placa de vídeo e microfone da primeira sessão já foi feita?
       browser,
       browserName: BROWSER_NAMES[browser],
       engineDir: config.engine_dir,
@@ -487,6 +488,7 @@ export function createController({
       const mic = patch.microphone;
       allowed.microphone = mic && typeof mic.id === 'string' && mic.id ? { id: mic.id.slice(0, 300), label: String(mic.label ?? '').slice(0, 120) } : null;
     }
+    if (patch.setupDone === true) allowed.setup_done = true;
     await save(allowed);
     publish();
     return snapshot();

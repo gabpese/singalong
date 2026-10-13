@@ -17,6 +17,8 @@ export default defineConfig({
       args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
     },
     permissions: ['microphone'],
+    // quem entra numa sala sem nome vê o modal que o pede; os testes comuns já chegam com um nome (os do modal limpam isto)
+    storageState: { cookies: [], origins: [{ origin: `http://127.0.0.1:${PORT}`, localStorage: [{ name: 'userName', value: 'Teste' }] }] },
   },
   webServer: {
     command: 'node e2e/server.mjs',

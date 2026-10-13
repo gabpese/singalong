@@ -50,6 +50,18 @@ function QueueBox({ current, upcoming }: { current: QueueItem | null; upcoming: 
   );
 }
 
+/** O QR code da sala sempre à vista (quem chega no meio da festa entra sem pedir o código): fica abaixo da fila enquanto toca. */
+function JoinCard({ code }: { code: string }) {
+  return (
+    <aside className="tv-join" aria-label="Entrar na sala">
+      <QrCode code={code} compact />
+      <p>
+        Entre na sala <strong>{code}</strong>
+      </p>
+    </aside>
+  );
+}
+
 function ScoreHud({ hud }: { hud: HudState }) {
   return (
     <aside className="score-hud" hidden={!hud.visible} aria-live="off">
@@ -233,7 +245,10 @@ export function TvPage({ code }: { code: string }) {
           {current?.guest?.status === 'accepted' && <DuetLegend first={current.added_by} second={current.guest.name} />}
         </section>
         <ScoreHud hud={hud} />
-        <QueueBox current={current} upcoming={upcoming} />
+        <div className="tv-side">
+          <QueueBox current={current} upcoming={upcoming} />
+          {current && <JoinCard code={code} />}
+        </div>
       </div>
 
       <footer className="tv-bottom">
