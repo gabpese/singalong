@@ -33,6 +33,7 @@ export function createLyricsView(els) {
       const el = document.createElement('span');
       el.className = 'w';
       el.textContent = span.word;
+      el.dataset.text = span.word; // o dueto repete a palavra numa camada de cima (o preenchimento colorido sobre o contorno)
       if (i) els.current.append(' ');
       els.current.append(el);
       return { el, span, p: -1 };
