@@ -320,4 +320,10 @@ export default {
   'apierr.queue_full': 'The queue is full.',
   'apierr.rate_limited': 'Too many wrong attempts. Wait a few minutes.',
   'apierr.room_not_found': 'Room not found.',
+
+  'a11y.lyricsSize': 'Lyrics size',
+  'a11y.lyricsSmaller': 'Make the lyrics smaller',
+  'a11y.lyricsBigger': 'Make the lyrics bigger',
+  'a11y.nowSinging': 'Now on the TV: {who}, {title}',
+  'a11y.skip': 'Skip to content',
 };

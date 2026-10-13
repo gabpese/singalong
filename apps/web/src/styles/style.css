@@ -315,8 +315,8 @@ body.tv { overflow: hidden; height: 100vh; }
   border: 1px solid rgba(255,255,255,.16); box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.18);
 }
 .line { margin: 0; min-height: 1.3em; line-height: 1.25; font-weight: 700; }
-.prev { font-size: clamp(1.1rem, 2.4vw, 2.2rem); color: var(--dim); opacity: .6; }
-.current { font-size: clamp(2rem, 4.6vw, 4.6rem); color: var(--fg); }
+.prev { font-size: calc(clamp(1.1rem, 2.4vw, 2.2rem) * var(--lyrics-scale, 1)); color: var(--dim); opacity: .75; }
+.current { font-size: calc(clamp(2rem, 4.6vw, 4.6rem) * var(--lyrics-scale, 1)); color: var(--fg); }
 /* cada palavra tem o próprio preenchimento (--p): a ordem de leitura não depende da quebra de linha */
 .current .w {
   --p: 0%;
@@ -328,8 +328,8 @@ body.tv { overflow: hidden; height: 100vh; }
 }
 /* aviso de pausa longa: "--------------" que vai sumindo até a próxima linha começar */
 .current .gap-dashes { color: var(--accent); letter-spacing: .12em; font-weight: 800; text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 45%, transparent); }
-.next { font-size: clamp(1.3rem, 3.2vw, 3rem); color: var(--dim); }
-.next2 { font-size: clamp(1.1rem, 2.4vw, 2.2rem); color: var(--dim); opacity: .55; }
+.next { font-size: calc(clamp(1.3rem, 3.2vw, 3rem) * var(--lyrics-scale, 1)); color: var(--dim); }
+.next2 { font-size: calc(clamp(1.1rem, 2.4vw, 2.2rem) * var(--lyrics-scale, 1)); color: var(--dim); opacity: .7; }
 
 .idle {
   position: absolute; inset: 0; z-index: 2;
@@ -498,10 +498,10 @@ body.stage { background: #0b0b14; }
 .stage-song { margin: 2px 0; font-size: 1.25rem; line-height: 1.2; }
 .stage-artist { margin: 0; color: var(--dim); font-size: .95rem; }
 .stage-lyrics { flex: 0 1 auto; min-height: 0; padding: 28px 16px; margin: auto 0; border-radius: 22px; } /* a altura do conteúdo, centrada no espaço livre */
-.stage-lyrics .prev { font-size: clamp(1rem, 4.4vw, 1.5rem); }
-.stage-lyrics .current { font-size: clamp(1.9rem, 9vw, 3.2rem); }
-.stage-lyrics .next { font-size: clamp(1.15rem, 5.4vw, 1.9rem); }
-.stage-lyrics .next2 { font-size: clamp(1rem, 4.4vw, 1.5rem); }
+.stage-lyrics .prev { font-size: calc(clamp(1rem, 4.4vw, 1.5rem) * var(--lyrics-scale, 1)); }
+.stage-lyrics .current { font-size: calc(clamp(1.9rem, 9vw, 3.2rem) * var(--lyrics-scale, 1)); }
+.stage-lyrics .next { font-size: calc(clamp(1.15rem, 5.4vw, 1.9rem) * var(--lyrics-scale, 1)); }
+.stage-lyrics .next2 { font-size: calc(clamp(1rem, 4.4vw, 1.5rem) * var(--lyrics-scale, 1)); }
 .stage-bottom { min-height: 2.6em; display: grid; place-items: center; color: var(--dim); text-align: center; }
 .stage-end { display: grid; gap: 4px; color: var(--fg); font-size: 1.2rem; }
 .stage-end small { color: var(--dim); font-size: .85rem; }
@@ -563,3 +563,21 @@ body.stage { background: #0b0b14; }
 .tv-viewer .lyrics { position: static; }
 .language-switch { min-height: 36px; padding: 4px 8px; border-radius: 10px; background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); }
 .landing-page .language-switch { justify-self: end; }
+
+/* ---------- acessibilidade ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip-link { position: absolute; left: 8px; top: -60px; z-index: 100; padding: 10px 14px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 600; text-decoration: none; }
+.skip-link:focus { top: 8px; }
+.lyrics-size { display: inline-flex; gap: 6px; }
+.lyrics-size button { min-height: 36px; min-width: 40px; padding: 4px 10px; font-weight: 700; }
+.tv-queue .is-current small { color: #c9c9dc; }
+/* quem pede menos movimento não vê transições nem animações */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+/* quem pede mais contraste ganha textos secundários e bordas mais fortes */
+@media (prefers-contrast: more) {
+  :root { --dim: #c4c4da; --line: #6a6a92; }
+  .prev, .next2 { opacity: 1; }
+}
+.stage-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }

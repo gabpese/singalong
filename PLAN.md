@@ -477,4 +477,5 @@ A before everything (safe releases and the base for text and tabs) → B (one au
 ### Phase A status (release 1.2.0)
 - **Done:** the room page has the **Room | TV** switch (the TV tab is a viewer: no sound, no microphone; the QR code is the room link) and the interface is available in **Portuguese (Brazil), English and Spanish** (`apps/web/src/i18n/`: one catalog per language, a language selector on the entry page and in the room, the browser's language as the default; a test checks that the three catalogs have the same keys and that every key used in the code exists).
 - **Server messages:** the API still answers in Portuguese; the client translates the error codes guests see (`apierr.*` keys) and falls back to the server's text for the others.
-- **Left:** accessibility (contrast, keyboard focus, screen reader, large lyrics on the TV) and the homologation/staging environments.
+- **Accessibility (done):** automatic checks with axe-core on every screen and dialog (WCAG 2.1 A/AA, in the end-to-end suite); **lyrics size** buttons (A−/A+, also `+`/`−` on the TV) shared by the TV, the stage and the TV tab; a "skip to content" link; a screen-reader announcement of who is singing; `aria-current` on the tabs; `prefers-reduced-motion` and `prefers-contrast` support; a contrast fix on the TV queue.
+- **Left:** the homologation/staging environments.

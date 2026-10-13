@@ -45,17 +45,17 @@ export function TopBar({ state, status, view, onView }: { state: RoomState | nul
 export function TabBar({ tab, onTab, queueCount, hidden }: { tab: Tab; onTab: (tab: Tab) => void; queueCount: number; hidden: boolean }) {
   return (
     <nav className="tabbar" aria-label={t('tabs.aria')} hidden={hidden}>
-      <button type="button" className={tab === 'queue' ? 'active' : ''} onClick={() => onTab('queue')}>
+      <button type="button" className={tab === 'queue' ? 'active' : ''} aria-current={tab === 'queue' ? 'page' : undefined} onClick={() => onTab('queue')}>
         <Icon name="singing" />
         <span className="label">
           {t('tabs.queue')} <b>{queueCount ? `(${queueCount})` : ''}</b>
         </span>
       </button>
-      <button type="button" className={tab === 'add' ? 'active' : ''} onClick={() => onTab('add')}>
+      <button type="button" className={tab === 'add' ? 'active' : ''} aria-current={tab === 'add' ? 'page' : undefined} onClick={() => onTab('add')}>
         <Icon name="add-song" />
         <span className="label">{t('tabs.add')}</span>
       </button>
-      <button type="button" className={tab === 'library' ? 'active' : ''} onClick={() => onTab('library')}>
+      <button type="button" className={tab === 'library' ? 'active' : ''} aria-current={tab === 'library' ? 'page' : undefined} onClick={() => onTab('library')}>
         <Icon name="musics" />
         <span className="label">{t('tabs.library')}</span>
       </button>

@@ -1,6 +1,7 @@
 // Palco: a tela de canto do celular. Mostra a letra no ritmo da TV (que toca a música) e devolve o cantor à sala quando acaba.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
+import { LyricsSize } from '../ui/LyricsSize';
 import { createSyncClock } from '../lib/clock.js';
 import { myPart, partName } from '../lib/duet.js';
 import { connectRoom } from '../lib/identity.js';
@@ -143,9 +144,12 @@ export function StagePage({ code }: { code: string }) {
             {current?.singers ? ` — ${current.singers}` : ''}
           </p>
         </div>
-        <button type="button" onClick={leave}>
-          {t('stage.back')}
-        </button>
+        <div className="stage-actions">
+          <LyricsSize />
+          <button type="button" onClick={leave}>
+            {t('stage.back')}
+          </button>
+        </div>
       </header>
 
       <InviteNotice state={state} onRespond={(invited, accept) => void respondInvite(code, invited, accept)} />

@@ -1,6 +1,8 @@
 // TV: toca o que a sala manda, mostra a letra sincronizada, quem canta, a fila e a pontuação.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
+import { changeLyricsScale } from '../lib/accessibility.js';
+import { LyricsSize } from '../ui/LyricsSize';
 import { tRich } from '../i18n/rich';
 import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-media.js';
 import { keySummary } from '../lib/music.js';
@@ -153,7 +155,10 @@ export function TvPage({ code }: { code: string }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.key === 'f' || event.key === 'F') && !event.ctrlKey && !event.metaKey && !event.altKey) toggleFullscreen();
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key === 'f' || event.key === 'F') toggleFullscreen();
+      else if (event.key === '+' || event.key === '=') changeLyricsScale(1);
+      else if (event.key === '-') changeLyricsScale(-1);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -196,8 +201,9 @@ export function TvPage({ code }: { code: string }) {
         </div>
         <div className="tv-meta">
           <span className="room-tag">
-            Sala <strong>{code}</strong>
+            {t('room.word')} <strong>{code}</strong>
           </span>
+          <LyricsSize />
           <button type="button" title={t('tvp.fullscreenTip')} aria-label={t('tvp.fullscreen')} onClick={toggleFullscreen}>
             ⛶
           </button>

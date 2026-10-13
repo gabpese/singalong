@@ -2,6 +2,7 @@
 import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
 import { api, setUserName, userName } from '../lib/identity.js';
+import { splitQueue } from '../lib/queue-view.js';
 import { stageDismissed, stageItemFor } from '../lib/stage.js';
 import type { LibrarySong, QueueItem, RoomState } from '../lib/types';
 import { AddSong, type AddSongHandle } from './AddSong';
@@ -132,17 +133,25 @@ export function RoomPage({ code }: { code: string }) {
 
   return (
     <RoomProvider value={context}>
+      <a className="skip-link" href="#conteudo">
+        {t('a11y.skip')}
+      </a>
       <TopBar state={state} status={status} view={view} onView={setView} />
+      <p className="sr-only" role="status" aria-live="polite">
+        {state && splitQueue(state).current
+          ? t('a11y.nowSinging', { who: splitQueue(state).current!.singers, title: splitQueue(state).current!.title ?? '' })
+          : ''}
+      </p>
       {view === 'room' && <RoomRail state={state} />}
       <InviteBanner />
 
       {view === 'tv' && (
-        <main className="room-page">
+        <main className="room-page" id="conteudo" tabIndex={-1}>
           <TvViewer state={state} position={position} lyrics={lyrics} />
         </main>
       )}
 
-      <main className="room-page" hidden={view !== 'room'}>
+      <main className="room-page" id={view === 'room' ? 'conteudo' : undefined} tabIndex={-1} hidden={view !== 'room'}>
         <section className="tab" hidden={tab !== 'queue'}>
           {state && (
             <>

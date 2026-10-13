@@ -8,6 +8,7 @@ import { createLyricsView } from '../lib/lyrics-view.js';
 import { nextUp, playOrder, splitQueue } from '../lib/queue-view.js';
 import type { LyricCue, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
+import { LyricsSize } from '../ui/LyricsSize';
 import { QueueBox, titleOf } from '../tv/QueueBox';
 import type { Position } from './useRoomConnection';
 
@@ -93,6 +94,7 @@ export function TvViewer({ state, position, lyrics }: Props) {
   return (
     <section className="tv-viewer" aria-label={t('tvview.aria')}>
       {!state?.tv_connected && <p className="hint tv-viewer-note">{t('tvview.noTv')}</p>}
+      <LyricsSize />
       <header className="tv-viewer-top">
         {current ? (
           <div className="singer is-now">

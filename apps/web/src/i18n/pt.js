@@ -320,4 +320,10 @@ export default {
   'apierr.queue_full': 'A fila está cheia.',
   'apierr.rate_limited': 'Muitas tentativas erradas. Espere alguns minutos.',
   'apierr.room_not_found': 'Sala não encontrada.',
+
+  'a11y.lyricsSize': 'Tamanho da letra',
+  'a11y.lyricsSmaller': 'Diminuir a letra',
+  'a11y.lyricsBigger': 'Aumentar a letra',
+  'a11y.nowSinging': 'Agora na TV: {who}, {title}',
+  'a11y.skip': 'Ir para o conteúdo',
 };
