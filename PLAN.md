@@ -433,3 +433,43 @@ Decided with the project owner: **keep going with plain HTML/CSS/JS until Phase 
 - **What is reused without rewriting:** all the pure, tested logic (`lyrics-sync.js`, `queue-view.js`, `music.js`, `youtube.js`, `identity.js`), `engine.js` and `preview.js` (audio), the CSS (tokens and screens) and **the 100+ end-to-end tests**, which verify behavior on screen and serve as a safety net.
 - **Migration plan (suggested):** Vite + React + TypeScript; `apps/web` gains `src/` and builds to `dist/`, which the API serves in place of `public/`; migrate one screen at a time (landing → controller → TV), keeping the end-to-end test green at every step; Tailwind optional.
 - **Prerequisite:** the API does not change (REST + WebSocket are already the boundary).
+
+## 17. Roadmap after 1.1.0 (decided Oct 2026)
+
+Ideas chosen by the project owner after a review of what the app has and what is missing. Nothing below is built yet. **Decision:** processing in the browser (separating the voice with WebGPU/ONNX) is **not** part of the plan; separation stays on the server worker or the owner's agent. "Separating audio without downloading the song" was dropped with it, since the browser cannot read YouTube's stream.
+
+### Phase A: foundation
+| Item | Notes |
+|---|---|
+| Homologation and staging environments | Already designed in TRD 12.13. Done first so the following phases are released safely |
+| Languages (i18n) and accessibility | Move every text into a catalog, then translate (English and Spanish first). Accessibility: contrast, keyboard focus, screen reader, large lyrics on the TV. The interface stops being a "non-goal" in Portuguese only |
+| Web room with tabs, like the desktop app | The room page gets the **Room** and **TV** tabs (and the host panel), the TV becoming a mode of the same page. The `tv.html` route stays, so nothing breaks. **The QR code becomes the room link:** whoever enters through it lands in the room and chooses to stay on the **Room** tab or go to the **TV** tab to watch the lyrics and the songs playing. Care: a guest on the TV tab is a **viewer only** (no sound and no microphone, so two devices never play the same song); only the device that opened the TV as the player (or the host's choice) plays audio, and audio, microphone and full screen must stay stable there |
+
+### Phase B: live audio (same engine, done together)
+| Item | Notes |
+|---|---|
+| Latency compensation | Calibrate with a beat and the microphone, saved per device; affects scoring and lyrics, so it comes before the melody guide |
+| Original-voice volume | A slider between the instrumental and the original voice (`vocals.mp3` is already stored); a guide for those learning the song. Host's mixer |
+| Feedback (whistle) detector | FFT-based; lowers the voice volume by itself. Closes the "left" item of 12.14 |
+| More than one microphone in the output | Several inputs in Web Audio with a limiter; the settings choose more than one device (also in the owner's app). Closes the other "left" item of 12.14 |
+
+### Phase C: the party
+| Item | Notes |
+|---|---|
+| Reactions from the phones | Applause, fire and emojis sent over the WebSocket and animated on the TV; a rate limit per person |
+| Owner's statistics | Events recorded per room and song: most sung, processing time, cache size; helps clean the cache |
+
+### Phase D: singing
+| Item | Notes |
+|---|---|
+| Melody guide | Extract the melody from the isolated voice during processing (pYIN or CREPE) and draw it as bars on the TV, with the singer's pitch on top; reuses the scoring base. Depends on latency compensation |
+| Duet with identified voices | Two layers. First **by lyrics**: each line marked voice 1, voice 2 or both (editor, plus a suggestion by speaker diarization on the isolated voice); the stage shows who sings what and scoring is per part. Later, **by audio**: real separation of the two voices (open research, a bonus) |
+
+### Phase E: platform
+| Item | Notes |
+|---|---|
+| Hybrid mode (F25) | Per song, choose whether it also goes to the cloud (S3/R2 driver already planned in section 14). Needs a decision on synchronization and storage cost |
+| macOS, Linux and AMD/Apple GPU (F26) | The engine is assembled for Windows only. First macOS on Apple Silicon (MPS), then Linux (ROCm for AMD) |
+
+### Order and dependencies
+A before everything (safe releases and the base for text and tabs) → B (one audio engine) → C (quick return) → D (needs B) → E (largest and most uncertain). Each item gets its own milestone, with tests, in the usual way (section 16).

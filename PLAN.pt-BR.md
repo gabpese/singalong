@@ -435,3 +435,43 @@ Decidido com o dono do projeto: **seguir com HTML/CSS/JS puros até fechar a Fas
 - **O que se aproveita sem reescrever:** toda a lógica pura e testada (`lyrics-sync.js`, `queue-view.js`, `music.js`, `youtube.js`, `identity.js`), `engine.js` e `preview.js` (áudio), o CSS (tokens e telas) e **os 100+ testes de ponta a ponta**, que verificam o comportamento na tela e servem de rede de segurança.
 - **Plano de migração (sugerido):** Vite + React + TypeScript; `apps/web` ganha `src/` e build para `dist/`, que a API serve no lugar de `public/`; migrar uma tela por vez (entrada → controle → TV), mantendo o teste de ponta a ponta verde a cada passo; Tailwind opcional.
 - **Pré-requisito:** a API não muda (REST + WebSocket já são a fronteira).
+
+## 17. Roteiro após a 1.1.0 (decidido em out/2026)
+
+Ideias escolhidas pelo dono do projeto após uma revisão do que o app tem e do que falta. Nada abaixo foi construído ainda. **Decisão:** o processamento no navegador (separar a voz com WebGPU/ONNX) **não** faz parte do plano; a separação continua no worker do servidor ou no agente do dono. "Separar o áudio sem baixar a música" saiu junto, já que o navegador não consegue ler o stream do YouTube.
+
+### Fase A: fundação
+| Item | Observações |
+|---|---|
+| Ambientes de homologação e staging | Já desenhados no TRD 12.13. Feitos primeiro para que as fases seguintes saiam com segurança |
+| Idiomas (i18n) e acessibilidade | Mover todos os textos para um catálogo e traduzir (inglês e espanhol primeiro). Acessibilidade: contraste, foco por teclado, leitor de tela, letra grande na TV. A interface deixa de ser "só em português" como não-objetivo |
+| Sala web com abas, como o app desktop | A página da sala ganha as abas **Sala** e **TV** (e o painel do anfitrião), e a TV vira um modo da mesma página. A rota `tv.html` continua, então nada quebra. **O QR code passa a ser o link da sala:** quem entra por ele cai na sala e escolhe ficar na aba **Sala** ou ir para a aba **TV** ver a letra e as músicas que estão passando. Cuidado: o convidado na aba TV é **só espectador** (sem som e sem microfone, para dois aparelhos nunca tocarem a mesma música); só o aparelho que abriu a TV como player (ou a escolha do anfitrião) toca o áudio, e áudio, microfone e tela cheia precisam continuar estáveis ali |
+
+### Fase B: áudio ao vivo (mesmo motor, feitos juntos)
+| Item | Observações |
+|---|---|
+| Compensação de latência | Calibrar com uma batida e o microfone, salvo por dispositivo; afeta pontuação e letra, então vem antes do guia de melodia |
+| Volume da voz original | Um slider entre o instrumental e a voz original (o `vocals.mp3` já é guardado); serve de guia para quem está aprendendo a música. Mesa de mixagem do anfitrião |
+| Detector de microfonia (apito) | Baseado em FFT; baixa o volume da voz sozinho. Fecha o item "pendente" da 12.14 |
+| Mais de um microfone na saída | Várias entradas no Web Audio com limitador; as configurações escolhem mais de um dispositivo (também no app do dono). Fecha o outro item "pendente" da 12.14 |
+
+### Fase C: a festa
+| Item | Observações |
+|---|---|
+| Reações dos celulares | Aplausos, fogo e emojis enviados pelo WebSocket e animados na TV; limite de envio por pessoa |
+| Estatísticas do dono | Eventos registrados por sala e música: mais cantadas, tempo de processamento, tamanho do cache; ajuda a limpar o cache |
+
+### Fase D: o canto
+| Item | Observações |
+|---|---|
+| Guia de melodia | Extrair a melodia da voz isolada no processamento (pYIN ou CREPE) e desenhá-la como barras na TV, com a afinação do cantor por cima; reaproveita a base da pontuação. Depende da compensação de latência |
+| Dueto com vozes identificadas | Duas camadas. Primeiro **pela letra**: cada linha marcada como voz 1, voz 2 ou ambas (editor, mais uma sugestão por diarização de falantes sobre a voz isolada); o palco mostra quem canta o quê e a pontuação é por trecho. Depois, **pelo áudio**: separação real das duas vozes (pesquisa em aberto, um bônus) |
+
+### Fase E: plataforma
+| Item | Observações |
+|---|---|
+| Modo híbrido (F25) | Por música, escolher se ela também vai para a nuvem (driver S3/R2 já previsto na seção 14). Exige decidir sincronização e custo de armazenamento |
+| macOS, Linux e GPU AMD/Apple (F26) | O motor é montado só para Windows. Primeiro macOS em Apple Silicon (MPS), depois Linux (ROCm para AMD) |
+
+### Ordem e dependências
+A antes de tudo (versões seguras e a base de textos e abas) → B (um motor de áudio) → C (retorno rápido) → D (precisa da B) → E (a maior e mais incerta). Cada item vira um marco próprio, com testes, no formato de sempre (seção 16).
