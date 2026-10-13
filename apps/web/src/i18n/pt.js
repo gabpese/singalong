@@ -305,4 +305,19 @@ export default {
 
   'room.someone': 'Alguém',
   'error.http': 'Erro {status}',
+
+  'apierr.artist_title_required': 'Informe o artista e o nome da música.',
+  'apierr.client_id_required': 'Identificação do navegador ausente.',
+  'apierr.host_only': 'Só o anfitrião da sala pode fazer isso.',
+  'apierr.invalid_url': 'Link do YouTube inválido.',
+  'apierr.invite_not_found': 'Este convite não existe mais.',
+  'apierr.invite_self': 'Você não pode convidar a si mesmo.',
+  'apierr.item_not_found': 'Música não encontrada na fila.',
+  'apierr.lyrics_text_required': 'Informe o texto da letra.',
+  'apierr.not_queued': 'Só dá para mover músicas que aguardam.',
+  'apierr.not_your_item': 'Você só pode alterar as suas músicas.',
+  'apierr.person_not_found': 'Essa pessoa não está mais na sala.',
+  'apierr.queue_full': 'A fila está cheia.',
+  'apierr.rate_limited': 'Muitas tentativas erradas. Espere alguns minutos.',
+  'apierr.room_not_found': 'Sala não encontrada.',
 };

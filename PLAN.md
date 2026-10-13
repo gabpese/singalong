@@ -473,3 +473,8 @@ Ideas chosen by the project owner after a review of what the app has and what is
 
 ### Order and dependencies
 A before everything (safe releases and the base for text and tabs) → B (one audio engine) → C (quick return) → D (needs B) → E (largest and most uncertain). Each item gets its own milestone, with tests, in the usual way (section 16).
+
+### Phase A status (release 1.2.0)
+- **Done:** the room page has the **Room | TV** switch (the TV tab is a viewer: no sound, no microphone; the QR code is the room link) and the interface is available in **Portuguese (Brazil), English and Spanish** (`apps/web/src/i18n/`: one catalog per language, a language selector on the entry page and in the room, the browser's language as the default; a test checks that the three catalogs have the same keys and that every key used in the code exists).
+- **Server messages:** the API still answers in Portuguese; the client translates the error codes guests see (`apierr.*` keys) and falls back to the server's text for the others.
+- **Left:** accessibility (contrast, keyboard focus, screen reader, large lyrics on the TV) and the homologation/staging environments.

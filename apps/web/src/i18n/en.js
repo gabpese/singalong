@@ -305,4 +305,19 @@ export default {
 
   'room.someone': 'Someone',
   'error.http': 'Error {status}',
+
+  'apierr.artist_title_required': 'Enter the artist and the song title.',
+  'apierr.client_id_required': 'Browser identification is missing.',
+  'apierr.host_only': 'Only the room host can do that.',
+  'apierr.invalid_url': 'Invalid YouTube link.',
+  'apierr.invite_not_found': 'This invitation no longer exists.',
+  'apierr.invite_self': 'You cannot invite yourself.',
+  'apierr.item_not_found': 'Song not found in the queue.',
+  'apierr.lyrics_text_required': 'Enter the lyrics text.',
+  'apierr.not_queued': 'Only waiting songs can be moved.',
+  'apierr.not_your_item': 'You can only change your own songs.',
+  'apierr.person_not_found': 'That person is no longer in the room.',
+  'apierr.queue_full': 'The queue is full.',
+  'apierr.rate_limited': 'Too many wrong attempts. Wait a few minutes.',
+  'apierr.room_not_found': 'Room not found.',
 };

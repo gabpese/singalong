@@ -305,4 +305,19 @@ export default {
 
   'room.someone': 'Alguien',
   'error.http': 'Error {status}',
+
+  'apierr.artist_title_required': 'Indica el artista y el nombre de la canción.',
+  'apierr.client_id_required': 'Falta la identificación del navegador.',
+  'apierr.host_only': 'Solo el anfitrión de la sala puede hacer eso.',
+  'apierr.invalid_url': 'Enlace de YouTube no válido.',
+  'apierr.invite_not_found': 'Esta invitación ya no existe.',
+  'apierr.invite_self': 'No puedes invitarte a ti mismo.',
+  'apierr.item_not_found': 'Canción no encontrada en la cola.',
+  'apierr.lyrics_text_required': 'Indica el texto de la letra.',
+  'apierr.not_queued': 'Solo se pueden mover las canciones que esperan.',
+  'apierr.not_your_item': 'Solo puedes modificar tus canciones.',
+  'apierr.person_not_found': 'Esa persona ya no está en la sala.',
+  'apierr.queue_full': 'La cola está llena.',
+  'apierr.rate_limited': 'Demasiados intentos fallidos. Espera unos minutos.',
+  'apierr.room_not_found': 'Sala no encontrada.',
 };

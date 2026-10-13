@@ -52,4 +52,7 @@ export function translate(language, key, vars) {
   return vars ? text.replace(/\{(\w+)\}/g, (match, name) => (name in vars ? String(vars[name]) : match)) : text;
 }
 
+/** Existe tradução para esta chave (no idioma atual ou no português)? */
+export const hasText = (key) => key in (CATALOGS[current] ?? {}) || key in pt;
+
 export const t = (key, vars) => translate(current, key, vars);
