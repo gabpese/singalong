@@ -473,10 +473,12 @@ Ideias escolhidas pelo dono do projeto após uma revisão do que o app tem e do 
 | Modo híbrido (F25) | Por música, escolher se ela também vai para a nuvem (driver S3/R2 já previsto na seção 14). Exige decidir sincronização e custo de armazenamento |
 | macOS, Linux e GPU AMD/Apple (F26) | O motor é montado só para Windows. Primeiro macOS em Apple Silicon (MPS), depois Linux (ROCm para AMD) |
 
+**Versões:** a fase A sai como **1.1.1**; a **1.2.0** é a versão que fecha todas as fases (A a E).
+
 ### Ordem e dependências
 A antes de tudo (versões seguras e a base de textos e abas) → B (um motor de áudio) → C (retorno rápido) → D (precisa da B) → E (a maior e mais incerta). Cada item vira um marco próprio, com testes, no formato de sempre (seção 16).
 
-### Status da Fase A (versão 1.2.0)
+### Status da Fase A (versão 1.1.1)
 - **Feito:** a página da sala tem a alternância **Sala | TV** (a aba TV é só para assistir: sem som e sem microfone; o QR code é o link da sala) e a interface existe em **português (Brasil), inglês e espanhol** (`apps/web/src/i18n/`: um catálogo por idioma, seletor de idioma na entrada e na sala, o idioma do navegador como padrão; um teste confere que os três catálogos têm as mesmas chaves e que toda chave usada no código existe).
 - **Mensagens do servidor:** a API ainda responde em português; o cliente traduz os códigos de erro que os convidados veem (chaves `apierr.*`) e usa o texto do servidor nos demais.
 - **Acessibilidade (feita):** verificação automática com axe-core em todas as telas e diálogos (WCAG 2.1 A/AA, na suíte de ponta a ponta); botões de **tamanho da letra** (A−/A+, e `+`/`−` na TV) compartilhados pela TV, pelo palco e pela aba TV; link "ir para o conteúdo"; aviso para leitor de tela de quem está cantando; `aria-current` nas abas; suporte a `prefers-reduced-motion` e `prefers-contrast`; correção de contraste na fila da TV.

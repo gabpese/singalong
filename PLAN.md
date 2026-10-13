@@ -471,10 +471,12 @@ Ideas chosen by the project owner after a review of what the app has and what is
 | Hybrid mode (F25) | Per song, choose whether it also goes to the cloud (S3/R2 driver already planned in section 14). Needs a decision on synchronization and storage cost |
 | macOS, Linux and AMD/Apple GPU (F26) | The engine is assembled for Windows only. First macOS on Apple Silicon (MPS), then Linux (ROCm for AMD) |
 
+**Versions:** phase A is released as **1.1.1**; **1.2.0** is the release that closes all the phases (A to E).
+
 ### Order and dependencies
 A before everything (safe releases and the base for text and tabs) → B (one audio engine) → C (quick return) → D (needs B) → E (largest and most uncertain). Each item gets its own milestone, with tests, in the usual way (section 16).
 
-### Phase A status (release 1.2.0)
+### Phase A status (release 1.1.1)
 - **Done:** the room page has the **Room | TV** switch (the TV tab is a viewer: no sound, no microphone; the QR code is the room link) and the interface is available in **Portuguese (Brazil), English and Spanish** (`apps/web/src/i18n/`: one catalog per language, a language selector on the entry page and in the room, the browser's language as the default; a test checks that the three catalogs have the same keys and that every key used in the code exists).
 - **Server messages:** the API still answers in Portuguese; the client translates the error codes guests see (`apierr.*` keys) and falls back to the server's text for the others.
 - **Accessibility (done):** automatic checks with axe-core on every screen and dialog (WCAG 2.1 A/AA, in the end-to-end suite); **lyrics size** buttons (A−/A+, also `+`/`−` on the TV) shared by the TV, the stage and the TV tab; a "skip to content" link; a screen-reader announcement of who is singing; `aria-current` on the tabs; `prefers-reduced-motion` and `prefers-contrast` support; a contrast fix on the TV queue.
