@@ -1,71 +1,8 @@
-// Topo da sala (código, estado da TV, menu com links e ajustes do anfitrião) e a barra de abas.
-import { type ReactNode, useRef, useState } from 'react';
-import { hostToken } from '../lib/identity.js';
+// Topo da sala (código e estado da TV) e a barra de abas. Os atalhos e ajustes ficam na barra lateral (RoomRail).
 import type { RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { type Tab, useRoom } from './context';
-import { VoiceDialog, VoiceVolume } from './VoiceControl';
 import type { ConnectionStatus } from './useRoomConnection';
-
-/** Ajuste do anfitrião: o clique vale na hora e volta atrás só se o servidor recusar (sem "piscar" à espera da resposta). */
-function HostSetting({ field, checked, children }: { field: 'fair' | 'scoring'; checked: boolean; children: ReactNode }) {
-  const { act, isHost } = useRoom();
-  const [pending, setPending] = useState<boolean | null>(null);
-  return (
-    <label className="check" hidden={!isHost}>
-      <input
-        type="checkbox"
-        checked={pending ?? checked}
-        onChange={(event) => {
-          setPending(event.target.checked);
-          act('PATCH', '', { [field]: event.target.checked })
-            .catch(() => {})
-            .finally(() => setPending(null));
-        }}
-      />
-      <span>{children}</span>
-    </label>
-  );
-}
-
-/** Liga e desliga a voz do microfone da TV nas caixas: para ligar, antes um aviso sobre microfones direcionais (evita a microfonia). */
-function VoiceSetting({ checked }: { checked: boolean }) {
-  const { act, isHost } = useRoom();
-  const [asking, setAsking] = useState(false);
-  const [pending, setPending] = useState<boolean | null>(null);
-  const set = (value: boolean) => {
-    setPending(value);
-    act('PATCH', '', { voice: value })
-      .catch(() => {})
-      .finally(() => setPending(null));
-  };
-  return (
-    <>
-      <label className="check" hidden={!isHost}>
-        <input
-          type="checkbox"
-          checked={pending ?? checked}
-          onChange={(event) => (event.target.checked ? setAsking(true) : set(false))}
-        />
-        <span>
-          Voz do microfone nas caixas de som
-          <br />
-          <small className="muted">a voz de quem canta sai junto com a música (use microfones direcionais, para evitar a microfonia)</small>
-        </span>
-      </label>
-      <VoiceVolume />
-      {asking && (
-        <VoiceDialog
-          onConfirm={() => {
-            setAsking(false);
-            set(true);
-          }}
-          onCancel={() => setAsking(false)}
-        />
-      )}
-    </>
-  );
-}
 
 function tvStatusText(state: RoomState | null, status: ConnectionStatus) {
   if (!state) return status === 'connected' ? 'Conectado' : status === 'reconnecting' ? 'Reconectando à sala…' : 'Conectando…';
@@ -79,20 +16,7 @@ function tvStatusText(state: RoomState | null, status: ConnectionStatus) {
 }
 
 export function TopBar({ state, status }: { state: RoomState | null; status: ConnectionStatus }) {
-  const { code, isHost, toast } = useRoom();
-  const menu = useRef<HTMLDetailsElement>(null);
-  const closeMenu = () => {
-    if (menu.current) menu.current.open = false;
-  };
-
-  async function copyText(text: string, okMessage: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast(okMessage);
-    } catch {
-      window.prompt('Copie o link:', text); // navegador sem permissão de área de transferência (http fora de localhost)
-    }
-  }
+  const { code } = useRoom();
 
   return (
     <header className="topbar">
@@ -103,59 +27,6 @@ export function TopBar({ state, status }: { state: RoomState | null; status: Con
         </h1>
         <p className={`tv-status${status === 'connected' && state?.tv_connected ? ' on' : ''}`}>{tvStatusText(state, status)}</p>
       </div>
-      <details className="menu" ref={menu}>
-        <summary aria-label="Opções da sala">⋯</summary>
-        <div className="menu-panel">
-          <button
-            type="button"
-            className="has-icon"
-            onClick={() => {
-              closeMenu();
-              window.open(`tv.html?room=${code}`, '_blank');
-            }}
-          >
-            <Icon name="display" />
-            Abrir TV
-          </button>
-          <button
-            type="button"
-            className="has-icon"
-            onClick={() => {
-              closeMenu();
-              void copyText(`${location.origin}/room.html?room=${code}`, 'Link da sala copiado!');
-            }}
-          >
-            <Icon name="link" />
-            Copiar link da sala
-          </button>
-          <button
-            type="button"
-            className="has-icon"
-            hidden={!isHost}
-            onClick={() => {
-              closeMenu();
-              void copyText(
-                `${location.origin}/room.html?room=${code}#host=${hostToken(code)}`,
-                'Link de anfitrião copiado! Quem abrir controla a sala.',
-              );
-            }}
-          >
-            <Icon name="host" />
-            Copiar link de anfitrião
-          </button>
-          <HostSetting field="scoring" checked={Boolean(state?.scoring)}>
-            Pontuação pelo microfone
-            <br />
-            <small className="muted">a TV compara a afinação de quem canta com a voz original (precisa de microfone na TV)</small>
-          </HostSetting>
-          <VoiceSetting checked={Boolean(state?.voice)} />
-          <HostSetting field="fair" checked={Boolean(state?.fair)}>
-            Rodízio justo
-            <br />
-            <small className="muted">a mesma pessoa não canta duas seguidas quando há outra esperando</small>
-          </HostSetting>
-        </div>
-      </details>
     </header>
   );
 }

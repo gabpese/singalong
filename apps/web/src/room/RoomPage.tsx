@@ -11,6 +11,7 @@ import { NowPlaying } from './NowPlaying';
 import { NameDialog } from './NameDialog';
 import { QueueList, Scoreboard } from './QueueList';
 import { PreviewBar, usePreview } from './usePreview';
+import { RoomRail } from './RoomRail';
 import { TabBar, TopBar } from './TopBar';
 import { useRoomConnection } from './useRoomConnection';
 
@@ -128,6 +129,7 @@ export function RoomPage({ code }: { code: string }) {
   return (
     <RoomProvider value={context}>
       <TopBar state={state} status={status} />
+      <RoomRail state={state} />
       <InviteBanner />
 
       <main className="room-page">

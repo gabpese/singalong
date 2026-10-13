@@ -478,6 +478,13 @@ Request from the owner after the second test:
 - **First session on a machine (owner's app):** the first time "Começar a sessão" is pressed, a modal asks for the video card (same options as the settings) and the microphone. Choosing a different card reinstalls the engine and the session starts on the next click. The choice is remembered (`setup_done` in the config).
 - **Duet stage layout:** the lyrics card is now as tall as its content and centered in the free space, with the legend right below it (the old grid put the flexible row on the wrong element when the duet notices were present, collapsing the lyrics to the bottom).
 
+### 12.19 Room sidebar (Oct 2026)
+
+- **The "..." menu is gone.** Shortcuts and host settings now live in an always-visible sidebar (a column on the left on wide screens; a strip under the header on phones), with icons only: the text is in the tooltip (hover or keyboard focus) and in the accessible name; on phones a toast confirms each change.
+- **Settings are switches** with the new icons: scoring (mic), voice through the speakers (sound; still asks about directional microphones before turning on, and the volume slider appears next to it) and fair rotation (shuffle).
+- **Shortcuts:** copy the room link (everyone), copy the host link (host only: to run the room from another device) and open the TV (host only, and not shown inside the owner's app, which already has the TV and Host tabs).
+- **Fix in the owner's app:** the copy buttons did nothing because the app denied the clipboard permission (and `prompt` does not exist there); the permission is now allowed for the server's pages and there is a fallback that copies without it.
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**

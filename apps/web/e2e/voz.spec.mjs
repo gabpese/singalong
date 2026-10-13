@@ -6,13 +6,12 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 const tvPlaying = (page) => page.evaluate(() => window.tv.engine.playing && window.tv.engine.duration > 0 && window.tv.engine.currentTime > 0);
 const voice = (page) => page.evaluate(() => ({ attached: window.tv.engine.voiceAttached, gain: window.tv.engine.voiceGain }));
-const openMenu = (page) => page.getByLabel('Opções da sala').click();
+const voiceSwitch = (page) => page.getByRole('switch', { name: /Voz do microfone nas caixas de som/ });
 
 test('o anfitrião liga a voz: antes aparece o aviso dos microfones direcionais; "Agora não" deixa desligada', async ({ page, request }) => {
   const room = await createRoom(request);
   await page.goto(room.hostUrl);
-  await openMenu(page);
-  const toggle = page.getByLabel(/Voz do microfone nas caixas de som/);
+  const toggle = voiceSwitch(page);
   await expect(toggle).not.toBeChecked();
   await expect(page.getByLabel('Volume da voz nas caixas de som')).toHaveCount(0); // sem a voz ligada não há volume
 
@@ -41,15 +40,13 @@ test('o anfitrião liga a voz: antes aparece o aviso dos microfones direcionais;
 test('quem não é anfitrião não vê a opção da voz', async ({ page, request }) => {
   const room = await createRoom(request);
   await page.goto(room.guestUrl);
-  await openMenu(page);
-  await expect(page.getByLabel(/Voz do microfone nas caixas de som/)).toBeHidden();
+  await expect(voiceSwitch(page)).toHaveCount(0);
 });
 
 test('o volume da voz vai para a sala ao soltar a barra', async ({ page, request }) => {
   const room = await createRoom(request);
   await hostPatch(request, room, { voice: true });
   await page.goto(room.hostUrl);
-  await openMenu(page);
   const slider = page.getByLabel('Volume da voz nas caixas de som');
   await slider.focus();
   await slider.press('ArrowRight');

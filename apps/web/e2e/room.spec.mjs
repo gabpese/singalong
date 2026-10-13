@@ -173,9 +173,8 @@ test('rodízio justo e pontuação: só o anfitrião vê e liga; a fila mostra a
   await addToQueue(request, room.code, SONGS.bravo, { name: 'Ana' });
   await addToQueue(request, room.code, SONGS.charlie, { client: BIA, name: 'Bia' });
   await page.goto(room.hostUrl);
-  await page.getByLabel('Opções da sala').click();
-  await page.getByLabel(/Rodízio justo/).check();
-  await expect(page.getByLabel(/Rodízio justo/)).toBeChecked();
+  await page.getByRole('switch', { name: /Rodízio justo/ }).click();
+  await expect(page.getByRole('switch', { name: /Rodízio justo/ })).toBeChecked();
   expect((await roomState(request, room.code)).fair).toBe(true);
   // com o rodízio, a Bia canta antes da 2ª música da Ana, e subir/descer ficam desabilitados
   const items = page.locator('.queue-item');
@@ -183,15 +182,16 @@ test('rodízio justo e pontuação: só o anfitrião vê e liga; a fila mostra a
   await expect(items.nth(1)).toContainText('Unethical');
   await expect(items.nth(0).getByRole('button', { name: 'Descer na fila' })).toBeDisabled();
 
-  await page.getByLabel(/Pontuação pelo microfone/).check();
+  await page.getByRole('switch', { name: /Pontuação pelo microfone/ }).click();
   await expect.poll(async () => (await roomState(request, room.code)).scoring).toBe(true);
   await expect(page.getByRole('heading', { name: 'Placar' })).toBeVisible();
 
   const guest = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage(); // outro navegador: sem o token
   await guest.goto(room.guestUrl);
-  await guest.getByLabel('Opções da sala').click();
-  await expect(guest.getByLabel(/Rodízio justo/)).toBeHidden();
-  await expect(guest.getByRole('button', { name: 'Copiar link de anfitrião' })).toBeHidden();
+  await expect(guest.getByRole('button', { name: 'Copiar link da sala' })).toBeVisible(); // o link da sala é de todos
+  await expect(guest.getByRole('switch')).toHaveCount(0);
+  await expect(guest.getByRole('button', { name: 'Copiar link de anfitrião' })).toHaveCount(0);
+  await expect(guest.getByRole('button', { name: 'Abrir TV' })).toHaveCount(0);
 });
 
 test('quem não é anfitrião só mexe nas próprias músicas e pode ceder a vez', async ({ page, request }) => {
@@ -359,11 +359,9 @@ test('os links da sala: copiar link da sala e de anfitrião; o token sai da barr
   const room = await createRoom(request);
   await page.goto(room.hostUrl);
   await expect(page).toHaveURL(room.guestUrl); // #host=... foi guardado e removido da barra
-  await page.getByLabel('Opções da sala').click();
   await page.getByRole('button', { name: 'Copiar link da sala' }).click();
   await expect(toast(page)).toContainText('Link da sala copiado!');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`http://127.0.0.1:3100/room.html?room=${room.code}`);
-  await page.getByLabel('Opções da sala').click();
   await page.getByRole('button', { name: 'Copiar link de anfitrião' }).click();
   await expect(toast(page)).toContainText('Link de anfitrião copiado!');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`http://127.0.0.1:3100/room.html?room=${room.code}#host=${room.host}`);
