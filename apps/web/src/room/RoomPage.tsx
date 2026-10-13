@@ -36,11 +36,11 @@ export function RoomPage({ code }: { code: string }) {
 
   const loadLibrary = useCallback(async () => {
     try {
-      setLibrary(await api('GET', '/api/songs'));
+      setLibrary(await api('GET', '/api/songs', undefined, code)); // com a sala: o servidor junta o catálogo do computador do dono
     } catch {
       // sem a lista: a aba "Músicas" fica vazia até a próxima tentativa
     }
-  }, []);
+  }, [code]);
   useEffect(() => {
     void loadLibrary();
   }, [loadLibrary]);

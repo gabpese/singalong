@@ -267,9 +267,14 @@ body.tv { overflow: hidden; height: 100vh; }
 .tv-queue small { color: var(--dim); font-size: clamp(.8rem, 1.15vw, 1.05rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv-queue li.more { justify-content: center; background: transparent; color: var(--dim); font-size: clamp(.85rem, 1.2vw, 1.1rem); }
 
+/* a letra passa dentro de um cartão de vidro (glassmorphism): o fundo da tela continua o mesmo, e o cartão escurece e desfoca
+   o que está atrás para qualquer cor de letra (turquesa, violeta, amarelo, branco) ficar legível */
 .lyrics {
   display: flex; flex-direction: column; justify-content: center; align-items: center;
-  gap: 1.4vh; text-align: center; padding: 2vh 2vw; overflow: hidden;
+  gap: 1.4vh; text-align: center; padding: 3vh 3vw; margin: 1vh 1vw; overflow: hidden; border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.03)), rgba(8, 10, 22, .62);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,.16); box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.18);
 }
 .line { margin: 0; min-height: 1.3em; line-height: 1.25; font-weight: 700; }
 .prev { font-size: clamp(1.1rem, 2.4vw, 2.2rem); color: var(--dim); opacity: .6; }
@@ -451,7 +456,7 @@ body.stage { background: #0b0b14; }
 .stage-where { margin: 0; color: var(--dim); font-size: .85rem; }
 .stage-song { margin: 2px 0; font-size: 1.25rem; line-height: 1.2; }
 .stage-artist { margin: 0; color: var(--dim); font-size: .95rem; }
-.stage-lyrics { min-height: 0; padding: 0; }
+.stage-lyrics { min-height: 0; padding: 18px 14px; margin: 0; border-radius: 22px; }
 .stage-lyrics .prev { font-size: clamp(1rem, 4.4vw, 1.5rem); }
 .stage-lyrics .current { font-size: clamp(1.8rem, 8.4vw, 3rem); }
 .stage-lyrics .next { font-size: clamp(1.15rem, 5.4vw, 1.9rem); }
@@ -472,24 +477,16 @@ body.stage { background: #0b0b14; }
 [data-part="a"] { --part: #10B8C8; --shape: '●'; }
 [data-part="b"] { --part: #8B5CF6; --shape: '■'; }
 [data-part="both"] { --part: var(--accent); --shape: '◆'; }
-/* A letra do dueto em duas camadas: por baixo, a própria palavra em PRETO com um traço grosso (só a metade de fora do traço
-   aparece: o halo preto que dá legibilidade); por cima, a mesma palavra com o preenchimento colorido que vai enchendo, inteiro,
-   sem o contorno comer as letras (um traço desenhado em cima do preenchimento as deixava finas e vazadas). */
+/* No dueto a letra enche com a cor de quem canta; quem dá o contraste é o cartão de vidro atrás dela (.lyrics), então o
+   preenchimento fica inteiro, sem contorno. */
 .current[data-part] .w {
-  position: relative; display: inline-block; font-weight: 800;
-  color: #000; -webkit-text-stroke: 0.22em #000; paint-order: stroke fill;
-  text-shadow: 0 0.04em 0.18em #000c;
-}
-.current[data-part] .w::after {
-  content: attr(data-text); position: absolute; left: 0; top: 0; white-space: nowrap;
   background: linear-gradient(90deg, var(--part) var(--p), var(--fg) var(--p));
-  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 0; text-shadow: none;
+  -webkit-background-clip: text; background-clip: text; font-weight: 800;
 }
 /* as linhas que ainda vêm e a legenda: a forma e a cor de quem canta */
 .line[data-part]:not(.current):not(:empty)::before,
 .duet-legend span::before {
   content: var(--shape, '●'); margin-right: .4em; font-size: .8em; color: var(--part);
-  -webkit-text-stroke: 0.12em #000; paint-order: stroke fill;
 }
 .duet-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 1.2vh 0 0; font-size: clamp(.8rem, 1.4vw, 1.1rem); color: var(--dim); }
 .stage-legend { font-size: .9rem; margin: 0; }

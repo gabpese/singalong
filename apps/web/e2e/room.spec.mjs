@@ -504,3 +504,10 @@ test('a biblioteca também filtra pelo título original do vídeo', async ({ pag
   await expect(page.locator('.library li')).toHaveCount(1);
   await expect(page.locator('.library li')).toContainText('Unethical (Acoustic)');
 });
+
+test('a biblioteca é pedida junto com o código da sala (assim as músicas do computador do dono aparecem)', async ({ page, request }) => {
+  const room = await createRoom(request);
+  const header = page.waitForRequest((req) => req.url().endsWith('/api/songs') && req.method() === 'GET');
+  await page.goto(room.guestUrl);
+  expect((await header).headers()['x-room']).toBe(room.code);
+});

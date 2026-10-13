@@ -469,6 +469,7 @@ Request from the owner after the second test:
 - **The notice reaches the guest on any screen:** a banner with **Aceitar/Recusar** that sticks to the top of the **room (queue, add and Jukebox tabs)**, over the **stage** and over the **TV** (for whoever uses that browser as their own screen, as in the owner's app, where the TV and host tabs share an identity). On phones that allow it, a new invitation also **vibrates**. The notice says when the song is already playing.
 - **Tests:** the server test now covers the invitation on the playing song; 3 new end-to-end tests: a playing song is invited from the stage and the notice shows in the queue, add and Jukebox tabs, accepting from the Jukebox sends the guest to the stage and the TV starts coloring; the notice reaches someone who is on the stage (declining does not take them out); and the notice on the TV page.
 - **Legibility, second pass (Oct 2026):** the outline used to be drawn over the fill and ate into the letters. The duet lyrics now use two layers: a thick black halo underneath and the full colored fill on top (`data-text` + `::after`), in bolder type.
+- **Lyrics card and library fix (Oct 2026):** the halo did not help enough, so the lyrics now pass inside a glassmorphism card (translucent dark glass with blur, on TV and stage) and the colored fill is plain again. Also fixed: the room asked for the library without the room code, so the songs in the owner's computer catalog never showed (a test guards the `x-room` header).
 
 ## 13. Decisions made and open questions
 
