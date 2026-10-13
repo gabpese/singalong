@@ -20,11 +20,11 @@ test('criar sala abre a TV em outra aba e leva o anfitrião para a sala', async 
   const code = new URL(page.url()).searchParams.get('room');
   expect(new URL(tv.url()).pathname).toBe('/tv.html');
   expect(new URL(tv.url()).searchParams.get('room')).toBe(code);
-  // quem criou é o anfitrião: o menu mostra as opções que só ele tem
+  // quem criou é o anfitrião: a barra lateral mostra os atalhos e ajustes que só ele tem
   await expect(page.getByRole('heading', { name: `Sala ${code}` })).toBeVisible();
-  await page.getByLabel('Opções da sala').click();
   await expect(page.getByRole('button', { name: 'Copiar link de anfitrião' })).toBeVisible();
-  await expect(page.getByLabel(/Rodízio justo/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Abrir TV' })).toBeVisible();
+  await expect(page.getByRole('switch', { name: /Rodízio justo/ })).toBeVisible();
 });
 
 test('entrar com o código de uma sala que existe', async ({ page, request }) => {

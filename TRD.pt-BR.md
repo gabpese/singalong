@@ -478,6 +478,13 @@ Pedido do dono depois do segundo teste:
 - **Primeira sessão numa máquina (app do dono):** na primeira vez que "Começar a sessão" é apertado, um modal pede a placa de vídeo (as mesmas opções das configurações) e o microfone. Escolher outra placa reinstala o motor e a sessão começa no clique seguinte. A escolha fica guardada (`setup_done` na configuração).
 - **Layout do palco em dupla:** o cartão da letra agora tem a altura do conteúdo e fica centrado no espaço livre, com a legenda logo abaixo (a grade antiga dava a linha flexível ao elemento errado quando os avisos de dueto existiam, e a letra ia para a base).
 
+### 12.19 Barra lateral da sala (Out/2026)
+
+- **O menu "..." saiu.** Atalhos e ajustes do anfitrião agora ficam numa barra lateral sempre à vista (uma coluna à esquerda em telas largas; uma faixa abaixo do topo no celular), só com ícones: o texto está no tooltip (mouse ou foco do teclado) e no nome acessível; no celular um aviso confirma cada mudança.
+- **Os ajustes viraram switches** com os ícones novos: pontuação (microfone), voz nas caixas (som; continua perguntando sobre microfones direcionais antes de ligar, e o volume aparece ao lado) e rodízio justo (embaralhar).
+- **Atalhos:** copiar o link da sala (todos), copiar o link de anfitrião (só o anfitrião: para administrar a sala de outro aparelho) e abrir a TV (só o anfitrião, e não aparece dentro do app do dono, que já tem as abas TV e Anfitrião).
+- **Correção no app do dono:** os botões de copiar não faziam nada porque o app negava a permissão da área de transferência (e `prompt` não existe lá); a permissão agora vale para as páginas do servidor e há um plano B que copia sem ela.
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

@@ -307,7 +307,7 @@ function registerIpc() {
 
 /** As páginas do servidor (a TV precisa de microfone, tela cheia e acesso ao servidor de mídia local) só recebem essas licenças. */
 function allowRoomPermissions() {
-  const allowed = new Set(['media', 'fullscreen', 'local-network-access', 'local-network', 'loopback-network']);
+  const allowed = new Set(['media', 'fullscreen', 'clipboard-sanitized-write', 'local-network-access', 'local-network', 'loopback-network']); // clipboard: os botões de copiar link
   const room = electronSession.fromPartition('persist:sala');
   const fromServer = (url) => {
     try {

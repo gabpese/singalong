@@ -100,18 +100,50 @@ input[type=range] { accent-color: var(--accent); }
 .tv-status { margin: 2px 0 0; color: var(--dim); font-size: .82rem; }
 .tv-status.on { color: var(--ok); }
 
-.menu { position: relative; }
-.menu > summary {
-  list-style: none; cursor: pointer; width: var(--tap); height: var(--tap);
-  display: grid; place-items: center; font-size: 1.5rem; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line);
+/* a barra lateral da sala: atalhos e ajustes sempre à vista, só ícones (o texto vai no tooltip). Em tela larga é uma coluna à
+   esquerda; no celular, uma faixa logo abaixo do topo. */
+.room-rail {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 6px 10px;
+  padding: 8px 16px; border-bottom: 1px solid var(--line);
 }
-.menu > summary::-webkit-details-marker { display: none; }
-.menu-panel {
-  position: absolute; right: 0; top: calc(var(--tap) + 8px); z-index: 30; width: min(320px, 86vw);
-  display: grid; gap: 8px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: 0 12px 40px #000a;
+.rail-item { position: relative; }
+.rail-item.has-pop { display: contents; }
+.rail-sep { align-self: stretch; width: 1px; margin: 4px 2px; background: var(--line); }
+.rail-btn, .rail-switch {
+  position: relative; display: grid; place-items: center; gap: 5px; min-width: var(--tap); min-height: var(--tap);
+  padding: 6px 8px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); color: var(--dim);
+  cursor: pointer;
 }
-.menu-panel .check { padding: 4px 2px; }
+.rail-btn .icon, .rail-switch .icon { width: 1.35rem; height: 1.35rem; }
+.rail-btn:hover, .rail-switch:hover { color: var(--fg); }
+.rail-switch.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.rail-switch .sw { position: relative; width: 30px; height: 17px; border-radius: 999px; background: var(--line); transition: background .15s; }
+.rail-switch .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--fg); transition: transform .15s; }
+.rail-switch.on .sw { background: var(--accent); }
+.rail-switch.on .sw::after { transform: translateX(13px); background: var(--accent-ink); }
+.rail-pop { flex: 1 0 100%; order: 10; } /* no celular o volume vem depois dos botões, numa linha só dele */
+.rail-pop:empty { display: none; }
+.rail-pop .backing-row { margin: 0; }
+/* tooltip: só onde há mouse e espaço (no celular o aviso do toast faz esse papel) */
+@media (hover: hover) and (min-width: 960px) {
+  .rail-btn[data-tip]::after, .rail-switch[data-tip]::after {
+    content: attr(data-tip); position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); z-index: 40;
+    width: max-content; max-width: 260px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line);
+    color: var(--fg); font-size: .82rem; line-height: 1.35; text-align: left; box-shadow: 0 8px 24px #000a;
+    opacity: 0; pointer-events: none; transition: opacity .12s;
+  }
+  .rail-btn[data-tip]:hover::after, .rail-btn[data-tip]:focus-visible::after,
+  .rail-switch[data-tip]:hover::after, .rail-switch[data-tip]:focus-visible::after { opacity: 1; }
+}
+@media (min-width: 960px) {
+  .room-rail {
+    position: fixed; left: 16px; top: 96px; z-index: 15; width: 64px; flex-direction: column; flex-wrap: nowrap; align-items: center; gap: 8px;
+    padding: 10px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+  }
+  .rail-sep { align-self: auto; width: 28px; height: 1px; margin: 2px 0; }
+  .rail-item.has-pop { display: block; }
+  .rail-pop { position: absolute; left: calc(100% + 16px); top: 0; width: 250px; z-index: 35; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 24px #000a; }
+}
 
 .room-page {
   max-width: 760px; margin: 0 auto;
@@ -365,6 +397,9 @@ body.tv { overflow: hidden; height: 100vh; }
 .i-pause { --icon: url('/icons/pause.svg'); }
 .i-resume { --icon: url('/icons/resume.svg'); }
 .i-next-song { --icon: url('/icons/next-song.svg'); }
+.i-mic { --icon: url('/icons/mic.svg'); }
+.i-sound { --icon: url('/icons/sound.svg'); }
+.i-shuffle { --icon: url('/icons/shuffle.svg'); }
 /* botão só com ícone (o nome fica no aria-label e no title) */
 .icon-btn { display: inline-grid; place-items: center; padding: 4px 14px; min-width: var(--tap); }
 .icon-btn .icon { width: 1.25em; height: 1.25em; vertical-align: 0; }
@@ -474,7 +509,6 @@ body.stage { background: #0b0b14; }
 /* voz do microfone nas caixas: aviso antes de ligar e o volume */
 .voice-dialog .jukebox-body p { margin: 0; line-height: 1.45; }
 .voice-tips { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; color: var(--dim); }
-.menu-panel .voice-row { margin-top: 2px; }
 
 /* dueto: turquesa para um cantor, violeta para o outro e amarelo (a cor de sempre) quando cantam juntos. Pares escolhidos para
    se distinguirem em todos os tipos de daltonismo (testados por simulação), sem azul nem rosa. A cor nunca é a única pista:
