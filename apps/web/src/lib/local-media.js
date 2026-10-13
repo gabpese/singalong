@@ -1,6 +1,7 @@
 // Músicas no computador do dono (armazenamento local): a TV as busca de um servidor local de mídia, e o Chrome/Edge pedem ao
 // usuário a permissão de "Acesso à rede local" na primeira vez. Estas funções puras decidem o que a TV mostra (TRD, seção 5).
 
+import { t } from '../i18n/index.js';
 /**
  * O endereço do servidor local de mídia ("http://127.0.0.1:8765/token"), tirado do endereço de uma música local da fila;
  * null se a sala não tem música local.
@@ -24,10 +25,10 @@ export const HINT_AFTER_MS = 1_500;
  */
 export function accessMessage(status, elapsedMs = 0) {
   if (status === 'checking' && elapsedMs >= HINT_AFTER_MS) {
-    return 'Se o navegador perguntar, escolha Permitir: as músicas desta sala estão no computador do dono e precisam do acesso à rede local.';
+    return t('local.ask');
   }
   if (status === 'blocked') {
-    return 'O navegador bloqueou o acesso às músicas deste computador. Clique no cadeado ao lado do endereço, abra as configurações do site, permita o acesso à rede local e recarregue a página.';
+    return t('local.blocked');
   }
   return '';
 }

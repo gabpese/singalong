@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { t } from '../i18n/index.js';
 import { parseRoomCode } from '../lib/identity.js';
 import '../styles/style.css';
 import { TvPage } from './TvPage';
@@ -13,7 +14,7 @@ if (code) {
     <main className="tv-stage">
       <footer className="tv-bottom">
         <p className="hint" role="status">
-          Abra a TV a partir de uma sala (link com ?room=CÓDIGO).
+          {t('tvp.noRoom')}
         </p>
       </footer>
     </main>,

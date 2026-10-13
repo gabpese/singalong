@@ -148,7 +148,7 @@ test('pontuação: o quadro mostra a nota original e a cantada e a nota final va
   await expect(page.locator('.score-hud')).toContainText('Pontuação');
   await expect(page.locator('.score-hud small')).toContainText(/Original: [A-G]#?\d/);
   await expect(page.locator('.score-hud small')).toContainText('Você:');
-  await expect(page.locator('.score-hud small b').first()).toBeVisible(); // as notas em negrito
+  await expect(page.locator('.score-hud small strong').first()).toBeVisible(); // as notas em negrito
 
   // 10 s no fim da música: tempo de sobra para a nota valer (mínimo de 5 s com voz na original)
   await hostPost(request, room, '/player/seek', { seconds: 20 });

@@ -1,5 +1,7 @@
 // TV: toca o que a sala manda, mostra a letra sincronizada, quem canta, a fila e a pontuação.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
+import { tRich } from '../i18n/rich';
 import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-media.js';
 import { keySummary } from '../lib/music.js';
 import { nextUp, playOrder, splitQueue } from '../lib/queue-view.js';
@@ -21,11 +23,9 @@ declare global {
 /** O QR code da sala sempre à vista (quem chega no meio da festa entra sem pedir o código): fica abaixo da fila enquanto toca. */
 function JoinCard({ code }: { code: string }) {
   return (
-    <aside className="tv-join" aria-label="Entrar na sala">
+    <aside className="tv-join" aria-label={t('tvp.joinAria')}>
       <QrCode code={code} compact />
-      <p>
-        Entre na sala <strong>{code}</strong>
-      </p>
+      <p>{tRich('tvp.joinText', { code })}</p>
     </aside>
   );
 }
@@ -33,15 +33,15 @@ function JoinCard({ code }: { code: string }) {
 function ScoreHud({ hud }: { hud: HudState }) {
   return (
     <aside className="score-hud" hidden={!hud.visible} aria-live="off">
-      <span className="label">Pontuação</span>
+      <span className="label">{t('tvp.score')}</span>
       <strong>{hud.score}</strong>
       <small>
         {hud.notice ||
           (hud.original && (
             <>
-              Original: <b>{hud.original}</b>
+              {tRich('tvp.original', { note: hud.original })}
               <br />
-              Você: <b>{hud.sung}</b>
+              {tRich('tvp.you', { note: hud.sung })}
             </>
           ))}
       </small>
@@ -52,7 +52,7 @@ function ScoreHud({ hud }: { hud: HudState }) {
 function ScoreFinal({ final, room }: { final: FinalResult | null; room: RoomState | null }) {
   return (
     <section className="score-final" hidden={!final} role="status">
-      <span className="label">Pontuação final</span>
+      <span className="label">{t('tvp.finalScore')}</span>
       <strong>{final?.score}</strong>
       <span>{final?.singer}</span>
       <small>{final?.message}</small>
@@ -101,10 +101,10 @@ function useLocalMediaNotice(room: RoomState | null): string {
 /** Dueto: quem canta em cada cor (verde, vermelho e amarelo quando os dois cantam). */
 function DuetLegend({ first, second }: { first: string; second: string }) {
   return (
-    <p className="duet-legend" aria-label="Cores do dueto">
+    <p className="duet-legend" aria-label={t('tvp.duetAria')}>
       <span data-part="a">{first}</span>
       <span data-part="b">{second}</span>
-      <span data-part="both">os dois</span>
+      <span data-part="both">{t('tvp.both')}</span>
     </p>
   );
 }
@@ -163,7 +163,7 @@ export function TvPage({ code }: { code: string }) {
   const next = room ? nextUp(room) : null;
   const { upcoming } = room ? playOrder(room) : { upcoming: [] as QueueItem[] };
   const hasQueue = Boolean(current) || upcoming.length > 0;
-  const nextLabel = next ? `${titleOf(next.item)}${next.preparing ? ' (preparando…)' : ''}` : '';
+  const nextLabel = next ? `${titleOf(next.item)}${next.preparing ? ` ${t('next.preparing')}` : ''}` : '';
 
   return (
     <main className={`tv-stage${hasQueue ? ' has-queue' : ''}`} ref={stageRef}>
@@ -174,7 +174,7 @@ export function TvPage({ code }: { code: string }) {
         <div className="singer is-now" hidden={!current}>
           {current && (
             <>
-              <span className="label">Cantando agora</span>
+              <span className="label">{t('tv.singingNow')}</span>
               <strong className="who">
                 <Icon name="singing" /> {current.singers}
               </strong>
@@ -186,7 +186,7 @@ export function TvPage({ code }: { code: string }) {
         <div className="singer is-next" hidden={!next}>
           {next && (
             <>
-              <span className="label">Próximo</span>
+              <span className="label">{t('tv.next')}</span>
               <strong className="who">
                 <Icon name="singing" /> {next.item.singers}
               </strong>
@@ -198,7 +198,7 @@ export function TvPage({ code }: { code: string }) {
           <span className="room-tag">
             Sala <strong>{code}</strong>
           </span>
-          <button type="button" title="Tela cheia (F)" aria-label="Tela cheia" onClick={toggleFullscreen}>
+          <button type="button" title={t('tvp.fullscreenTip')} aria-label={t('tvp.fullscreen')} onClick={toggleFullscreen}>
             ⛶
           </button>
         </div>
@@ -237,11 +237,11 @@ export function TvPage({ code }: { code: string }) {
           Singalong
         </h1>
         <p className="idle-lead">
-          Entre na sala <strong>{code}</strong> pelo celular
+          {tRich('tvp.idleLead', { code })}
         </p>
         <QrCode code={code} />
         <p className="idle-msg">
-          {next ? `Próximo: ${next.item.singers} — ${nextLabel}` : 'Adicione músicas pelo celular para começar.'}
+          {next ? t('tvp.idleNext', { who: next.item.singers, title: nextLabel }) : t('tvp.idleAdd')}
         </p>
       </section>
 
@@ -253,7 +253,7 @@ export function TvPage({ code }: { code: string }) {
         hidden={!unlockVisible}
         onClick={() => void controllerRef.current?.unlock()}
       >
-        Toque aqui para ativar o som
+        {t('tvp.unlock')}
       </button>
     </main>
   );

@@ -1,5 +1,6 @@
 // QR code para entrar na sala: usa PUBLIC_URL (o endereço que os celulares alcançam) ou o da própria página.
 import { useEffect, useState } from 'react';
+import { t } from '../i18n/index.js';
 import { api } from '../lib/identity.js';
 import qrcode from '../vendor/qrcode/qrcode.mjs';
 
@@ -40,10 +41,10 @@ export function QrCode({ code, compact = false }: { code: string; compact?: bool
 
   return (
     <>
-      <div className="qr" aria-label="QR code para entrar na sala" dangerouslySetInnerHTML={{ __html: join?.svg ?? '' }} />
+      <div className="qr" aria-label={t('tvp.qrAria')} dangerouslySetInnerHTML={{ __html: join?.svg ?? '' }} />
       <p className="hint" hidden={compact}>
         {join?.url}
-        {join?.localhostWarning ? '  —  para o QR funcionar nos celulares, defina PUBLIC_URL (ex.: http://192.168.0.10:3000)' : ''}
+        {join?.localhostWarning ? t('tvp.qrLocalhost') : ''}
       </p>
     </>
   );

@@ -68,7 +68,7 @@ export function RoomPage({ code }: { code: string }) {
     void loadLibrary();
   }, [readyKey, loadLibrary]);
 
-  const myName = name.trim() || 'Alguém';
+  const myName = name.trim() || t('room.someone');
   const context: RoomContextValue = useMemo(
     () => ({ code, state, isHost: Boolean(state?.me?.is_host), act, toast: show, myName, showTab }),
     [code, state, act, show, myName, showTab],

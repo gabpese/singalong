@@ -29,3 +29,25 @@ test('translate troca os {valores}; sem tradução cai no português e depois na
   assert.equal(translate('en', 'chave.que.nao.existe'), 'chave.que.nao.existe');
   assert.equal(translate('es', 'queue.more'), '+ {n} en la cola'); // sem valores: deixa o marcador
 });
+
+test('toda chave usada no código (t, tRich, translate) existe no catálogo', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) {
+        if (name !== 'vendor' && name !== 'i18n') walk(path);
+      } else if (/\.(tsx?|js)$/.test(name)) files.push(path);
+    }
+  };
+  walk(new URL('../src', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+  const missing = [];
+  for (const file of files) {
+    for (const match of readFileSync(file, 'utf8').matchAll(/\b(?:t|tRich|translate)\(\s*'([a-zA-Z0-9.]+)'/g)) {
+      if (!(match[1] in pt)) missing.push(`${file}: ${match[1]}`);
+    }
+  }
+  assert.deepEqual(missing, []);
+});

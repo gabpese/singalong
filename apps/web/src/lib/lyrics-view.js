@@ -1,5 +1,6 @@
 // Desenho da letra sincronizada (anterior, atual com palavras preenchidas, próximas e o aviso de pausa longa). Não sabe de onde vem
 // o relógio: a TV passa o tempo do áudio; o palco do celular, o de um relógio sincronizado com a TV.
+import { t as translate } from '../i18n/index.js';
 import { splitParts } from './duet.js';
 import { gapDisplay, lineProgress, locate, wordFills, wordProgress, wordSpans } from './lyrics-sync.js';
 
@@ -105,7 +106,7 @@ export function createLyricsView(els) {
         lastKey = key;
         els.prev.textContent = text(anchor - 1);
         if (gap) buildGapLine();
-        else buildCurrentLine(current >= 0 ? text(current) : cues.length ? '' : '♪ Sem letra para esta música');
+        else buildCurrentLine(current >= 0 ? text(current) : cues.length ? '' : translate('lyrics.none'));
         els.next.textContent = text(current >= 0 ? current + 1 : next);
         els.next2.textContent = text(current >= 0 ? current + 2 : next + 1);
         // dueto: quem canta cada linha (o CSS pinta de verde, vermelho ou amarelo); fora do dueto o atributo some

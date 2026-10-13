@@ -1,4 +1,5 @@
 // Identidade do navegador, token de anfitrião e chamadas à API (compartilhado por entrada, controle e TV).
+import { t } from '../i18n/index.js';
 
 const memory = new Map(); // se o localStorage estiver bloqueado, vale só enquanto a página estiver aberta
 const store = {
@@ -66,7 +67,7 @@ export async function api(method, path, body, code) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const error = new Error(data.message ?? data.error ?? `Erro ${res.status}`);
+    const error = new Error(data.message ?? data.error ?? t('error.http', { status: res.status }));
     error.status = res.status;
     error.code = data.error;
     throw error;

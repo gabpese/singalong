@@ -1,5 +1,6 @@
 // Palco: a tela de canto do celular. Mostra a letra no ritmo da TV (que toca a música) e devolve o cantor à sala quando acaba.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
 import { createSyncClock } from '../lib/clock.js';
 import { myPart, partName } from '../lib/duet.js';
 import { connectRoom } from '../lib/identity.js';
@@ -115,7 +116,7 @@ export function StagePage({ code }: { code: string }) {
     } else if (!ended) {
       // a música acabou (ou o anfitrião pulou): mostra o fim e devolve o cantor à sala
       const score = state.scoring ? state.scoreboard.find((entry) => entry.id === itemRef.current)?.score ?? null : null;
-      setEnded({ title: itemInfo.current?.title ?? 'Sua música', score });
+      setEnded({ title: itemInfo.current?.title ?? t('stage.songFallback'), score });
     } else if (state.scoring && ended.score === null) {
       // a nota pode chegar um instante depois do fim
       const score = state.scoreboard.find((entry) => entry.id === itemRef.current)?.score ?? null;
@@ -135,7 +136,7 @@ export function StagePage({ code }: { code: string }) {
     <main className="stage-page">
       <header className="stage-top">
         <div>
-          <p className="stage-where">Palco · Sala {code}</p>
+          <p className="stage-where">{t('stage.where', { code })}</p>
           <h1 className="stage-song">{current?.title ?? '…'}</h1>
           <p className="stage-artist">
             {current?.artist ?? ''}
@@ -143,7 +144,7 @@ export function StagePage({ code }: { code: string }) {
           </p>
         </div>
         <button type="button" onClick={leave}>
-          Voltar à sala
+          {t('stage.back')}
         </button>
       </header>
 
@@ -152,15 +153,15 @@ export function StagePage({ code }: { code: string }) {
       {/* quem canta pode chamar alguém da sala para cantar junto, mesmo com a música já tocando */}
       {item?.mine && (
         <div className="stage-duet">
-          {item.guest?.status === 'pending' && <span className="duet-note">{`Convite enviado para ${item.guest.name}, aguardando…`}</span>}
-          {item.guest?.status === 'accepted' && <span className="duet-note ok">{`Dueto com ${item.guest.name} ✓`}</span>}
+          {item.guest?.status === 'pending' && <span className="duet-note">{t('duet.pending', { name: item.guest.name })}</span>}
+          {item.guest?.status === 'accepted' && <span className="duet-note ok">{t('duet.withOk', { name: item.guest.name })}</span>}
           {item.guest ? (
             <button type="button" className="ghost" onClick={() => void api('DELETE', `/api/rooms/${code}/queue/${item.id}/invite`, undefined, code).catch(() => undefined)}>
-              {item.guest.status === 'accepted' ? 'Tirar o dueto' : 'Cancelar o convite'}
+              {t(item.guest.status === 'accepted' ? 'duet.remove' : 'duet.cancelInvite')}
             </button>
           ) : (
             <button type="button" className="ghost" onClick={() => setChoosing(true)}>
-              Convidar para cantar junto
+              {t('duet.invite')}
             </button>
           )}
         </div>
@@ -184,26 +185,26 @@ export function StagePage({ code }: { code: string }) {
       </section>
 
       {item?.guest?.status === 'accepted' && (
-        <p className="duet-legend stage-legend" aria-label="Cores do dueto">
-          <span data-part={myPart(item)}>{`Você canta nas partes ${partName(myPart(item))}`}</span>
+        <p className="duet-legend stage-legend" aria-label={t('tvp.duetAria')}>
+          <span data-part={myPart(item)}>{t('stage.myParts', { part: partName(myPart(item)) })}</span>
           <span data-part={myPart(item) === 'a' ? 'b' : 'a'}>{item.mine ? item.guest.name : item.added_by}</span>
-          <span data-part="both">os dois</span>
+          <span data-part="both">{t('tvp.both')}</span>
         </p>
       )}
 
       <footer className="stage-bottom" role="status">
         {ended ? (
           <div className="stage-end">
-            <strong>Acabou! 👏</strong>
-            {ended.score !== null ? <span>Sua nota: {ended.score}</span> : null}
-            <small>Voltando para a sala…</small>
+            <strong>{t('stage.over')}</strong>
+            {ended.score !== null ? <span>{t('stage.yourScore', { score: ended.score })}</span> : null}
+            <small>{t('stage.returning')}</small>
           </div>
         ) : status === 'reconnecting' ? (
-          'Reconectando à sala…'
+          t('ctl.reconnecting')
         ) : state && !state.tv_connected ? (
-          'A TV não está conectada.'
+          t('stage.noTv')
         ) : paused ? (
-          'Em pausa'
+          t('stage.paused')
         ) : (
           ''
         )}

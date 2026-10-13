@@ -1,5 +1,5 @@
 // Lógica pura de sincronia da letra (sem DOM), testável em Node.
-import { t } from '../i18n/index.js';
+import { t as translate } from '../i18n/index.js';
 
 /**
  * Localiza a linha ativa no tempo `t` (segundos).
@@ -109,9 +109,9 @@ const LYRICS_SOURCES = {
 
 /** Texto amigável para o `lyrics_source` do meta.json (ex.: "text+lrclib"). */
 export function describeLyricsSource(source) {
-  if (!source) return t('lyrics.src.unknown');
-  if (source.startsWith('text+')) return t(source.slice('text+'.length) === 'video' ? 'lyrics.src.textVideo' : 'lyrics.src.textWeb');
-  return LYRICS_SOURCES[source] ? t(LYRICS_SOURCES[source]) : source;
+  if (!source) return translate('lyrics.src.unknown');
+  if (source.startsWith('text+')) return translate(source.slice('text+'.length) === 'video' ? 'lyrics.src.textVideo' : 'lyrics.src.textWeb');
+  return LYRICS_SOURCES[source] ? translate(LYRICS_SOURCES[source]) : source;
 }
 
 export const PITCH_MIN = -6;
