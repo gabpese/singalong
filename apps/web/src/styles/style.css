@@ -561,3 +561,5 @@ body.stage { background: #0b0b14; }
 .tv-viewer .tv-queue { max-height: none; }
 .tv-viewer .singer .who { font-size: clamp(1.3rem, 6vw, 2rem); }
 .tv-viewer .lyrics { position: static; }
+.language-switch { min-height: 36px; padding: 4px 8px; border-radius: 10px; background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); }
+.landing-page .language-switch { justify-self: end; }

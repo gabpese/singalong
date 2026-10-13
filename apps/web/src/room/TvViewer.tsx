@@ -1,6 +1,7 @@
 // Aba TV da sala: quem está no celular acompanha a letra, quem canta e a fila. Só assiste: o som e o microfone são do aparelho
 // que abriu a TV como player (tv.html), então dois aparelhos nunca tocam a mesma música.
 import { useEffect, useRef } from 'react';
+import { t } from '../i18n/index.js';
 import { createSyncClock } from '../lib/clock.js';
 import { keySummary } from '../lib/music.js';
 import { createLyricsView } from '../lib/lyrics-view.js';
@@ -90,12 +91,12 @@ export function TvViewer({ state, position, lyrics }: Props) {
   }, [lyricsUrl]);
 
   return (
-    <section className="tv-viewer" aria-label="TV da sala">
-      {!state?.tv_connected && <p className="hint tv-viewer-note">Nenhuma TV está tocando agora. Abra a TV em um aparelho com caixa de som para ouvir as músicas.</p>}
+    <section className="tv-viewer" aria-label={t('tvview.aria')}>
+      {!state?.tv_connected && <p className="hint tv-viewer-note">{t('tvview.noTv')}</p>}
       <header className="tv-viewer-top">
         {current ? (
           <div className="singer is-now">
-            <span className="label">Cantando agora</span>
+            <span className="label">{t('tv.singingNow')}</span>
             <strong className="who">
               <Icon name="singing" /> {current.singers}
             </strong>
@@ -103,11 +104,11 @@ export function TvViewer({ state, position, lyrics }: Props) {
             <span className="key">{keySummary(current.song.key, current.pitch)}</span>
           </div>
         ) : (
-          <p className="hint">Nada tocando agora. Adicione músicas na aba Sala.</p>
+          <p className="hint">{t('tvview.nothing')}</p>
         )}
         {next && (
           <div className="singer is-next">
-            <span className="label">Próximo</span>
+            <span className="label">{t('tv.next')}</span>
             <strong className="who">
               <Icon name="singing" /> {next.item.singers}
             </strong>

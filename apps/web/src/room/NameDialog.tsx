@@ -1,6 +1,7 @@
 // A primeira coisa ao entrar na sala: quem é você? O nome aparece na fila, nos convites de dueto e na pontuação, então o
 // modal não fecha sem ele (depois a pessoa ainda pode trocá-lo na aba "Adicionar").
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { t } from '../i18n/index.js';
 
 export function NameDialog({ code, onName }: { code: string; onName: (name: string) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -24,23 +25,23 @@ export function NameDialog({ code, onName }: { code: string; onName: (name: stri
       onCancel={(event) => event.preventDefault()} // Esc não fecha: o nome é obrigatório
     >
       <form className="jukebox-body" onSubmit={submit}>
-        <h2 id="name-title">Bem-vindo à sala {code}!</h2>
-        <p className="muted">Como você quer aparecer? Esse nome vai na fila, nos convites de dueto e na pontuação.</p>
+        <h2 id="name-title">{t('name.welcome', { code })}</h2>
+        <p className="muted">{t('name.body')}</p>
         <label className="field">
-          <span>Seu nome</span>
+          <span>{t('name.label')}</span>
           <input
             type="text"
             maxLength={30}
             autoFocus
             autoComplete="nickname"
-            placeholder="Seu nome ou apelido"
+            placeholder={t('name.placeholder')}
             value={value}
             onChange={(event) => setValue(event.target.value)}
           />
         </label>
         <div className="jukebox-actions">
           <button type="submit" className="primary" disabled={!value.trim()}>
-            Entrar na sala
+            {t('name.button')}
           </button>
         </div>
       </form>

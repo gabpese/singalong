@@ -1,4 +1,5 @@
 // Lista de cantores da TV (a música atual e as próximas), compartilhada pela TV que toca e pela aba TV da sala.
+import { t } from '../i18n/index.js';
 import { songChip } from '../lib/queue-view.js';
 import type { QueueItem } from '../lib/types';
 
@@ -23,14 +24,14 @@ function QueueRow({ item, badge, isCurrent = false }: { item: QueueItem; badge: 
 /** Lista lateral: a música atual e as próximas 5, na ordem em que vão tocar (para ceder a vez com conhecimento de causa). */
 export function QueueBox({ current, upcoming }: { current: QueueItem | null; upcoming: QueueItem[] }) {
   return (
-    <aside className="tv-queue" hidden={!current && !upcoming.length} aria-label="Fila de cantores">
-      <h2>Fila</h2>
+    <aside className="tv-queue" hidden={!current && !upcoming.length} aria-label={t('queue.aria')}>
+      <h2>{t('queue.title')}</h2>
       <ol>
         {current && <QueueRow item={current} badge="▶" isCurrent />}
         {upcoming.slice(0, UPCOMING_SHOWN).map((item, i) => (
           <QueueRow key={item.id} item={item} badge={String(i + 1)} />
         ))}
-        {upcoming.length > UPCOMING_SHOWN && <li className="more">+ {upcoming.length - UPCOMING_SHOWN} na fila</li>}
+        {upcoming.length > UPCOMING_SHOWN && <li className="more">{t('queue.more', { n: upcoming.length - UPCOMING_SHOWN })}</li>}
       </ol>
     </aside>
   );
