@@ -1,4 +1,5 @@
 // Prévia do instrumental no celular, com troca de tom: o estado, a ligação com o player de áudio e a barra na tela.
+import { t } from '../i18n/index.js';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { keySummary } from '../lib/music.js';
 import { createPreviewPlayer } from '../lib/preview.js';
@@ -56,17 +57,17 @@ export function usePreview(state: RoomState | null, act: Act) {
       itemRef.current = opened;
       setItem(opened);
       changePitch(queueItem.pitch);
-      setHint('Carregando a música…');
+      setHint(t('preview.loading'));
       try {
         if (!(await player.load(queueItem.song.media!.instrumental))) return; // outra prévia foi pedida
         await player.play();
         setHint(
           queueItem.can_edit
-            ? 'Mudar o tom aqui muda o tom da sua música na fila.'
-            : 'Esta música é de outra pessoa: o tom aqui vale só para a sua prévia.',
+            ? t('preview.hintOwn')
+            : t('preview.hintOther'),
         );
       } catch (err) {
-        setHint(`Não consegui tocar a prévia: ${(err as Error).message}`);
+        setHint(t('preview.fail', { error: (err as Error).message }));
       }
       rerender();
     },
@@ -130,20 +131,20 @@ export function PreviewBar({ preview }: { preview: PreviewControls }) {
   const playedValue = player.duration ? Math.round((player.position / player.duration) * 1000) : 0;
 
   return (
-    <aside className="preview-bar" hidden={!item} aria-label="Prévia da música">
+    <aside className="preview-bar" hidden={!item} aria-label={t('preview.aria')}>
       <div className="preview-info">
         <strong>{item?.title}</strong>
         <span className="muted small">{item ? keySummary(item.key, pitch) : ''}</span>
       </div>
       <div className="preview-controls">
-        <button type="button" className="icon-btn" aria-label="Tocar ou pausar a prévia" onClick={() => void togglePlay()}>
+        <button type="button" className="icon-btn" aria-label={t('preview.playPause')} onClick={() => void togglePlay()}>
           <Icon name={playing ? 'pause' : 'resume'} />
         </button>
         <input
           type="range"
           min={0}
           max={1000}
-          aria-label="Posição da prévia"
+          aria-label={t('preview.position')}
           value={dragging.current ? dragValue : playedValue}
           onPointerDown={() => {
             dragging.current = true;
@@ -161,15 +162,15 @@ export function PreviewBar({ preview }: { preview: PreviewControls }) {
           }}
         />
         <span className="pitch">
-          <button type="button" className="icon-btn" aria-label="Tom mais grave" onClick={() => stepPitch(-1)}>
+          <button type="button" className="icon-btn" aria-label={t('pitch.lower')} onClick={() => stepPitch(-1)}>
             <Icon name="minus" />
           </button>
-          <span className="pitch-value">{`Tom ${formatPitch(pitch)}`}</span>
-          <button type="button" className="icon-btn" aria-label="Tom mais agudo" onClick={() => stepPitch(1)}>
+          <span className="pitch-value">{t('pitch.label', { n: formatPitch(pitch) })}</span>
+          <button type="button" className="icon-btn" aria-label={t('pitch.higher')} onClick={() => stepPitch(1)}>
             <Icon name="plus" />
           </button>
         </span>
-        <button type="button" aria-label="Fechar a prévia" onClick={close}>
+        <button type="button" aria-label={t('preview.close')} onClick={close}>
           ✕
         </button>
       </div>

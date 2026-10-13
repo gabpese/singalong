@@ -1,6 +1,8 @@
 // Dueto: convidar alguém da sala para cantar junto, responder a um convite e ver com quem a música vai ser cantada.
 // Os componentes de convite e de aviso não dependem do contexto da sala: servem à sala, ao palco e à TV.
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
+import { tRich } from '../i18n/rich';
 import { api } from '../lib/identity.js';
 import type { ApiError, QueueItem, RoomState } from '../lib/types';
 import { useRoom } from './context';
@@ -39,13 +41,12 @@ export function InviteDialog({ people, mePid, onInvite, onClose }: { people: Per
       }}
     >
       <div className="jukebox-body">
-        <h2 id="duet-title">Cantar junto com quem?</h2>
+        <h2 id="duet-title">{t('duet.pickTitle')}</h2>
         <p className="muted">
-          Escolha alguém que está na sala agora. A pessoa recebe o convite no celular, em qualquer tela, e precisa aceitar. Se a música já estiver tocando, quem
-          aceitar entra no dueto na hora.
+          {t('duet.pickHint')}
         </p>
         {others.length === 0 ? (
-          <p className="hint">Ninguém mais está na sala agora. Peça para a pessoa entrar pelo código da sala e tente de novo.</p>
+          <p className="hint">{t('duet.nobody')}</p>
         ) : (
           <ul className="people">
             {others.map((person) => (
@@ -59,7 +60,7 @@ export function InviteDialog({ people, mePid, onInvite, onClose }: { people: Per
         )}
         <div className="jukebox-actions">
           <button type="button" onClick={onClose}>
-            Fechar
+            {t('duet.close')}
           </button>
         </div>
       </div>
@@ -73,21 +74,21 @@ export function DuetControl({ item }: { item: QueueItem }) {
   const [choosing, setChoosing] = useState(false);
   const cancel = () => void act('DELETE', `/queue/${item.id}/invite`).catch(() => {});
 
-  if (item.guest_me) return <p className="duet-note ok">{`Dueto com ${item.added_by} ✓`}</p>;
+  if (item.guest_me) return <p className="duet-note ok">{t('duet.withOk', { name: item.added_by })}</p>;
   if (!item.can_edit) {
-    return item.guest?.status === 'accepted' ? <p className="duet-note">{`Dueto com ${item.guest.name}`}</p> : null;
+    return item.guest?.status === 'accepted' ? <p className="duet-note">{t('duet.with', { name: item.guest.name })}</p> : null;
   }
   return (
     <div className="duet-row">
-      {item.guest?.status === 'accepted' && <span className="duet-note ok">{`Dueto com ${item.guest.name} ✓`}</span>}
-      {item.guest?.status === 'pending' && <span className="duet-note">{`Convite enviado para ${item.guest.name}, aguardando…`}</span>}
+      {item.guest?.status === 'accepted' && <span className="duet-note ok">{t('duet.withOk', { name: item.guest.name })}</span>}
+      {item.guest?.status === 'pending' && <span className="duet-note">{t('duet.pending', { name: item.guest.name })}</span>}
       {item.guest ? (
         <button type="button" className="ghost" onClick={cancel}>
-          {item.guest.status === 'accepted' ? 'Tirar o dueto' : 'Cancelar o convite'}
+          {t(item.guest.status === 'accepted' ? 'duet.remove' : 'duet.cancelInvite')}
         </button>
       ) : (
         <button type="button" className="ghost" onClick={() => setChoosing(true)}>
-          Convidar para cantar junto
+          {t('duet.invite')}
         </button>
       )}
       {choosing && (
@@ -97,7 +98,7 @@ export function DuetControl({ item }: { item: QueueItem }) {
           onClose={() => setChoosing(false)}
           onInvite={async (person) => {
             await act('POST', `/queue/${item.id}/invite`, { pid: person.pid });
-            toast(`Convite enviado para ${person.name}. Quando aceitar, vocês cantam juntos.`);
+            toast(t('duet.sent', { name: person.name }));
           }}
         />
       )}
@@ -119,19 +120,22 @@ export function InviteNotice({ state, onRespond }: { state: RoomState | null; on
   }, [invites.length]);
   if (invites.length === 0) return null;
   return (
-    <section className="invites" role="alert" aria-label="Convites para cantar junto">
+    <section className="invites" role="alert" aria-label={t('duet.invitesAria')}>
       {invites.map((item) => (
         <article key={item.id} className="card invite">
           <p>
-            <strong>{item.added_by}</strong> convidou você para cantar <strong>{item.title ?? 'uma música'}</strong> em dupla
-            {item.status === 'playing' ? ' (ela já está tocando)' : ''}.
+            {tRich('duet.inviteText', {
+              who: item.added_by,
+              song: item.title ?? t('duet.songFallback'),
+              playing: item.status === 'playing' ? t('duet.playingNow') : '',
+            })}
           </p>
           <div className="invite-actions">
             <button type="button" className="primary" onClick={() => onRespond(item, true)}>
-              Aceitar
+              {t('duet.accept')}
             </button>
             <button type="button" onClick={() => onRespond(item, false)}>
-              Recusar
+              {t('duet.decline')}
             </button>
           </div>
         </article>

@@ -1,7 +1,7 @@
 // Palco: a tela de canto do celular. Mostra a letra no ritmo da TV (que toca a música) e devolve o cantor à sala quando acaba.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSyncClock } from '../lib/clock.js';
-import { myPart, PART_NAMES } from '../lib/duet.js';
+import { myPart, partName } from '../lib/duet.js';
 import { connectRoom } from '../lib/identity.js';
 import { createLyricsView } from '../lib/lyrics-view.js';
 import { splitQueue } from '../lib/queue-view.js';
@@ -185,7 +185,7 @@ export function StagePage({ code }: { code: string }) {
 
       {item?.guest?.status === 'accepted' && (
         <p className="duet-legend stage-legend" aria-label="Cores do dueto">
-          <span data-part={myPart(item)}>{`Você canta nas partes ${PART_NAMES[myPart(item)]}`}</span>
+          <span data-part={myPart(item)}>{`Você canta nas partes ${partName(myPart(item))}`}</span>
           <span data-part={myPart(item) === 'a' ? 'b' : 'a'}>{item.mine ? item.guest.name : item.added_by}</span>
           <span data-part="both">os dois</span>
         </p>

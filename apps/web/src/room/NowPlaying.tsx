@@ -1,5 +1,6 @@
 // Card "Tocando agora": a música, quem canta, a barra de progresso e os controles do anfitrião.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { getLanguage, t } from '../i18n/index.js';
 import { describeLyricsSource } from '../lib/lyrics-sync.js';
 import { keySummary } from '../lib/music.js';
 import { formatDuration, nextUp, progressPercent, splitQueue, thumbnailUrl } from '../lib/queue-view.js';
@@ -20,8 +21,8 @@ export function NextSinger({ state }: { state: RoomState }) {
   if (!next) return null;
   return (
     <p className="next-singer">
-      Próximo: <strong>{next.item.singers}</strong>
-      <span className="muted">{` — ${next.item.title ?? next.item.video_id}${next.preparing ? ' (preparando…)' : ''}`}</span>
+      {t('next.prefix')} <strong>{next.item.singers}</strong>
+      <span className="muted">{` — ${next.item.title ?? next.item.video_id}${next.preparing ? ` ${t('next.preparing')}` : ''}`}</span>
     </p>
   );
 }
@@ -86,7 +87,7 @@ function Progress({ state, current, position }: { state: RoomState; current: Que
         max={max}
         step={1}
         value={value}
-        aria-label="Posição da música"
+        aria-label={t('now.progress')}
         aria-valuetext={formatDuration(value)}
         style={{ '--fill': `${(value / max) * 100}%` } as CSSProperties}
         onChange={(event) => setDrag(Number(event.target.value))}
@@ -103,14 +104,12 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
 
   return (
     <article className="card now">
-      <h2>Tocando agora</h2>
+      <h2>{t('now.title')}</h2>
       <div>
         {!current ? (
           <div className="now-content">
             <p className="hint">
-              {state.queue.length
-                ? 'Preparando a próxima música… ela começa sozinha quando estiver pronta.'
-                : 'Nada tocando. Toque em Adicionar para escolher uma música.'}
+              {state.queue.length ? t('now.preparing') : t('now.nothing')}
             </p>
             <NextSinger state={state} />
           </div>
@@ -123,10 +122,10 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
                 {current.artist && <span className="muted">{current.artist}</span>}
                 <span className="now-singer">
                   <Icon name="singing" />
-                  {` ${current.singers} ${current.guest?.status === 'accepted' ? 'estão cantando' : 'está cantando'}`}
+                  {` ${t(current.guest?.status === 'accepted' ? 'now.singing.many' : 'now.singing.one', { who: current.singers })}`}
                 </span>
                 {current.song.key && <span className="muted small">{keySummary(current.song.key, current.pitch)}</span>}
-                <span className="muted small">{`Letra: ${describeLyricsSource(current.song.lyrics_source)}`}</span>
+                <span className="muted small">{t('now.lyrics', { source: describeLyricsSource(current.song.lyrics_source) })}</span>
               </div>
             </div>
             <Progress state={state} current={current} position={position} />
@@ -137,13 +136,13 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
                   <button
                     type="button"
                     className="icon-btn"
-                    aria-label={state.playback === 'paused' ? 'Retomar' : 'Pausar'}
-                    title={state.playback === 'paused' ? 'Retomar' : 'Pausar'}
+                    aria-label={t(state.playback === 'paused' ? 'player.resume' : 'player.pause')}
+                    title={t(state.playback === 'paused' ? 'player.resume' : 'player.pause')}
                     onClick={() => run('POST', `/player/${state.playback === 'paused' ? 'resume' : 'pause'}`)}
                   >
                     <Icon name={state.playback === 'paused' ? 'resume' : 'pause'} />
                   </button>
-                  <button type="button" className="icon-btn" aria-label="Pular" title="Pular para a próxima música" onClick={() => run('POST', '/player/skip')}>
+                  <button type="button" className="icon-btn" aria-label={t('player.skip')} title={t('player.skipTitle')} onClick={() => run('POST', '/player/skip')}>
                     <Icon name="next-song" />
                   </button>
                 </>
@@ -155,7 +154,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
             <DuetControl item={current} />
             {isHost && (
               <div className="controls-row offset">
-                <span className="muted">Ajuste da letra</span>
+                <span className="muted">{t('now.offset')}</span>
                 {OFFSET_STEPS.map((step) => (
                   <button
                     key={step}
@@ -167,11 +166,11 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
                     {`${step > 0 ? '+' : '−'}${Math.abs(step)} s`}
                   </button>
                 ))}
-                <span className="offset-value">{`${current.lyric_offset.toFixed(1).replace('.', ',')} s`}</span>
+                <span className="offset-value">{`${current.lyric_offset.toLocaleString(getLanguage(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`}</span>
               </div>
             )}
             {!state.tv_connected && (
-              <p className="hint error">A TV não está conectada: abra o menu (⋯) e toque em “Abrir TV” para a música tocar.</p>
+              <p className="hint error">{t('now.noTv')}</p>
             )}
           </div>
         )}

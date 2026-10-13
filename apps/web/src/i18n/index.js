@@ -29,7 +29,7 @@ function read() {
   }
 }
 
-let current = pickLanguage(read(), typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language]);
+let current = pickLanguage(read(), typeof document === 'undefined' ? [] : navigator.languages ?? [navigator.language]);
 if (typeof document !== 'undefined') document.documentElement.lang = current;
 
 export const getLanguage = () => current;

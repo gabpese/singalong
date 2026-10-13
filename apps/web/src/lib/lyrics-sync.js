@@ -1,4 +1,5 @@
 // Lógica pura de sincronia da letra (sem DOM), testável em Node.
+import { t } from '../i18n/index.js';
 
 /**
  * Localiza a linha ativa no tempo `t` (segundos).
@@ -98,22 +99,19 @@ export function wordFills(cue, wordCount, t) {
 }
 
 const LYRICS_SOURCES = {
-  video: 'legenda do vídeo',
-  lrclib: 'buscada na internet',
-  file: 'colada, com tempos',
-  align: 'seu texto, sincronizado com a voz por IA',
-  'lrclib+align': 'buscada na internet, sincronizada com a voz por IA',
-  none: 'sem letra (só o instrumental)',
+  video: 'lyrics.src.video',
+  lrclib: 'lyrics.src.lrclib',
+  file: 'lyrics.src.file',
+  align: 'lyrics.src.align',
+  'lrclib+align': 'lyrics.src.lrclibAlign',
+  none: 'lyrics.src.none',
 };
 
 /** Texto amigável para o `lyrics_source` do meta.json (ex.: "text+lrclib"). */
 export function describeLyricsSource(source) {
-  if (!source) return 'desconhecida';
-  if (source.startsWith('text+')) {
-    const donor = source.slice('text+'.length);
-    return `seu texto, com os tempos ${donor === 'video' ? 'da legenda do vídeo' : 'da busca na internet'}`;
-  }
-  return LYRICS_SOURCES[source] ?? source;
+  if (!source) return t('lyrics.src.unknown');
+  if (source.startsWith('text+')) return t(source.slice('text+'.length) === 'video' ? 'lyrics.src.textVideo' : 'lyrics.src.textWeb');
+  return LYRICS_SOURCES[source] ? t(LYRICS_SOURCES[source]) : source;
 }
 
 export const PITCH_MIN = -6;

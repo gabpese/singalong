@@ -1,12 +1,7 @@
 // Textos e cálculos de exibição da fila (puro, sem DOM).
+import { t } from '../i18n/index.js';
 
-const STAGES = {
-  downloading: 'Baixando o áudio…',
-  separating: 'Separando a voz…',
-  lyrics: 'Buscando a letra…',
-  aligning: 'Sincronizando a letra…',
-  retrying: 'Tentando de novo…',
-};
+const STAGES = ['downloading', 'separating', 'lyrics', 'aligning', 'retrying'];
 
 /** Vale oferecer "Tentar de novo"? Não quando o erro é definitivo (vídeo privado, bloqueado, longo demais...). */
 export function canRetry(song) {
@@ -15,13 +10,13 @@ export function canRetry(song) {
 
 /** Etiqueta do estado de uma música na fila: { label, kind } com kind = ok | busy | warn | error. */
 export function songChip(song) {
-  if (!song) return { label: 'Aguardando', kind: 'busy' };
-  if (song.status === 'needs_lyrics') return { label: 'Precisa de letra', kind: 'warn' };
-  if (song.status === 'failed') return { label: 'Falhou', kind: 'error' };
-  if (song.status === 'pending') return { label: 'Na fila de processamento', kind: 'busy' };
-  if (song.status === 'processing') return { label: STAGES[song.stage] ?? 'Processando…', kind: 'busy' };
-  if (song.ready) return { label: 'Pronta', kind: 'ok' };
-  return { label: 'Aguardando', kind: 'busy' };
+  if (!song) return { label: t('chip.waiting'), kind: 'busy' };
+  if (song.status === 'needs_lyrics') return { label: t('chip.needsLyrics'), kind: 'warn' };
+  if (song.status === 'failed') return { label: t('chip.failed'), kind: 'error' };
+  if (song.status === 'pending') return { label: t('chip.pending'), kind: 'busy' };
+  if (song.status === 'processing') return { label: STAGES.includes(song.stage) ? t(`stage.${song.stage}`) : t('chip.processing'), kind: 'busy' };
+  if (song.ready) return { label: t('chip.ready'), kind: 'ok' };
+  return { label: t('chip.waiting'), kind: 'busy' };
 }
 
 export function formatDuration(seconds) {

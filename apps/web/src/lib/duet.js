@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 // Dueto: quem canta cada linha da letra. Por enquanto a divisão é AUTOMÁTICA; o desenho deixa espaço para evoluir (por exemplo,
 // uma divisão escolhida à mão pelos cantores, que entraria no lugar do resultado desta função).
 
@@ -32,4 +34,4 @@ export function splitParts(cues) {
 /** Qual é a minha parte no palco? Quem adicionou a música é o 'a' (turquesa, círculo); o convidado, o 'b' (violeta, quadrado). */
 export const myPart = (item) => (item?.guest_me ? 'b' : 'a');
 
-export const PART_NAMES = { a: 'turquesa', b: 'violeta', both: 'os dois' };
+export const partName = (part) => t(`duet.part.${part}`);

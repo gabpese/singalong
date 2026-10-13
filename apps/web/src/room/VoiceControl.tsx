@@ -1,5 +1,7 @@
 // A voz do microfone da TV nas caixas de som: o anfitrião liga (com um aviso sobre microfones direcionais) e ajusta o volume.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
+import { tRich } from '../i18n/rich';
 import { useRoom } from './context';
 
 const PENDING_MS = 1500;
@@ -40,7 +42,7 @@ export function VoiceVolume() {
   const level = drag ?? pending ?? volume;
   return (
     <div className="backing-row voice-row">
-      <span className="muted small">Volume da voz</span>
+      <span className="muted small">{t('voice.volume')}</span>
       <input
         ref={slider}
         type="range"
@@ -49,7 +51,7 @@ export function VoiceVolume() {
         max={100}
         step={5}
         value={level}
-        aria-label="Volume da voz nas caixas de som"
+        aria-label={t('voice.volumeAria')}
         aria-valuetext={`${level}%`}
         style={{ '--fill': `${level}%` } as CSSProperties}
         onChange={(event) => setDrag(Number(event.target.value))}
@@ -77,24 +79,21 @@ export function VoiceDialog({ onConfirm, onCancel }: { onConfirm: () => void; on
       }}
     >
       <div className="jukebox-body">
-        <h2 id="voice-title">🎤 Ligar a voz nas caixas de som?</h2>
-        <p>A voz de quem canta vai sair junto com a música, pelo microfone ligado à TV.</p>
-        <p>
-          Para ela soar bem e <strong>sem aquele apito chato (microfonia)</strong>, use <strong>microfones direcionais</strong>, daqueles de
-          mão, que só captam o que está bem na frente deles.
-        </p>
+        <h2 id="voice-title">{t('voicedlg.title')}</h2>
+        <p>{t('voicedlg.lead')}</p>
+        <p>{tRich('voicedlg.directional')}</p>
         <ul className="voice-tips">
-          <li>Cante perto do microfone, apontado para você.</li>
-          <li>Deixe as caixas de som longe dele, viradas para a plateia.</li>
-          <li>Comece com o volume baixo e aumente aos poucos.</li>
-          <li>Se o apito aparecer, abaixe o volume da voz: ele fica aqui mesmo, na sala.</li>
+          <li>{t('voicedlg.tip1')}</li>
+          <li>{t('voicedlg.tip2')}</li>
+          <li>{t('voicedlg.tip3')}</li>
+          <li>{t('voicedlg.tip4')}</li>
         </ul>
         <div className="jukebox-actions">
           <button type="button" className="primary" onClick={onConfirm}>
-            Entendi, ligar a voz
+            {t('voicedlg.confirm')}
           </button>
           <button type="button" onClick={onCancel}>
-            Agora não
+            {t('voicedlg.cancel')}
           </button>
         </div>
       </div>

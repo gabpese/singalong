@@ -1,4 +1,6 @@
 // "Na fila": quem espera, na ordem em que vai tocar, com as ações de cada item.
+import { t } from '../i18n/index.js';
+import { tRich } from '../i18n/rich';
 import { api } from '../lib/identity.js';
 import { keySummary } from '../lib/music.js';
 import { canRetry, playOrder, songChip, thumbnailUrl } from '../lib/queue-view.js';
@@ -8,8 +10,6 @@ import { useRoom } from './context';
 import { BackingControl } from './BackingControl';
 import { DuetControl } from './Duet';
 import { PitchControl } from './PitchControl';
-
-const FAIR_HINT = 'Com o rodízio justo ligado a ordem é automática';
 
 interface ItemProps {
   item: QueueItem;
@@ -22,6 +22,7 @@ interface ItemProps {
 
 function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: ItemProps) {
   const { act, isHost, toast, code } = useRoom();
+  const fairHint = t('queue.fairHint');
   const chip = songChip(item.song);
   const run = (method: string, path: string, body?: unknown) => act(method, path, body).catch(() => {});
   const showError =
@@ -30,7 +31,7 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
   async function retry() {
     try {
       await api('POST', '/api/songs', { url: `https://www.youtube.com/watch?v=${item.video_id}` }, code);
-      toast('Tentando de novo…');
+      toast(t('queue.retryToast'));
     } catch (err) {
       toast((err as ApiError).message, true);
     }
@@ -50,24 +51,24 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
         {item.song.key && <span className="muted small">{keySummary(item.song.key, item.pitch)}</span>}
         <span className="chips">
           <span className={`chip ${chip.kind}`}>{chip.label}</span>
-          {item.id === state.next_item_id && <span className="chip is-next">Próximo</span>}
+          {item.id === state.next_item_id && <span className="chip is-next">{t('tv.next')}</span>}
         </span>
         {showError && <span className="muted small">{item.song.error ?? ''}</span>}
       </div>
       <div className="actions">
         {item.song.ready && !item.song.media?.local && (
           <button type="button" className="ghost" onClick={() => onPreview(item)}>
-            Prévia
+            {t('queue.preview')}
           </button>
         )}
         {item.song.status === 'needs_lyrics' && item.can_edit && (
           <button type="button" onClick={() => onChooseLyrics(item)}>
-            Escolher letra
+            {t('queue.chooseLyrics')}
           </button>
         )}
         {canRetry(item.song) && item.can_edit && (
           <button type="button" onClick={retry}>
-            Tentar de novo
+            {t('queue.retry')}
           </button>
         )}
         <PitchControl item={item} />
@@ -75,18 +76,18 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
           <>
             <button
               type="button"
-              aria-label="Subir na fila"
+              aria-label={t('queue.up')}
               disabled={state.fair || index === 0}
-              title={state.fair ? FAIR_HINT : undefined}
+              title={state.fair ? fairHint : undefined}
               onClick={() => void run('POST', `/queue/${item.id}/move`, { direction: 'up' })}
             >
               ▲
             </button>
             <button
               type="button"
-              aria-label="Descer na fila"
+              aria-label={t('queue.down')}
               disabled={state.fair || index === waiting.length - 1}
-              title={state.fair ? FAIR_HINT : undefined}
+              title={state.fair ? fairHint : undefined}
               onClick={() => void run('POST', `/queue/${item.id}/move`, { direction: 'down' })}
             >
               ▼
@@ -98,20 +99,20 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
             <button
               type="button"
               className="ghost"
-              title="Passa a sua música uma posição para trás: a pessoa de trás canta antes"
+              title={t('queue.yieldTitle')}
               disabled={state.fair || index === waiting.length - 1}
               onClick={() =>
                 void act('POST', `/queue/${item.id}/move`, { direction: 'down' })
-                  .then(() => toast('Você cedeu a vez: sua música desceu uma posição.'))
+                  .then(() => toast(t('queue.yielded')))
                   .catch(() => {})
               }
             >
-              Ceder a vez
+              {t('queue.yield')}
             </button>
           )
         )}
         {item.can_edit && (
-          <button type="button" className="danger" aria-label="Remover da fila" onClick={() => void run('DELETE', `/queue/${item.id}`)}>
+          <button type="button" className="danger" aria-label={t('queue.remove')} onClick={() => void run('DELETE', `/queue/${item.id}`)}>
             ✕
           </button>
         )}
@@ -135,7 +136,7 @@ export function QueueList({
   return (
     <article className="card">
       <h2>
-        Na fila <span className="count">{waiting.length ? `(${waiting.length})` : ''}</span>
+        {t('queue.heading')} <span className="count">{waiting.length ? `(${waiting.length})` : ''}</span>
       </h2>
       <ol className="queue">
         {waiting.map((item: QueueItem, index: number) => (
@@ -143,7 +144,7 @@ export function QueueList({
         ))}
       </ol>
       <p className="hint empty" hidden={waiting.length > 0}>
-        Ninguém na fila. Toque em <strong>Adicionar</strong> para escolher uma música.
+        {tRich('queue.empty')}
       </p>
     </article>
   );
@@ -152,7 +153,7 @@ export function QueueList({
 export function Scoreboard({ state }: { state: RoomState }) {
   return (
     <article className="card" hidden={!state.scoring && !state.scoreboard?.length}>
-      <h2>Placar</h2>
+      <h2>{t('score.title')}</h2>
       <ol className="scoreboard">
         {(state.scoreboard ?? []).map((row) => (
           <li key={row.id}>
