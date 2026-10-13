@@ -5,6 +5,8 @@ import { myPart, PART_NAMES } from '../lib/duet.js';
 import { connectRoom } from '../lib/identity.js';
 import { createLyricsView } from '../lib/lyrics-view.js';
 import { splitQueue } from '../lib/queue-view.js';
+import { InviteDialog, InviteNotice, respondInvite } from '../room/Duet';
+import { api } from '../lib/identity.js';
 import { dismissStage, STAGE_END_SECONDS, stageItemFor } from '../lib/stage.js';
 import type { LyricCue, QueueItem, RoomState, ServerMessage } from '../lib/types';
 
@@ -19,6 +21,7 @@ export function StagePage({ code }: { code: string }) {
   const [state, setState] = useState<RoomState | null>(null);
   const [ended, setEnded] = useState<Ended | null>(null);
   const [item, setItem] = useState<QueueItem | null>(null); // a música no palco (para o título na tela)
+  const [choosing, setChoosing] = useState(false); // escolhendo quem convidar para cantar junto
   const [status, setStatus] = useState<'connecting' | 'connected' | 'reconnecting'>('connecting');
   const lyricsRefs = {
     prev: useRef<HTMLParagraphElement>(null),
@@ -143,6 +146,35 @@ export function StagePage({ code }: { code: string }) {
           Voltar à sala
         </button>
       </header>
+
+      <InviteNotice state={state} onRespond={(invited, accept) => void respondInvite(code, invited, accept)} />
+
+      {/* quem canta pode chamar alguém da sala para cantar junto, mesmo com a música já tocando */}
+      {item?.mine && (
+        <div className="stage-duet">
+          {item.guest?.status === 'pending' && <span className="duet-note">{`Convite enviado para ${item.guest.name}, aguardando…`}</span>}
+          {item.guest?.status === 'accepted' && <span className="duet-note ok">{`Dueto com ${item.guest.name} ✓`}</span>}
+          {item.guest ? (
+            <button type="button" className="ghost" onClick={() => void api('DELETE', `/api/rooms/${code}/queue/${item.id}/invite`, undefined, code).catch(() => undefined)}>
+              {item.guest.status === 'accepted' ? 'Tirar o dueto' : 'Cancelar o convite'}
+            </button>
+          ) : (
+            <button type="button" className="ghost" onClick={() => setChoosing(true)}>
+              Convidar para cantar junto
+            </button>
+          )}
+        </div>
+      )}
+      {choosing && item && (
+        <InviteDialog
+          people={state?.people ?? []}
+          mePid={state?.me.pid ?? null}
+          onClose={() => setChoosing(false)}
+          onInvite={async (person) => {
+            await api('POST', `/api/rooms/${code}/queue/${item.id}/invite`, { pid: person.pid }, code);
+          }}
+        />
+      )}
 
       <section className="lyrics stage-lyrics" aria-live="off">
         <p className="line prev" ref={lyricsRefs.prev} />

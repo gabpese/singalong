@@ -125,12 +125,12 @@ export function RoomPage({ code }: { code: string }) {
   return (
     <RoomProvider value={context}>
       <TopBar state={state} status={status} />
+      <InviteBanner />
 
       <main className="room-page">
         <section className="tab" hidden={tab !== 'queue'}>
           {state && (
             <>
-              <InviteBanner />
               <NowPlaying state={state} position={position} />
               <QueueList
                 state={state}

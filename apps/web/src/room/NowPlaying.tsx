@@ -8,6 +8,7 @@ import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
 import { BackingControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
+import { DuetControl } from './Duet';
 import { VoiceVolume } from './VoiceControl';
 import type { Position } from './useRoomConnection';
 
@@ -151,6 +152,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
             </div>
             <BackingControl item={current} />
             <VoiceVolume />
+            <DuetControl item={current} />
             {isHost && (
               <div className="controls-row offset">
                 <span className="muted">Ajuste da letra</span>

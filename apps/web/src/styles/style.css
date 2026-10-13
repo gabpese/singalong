@@ -499,3 +499,11 @@ body.stage { background: #0b0b14; }
 .invite-actions button { flex: 1; }
 .people { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .people button { width: 100%; text-align: left; }
+
+/* o convite aparece em qualquer tela: preso ao topo da sala, sobre o palco e sobre a TV */
+.invites { position: sticky; top: 0; z-index: 60; padding: 8px 12px 0; }
+.invite { box-shadow: 0 8px 28px #000a; }
+.stage-page .invites { position: static; padding: 0; }
+.stage-duet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tv-invites { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 70; width: min(640px, 92vw); }
+.tv-invites .invites { position: static; padding: 0; }
