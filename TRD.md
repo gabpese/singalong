@@ -453,6 +453,15 @@ Noted for the future (decision of Oct 2026): besides production we will have **t
 - More than two singers, and a microphone per singer.
 - The fair rotation does not consider the guest (only the owner's turn counts).
 
+### 12.16 Adjustments after the first test of the duet (Oct 2026)
+
+Feedback from the owner's first test with real devices: the voice in the speakers was good; the lyrics were hard to read; green and red are confused by people with colour blindness; and the TV did not always show the right colour of who sings (the stage did).
+
+- **Outline:** black instead of white (the white outline around dark fills looked hollow).
+- **New colors, safe for colour blindness and neutral:** the two parts are now **turquoise `#10B8C8`** (who added the song) and **violet `#8B5CF6`** (the guest); **yellow** (the usual color) when both sing. They were chosen by **simulating protanopia, deuteranopia and tritanopia** (Viénot/Machado matrices, distance in Lab) and keeping the pairs that stay clearly apart in all of them, without blue and pink so that no part reads as "the man" or "the woman". The old green/red pair is gone.
+- **The color is never the only clue:** each part also has a **shape**, a circle for turquoise, a square for violet and a diamond for both, in the legend and in the dot before the lines still to come; the stage says "Você canta nas partes turquesa/violeta".
+- **Bug on the TV:** the TV decided "it is a duet" only when it loaded the song, so a change after that was not shown; now it is applied on every state update (`engine.setDuet`). A second defect found along the way: in songs **without** a duet the lines got a yellow dot, because the attribute stayed empty instead of disappearing; it now disappears (a test guards it).
+
 ## 13. Decisions made and open questions
 
 **Decided (Oct 2026)**

@@ -29,7 +29,7 @@ export function splitParts(cues) {
   });
 }
 
-/** Qual é a minha cor no palco? Quem adicionou a música é o 'a' (verde); o convidado, o 'b' (vermelho). */
+/** Qual é a minha parte no palco? Quem adicionou a música é o 'a' (turquesa, círculo); o convidado, o 'b' (violeta, quadrado). */
 export const myPart = (item) => (item?.guest_me ? 'b' : 'a');
 
-export const PART_NAMES = { a: 'verde', b: 'vermelho', both: 'os dois' };
+export const PART_NAMES = { a: 'turquesa', b: 'violeta', both: 'os dois' };

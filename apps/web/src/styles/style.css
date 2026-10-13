@@ -465,24 +465,27 @@ body.stage { background: #0b0b14; }
 .voice-tips { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; color: var(--dim); }
 .menu-panel .voice-row { margin-top: 2px; }
 
-/* dueto: verde para um cantor, vermelho para o outro, amarelo (a cor de sempre) quando cantam juntos; a letra ganha um contorno branco */
+/* dueto: turquesa para um cantor, violeta para o outro e amarelo (a cor de sempre) quando cantam juntos. Pares escolhidos para
+   se distinguirem em todos os tipos de daltonismo (testados por simulação), sem azul nem rosa. A cor nunca é a única pista:
+   cada parte tem também uma forma (círculo, quadrado, losango). A letra ganha um contorno PRETO, que a deixa legível. */
 [data-part] { --part: var(--accent); }
-[data-part="a"] { --part: #3A5A40; }
-[data-part="b"] { --part: #541E1B; }
-[data-part="both"] { --part: var(--accent); }
+[data-part="a"] { --part: #10B8C8; --shape: '●'; }
+[data-part="b"] { --part: #8B5CF6; --shape: '■'; }
+[data-part="both"] { --part: var(--accent); --shape: '◆'; }
 .current[data-part] .w {
   background: linear-gradient(90deg, var(--part) var(--p), var(--fg) var(--p));
   -webkit-background-clip: text;
   background-clip: text;
-  -webkit-text-stroke: 0.045em #fff; /* o contorno branco: as duas cores são escuras */
+  -webkit-text-stroke: 0.07em #000; /* o contorno preto; só a metade de fora aparece (paint-order) */
   paint-order: stroke fill;
 }
-/* as linhas que ainda vêm: um ponto na cor de quem canta */
-.line[data-part]:not(.current):not(:empty)::before {
-  content: '●'; margin-right: .4em; font-size: .8em; color: var(--part); -webkit-text-stroke: 1px #fff; paint-order: stroke fill;
+/* as linhas que ainda vêm e a legenda: a forma e a cor de quem canta */
+.line[data-part]:not(.current):not(:empty)::before,
+.duet-legend span::before {
+  content: var(--shape, '●'); margin-right: .4em; font-size: .8em; color: var(--part);
+  -webkit-text-stroke: 0.12em #000; paint-order: stroke fill;
 }
 .duet-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 1.2vh 0 0; font-size: clamp(.8rem, 1.4vw, 1.1rem); color: var(--dim); }
-.duet-legend span::before { content: '●'; margin-right: .4em; color: var(--part); -webkit-text-stroke: 1px #fff; paint-order: stroke fill; }
 .stage-legend { font-size: .9rem; margin: 0; }
 
 /* dueto: convidar, o convite recebido e a dupla na fila */

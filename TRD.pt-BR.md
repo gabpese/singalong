@@ -453,6 +453,15 @@ Anotado para o futuro (decisão de Out/2026): além da produção teremos **mais
 - Mais de dois cantores, e um microfone por cantor.
 - O rodízio justo não considera o convidado (só a vez do dono conta).
 
+### 12.16 Ajustes depois do primeiro teste do dueto (Out/2026)
+
+Retorno do primeiro teste do dono com aparelhos de verdade: a voz nas caixas ficou boa; a letra estava difícil de ler; verde e vermelho se confundem para quem tem daltonismo; e a TV nem sempre mostrava a cor certa de quem canta (o palco mostrava).
+
+- **Contorno:** preto em vez de branco (o contorno branco em volta de preenchimentos escuros parecia vazado).
+- **Cores novas, seguras para daltonismo e neutras:** as duas partes agora são **turquesa `#10B8C8`** (quem adicionou a música) e **violeta `#8B5CF6`** (o convidado); **amarelo** (a cor de sempre) quando os dois cantam. Foram escolhidas **simulando protanopia, deuteranopia e tritanopia** (matrizes de Viénot/Machado, distância no Lab) e ficando com os pares que continuam bem separados em todas, sem azul e rosa para que nenhuma parte soe como "o homem" ou "a mulher". O par verde/vermelho antigo saiu.
+- **A cor nunca é a única pista:** cada parte também tem uma **forma**, um círculo para o turquesa, um quadrado para o violeta e um losango para os dois, na legenda e no ponto antes das linhas que ainda vêm; o palco diz "Você canta nas partes turquesa/violeta".
+- **Defeito na TV:** a TV decidia "é um dueto" só ao carregar a música, então uma mudança depois disso não aparecia; agora vale a cada atualização do estado (`engine.setDuet`). Um segundo defeito achado no caminho: em músicas **sem** dueto as linhas ganhavam um ponto amarelo, porque o atributo ficava vazio em vez de sumir; agora ele some (um teste protege isso).
+
 ## 13. Decisões tomadas e perguntas em aberto
 
 **Decidido (Out/2026)**

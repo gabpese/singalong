@@ -278,6 +278,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
             engine.setPitch(current.pitch);
             engine.setBacking(current.backing);
             engine.setOffset(current.lyric_offset);
+            engine.setDuet(current.guest?.status === 'accepted');
           }
           await syncPlayback(state.playback);
           if (engine.playing && current.pitch !== 0 && !engine.pitchAvailable) {

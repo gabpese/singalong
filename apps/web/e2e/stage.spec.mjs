@@ -111,3 +111,17 @@ test('com a música no computador do dono a letra chega ao palco repassada pela 
   await ana.context.close();
   await request.post('/__test/remove-song', { data: { id: LOCAL.id } });
 });
+
+test('música sem dueto: a letra não ganha nenhum dono de linha (nem o ponto colorido do dueto)', async ({ browser, page: tv, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await tv.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(tv)).toBe(true);
+  await expect(tv.locator('.line.next')).toContainText('Segunda linha');
+  expect(await tv.locator('.lyrics [data-part]').count()).toBe(0); // nenhum atributo, então nenhum ponto
+  const ana = await phone(browser, ANA);
+  await ana.page.goto(room.guestUrl);
+  await expect(ana.page.locator('.line.current')).toContainText('Primeira linha da letra');
+  expect(await ana.page.locator('.stage-lyrics [data-part]').count()).toBe(0);
+  await ana.context.close();
+});

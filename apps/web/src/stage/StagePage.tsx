@@ -153,7 +153,7 @@ export function StagePage({ code }: { code: string }) {
 
       {item?.guest?.status === 'accepted' && (
         <p className="duet-legend stage-legend" aria-label="Cores do dueto">
-          <span data-part={myPart(item)}>{`Você canta nas partes ${PART_NAMES[myPart(item)]}s`.replace('verdes', 'verdes').replace('vermelhos', 'vermelhas')}</span>
+          <span data-part={myPart(item)}>{`Você canta nas partes ${PART_NAMES[myPart(item)]}`}</span>
           <span data-part={myPart(item) === 'a' ? 'b' : 'a'}>{item.mine ? item.guest.name : item.added_by}</span>
           <span data-part="both">os dois</span>
         </p>
