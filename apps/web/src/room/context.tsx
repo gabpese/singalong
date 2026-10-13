@@ -4,6 +4,8 @@ import { api } from '../lib/identity.js';
 import type { ApiError, RoomState } from '../lib/types';
 
 export type Tab = 'queue' | 'add' | 'library';
+/** As duas telas da sala: a sala (fila, adicionar, músicas) e a TV (a letra e a fila, só para assistir). */
+export type View = 'room' | 'tv';
 
 export interface RoomContextValue {
   code: string;

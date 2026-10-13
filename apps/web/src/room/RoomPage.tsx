@@ -5,7 +5,7 @@ import { stageDismissed, stageItemFor } from '../lib/stage.js';
 import type { LibrarySong, QueueItem, RoomState } from '../lib/types';
 import { AddSong, type AddSongHandle } from './AddSong';
 import { InviteBanner } from './Duet';
-import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast } from './context';
+import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast, type View } from './context';
 import { Library } from './Library';
 import { NowPlaying } from './NowPlaying';
 import { NameDialog } from './NameDialog';
@@ -13,6 +13,7 @@ import { QueueList, Scoreboard } from './QueueList';
 import { PreviewBar, usePreview } from './usePreview';
 import { RoomRail } from './RoomRail';
 import { TabBar, TopBar } from './TopBar';
+import { TvViewer } from './TvViewer';
 import { useRoomConnection } from './useRoomConnection';
 
 declare global {
@@ -22,10 +23,11 @@ declare global {
 }
 
 export function RoomPage({ code }: { code: string }) {
-  const { state, setState, status, gone, position, send } = useRoomConnection(code);
+  const { state, setState, status, gone, position, lyrics, send } = useRoomConnection(code);
   const { toast, show } = useToast();
   const act = useAct(code, setState, show);
   const [tab, setTab] = useState<Tab>('queue');
+  const [view, setView] = useState<View>(() => (new URLSearchParams(location.search).get('view') === 'tv' ? 'tv' : 'room'));
   const [name, setName] = useState<string>(() => userName());
   // o modal do nome só na chegada (quem apaga o campo depois, para digitar outro, não leva um modal na cara)
   const [askName, setAskName] = useState(() => !userName().trim());
@@ -34,6 +36,7 @@ export function RoomPage({ code }: { code: string }) {
   const preview = usePreview(state, act);
 
   const showTab = useCallback((next: Tab) => {
+    setView('room'); // adicionar, ver a fila... sempre levam à sala
     setTab(next);
     window.scrollTo({ top: 0 });
   }, []);
@@ -128,11 +131,17 @@ export function RoomPage({ code }: { code: string }) {
 
   return (
     <RoomProvider value={context}>
-      <TopBar state={state} status={status} />
-      <RoomRail state={state} />
+      <TopBar state={state} status={status} view={view} onView={setView} />
+      {view === 'room' && <RoomRail state={state} />}
       <InviteBanner />
 
-      <main className="room-page">
+      {view === 'tv' && (
+        <main className="room-page">
+          <TvViewer state={state} position={position} lyrics={lyrics} />
+        </main>
+      )}
+
+      <main className="room-page" hidden={view !== 'room'}>
         <section className="tab" hidden={tab !== 'queue'}>
           {state && (
             <>
@@ -180,7 +189,7 @@ export function RoomPage({ code }: { code: string }) {
         />
       )}
       <PreviewBar preview={preview} />
-      <TabBar tab={tab} onTab={showTab} queueCount={state?.queue.length ?? 0} hidden={false} />
+      <TabBar tab={tab} onTab={showTab} queueCount={state?.queue.length ?? 0} hidden={view !== 'room'} />
       <p className={`toast${toast.show ? ' show' : ''}${toast.isError ? ' error' : ''}`} role="status">
         {toast.text}
       </p>

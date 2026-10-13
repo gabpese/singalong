@@ -2,52 +2,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-media.js';
 import { keySummary } from '../lib/music.js';
-import { nextUp, playOrder, songChip, splitQueue } from '../lib/queue-view.js';
+import { nextUp, playOrder, splitQueue } from '../lib/queue-view.js';
 import type { QueueItem, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { InviteNotice, respondInvite } from '../room/Duet';
 import { createTvController, type FinalResult, type HudState, type TvController } from './controller';
 import { QrCode } from './QrCode';
+import { QueueBox, titleOf } from './QueueBox';
 
-const UPCOMING_SHOWN = 5;
 const trackName = (item: QueueItem) => [item.title ?? item.video_id, item.artist].filter(Boolean).join(' — ');
-const titleOf = (item: QueueItem) => item.title ?? item.video_id;
 
 declare global {
   interface Window {
     tv?: { engine: TvController['engine']; readonly state: RoomState | null };
   }
-}
-
-function QueueRow({ item, badge, isCurrent = false }: { item: QueueItem; badge: string; isCurrent?: boolean }) {
-  return (
-    <li className={isCurrent ? 'is-current' : ''}>
-      <span className="mark">{badge}</span>
-      <span className="text">
-        <strong>{item.singers}</strong>
-        <small>
-          {titleOf(item)}
-          {item.song.ready ? '' : ` · ${songChip(item.song).label.toLowerCase()}`}
-        </small>
-      </span>
-    </li>
-  );
-}
-
-/** Lista lateral: a música atual e as próximas 5, na ordem em que vão tocar (para ceder a vez com conhecimento de causa). */
-function QueueBox({ current, upcoming }: { current: QueueItem | null; upcoming: QueueItem[] }) {
-  return (
-    <aside className="tv-queue" hidden={!current && !upcoming.length} aria-label="Fila de cantores">
-      <h2>Fila</h2>
-      <ol>
-        {current && <QueueRow item={current} badge="▶" isCurrent />}
-        {upcoming.slice(0, UPCOMING_SHOWN).map((item, i) => (
-          <QueueRow key={item.id} item={item} badge={String(i + 1)} />
-        ))}
-        {upcoming.length > UPCOMING_SHOWN && <li className="more">+ {upcoming.length - UPCOMING_SHOWN} na fila</li>}
-      </ol>
-    </aside>
-  );
 }
 
 /** O QR code da sala sempre à vista (quem chega no meio da festa entra sem pedir o código): fica abaixo da fila enquanto toca. */

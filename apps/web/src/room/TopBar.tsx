@@ -1,7 +1,7 @@
 // Topo da sala (código e estado da TV) e a barra de abas. Os atalhos e ajustes ficam na barra lateral (RoomRail).
 import type { RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
-import { type Tab, useRoom } from './context';
+import { type Tab, useRoom, type View } from './context';
 import type { ConnectionStatus } from './useRoomConnection';
 
 function tvStatusText(state: RoomState | null, status: ConnectionStatus) {
@@ -15,7 +15,7 @@ function tvStatusText(state: RoomState | null, status: ConnectionStatus) {
   );
 }
 
-export function TopBar({ state, status }: { state: RoomState | null; status: ConnectionStatus }) {
+export function TopBar({ state, status, view, onView }: { state: RoomState | null; status: ConnectionStatus; view: View; onView: (view: View) => void }) {
   const { code } = useRoom();
 
   return (
@@ -26,6 +26,14 @@ export function TopBar({ state, status }: { state: RoomState | null; status: Con
           Sala <span>{code}</span>
         </h1>
         <p className={`tv-status${status === 'connected' && state?.tv_connected ? ' on' : ''}`}>{tvStatusText(state, status)}</p>
+      </div>
+      <div className="view-switch" role="tablist" aria-label="Sala ou TV">
+        <button type="button" role="tab" aria-selected={view === 'room'} className={view === 'room' ? 'active' : ''} onClick={() => onView('room')}>
+          Sala
+        </button>
+        <button type="button" role="tab" aria-selected={view === 'tv'} className={view === 'tv' ? 'active' : ''} onClick={() => onView('tv')}>
+          <Icon name="display" /> TV
+        </button>
       </div>
     </header>
   );

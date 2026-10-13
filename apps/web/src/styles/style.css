@@ -549,3 +549,15 @@ body.stage { background: #0b0b14; }
 .stage-duet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tv-invites { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 70; width: min(640px, 92vw); }
 .tv-invites .invites { position: static; padding: 0; }
+
+/* ---------- sala: alternar entre Sala e TV ---------- */
+.view-switch { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); }
+.view-switch button { min-height: 36px; padding: 4px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--dim); }
+.view-switch button.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.view-switch .icon { width: 1em; height: 1em; vertical-align: -.15em; }
+.tv-viewer { display: grid; gap: 16px; }
+.tv-viewer-top { display: grid; gap: 12px; }
+.tv-viewer .singer.is-next { padding-left: 0; border-left: 0; }
+.tv-viewer .tv-queue { max-height: none; }
+.tv-viewer .singer .who { font-size: clamp(1.3rem, 6vw, 2rem); }
+.tv-viewer .lyrics { position: static; }
