@@ -24,6 +24,42 @@
       <p id="status" class="muted" role="status"></p>
       <p id="mail-warning" class="warn" hidden>O envio de e-mail não está configurado neste servidor (BREVO_API_KEY e MAIL_FROM): ninguém consegue pedir código pelo app.</p>
 
+      <section class="card" id="release-card">
+        <h2>Versão do app <span id="release-source" class="pill"></span></h2>
+        <p class="muted">O que os apps instalados veem. Quem está <strong>abaixo da versão mais recente</strong> recebe o aviso "Atualizar agora" com a mensagem; quem está <strong>abaixo da mínima</strong> para de receber trabalho do servidor até atualizar. Vale na hora, sem reiniciar. A página inicial também mostra a versão mais recente e o endereço de download.</p>
+        <form id="release-form" class="release-grid">
+          <label>Versão mais recente
+            <input id="rel-latest" type="text" placeholder="ex.: 1.2.3" autocomplete="off" inputmode="decimal">
+          </label>
+          <label>Versão mínima (opcional)
+            <input id="rel-min" type="text" placeholder="ex.: 1.1.0" autocomplete="off" inputmode="decimal">
+          </label>
+          <label class="wide">Mensagem da versão (o que mudou)
+            <textarea id="rel-notes" rows="3" maxlength="500" placeholder="Corrige a pontuação e melhora o guia de melodia."></textarea>
+            <small id="rel-count" class="muted"></small>
+          </label>
+          <label class="wide">Endereço de download
+            <input id="rel-url" type="text" placeholder="https://github.com/…/releases/latest" autocomplete="off">
+          </label>
+          <div class="row wide">
+            <button type="submit" class="primary">Publicar</button>
+            <button type="button" id="rel-clear">Voltar ao .env</button>
+            <span id="release-note" class="muted"></span>
+          </div>
+        </form>
+        <h3>Como o aviso aparece no app</h3>
+        <div class="banner-preview" aria-live="polite">
+          <div><strong id="prev-title"></strong><div id="prev-notes" class="muted"></div></div>
+          <span class="fake-button">Atualizar agora</span>
+        </div>
+        <div class="banner-preview required" id="prev-required-box" aria-live="polite" hidden>
+          <div><strong id="prev-required-title"></strong><div id="prev-required-notes" class="muted"></div></div>
+          <span class="fake-button">Atualizar agora</span>
+        </div>
+        <p class="muted" id="prev-required-hint" hidden>O segundo aviso é o de quem está abaixo da versão mínima.</p>
+        <p id="release-devices" class="muted"></p>
+      </section>
+
       <section class="card">
         <h2>E-mails autorizados</h2>
         <p class="muted">Quem <strong>recebe o código</strong> pode instalar o app e conectar o computador. Quem <strong>envia músicas</strong> alimenta a biblioteca da nuvem automaticamente. Use <code>*</code> em "recebe o código" para liberar qualquer e-mail.</p>
@@ -39,7 +75,7 @@
 
       <section class="card">
         <h2>Computadores conectados</h2>
-        <table id="devices"><thead><tr><th>Nome</th><th>E-mail</th><th>Envia músicas</th><th>Visto por último</th><th></th></tr></thead><tbody></tbody></table>
+        <table id="devices"><thead><tr><th>Nome</th><th>E-mail</th><th>Versão do app</th><th>Envia músicas</th><th>Visto por último</th><th></th></tr></thead><tbody></tbody></table>
       </section>
 
       <section class="card">

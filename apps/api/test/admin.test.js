@@ -185,3 +185,93 @@ test('músicas da nuvem: aparecem na página; remover apaga, bloqueia o reenvio 
   assert.equal((await admin(app, 'DELETE', '/cloud/..%2F..%2Fetc')).statusCode, 400); // id inválido
   await app.close();
 });
+
+// --- controle de versão do app pelo painel: o que o servidor diz aos apps e à página inicial ---
+const versionOf = (app, current) => app.inject({ method: 'GET', url: `/agent/v1/version${current ? `?current=${current}` : ''}` }).then((res) => res.json());
+const publicConfig = (app) => app.inject({ method: 'GET', url: '/api/config' }).then((res) => res.json());
+const RELEASE = { latest: '1.3.0', minimum: '1.1.0', notes: 'Novidades da 1.3.0', url: 'https://github.com/dono/repo/releases/latest' };
+
+test('versão: sem nada publicado vale o .env; publicar no painel vale na hora, para os apps e para a página inicial', async () => {
+  const { app } = await build({ config: { appLatestVersion: '1.2.0', appMinVersion: '1.0.0', appNotes: 'do env', appDownloadUrl: 'https://env.example/baixar' } });
+  const state = (await admin(app, 'GET', '/state')).json();
+  assert.equal(state.release.source, 'env');
+  assert.deepEqual([state.release.latest, state.release.notes], ['1.2.0', 'do env']);
+  assert.equal((await versionOf(app, '1.1.0')).status, 'update_available');
+  assert.equal((await publicConfig(app)).app_latest_version, '1.2.0');
+
+  const saved = await admin(app, 'PUT', '/release', RELEASE);
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.json().release.source, 'panel');
+  // o painel manda no lugar do .env, sem reiniciar
+  const answer = await versionOf(app, '1.0.5');
+  assert.deepEqual([answer.status, answer.latest, answer.minimum, answer.notes], ['update_required', '1.3.0', '1.1.0', 'Novidades da 1.3.0']);
+  assert.equal((await versionOf(app, '1.3.0')).status, 'ok');
+  const config = await publicConfig(app);
+  assert.deepEqual([config.app_latest_version, config.app_download_url], ['1.3.0', RELEASE.url]);
+  assert.equal((await admin(app, 'GET', '/state')).json().release.env.latest, '1.2.0'); // o que o .env diria ao limpar
+
+  // limpar volta ao .env
+  const cleared = await admin(app, 'DELETE', '/release');
+  assert.equal(cleared.json().removed, true);
+  assert.equal(cleared.json().release.source, 'env');
+  assert.equal((await versionOf(app, '1.1.0')).latest, '1.2.0');
+  assert.equal((await admin(app, 'DELETE', '/release')).json().removed, false); // já estava limpo
+  await app.close();
+});
+
+test('versão: sem .env nem painel não há aviso; só o painel pode publicar (token) e os dados são validados', async () => {
+  const { app } = await build();
+  assert.equal((await admin(app, 'GET', '/state')).json().release.source, 'none');
+  assert.equal((await versionOf(app, '1.0.0')).status, 'unknown');
+  assert.equal((await publicConfig(app)).app_latest_version, null);
+
+  const anon = await app.inject({ method: 'PUT', url: `/${PATH}/api/release`, payload: RELEASE });
+  assert.equal(anon.statusCode, 403);
+  assert.equal((await versionOf(app, '1.0.0')).status, 'unknown'); // nada mudou
+
+  const bad = async (patch) => (await admin(app, 'PUT', '/release', { ...RELEASE, ...patch })).statusCode;
+  assert.equal(await bad({ latest: 'abc' }), 400);
+  assert.equal(await bad({ minimum: '1.2' }), 400);
+  assert.equal(await bad({ latest: '1.0.0', minimum: '2.0.0' }), 400); // a mínima acima da mais recente
+  assert.equal(await bad({ url: 'javascript:alert(1)' }), 400);
+  assert.equal(await bad({ url: 'ftp://x.example/a' }), 400);
+  assert.equal(await bad({ notes: 'x'.repeat(501) }), 400);
+  assert.equal(await bad({ notes: 'x'.repeat(1001) }), 400);
+  assert.equal((await admin(app, 'PUT', '/release', { latest: '1.0.0' })).statusCode, 400); // faltam campos
+  assert.equal(await bad({ minimum: '', url: '', notes: '' }), 200); // só a mais recente já basta
+  assert.equal(await bad({ latest: '', minimum: '1.0.0', url: '', notes: '' }), 200); // ou só a mínima
+  const message = (await admin(app, 'PUT', '/release', { ...RELEASE, latest: 'x' })).json();
+  assert.match(message.message, /1\.2\.3/); // a mensagem de erro diz o formato
+  await app.close();
+});
+
+test('versão: a mensagem é texto puro (nunca HTML) e o endereço só vai à página inicial se for http/https', async () => {
+  const { app } = await build();
+  await admin(app, 'PUT', '/release', { ...RELEASE, notes: '  <script>alert(1)</script> Novidades  ' });
+  const answer = await versionOf(app, '1.0.0');
+  assert.equal(answer.notes, '<script>alert(1)</script> Novidades'); // aparada; o app a mostra como texto (textContent)
+  await app.close();
+});
+
+test('versão: cada computador aparece com a versão que informou e se está em dia', async () => {
+  const { app, sent } = await build({ config: { pairAllowedEmails: ['ana@exemplo.com', 'bia@exemplo.com', 'caio@exemplo.com'] } });
+  await admin(app, 'PUT', '/release', { latest: '1.3.0', minimum: '1.2.0', notes: '', url: '' });
+  const beat = (agent, version) => app.inject({ method: 'POST', url: '/agent/v1/heartbeat', headers: agent.headers, payload: { version } });
+  const ana = await pairByEmail(app, sent, 'ana@exemplo.com');
+  const bia = await pairByEmail(app, sent, 'bia@exemplo.com');
+  const caio = await pairByEmail(app, sent, 'caio@exemplo.com');
+  await beat(ana, '1.3.0'); // em dia
+  await beat(bia, '1.2.5'); // há uma mais nova
+  await beat(caio, '1.1.0'); // abaixo da mínima
+  await beat(caio, 'lixo'); // um valor que não é versão não apaga o que já se sabia
+
+  const byName = Object.fromEntries((await admin(app, 'GET', '/state')).json().devices.map((d) => [d.name, d]));
+  assert.deepEqual([byName['PC ana@exemplo.com'].version, byName['PC ana@exemplo.com'].update_status], ['1.3.0', 'ok']);
+  assert.deepEqual([byName['PC bia@exemplo.com'].version, byName['PC bia@exemplo.com'].update_status], ['1.2.5', 'update_available']);
+  assert.deepEqual([byName['PC caio@exemplo.com'].version, byName['PC caio@exemplo.com'].update_status], ['1.1.0', 'update_required']);
+  // publicar uma mínima maior recalcula o estado sem esperar o próximo sinal
+  await admin(app, 'PUT', '/release', { latest: '1.3.0', minimum: '1.3.0', notes: '', url: '' });
+  const after = Object.fromEntries((await admin(app, 'GET', '/state')).json().devices.map((d) => [d.name, d.update_status]));
+  assert.equal(after['PC bia@exemplo.com'], 'update_required');
+  await app.close();
+});

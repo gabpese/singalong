@@ -305,16 +305,19 @@ body.tv { overflow: hidden; height: 100vh; }
 /* corpo da TV: a letra e, ao lado, a fila (atual + próximas 5) */
 .tv-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--queue-w); gap: 28px; min-height: 0; }
 .tv-stage:not(.has-queue) .tv-body { grid-template-columns: minmax(0, 1fr); }
-.tv-side { align-self: center; display: grid; gap: 16px; max-height: 100%; min-height: 0; justify-items: stretch; }
-.tv-join { display: grid; justify-items: center; gap: 8px; padding: 14px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); text-align: center; }
-.tv-join .qr { width: min(18vh, 170px, 100%); padding: 6px; }
+.tv-side { align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 14px; min-height: 0; overflow: hidden; }
+.tv-body > * { min-height: 0; }
+.tv-join { display: grid; justify-items: center; gap: 8px; padding: 14px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); text-align: center; flex: 0 0 auto; }
+.tv-join .qr { width: clamp(72px, 16vh, 170px); padding: 6px; }
 .tv-join p { margin: 0; color: var(--dim); font-size: clamp(.8rem, 1.2vw, 1.05rem); }
 .tv-join strong { color: var(--accent); letter-spacing: .12em; }
 .tv-join[hidden] { display: none; }
-.tv-queue { max-height: 100%; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
+.tv-queue { flex: 0 1 auto; min-height: 0; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
 .tv-queue[hidden] { display: none; }
 .tv-queue h2 { margin: 0 0 10px; color: var(--dim); font-size: clamp(.8rem, 1.1vw, 1rem); text-transform: uppercase; letter-spacing: .12em; font-weight: 600; }
 .tv-queue ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+/* o que não cabe some aos poucos em vez de passar por cima do resto */
+.tv-queue { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); }
 .tv-queue li { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); min-width: 0; }
 .tv-queue li.is-current { background: color-mix(in srgb, var(--accent) 16%, var(--bg-2)); box-shadow: inset 3px 0 0 var(--accent); }
 .tv-queue .mark { flex: 0 0 auto; width: 1.9em; height: 1.9em; display: grid; place-items: center; border-radius: 50%; background: var(--panel-2); color: var(--dim); font-size: clamp(.8rem, 1.2vw, 1.1rem); font-variant-numeric: tabular-nums; }
@@ -624,7 +627,7 @@ body.stage { background: #0b0b14; }
 /* a faixa de baixo da TV: o guia de melodia (se ligado) e a pontuação, lado a lado e dentro do layout (nada flutua sobre o QR code) */
 .tv-stage.has-lower { grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .tv-lower { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: stretch; }
-.tv-lower .pitch-guide { height: clamp(110px, 22vh, 240px); }
+.tv-lower .pitch-guide { height: clamp(90px, 20vh, 240px); }
 .tv-lower .score-hud { grid-column: 2; }
 /* sem o guia, a pontuação vira uma tira baixa, à direita */
 .tv-lower:not(:has(.pitch-guide)) .score-hud { grid-auto-flow: column; align-items: baseline; gap: 18px; width: auto; padding: 8px 18px; }

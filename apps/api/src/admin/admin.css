@@ -1,6 +1,6 @@
 :root { --bg: #0e0e16; --card: #181824; --text: #ecebf4; --muted: #9a98ad; --accent: #8b7bff; --accent-text: #0e0e16; --danger: #ff6b7a; --warn: #ffc857; --border: #33334a; }
 @media (prefers-color-scheme: light) {
-  :root { --bg: #f4f3fa; --card: #ffffff; --text: #1b1a29; --muted: #6a6880; --accent: #5b45ff; --accent-text: #ffffff; --danger: #c4283b; --warn: #9a6b00; --border: #d9d7e8; }
+  :root { --bg: #f4f3fa; --card: #ffffff; --text: #1b1a29; --muted: #6a6880; --accent: #5b45ff; --accent-text: #ffffff; --danger: #c4283b; --warn: #7a5200; --border: #d9d7e8; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
@@ -27,3 +27,14 @@ button.danger { color: var(--danger); }
 [hidden] { display: none !important; }
 code { background: var(--bg); padding: 1px 6px; border-radius: 4px; }
 #login-form { display: flex; gap: 10px; flex-wrap: wrap; }
+textarea { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font: inherit; width: 100%; resize: vertical; }
+label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+label.check { display: inline-flex; }
+.release-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-top: 10px; }
+.release-grid .wide { grid-column: 1 / -1; }
+.release-grid input[type="text"] { min-width: 0; width: 100%; }
+.pill { font-size: 12px; font-weight: 400; padding: 2px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); margin-left: 6px; }
+.banner-preview { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.banner-preview .fake-button { flex: none; padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+@media (max-width: 640px) { .release-grid { grid-template-columns: minmax(0, 1fr); } }
+.banner-preview.required { margin-top: 8px; border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--card)); }

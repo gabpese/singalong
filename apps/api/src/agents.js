@@ -5,6 +5,7 @@
 // A nuvem sabe só um apelido de exibição e se o dono está online: nunca cookies, e-mail ou a conta do YouTube.
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { HttpError, generateCode } from './rooms.js';
+import { parseVersion } from './version.js';
 
 export const PAIR_CODE_LENGTH = 8;
 export const PAIR_TTL_MS = 10 * 60 * 1000;
@@ -213,6 +214,11 @@ export function createAgentService({
       const session = db.activeSessionOf(device.id);
       if (session) db.touchSession(session.id, now());
       return session;
+    },
+
+    /** A versão do app que o computador informou (só valores que são versões; o painel do administrador mostra quem está desatualizado). */
+    recordVersion(device, version) {
+      if (parseVersion(version)) db.setDeviceVersion(device.id, String(version).trim().slice(0, 40));
     },
 
     /** A sessão ativa do dispositivo (ou null). */

@@ -52,6 +52,15 @@ CREATE TABLE IF NOT EXISTS devices (
   last_seen   INTEGER,
   revoked_at  INTEGER
 );
+-- A versão do app publicada pelo painel do administrador (uma linha só): quando existe, vale no lugar das variáveis APP_* do .env.
+CREATE TABLE IF NOT EXISTS app_release (
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  latest      TEXT NOT NULL DEFAULT '',            -- a versão mais recente (o app mais velho vê o aviso de atualização)
+  minimum     TEXT NOT NULL DEFAULT '',            -- a versão mínima: abaixo dela o servidor recusa trabalho até o app atualizar
+  notes       TEXT NOT NULL DEFAULT '',            -- a mensagem da versão (o que mudou)
+  url         TEXT NOT NULL DEFAULT '',            -- onde baixar
+  updated_at  INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS pair_codes (
   code_hash   TEXT PRIMARY KEY,
   expires_at  INTEGER NOT NULL
@@ -143,6 +152,8 @@ export function openDb(path = ':memory:') {
   // o e-mail com que o computador foi pareado (pelo código enviado por e-mail): é ele que decide quem pode enviar músicas para a nuvem
   if (!hasColumn('devices', 'email')) db.exec('ALTER TABLE devices ADD COLUMN email TEXT');
   if (!hasColumn('pair_codes', 'email')) db.exec('ALTER TABLE pair_codes ADD COLUMN email TEXT');
+  // a versão do app que cada computador informou na última batida de coração (a página do administrador mostra quem está desatualizado)
+  if (!hasColumn('devices', 'app_version')) db.exec('ALTER TABLE devices ADD COLUMN app_version TEXT');
 
   const one = (sql, ...params) => db.prepare(sql).get(...params) ?? null;
   const all = (sql, ...params) => db.prepare(sql).all(...params);
@@ -299,7 +310,16 @@ export function openDb(path = ':memory:') {
       ),
     deleteEmailRule: (email) => run('DELETE FROM email_rules WHERE email = ?', email).changes > 0,
     hasPairRules: () => one('SELECT 1 AS n FROM email_rules WHERE can_pair = 1 LIMIT 1') !== null,
-    listDevices: () => all('SELECT id, name, email, created_at, last_seen, revoked_at FROM devices ORDER BY created_at DESC'),
+    listDevices: () => all('SELECT id, name, email, created_at, last_seen, revoked_at, app_version FROM devices ORDER BY created_at DESC'),
+    setDeviceVersion: (id, version) => run('UPDATE devices SET app_version = ? WHERE id = ? AND COALESCE(app_version, \'\') <> ?', version, id, version),
+    getRelease: () => one('SELECT latest, minimum, notes, url, updated_at FROM app_release WHERE id = 1'),
+    setRelease: ({ latest, minimum, notes, url }, now) =>
+      run(
+        `INSERT INTO app_release (id, latest, minimum, notes, url, updated_at) VALUES (1, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET latest = excluded.latest, minimum = excluded.minimum, notes = excluded.notes, url = excluded.url, updated_at = excluded.updated_at`,
+        latest, minimum, notes, url, now,
+      ),
+    clearRelease: () => run('DELETE FROM app_release WHERE id = 1').changes > 0,
     blockSong: (videoId, now) => run('INSERT OR REPLACE INTO cloud_blocked (video_id, blocked_at) VALUES (?, ?)', videoId, now),
     unblockSong: (videoId) => run('DELETE FROM cloud_blocked WHERE video_id = ?', videoId).changes > 0,
     isSongBlocked: (videoId) => one('SELECT 1 AS n FROM cloud_blocked WHERE video_id = ?', videoId) !== null,

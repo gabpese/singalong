@@ -2,6 +2,7 @@ import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { createAgentService } from './agents.js';
 import { createMailer } from './mailer.js';
+import { createRelease } from './release.js';
 import { openDb } from './db.js';
 import { sendFile } from './files.js';
 import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.js';
@@ -31,6 +32,8 @@ export function buildApp({ config, storage, jobs, logger = false, mailer = creat
   app.decorate('rooms', rooms);
   app.decorate('agents', agents);
   app.decorate('db', db);
+  const release = createRelease({ config, db });
+  app.decorate('release', release);
   app.addHook('onClose', async () => {
     rooms.stop();
     db.close();
@@ -62,10 +65,10 @@ export function buildApp({ config, storage, jobs, logger = false, mailer = creat
 
   app.register(websocket);
   app.register(songRoutes, { prefix: '/api', songs, jobs, limiters, rooms, agents });
-  app.register(roomRoutes, { prefix: '/api', rooms, config, limiters });
-  app.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters, mailer, storage });
+  app.register(roomRoutes, { prefix: '/api', rooms, config, limiters, release });
+  app.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters, mailer, storage, release });
 
-  app.register(adminRoutes, { agents, db, storage, config, limiters });
+  app.register(adminRoutes, { agents, db, storage, config, limiters, release });
 
   if (storage.local) {
     app.get('/media/*', (request, reply) => {

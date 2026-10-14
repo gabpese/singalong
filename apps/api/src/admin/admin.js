@@ -84,7 +84,7 @@ function rows(table, items, build, emptyText) {
   if (items.length === 0) {
     const tr = document.createElement('tr');
     const td = cell(emptyText);
-    td.colSpan = 5;
+    td.colSpan = 6;
     td.className = 'muted';
     tr.append(td);
     body.append(tr);
@@ -97,8 +97,48 @@ function rows(table, items, build, emptyText) {
   }
 }
 
+// --- versão do app: a publicada, a mensagem e quem está desatualizado ---
+const STATUS_TEXT = { ok: 'em dia', update_available: 'atualização disponível', update_required: 'atualização obrigatória', unknown: 'não informou a versão' };
+const SOURCE_TEXT = { panel: 'publicada aqui', env: 'vem do .env', none: 'nada publicado' };
+let releaseDirty = false; // a pessoa está editando o formulário: um recarregamento não apaga o que ela digitou
+
+function renderPreview() {
+  const latest = $('rel-latest').value.trim();
+  const minimum = $('rel-min').value.trim();
+  const notes = $('rel-notes').value.trim() || '(sem mensagem)';
+  // os mesmos textos que o app mostra (apps/desktop/ui/app.js)
+  $('prev-title').textContent = `Há uma versão nova: ${latest || '—'}`;
+  $('prev-notes').textContent = notes;
+  $('prev-required-box').hidden = !minimum;
+  $('prev-required-hint').hidden = !minimum;
+  $('prev-required-title').textContent = `Atualização necessária (versão ${minimum} ou mais nova)`;
+  $('prev-required-notes').textContent = notes;
+  $('rel-count').textContent = `${$('rel-notes').value.length}/500`;
+}
+
+function renderRelease(state) {
+  const release = state.release;
+  $('release-source').textContent = SOURCE_TEXT[release.source] ?? '';
+  if (!releaseDirty) {
+    $('rel-latest').value = release.latest;
+    $('rel-min').value = release.minimum;
+    $('rel-notes').value = release.notes;
+    $('rel-url').value = release.url;
+  }
+  $('rel-clear').hidden = release.source !== 'panel';
+  $('release-note').textContent = release.source === 'panel' ? `Última publicação: ${fmtDate(release.updated_at)}.` : release.source === 'env' ? 'Estes valores vêm das variáveis APP_* do .env; publicar aqui passa a valer no lugar deles.' : 'Nada configurado: os apps não recebem aviso.';
+  renderPreview();
+
+  const active = state.devices.filter((d) => !d.revoked);
+  const count = (status) => active.filter((d) => d.update_status === status).length;
+  $('release-devices').textContent = active.length
+    ? `${active.length} computador${active.length === 1 ? '' : 'es'}: ${count('ok')} em dia, ${count('update_available')} com atualização disponível, ${count('update_required')} abaixo da mínima, ${count('unknown')} sem informar a versão.`
+    : 'Nenhum computador conectado.';
+}
+
 function render(state) {
   $('mail-warning').hidden = state.mail.enabled;
+  renderRelease(state);
 
   rows($('emails'), state.emails.rules, (rule) => [
     cell(rule.email === '*' ? '* (qualquer e-mail)' : rule.email),
@@ -114,6 +154,7 @@ function render(state) {
   rows($('devices'), state.devices, (device) => [
     cell(device.revoked ? `${device.name} (desconectado)` : device.name),
     cell(device.email ?? '— (pareado sem e-mail)'),
+    cell(device.revoked ? '' : `${device.version ?? '?'} · ${STATUS_TEXT[device.update_status] ?? ''}`),
     cell(device.cloud ? 'sim' : 'não'),
     cell(fmtDate(device.last_seen)),
     cell(device.revoked ? '' : button('Desconectar', () => confirm(`Desconectar "${device.name}"? O app dele vai precisar parear de novo.`) && run(() => api('DELETE', `/devices/${device.id}`), 'Computador desconectado.'), 'danger')),
@@ -162,6 +203,29 @@ $('login-form').addEventListener('submit', async (event) => {
   $('token').value = '';
   $('login-error').hidden = true;
   await load();
+});
+
+for (const id of ['rel-latest', 'rel-min', 'rel-notes', 'rel-url']) {
+  $(id).addEventListener('input', () => {
+    releaseDirty = true;
+    renderPreview();
+  });
+}
+
+$('release-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const body = { latest: $('rel-latest').value.trim(), minimum: $('rel-min').value.trim(), notes: $('rel-notes').value.trim(), url: $('rel-url').value.trim() };
+  run(() => api('PUT', '/release', body), 'Versão publicada: os apps já recebem o aviso.').then(() => {
+    // se o servidor recusou (formato, mínima acima da mais recente...), o que a pessoa digitou fica para ela corrigir
+    if ($('status').className !== 'error') releaseDirty = false;
+    return load();
+  });
+});
+
+$('rel-clear').addEventListener('click', () => {
+  if (!confirm('Voltar a usar a versão do .env? O que foi publicado aqui será apagado.')) return;
+  releaseDirty = false;
+  run(() => api('DELETE', '/release'), 'Voltou a valer o .env.');
 });
 
 $('email-form').addEventListener('submit', (event) => {
