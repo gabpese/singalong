@@ -471,7 +471,26 @@ Ideas chosen by the project owner after a review of what the app has and what is
 | Hybrid mode (F25) | Per song, choose whether it also goes to the cloud (S3/R2 driver already planned in section 14). Needs a decision on synchronization and storage cost |
 | macOS, Linux and AMD/Apple GPU (F26) | The engine is assembled for Windows only. First macOS on Apple Silicon (MPS), then Linux (ROCm for AMD) |
 
-**Versions:** phase A is released as **1.1.1**; **1.2.0** is the release that closes all the phases (A to E).
+### Phase F: the web home page
+The entry page (`/`) gets the same look as the owner's app welcome screen: the **picture** (TV, laptop and phone, `apps/desktop/ui/welcome.png`) on the **left** and the actions on the **right**.
+| Item | Notes |
+|---|---|
+| Layout | Two columns from ~900 px wide (picture ~64 %, panel ~36 %, like the app's `welcome-art`/`welcome-form`); on a phone the picture goes on top (smaller) and the panel below. The page keeps the dark theme, the language selector and the accessibility rules (axe in the suite) |
+| Actions panel | **Create room and open the TV** (primary), **Join a room** (code field) and **Download the app** (secondary), plus a short sentence on why the app exists ("to prepare new songs on your computer") |
+| Download button | The address comes from the server (`APP_DOWNLOAD_URL`, already used by the update notice), exposed in `/api/config` as `app_download_url` (and the latest version, `app_latest_version`, shown next to the button). With no address configured, the button is not shown. On a phone or a non-Windows computer the button explains that the app is for Windows computers (macOS and Linux are phase E) instead of downloading a useless file |
+| The picture | Copied to `apps/web/public/` (the app keeps its own copy: its security policy only allows local files). It has the tagline "Karaokê de qualquer vídeo do YouTube" **drawn inside it**, and the screens inside it show the old menu: the picture should be re-exported **without the text** (the title and tagline become translated text) and with the current screens. Until then the page uses the current picture and cuts the text off with CSS if needed |
+| Tests | The landing end-to-end tests are updated; new ones for the two-column and phone layouts, the download button (shown, hidden without an address, explanatory on a phone) and axe on the new page; the three languages get the new texts |
+
+**Phase F status (release 1.1.3):** done. `/` now has the picture on the left and the actions on the right (stacked on a phone: picture on top); `GET /api/config` returns `app_download_url` (only `http(s)` links; it is `APP_DOWNLOAD_URL`, today the repository's `releases/latest`) and `app_latest_version`; the download block shows a **Download the app for Windows (vX.Y.Z)** link on a Windows computer, an explanation plus a "downloads page" link on a phone or another system, and nothing without an address. The current picture is used (copied to `apps/web/public/welcome.png`); re-exporting it without the baked-in Portuguese tagline and with the current screens is still open, and only its alt text is translated meanwhile.
+
+**Decisions for phase F (answered)**
+1. **Where is the installer hosted?** `APP_DOWNLOAD_URL` today points to a **private** folder (see `deploy/README.md`). A public button needs a link that anyone can open: GitHub Releases of this repository (the repository is public) or the link you already use. Without a public link the button stays hidden.
+2. **The picture:** re-export without the text and with the current screens (recommended, needs the new art from you), or use the current picture for now.
+3. **Order:** F is independent of A to E. Recommended: right after phase B (version 1.1.3), because it is small and visible; C, D and E follow.
+
+*Answers:* (1) `APP_DOWNLOAD_URL` points to the repository's `releases/latest`; (2) the current picture for now; (3) F goes right after B, as 1.1.3.
+
+**Versions:** phase A is released as **1.1.1**, phase B as **1.1.2**; **1.2.0** is the release that closes all the phases (A to F).
 
 ### Order and dependencies
 A before everything (safe releases and the base for text and tabs) → B (one audio engine) → C (quick return) → D (needs B) → E (largest and most uncertain). Each item gets its own milestone, with tests, in the usual way (section 16).

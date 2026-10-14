@@ -82,3 +82,18 @@ test('o heartbeat devolve o aviso e abaixo da mínima o servidor recusa trabalho
   assert.equal((await claim()).statusCode, 204);
   await app.close();
 });
+
+test('GET /api/config: o endereço do app e a versão só saem se estiverem configurados (e o link precisa ser http/https)', async () => {
+  const configured = await build({ appLatestVersion: '1.3.0', appDownloadUrl: 'https://github.com/dono/repo/releases/latest', publicUrl: 'https://sing.example' });
+  const body = (await configured.inject({ method: 'GET', url: '/api/config' })).json();
+  assert.deepEqual(body, { public_url: 'https://sing.example', app_download_url: 'https://github.com/dono/repo/releases/latest', app_latest_version: '1.3.0' });
+  await configured.close();
+
+  const bare = await build({});
+  assert.deepEqual((await bare.inject({ method: 'GET', url: '/api/config' })).json(), { public_url: null, app_download_url: null, app_latest_version: null });
+  await bare.close();
+
+  const unsafe = await build({ appDownloadUrl: 'javascript:alert(1)' }); // um link que não é http(s) nunca vai para um botão
+  assert.equal((await unsafe.inject({ method: 'GET', url: '/api/config' })).json().app_download_url, null);
+  await unsafe.close();
+});

@@ -43,3 +43,72 @@ test('código que não existe mostra o erro e fica na entrada', async ({ page })
   await expect(page.getByRole('status')).toContainText('Não achei a sala ZZZZ');
   await expect(page).toHaveURL(/\/$/);
 });
+
+// --- a página inicial: a imagem de um lado, as ações do outro, e o botão de baixar o app ---
+const WINDOWS_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+const PHONE_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36';
+
+test.describe('computador', () => {
+  test.use({ viewport: { width: 1280, height: 720 }, userAgent: WINDOWS_UA });
+
+  test('a imagem fica à esquerda e as ações à direita; criar, entrar e baixar estão à vista', async ({ page }) => {
+    await page.goto('/');
+    const art = page.getByRole('img', { name: /Singalong: karaokê com a TV/ });
+    await expect(art).toBeVisible();
+    expect(await art.evaluate((img) => img.complete && img.naturalWidth > 0)).toBe(true); // a imagem carregou
+    const artBox = await art.boundingBox();
+    const panelBox = await page.getByRole('heading', { name: 'Criar uma sala' }).boundingBox();
+    expect(artBox.x + artBox.width).toBeLessThanOrEqual(panelBox.x + 1); // a imagem termina antes de o painel começar
+    await expect(page.getByRole('button', { name: 'Criar sala e abrir a TV' })).toBeVisible();
+    await expect(page.getByLabel('Código da sala')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Baixar o app para Windows (v1.2.3)' })).toBeVisible();
+  });
+
+  test('o botão de baixar abre o endereço configurado numa nova aba', async ({ page }) => {
+    await page.goto('/');
+    const link = page.getByRole('link', { name: /Baixar o app para Windows/ });
+    await expect(link).toHaveAttribute('href', 'https://example.test/releases/latest');
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', /noopener/);
+  });
+
+  test('sem endereço de download configurado, o bloco do app não aparece', async ({ page }) => {
+    await page.route('**/api/config', (route) => route.fulfill({ json: { public_url: null, app_download_url: null, app_latest_version: null } }));
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Criar sala e abrir a TV' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Baixar o app' })).toHaveCount(0);
+  });
+
+  test('sem a versão, o botão não mostra o número', async ({ page }) => {
+    await page.route('**/api/config', (route) => route.fulfill({ json: { public_url: null, app_download_url: 'https://example.test/x', app_latest_version: null } }));
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Baixar o app para Windows', exact: true })).toBeVisible();
+  });
+});
+
+test.describe('celular', () => {
+  test.use({ viewport: { width: 390, height: 844 }, userAgent: PHONE_UA });
+
+  test('a imagem vai em cima e as ações embaixo; no celular o app é explicado em vez de baixado', async ({ page }) => {
+    await page.goto('/');
+    const art = await page.getByRole('img', { name: /Singalong: karaokê com a TV/ }).boundingBox();
+    const create = await page.getByRole('heading', { name: 'Criar uma sala' }).boundingBox();
+    expect(art.y + art.height).toBeLessThanOrEqual(create.y + 1);
+    expect(art.width).toBeLessThanOrEqual(390);
+    await expect(page.getByText('O app é para computadores com Windows')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Baixar o app para Windows/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Ver a página de downloads' })).toHaveAttribute('href', 'https://example.test/releases/latest');
+    // nada transborda para os lados
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+});
+
+test('a página inicial muda de idioma, inclusive o bloco do app', async ({ browser }) => {
+  const context = await browser.newContext({ locale: 'en-US', userAgent: WINDOWS_UA, viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Download the app' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Download the app for Windows (v1.2.3)' })).toBeVisible();
+  await expect(page.getByRole('img', { name: /karaoke with the TV/ })).toBeVisible();
+  await context.close();
+});
