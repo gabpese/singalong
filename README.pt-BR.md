@@ -6,6 +6,22 @@ Karaokê próprio e colaborativo: pesquise uma música no YouTube e o Singalong 
 
 Documentação: [PRD](PRD.pt-BR.md) (requisitos do produto), [TRD](TRD.pt-BR.md) (requisitos técnicos e a proposta do instalador/agente) e [PLAN](PLAN.pt-BR.md) (decisões e histórico). Cada um tem também a versão em inglês.
 
+## Download
+
+O app do Windows (instalador `singalong_karaoke.exe`) está na [versão mais recente](https://github.com/gabpese/singalong/releases/latest). É gratuito e de código aberto (MIT).
+
+## Política de assinatura de código (Code signing policy)
+
+A assinatura gratuita do instalador do Windows é fornecida pela [SignPath.io](https://signpath.io), com o certificado emitido pela [SignPath Foundation](https://signpath.org). Versões geradas antes da concessão do certificado não têm assinatura.
+
+- **Autores, revisores e aprovadores:** [@gabpese](https://github.com/gabpese) (único mantenedor). Cada versão é gerada pelo [GitHub Actions](.github/workflows/ci.yml) a partir deste repositório e cada pedido de assinatura é aprovado manualmente.
+- **O que é assinado:** só os binários gerados a partir deste repositório (o app, o instalador e o desinstalador). Componentes de terceiros, como o Electron, mantêm as próprias assinaturas.
+- **Autenticação em dois fatores** é obrigatória nas contas do mantenedor no GitHub e na SignPath.
+
+## Privacidade
+
+O app e o servidor não enviam dados aos autores do projeto nem a terceiros. O app só conversa com o servidor do Singalong que você configurou (o seu, ou o que o convidou), e o servidor roda na sua própria máquina. A busca de músicas usa o YouTube a partir desse servidor, com os seus cookies, como descrito abaixo.
+
 ## Como rodar
 
 Pré-requisitos: Docker (com NVIDIA Container Toolkit para GPU) e `secrets/youtube_cookies.txt` com os cookies
