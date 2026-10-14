@@ -132,16 +132,14 @@ test('sala com os botões de reação', async ({ page, request }) => {
   expect(await violations(page)).toEqual([]);
 });
 
-test('página inicial no Mac, com a pergunta e o botão do Apple Silicon', async ({ browser }) => {
+test('página inicial no Mac, com o botão do Apple Silicon e a dica do Intel aberta', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15' });
   const page = await context.newPage();
   await page.goto('/');
-  await expect(page.getByText('Qual é o seu Mac?')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Baixar para macOS (Apple Silicon)' })).toBeVisible();
   expect(await violations(page)).toEqual([]);
-  await page.getByRole('button', { name: 'Apple Silicon (M1 ou mais novo)' }).click();
-  await expect(page.getByRole('link', { name: /Baixar para macOS/ })).toBeVisible();
-  expect(await violations(page)).toEqual([]);
-  await page.getByRole('button', { name: 'Intel' }).click();
+  await page.getByRole('button', { name: 'Sobre o Mac Intel' }).click(); // a dica aberta também passa no axe (contraste, nome, descrição)
+  await expect(page.getByRole('tooltip')).toBeVisible();
   expect(await violations(page)).toEqual([]);
   await context.close();
 });

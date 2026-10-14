@@ -31,78 +31,65 @@ const NO_CONFIG: HomeConfig = { app_download_url: null, app_latest_version: null
 
 const systemName = (system: System) => t(`home.system.${system}`);
 
-/** Um botão de baixar o instalador de um sistema (abre numa aba nova; o arquivo vem do GitHub, não daqui). */
-function DownloadButton({ item, version }: { item: Download; version: string | null }) {
-  const system = systemName(item.system);
+/** Uma dica ao lado de um botão: abre com o mouse em cima, com o foco do teclado ou com um toque (no celular não existe "mouse em cima"). */
+function InfoTip({ id, label, text }: { id: string; label: string; text: string }) {
+  const [open, setOpen] = useState(false);
   return (
-    <a className="button" href={item.url} target="_blank" rel="noopener noreferrer">
-      {version ? t('home.download.buttonForVersion', { system, version }) : t('home.download.buttonFor', { system })}
-    </a>
+    <span className="info-tip" onMouseLeave={() => setOpen(false)}>
+      <button
+        type="button"
+        className="info-tip-btn"
+        aria-label={label}
+        aria-describedby={id}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(event) => event.key === 'Escape' && setOpen(false)}
+        onBlur={() => setOpen(false)}
+      >
+        i
+      </button>
+      <span id={id} role="tooltip" className={`info-tip-text${open ? ' open' : ''}`}>
+        {text}
+      </span>
+    </span>
   );
 }
 
-/**
- * O Mac não diz se é Intel ou Apple Silicon (o navegador sempre se apresenta como Intel): a pessoa responde. O app só existe para Apple Silicon;
- * quem tem Mac Intel recebe a explicação em vez de um arquivo que não abre.
- */
-function MacChoice({ item, version }: { item: Download | undefined; version: string | null }) {
-  const [chip, setChip] = useState<'silicon' | 'intel' | null>(null);
+/** O botão de baixar o instalador de um sistema (abre numa aba nova; o arquivo vem do GitHub, não daqui). O Mac leva a dica do Intel ao lado. */
+function DownloadButton({ item }: { item: Download }) {
   return (
-    <div className="mac-choice">
-      <p id="mac-ask" className="hint">
-        {t('home.download.macAsk')}
-      </p>
-      <div className="row" role="group" aria-labelledby="mac-ask">
-        <button type="button" className={chip === 'silicon' ? 'primary' : undefined} aria-pressed={chip === 'silicon'} onClick={() => setChip('silicon')}>
-          {t('home.download.macSilicon')}
-        </button>
-        <button type="button" className={chip === 'intel' ? 'primary' : undefined} aria-pressed={chip === 'intel'} onClick={() => setChip('intel')}>
-          {t('home.download.macIntel')}
-        </button>
-      </div>
-      {chip === 'silicon' && item && (
-        <>
-          <DownloadButton item={item} version={version} />
-          <p className="hint">{t('home.download.macNote')}</p>
-        </>
-      )}
-      {chip === 'intel' && <p className="hint">{t('home.download.macIntelNo')}</p>}
+    <div className="download-row">
+      <a className="button" href={item.url} target="_blank" rel="noopener noreferrer">
+        {t('home.download.buttonFor', { system: t(`home.system.${item.system}`) })}
+      </a>
+      {item.system === 'macos' && <InfoTip id="mac-tip" label={t('home.download.macTipLabel')} text={t('home.download.macIntelNo')} />}
     </div>
   );
 }
 
 /**
- * O bloco do app: o botão do sistema do visitante (no Mac, antes a pergunta "qual é o seu Mac?"), a lista dos outros sistemas, sempre à
- * vista, e a página com todas as versões. Celular e tablet recebem a explicação. Sem endereço configurado, nada aparece.
+ * O bloco do app: um botão por sistema, o do visitante primeiro (detectado pelo navegador) e os outros logo abaixo, sempre à vista. O botão do Mac
+ * tem ao lado a dica de que Macs Intel não são suportados (o navegador não distingue Intel de Apple Silicon). Celular e tablet recebem também a
+ * explicação. Sem endereço configurado, nada aparece.
  */
 function DownloadApp({ config }: { config: HomeConfig }) {
   if (!config.app_downloads.length) return null;
   const system = detectSystem(navigator.userAgent);
-  const version = config.app_latest_version;
-  const of = (name: System) => config.app_downloads.find((item) => item.system === name);
   const detected = system === 'windows' || system === 'macos' || system === 'linux' ? system : null;
+  const primary = config.app_downloads.find((item) => item.system === detected);
   const others = config.app_downloads.filter((item) => item.system !== detected);
-  const primary = detected && detected !== 'macos' ? of(detected) : undefined;
   return (
     <section className="card download-card" aria-labelledby="download-title">
       <h2 id="download-title">{t('home.download.title')}</h2>
       <p className="hint">{t('home.download.hint')}</p>
-      {primary && <DownloadButton item={primary} version={version} />}
-      {primary?.system === 'linux' && <p className="hint">{t('home.download.linuxNote')}</p>}
-      {detected === 'macos' && <MacChoice item={of('macos')} version={version} />}
+      {primary && <DownloadButton item={primary} />}
+      {detected === 'macos' && <p className="hint">{t('home.download.macNote')}</p>}
+      {detected === 'linux' && <p className="hint">{t('home.download.linuxNote')}</p>}
       {!detected && <p className="hint">{t('home.download.computerOnly')}</p>}
-      <h3 className="download-others">{t('home.download.others')}</h3>
-      <ul className="download-list">
-        {others.map((item) => (
-          <li key={item.system}>
-            <a href={item.url} target="_blank" rel="noopener noreferrer">
-              {systemName(item.system)}
-            </a>
-            <span className="muted small"> · {item.file}</span>
-          </li>
-        ))}
-      </ul>
-      {others.some((item) => item.system === 'macos') && <p className="hint small">{t('home.download.macIntelNo')}</p>}
+      {detected && <h3 className="download-others">{t('home.download.others')}</h3>}
+      {others.map((item) => (
+        <DownloadButton key={item.system} item={item} />
+      ))}
       {config.app_page_url && (
         <a className="download-more" href={config.app_page_url} target="_blank" rel="noopener noreferrer">
           {t('home.download.page')}
