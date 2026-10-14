@@ -106,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest] # o instalador é de Windows: lá roda o tar.exe de verdade
+        os: [ubuntu-latest, windows-latest, macos-latest] # o instalador é de Windows: lá roda o tar.exe de verdade; macos-latest é Apple Silicon
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -118,11 +118,15 @@ jobs:
           node-version: 24
       - run: npm test
 
-  # a prova do motor do Linux com tudo de verdade: baixa os componentes oficiais (confere o SHA-256 de cada um), instala o torch de CPU
+  # a prova do motor com tudo de verdade: baixa os componentes oficiais (confere o SHA-256 de cada um), instala o torch de CPU
   # e os pacotes, e roda a verificação (ffmpeg com os filtros do karaokê, deno, python e todas as bibliotecas)
-  engine-linux:
-    name: Motor real no Linux (baixa e monta, em CPU)
-    runs-on: ubuntu-latest
+  engine-real:
+    name: Motor real (baixa e monta, em CPU, no ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest] # macos-latest é Apple Silicon (arm64)
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -139,7 +143,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     defaults:

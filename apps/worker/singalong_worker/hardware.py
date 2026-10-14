@@ -79,6 +79,8 @@ def choose_engine(gpus: list[dict], force_cpu: bool = False) -> dict:
     o teste de verdade (`gpu_selftest`) confirma depois de instalar e pode devolver para a CPU."""
     if force_cpu:
         return {"engine": "cpu", "reason": "CPU forçada nas configurações", "gpu": None}
+    if not gpus and platform.system() == "Darwin":
+        return {"engine": "cpu", "reason": "macOS: o motor roda na CPU por enquanto (a GPU da Apple fica para uma versão futura)", "gpu": None}
     if not gpus:
         return {"engine": "cpu", "reason": "nenhuma placa NVIDIA com driver encontrada", "gpu": None}
     gpu = max(gpus, key=lambda g: g["vram_mb"])

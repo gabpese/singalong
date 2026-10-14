@@ -26,6 +26,14 @@ class ChooseEngineTests(unittest.TestCase):
     def test_no_gpu_is_cpu(self):
         self.assertEqual(hardware.choose_engine([])["engine"], "cpu")
 
+    def test_macos_runs_on_the_cpu_for_now_and_says_so(self):
+        with mock.patch.object(hardware.platform, "system", return_value="Darwin"):
+            decision = hardware.choose_engine([])
+        self.assertEqual(decision["engine"], "cpu")
+        self.assertIn("macOS", decision["reason"])
+        with mock.patch.object(hardware.platform, "system", return_value="Linux"):
+            self.assertIn("nenhuma placa NVIDIA", hardware.choose_engine([])["reason"])  # fora do Mac a mensagem continua a de sempre
+
     def test_old_driver_is_cpu_and_says_to_update(self):
         decision = hardware.choose_engine([gpu(driver="470.99")])
         self.assertEqual(decision["engine"], "cpu")

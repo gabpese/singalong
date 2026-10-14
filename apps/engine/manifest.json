@@ -97,6 +97,58 @@
           ]
         }
       }
+    },
+    "darwin-arm64": {
+      "components": {
+        "python": {
+          "version": "3.11.17",
+          "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.11.17%2B20261009-aarch64-apple-darwin-install_only.tar.gz",
+          "sha256": "7b6068989d9b6a0e2a883352b7d0d141ce8670a61360bf4ddabac0e046a08e10",
+          "extract": "tar",
+          "files": [
+            {
+              "from": "python",
+              "to": "python"
+            }
+          ]
+        },
+        "ffmpeg": {
+          "version": "9.0.2 (GPL, martin-riedl.de; sem rubberband)",
+          "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip",
+          "sha256": "c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924",
+          "extract": "zip",
+          "files": [
+            {
+              "from": "ffmpeg",
+              "to": "bin/ffmpeg"
+            }
+          ]
+        },
+        "ffprobe": {
+          "version": "9.0.2",
+          "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffprobe.zip",
+          "sha256": "fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6",
+          "extract": "zip",
+          "files": [
+            {
+              "from": "ffprobe",
+              "to": "bin/ffprobe"
+            }
+          ]
+        },
+        "deno": {
+          "version": "2.9.7",
+          "url": "https://github.com/denoland/deno/releases/download/v2.9.7/deno-aarch64-apple-darwin.zip",
+          "sha256": "5cd46d6268f6f78f5d88bdc7159d20bd44cdaa4b3303474839f87ec6fe7ae25c",
+          "extract": "zip",
+          "files": [
+            {
+              "from": "deno",
+              "to": "bin/deno"
+            }
+          ]
+        }
+      }
     }
   },
   "torch": {

@@ -58,7 +58,32 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(output_key("abcdefghijk", 2), "cache/abcdefghijk/karaoke_p+2.mp4")
         self.assertEqual(output_key("abcdefghijk", -3), "cache/abcdefghijk/karaoke_p-3.mp4")
         self.assertEqual(pitch_filter(0), [])
-        self.assertEqual(pitch_filter(12), ["-af", "rubberband=pitch=2.000000"])
+        self.assertEqual(pitch_filter(12, rubberband=True), ["-af", "rubberband=pitch=2.000000"])
+
+    def test_pitch_filter_without_rubberband_uses_asetrate_and_atempo(self):
+        # o ffmpeg do macOS não tem o rubberband: o tom sobe pela taxa de amostragem e o atempo devolve a duração
+        self.assertEqual(pitch_filter(0, rubberband=False), [])
+        self.assertEqual(pitch_filter(12, rubberband=False), ["-af", "aresample=44100,asetrate=88200,aresample=44100,atempo=0.500000"])
+        down = pitch_filter(-12, rubberband=False)[1]
+        self.assertIn("asetrate=22050", down)
+        self.assertIn("atempo=2.000000", down)  # dentro do limite do atempo (0,5 a 100)
+        self.assertTrue(all(0.5 <= 2 ** (-p / 12) <= 2 for p in range(-12, 13)))
+
+    def test_has_rubberband_reads_the_ffmpeg_filter_list_and_assumes_yes_when_it_cannot_run(self):
+        from singalong_worker import export
+        from unittest import mock
+
+        def ran(stdout):
+            return mock.Mock(stdout=stdout)
+
+        for stdout, expected in ((" ... rubberband  A->A  Pitch-shift\n", True), (" ... subtitles  V->V  Render\n", False)):
+            export._rubberband = None
+            with mock.patch.object(export.subprocess, "run", return_value=ran(stdout)):
+                self.assertIs(export.has_rubberband(), expected)
+        export._rubberband = None
+        with mock.patch.object(export.subprocess, "run", side_effect=FileNotFoundError):
+            self.assertIs(export.has_rubberband(), True)
+        export._rubberband = None
 
     def test_ffmpeg_command_escapes_the_subtitle_path(self):
         cmd = ffmpeg_command(Path("C:\\tmp\\lyrics.ass"), Path("a.mp3"), Path("o.mp4"), 0, "T", "A")

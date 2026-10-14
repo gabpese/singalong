@@ -186,9 +186,10 @@ test('o ambiente do worker põe o ffmpeg do motor na frente do PATH só para o p
 
 test('o manifesto de verdade: cada sistema tem Python, ffmpeg e deno com URL https, SHA-256 e arquivos a instalar', async () => {
   const raw = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
-  assert.deepEqual(Object.keys(raw.platforms), ['win32-x64', 'linux-x64']);
+  assert.deepEqual(Object.keys(raw.platforms), ['win32-x64', 'linux-x64', 'darwin-arm64']);
   for (const [platform, { components }] of Object.entries(raw.platforms)) {
-    assert.deepEqual(Object.keys(components), ['python', 'ffmpeg', 'deno'], platform); // o Python vem primeiro (a verificação de hardware usa ele)
+    // o Python vem primeiro (a verificação de hardware usa ele); no macOS o ffprobe é um arquivo à parte
+    assert.deepEqual(Object.keys(components), platform === 'darwin-arm64' ? ['python', 'ffmpeg', 'ffprobe', 'deno'] : ['python', 'ffmpeg', 'deno'], platform);
     for (const [name, c] of Object.entries(components)) {
       assert.match(c.url, /^https:\/\//, `${platform} ${name}`);
       assert.match(c.sha256, /^[0-9a-f]{64}$/, `${platform} ${name}`);
@@ -196,9 +197,13 @@ test('o manifesto de verdade: cada sistema tem Python, ffmpeg e deno com URL htt
     }
     assert.ok(components.python.url.includes('python-build-standalone'), platform);
     assert.ok(components.ffmpeg.version.includes('GPL'), platform);
+    assert.ok(Object.values(components).every((c) => c.files.every((f) => !f.to.endsWith('.exe') || platform === 'win32-x64')), platform); // só o Windows tem .exe
   }
   assert.match(raw.platforms['win32-x64'].components.ffmpeg.url, /win64-gpl/);
   assert.match(raw.platforms['linux-x64'].components.ffmpeg.url, /linux64-gpl/);
+  assert.match(raw.platforms['darwin-arm64'].components.python.url, /aarch64-apple-darwin/);
+  assert.match(raw.platforms['darwin-arm64'].components.ffmpeg.url, /macos\/arm64/);
+  assert.match(raw.platforms['darwin-arm64'].components.deno.url, /aarch64-apple-darwin/);
   assert.deepEqual(raw.platforms['linux-x64'].components.ffmpeg.files.map((f) => f.to), ['bin/ffmpeg', 'bin/ffprobe', 'licenses/ffmpeg-LICENSE.txt']); // sem .exe
   assert.equal(raw.torch.version, '2.5.1'); // o Demucs 4.0.1 quebra com outros
 });

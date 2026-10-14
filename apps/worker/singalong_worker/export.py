@@ -7,6 +7,7 @@ O transporte dos pedidos (Redis ou HTTP) está em backend.py; o contrato com a A
 """
 import json
 import logging
+import re
 import subprocess
 import tempfile
 import threading
@@ -123,9 +124,35 @@ def output_key(video_id: str, pitch: int) -> str:
     return f"cache/{video_id}/karaoke{'' if pitch == 0 else f'_p{pitch:+d}'}.mp4"
 
 
-def pitch_filter(pitch: int) -> list[str]:
-    """Filtro de áudio do ffmpeg para trocar o tom sem mudar a duração (a letra continua no tempo)."""
-    return ["-af", f"rubberband=pitch={2 ** (pitch / 12):.6f}"] if pitch else []
+_rubberband: bool | None = None
+
+
+def has_rubberband() -> bool:
+    """O ffmpeg tem o filtro rubberband (a troca de tom de melhor qualidade)? Os builds do Windows e do Linux têm; os estáticos do
+    macOS não. Se o ffmpeg nem roda aqui, assume que sim (o erro de verdade aparece ao exportar). A resposta é guardada."""
+    global _rubberband
+    if _rubberband is None:
+        try:
+            out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True, timeout=30).stdout
+            _rubberband = bool(re.search(r"\brubberband\b", out))
+        except (OSError, subprocess.SubprocessError):
+            _rubberband = True
+    return _rubberband
+
+
+def pitch_filter(pitch: int, rubberband: bool | None = None) -> list[str]:
+    """Filtro de áudio do ffmpeg para trocar o tom sem mudar a duração (a letra continua no tempo).
+
+    Com o rubberband é o filtro dele; sem ele (ffmpeg do macOS) vale a troca clássica: muda a taxa de amostragem (o tom sobe ou desce
+    junto com a velocidade) e o atempo devolve a velocidade. Fica um pouco menos natural, mas serve para o vídeo do karaokê.
+    """
+    if not pitch:
+        return []
+    factor = 2 ** (pitch / 12)
+    if rubberband if rubberband is not None else has_rubberband():
+        return ["-af", f"rubberband=pitch={factor:.6f}"]
+    # a entrada é normalizada para 44,1 kHz primeiro: o asetrate precisa saber a taxa de origem; o atempo aceita de 0,5 a 100 (±12 semitons cabem)
+    return ["-af", f"aresample=44100,asetrate={round(44100 * factor)},aresample=44100,atempo={1 / factor:.6f}"]
 
 
 def ffmpeg_command(ass: Path, audio: Path, out: Path, pitch: int, title: str, artist: str | None) -> list[str]:

@@ -2,6 +2,7 @@
 // guarda a configuração, monta o motor, pareia, inicia/para o agente (o worker em modo serviço) e roda os comandos dele
 // (criar sala, login do YouTube, importar música, hardware). A janela só mostra o `snapshot()` e chama estes métodos.
 import { execFile, spawn } from 'node:child_process';
+import { homedir } from 'node:os';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { assemble, refreshWorker } from '@singalong/engine/src/assemble.js';
@@ -37,11 +38,25 @@ export function normalizeServer(value) {
 /** O arquivo .desktop do navegador padrão do Linux (xdg-settings) como o nome que o app conhece. */
 const browserFromDesktopFile = (name) => (/chrom|brave|vivaldi/i.test(name) ? 'chrome' : /msedge|microsoft-edge/i.test(name) ? 'edge' : 'auto');
 
-/** O navegador padrão do sistema (o do https): "chrome", "edge" ou "auto" (outro: o worker usa o Chrome/Edge que achar). Windows: pelo registro; Linux: pelo xdg-settings. */
+/** O navegador padrão do sistema (o do https): "chrome", "edge" ou "auto" (outro: o worker usa o Chrome/Edge que achar). Windows: pelo registro; Linux: pelo xdg-settings; macOS: pelos handlers do LaunchServices. */
 export function detectDefaultBrowser(run = execFile, platform = process.platform) {
   return new Promise((resolve) => {
     if (platform === 'linux') {
       run('xdg-settings', ['get', 'default-web-browser'], { timeout: 5000 }, (error, stdout) => resolve(error ? 'auto' : browserFromDesktopFile(String(stdout).trim())));
+      return;
+    }
+    if (platform === 'darwin') {
+      // o navegador padrão do macOS fica nos "handlers" do LaunchServices; sem entrada é o Safari (que não serve para os cookies: automático)
+      const plist = join(homedir(), 'Library', 'Preferences', 'com.apple.LaunchServices', 'com.apple.launchservices.secure.plist');
+      run('plutil', ['-convert', 'json', '-o', '-', plist], { timeout: 5000 }, (error, stdout) => {
+        let bundle = '';
+        try {
+          bundle = error ? '' : (JSON.parse(String(stdout)).LSHandlers ?? []).find((h) => h.LSHandlerURLScheme === 'https')?.LSHandlerRoleAll ?? '';
+        } catch {
+          /* arquivo ilegível: automático */
+        }
+        resolve(/edgemac/i.test(bundle) ? 'edge' : /chrome|brave|vivaldi/i.test(bundle) ? 'chrome' : 'auto');
+      });
       return;
     }
     if (platform !== 'win32') return resolve('auto');

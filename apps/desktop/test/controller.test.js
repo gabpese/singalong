@@ -352,7 +352,22 @@ test('o navegador padrão do Linux vem do xdg-settings; macOS e sistemas sem res
   assert.equal(await detectDefaultBrowser(desktop('microsoft-edge.desktop'), 'linux'), 'edge');
   assert.equal(await detectDefaultBrowser(desktop('firefox.desktop'), 'linux'), 'auto');
   assert.equal(await detectDefaultBrowser(desktop('', new Error('xdg-settings não existe')), 'linux'), 'auto');
-  assert.equal(await detectDefaultBrowser(() => assert.fail('não deve consultar nada'), 'darwin'), 'auto'); // macOS: M2
+  assert.equal(await detectDefaultBrowser(() => assert.fail('não deve consultar nada'), 'freebsd'), 'auto'); // sistema sem suporte
+});
+
+test('o navegador padrão do macOS vem dos handlers do LaunchServices (Chrome, Edge ou outro = automático)', async () => {
+  const handlers = (bundle) => (command, args, options, callback) => {
+    assert.equal(command, 'plutil');
+    assert.deepEqual(args.slice(0, 4), ['-convert', 'json', '-o', '-']);
+    callback(null, JSON.stringify({ LSHandlers: [{ LSHandlerURLScheme: 'mailto', LSHandlerRoleAll: 'com.apple.mail' }, ...(bundle ? [{ LSHandlerURLScheme: 'https', LSHandlerRoleAll: bundle }] : [])] }));
+  };
+  assert.equal(await detectDefaultBrowser(handlers('com.google.chrome'), 'darwin'), 'chrome');
+  assert.equal(await detectDefaultBrowser(handlers('com.brave.browser'), 'darwin'), 'chrome');
+  assert.equal(await detectDefaultBrowser(handlers('com.microsoft.edgemac'), 'darwin'), 'edge');
+  assert.equal(await detectDefaultBrowser(handlers('com.apple.safari'), 'darwin'), 'auto');
+  assert.equal(await detectDefaultBrowser(handlers(''), 'darwin'), 'auto'); // sem escolha feita: Safari
+  assert.equal(await detectDefaultBrowser((command, args, options, callback) => callback(new Error('sem arquivo'), ''), 'darwin'), 'auto');
+  assert.equal(await detectDefaultBrowser((command, args, options, callback) => callback(null, 'não é json'), 'darwin'), 'auto');
 });
 
 test('o login do YouTube usa o navegador padrão e não deixa escolher outro', async () => {
