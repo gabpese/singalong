@@ -213,7 +213,28 @@ npm run dist                         # gera dist\singalong_karaoke.exe (+ latest
 dist\singalong_karaoke.exe           # instala só para o seu usuário; o SmartScreen do Windows pode avisar: "Mais informações" > "Executar assim mesmo"
 ```
 
-Para publicar uma atualização: suba a versão em `apps/desktop/package.json`, `apps/desktop/src/controller.js` e `apps/worker/singalong_worker/version.py` (um teste confere que são iguais), rode `npm run dist`, ponha `singalong_karaoke.exe` e `latest.yml` numa pasta **privada** e defina no servidor `APP_LATEST_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` (o endereço dessa pasta). Todo app instalado passa a mostrar "Atualizar agora". Dá para usar uma **Release do GitHub** como essa pasta: anexe `singalong_karaoke.exe` e `latest.yml` à release e defina `APP_DOWNLOAD_URL=https://github.com/<dono>/<repositório>/releases/latest/download/` (atenção: as Releases de um repositório público são públicas, então qualquer pessoa pode baixar o instalador). `node scripts/test-update.mjs <instalado.exe> <pasta-da-versao-nova> <pasta-de-dados>` testa tudo isso num computador.
+Para publicar uma atualização (**a versão e a mensagem também podem ser publicadas na página do administrador**, sem editar o `.env` nem fazer deploy): suba a versão em `apps/desktop/package.json`, `apps/desktop/src/controller.js` e `apps/worker/singalong_worker/version.py` (um teste confere que são iguais), rode `npm run dist`, ponha `singalong_karaoke.exe` e `latest.yml` numa pasta **privada** e defina no servidor `APP_LATEST_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` (o endereço dessa pasta). Todo app instalado passa a mostrar "Atualizar agora". Dá para usar uma **Release do GitHub** como essa pasta: anexe `singalong_karaoke.exe` e `latest.yml` à release e defina `APP_DOWNLOAD_URL=https://github.com/<dono>/<repositório>/releases/latest/download/` (atenção: as Releases de um repositório público são públicas, então qualquer pessoa pode baixar o instalador). `node scripts/test-update.mjs <instalado.exe> <pasta-da-versao-nova> <pasta-de-dados>` testa tudo isso num computador.
+
+#### Assinar o instalador (code signing)
+
+O instalador sai **sem assinatura** por padrão. Com um certificado ele sai assinado (instalador, desinstalador e programa) e com carimbo de hora (a assinatura sobrevive ao vencimento do certificado):
+
+```powershell
+$env:CSC_LINK = "C:\certs\singalong.pfx"      # o arquivo .pfx (ou o conteúdo em base64)
+$env:CSC_KEY_PASSWORD = "a-senha"
+$env:SINGALONG_REQUIRE_SIGNING = "1"            # opcional: o build FALHA se não conseguir assinar
+cd apps\desktop; npm run dist                   # termina conferindo a assinatura dos arquivos gerados
+node scripts\verify-signature.mjs dist\singalong_karaoke.exe --trusted   # mostra quem assinou e se o Windows confia
+```
+
+Outros caminhos (`apps/desktop/scripts/signing.mjs`): **Azure Trusted Signing** (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` e `SINGALONG_AZURE_ENDPOINT`, `SINGALONG_AZURE_ACCOUNT`, `SINGALONG_AZURE_PROFILE`, `SINGALONG_PUBLISHER`), em que a chave fica na nuvem da Microsoft. No CI, o job `installer` usa os segredos `WINDOWS_CERT_PFX_BASE64` e `WINDOWS_CERT_PASSWORD` (e a variável `WINDOWS_PUBLISHER`) quando existem; sem eles, assina com um **certificado de teste descartável**, só para provar que o caminho da assinatura funciona (o Windows não confia nele).
+
+**Onde conseguir um certificado** (nada disso foi comprado nem solicitado ainda):
+- **SignPath Foundation:** grátis para projetos de código aberto (este repositório é público e MIT); a chave fica com eles e a assinatura é pedida a partir do GitHub Actions. O nome do assinante é "SignPath Foundation". Exige um cadastro e um passo de assinatura no workflow (ainda não ligado: ele envia o arquivo ao serviço deles em vez de usar o `CSC_LINK`).
+- **Azure Trusted Signing:** mensalidade baixa, a chave na nuvem, sem token; exige validação de identidade e depende do país do titular. Já é suportado pelo build (variáveis acima).
+- **Certificado comercial OV/EV** (algumas centenas de dólares por ano): desde 2023 a chave privada precisa ficar num token físico ou num HSM na nuvem, então não vira um `.pfx` para o CI; a ferramenta de assinatura na nuvem do fornecedor precisa ser chamada pelo build (um gancho do `electron-builder`, ainda não ligado).
+
+Limites honestos: assinar mostra **quem publicou** o instalador em vez de "editor desconhecido", mas o **SmartScreen pode continuar avisando** até o arquivo assinado ganhar reputação. A atualização automática confere que o instalador novo foi assinado pelo **mesmo nome de publicador** do instalado (`SINGALONG_PUBLISHER`, ou o nome comum do certificado): ao trocar de certificado, mantenha esse nome ou publique uma versão de transição assinada pelos dois.
 
 ### CLI do worker (sem API, para testes)
 

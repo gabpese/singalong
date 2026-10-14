@@ -208,7 +208,28 @@ npm run dist                         # builds dist\singalong_karaoke.exe (+ late
 dist\singalong_karaoke.exe           # installs for your user only; Windows' SmartScreen may warn: "More info" > "Run anyway"
 ```
 
-To publish an update: raise the version in `apps/desktop/package.json`, `apps/desktop/src/controller.js` and `apps/worker/singalong_worker/version.py` (a test checks they match), run `npm run dist`, put `singalong_karaoke.exe` and `latest.yml` in a **private** folder and set on the server `APP_LATEST_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` (that folder's address). Every installed app then shows "Update now". Using a **GitHub Release** as that folder works: attach `singalong_karaoke.exe` and `latest.yml` to the release and set `APP_DOWNLOAD_URL=https://github.com/<owner>/<repo>/releases/latest/download/` (note: the Releases of a public repository are public, so anyone can download the installer). `node scripts/test-update.mjs <installed.exe> <new-version-folder> <data-folder>` tests the whole thing on a computer.
+To publish an update (**the version and the message can also be published on the administrator page**, no `.env` edit and no deploy): raise the version in `apps/desktop/package.json`, `apps/desktop/src/controller.js` and `apps/worker/singalong_worker/version.py` (a test checks they match), run `npm run dist`, put `singalong_karaoke.exe` and `latest.yml` in a **private** folder and set on the server `APP_LATEST_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` (that folder's address). Every installed app then shows "Update now". Using a **GitHub Release** as that folder works: attach `singalong_karaoke.exe` and `latest.yml` to the release and set `APP_DOWNLOAD_URL=https://github.com/<owner>/<repo>/releases/latest/download/` (note: the Releases of a public repository are public, so anyone can download the installer). `node scripts/test-update.mjs <installed.exe> <new-version-folder> <data-folder>` tests the whole thing on a computer.
+
+#### Signing the installer (code signing)
+
+The installer is built **unsigned** by default. With a certificate it comes out signed (installer, uninstaller and program) and time-stamped (the signature outlives the certificate):
+
+```powershell
+$env:CSC_LINK = "C:\certs\singalong.pfx"      # the .pfx file (or its base64)
+$env:CSC_KEY_PASSWORD = "the-password"
+$env:SINGALONG_REQUIRE_SIGNING = "1"            # optional: the build FAILS if it cannot sign
+cd apps\desktop; npm run dist                   # ends by checking the signature of the generated files
+node scripts\verify-signature.mjs dist\singalong_karaoke.exe --trusted   # shows who signed it and whether Windows trusts it
+```
+
+Other ways (`apps/desktop/scripts/signing.mjs`): **Azure Trusted Signing** (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` and `SINGALONG_AZURE_ENDPOINT`, `SINGALONG_AZURE_ACCOUNT`, `SINGALONG_AZURE_PROFILE`, `SINGALONG_PUBLISHER`), where the key stays in Microsoft's cloud. In CI the `installer` job uses the secrets `WINDOWS_CERT_PFX_BASE64` and `WINDOWS_CERT_PASSWORD` (and the variable `WINDOWS_PUBLISHER`) when they exist; without them it signs with a **throwaway test certificate**, only to prove that the signing path works (Windows does not trust it).
+
+**Where to get a certificate** (nothing here is bought or applied for yet):
+- **SignPath Foundation:** free for open-source projects (this repository is public and MIT); the key stays with them and signing is requested from GitHub Actions. The signer name is "SignPath Foundation". It needs an application and a signing step in the workflow (not wired yet: it submits the file to their service instead of using `CSC_LINK`).
+- **Azure Trusted Signing:** a low monthly fee, the key in the cloud, no token; it needs an identity validation and depends on the country of the owner. Already supported by the build (variables above).
+- **A commercial OV/EV certificate** (a few hundred dollars a year): since 2023 the private key must live on a hardware token or a cloud HSM, so it does not become a `.pfx` for CI; the vendor's cloud signing tool has to be called from the build (a hook of `electron-builder`, not wired yet).
+
+Honest limits: signing shows **who published** the installer instead of "unknown publisher", but **SmartScreen can keep warning** until the signed file builds reputation. The auto-update checks that the new installer was signed by the **same publisher name** as the installed one (`SINGALONG_PUBLISHER`, or the certificate's common name): when changing certificate keep that name or release one transition version signed by both.
 
 ### Worker CLI (no API, for testing)
 
