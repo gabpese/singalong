@@ -312,12 +312,10 @@ body.tv { overflow: hidden; height: 100vh; }
 .tv-join p { margin: 0; color: var(--dim); font-size: clamp(.8rem, 1.2vw, 1.05rem); }
 .tv-join strong { color: var(--accent); letter-spacing: .12em; }
 .tv-join[hidden] { display: none; }
-.tv-queue { flex: 0 1 auto; min-height: 0; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
+.tv-queue { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); flex: 0 1 auto; min-height: 0; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
 .tv-queue[hidden] { display: none; }
 .tv-queue h2 { margin: 0 0 10px; color: var(--dim); font-size: clamp(.8rem, 1.1vw, 1rem); text-transform: uppercase; letter-spacing: .12em; font-weight: 600; }
 .tv-queue ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-/* o que não cabe some aos poucos em vez de passar por cima do resto */
-.tv-queue { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); }
 .tv-queue li { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); min-width: 0; }
 .tv-queue li.is-current { background: color-mix(in srgb, var(--accent) 16%, var(--bg-2)); box-shadow: inset 3px 0 0 var(--accent); }
 .tv-queue .mark { flex: 0 0 auto; width: 1.9em; height: 1.9em; display: grid; place-items: center; border-radius: 50%; background: var(--panel-2); color: var(--dim); font-size: clamp(.8rem, 1.2vw, 1.1rem); font-variant-numeric: tabular-nums; }
