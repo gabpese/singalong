@@ -1,6 +1,7 @@
 // Nível das vozes de apoio (backing vocals) de uma música da fila, de 0 a 100 %. Só aparece nas músicas que têm o arquivo
 // de apoio; quem escolheu a música (ou o anfitrião) arrasta, os demais só veem o valor.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
 import type { QueueItem } from '../lib/types';
 import { useRoom } from './context';
 
@@ -39,11 +40,11 @@ export function BackingControl({ item }: { item: QueueItem }) {
   const level = drag ?? pending ?? item.backing;
 
   if (!editable) {
-    return item.backing > 0 ? <span className="muted small">{`Vozes de apoio ${item.backing}%`}</span> : null;
+    return item.backing > 0 ? <span className="muted small">{t('backing.static', { n: item.backing })}</span> : null;
   }
   return (
     <div className="backing-row">
-      <span className="muted small">Vozes de apoio</span>
+      <span className="muted small">{t('backing.label')}</span>
       <input
         ref={slider}
         type="range"
@@ -52,7 +53,7 @@ export function BackingControl({ item }: { item: QueueItem }) {
         max={100}
         step={5}
         value={level}
-        aria-label="Nível das vozes de apoio"
+        aria-label={t('backing.aria')}
         aria-valuetext={`${level}%`}
         style={{ '--fill': `${level}%` } as CSSProperties}
         onChange={(event) => setDrag(Number(event.target.value))}

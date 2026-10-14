@@ -1,22 +1,7 @@
 // Tom da música como a pessoa lê: só a nota ("Lá (A)"), sem maior/menor, e quanto muda ao transpor.
 // `key` vem do worker: { tonic: 0..11 (0 = Dó), mode, margin?, alt? }. O modo não é mostrado: ao subir ou descer o tom
 // ele não muda, e a nota é o que a pessoa precisa para escolher em que tom cantar.
-
-// notas com a grafia dos dois nomes quando têm acidente (a mesma tecla pode ser sustenido ou bemol)
-const NOTES = [
-  'Dó (C)',
-  'Dó♯ / Ré♭ (C#/Db)',
-  'Ré (D)',
-  'Ré♯ / Mi♭ (D#/Eb)',
-  'Mi (E)',
-  'Fá (F)',
-  'Fá♯ / Sol♭ (F#/Gb)',
-  'Sol (G)',
-  'Sol♯ / Lá♭ (G#/Ab)',
-  'Lá (A)',
-  'Lá♯ / Si♭ (A#/Bb)',
-  'Si (B)',
-];
+import { t } from '../i18n/index.js';
 
 /**
  * Margem (correlação da 1ª tonalidade menos a da 2ª) abaixo da qual não dá para ter certeza (ex.: Dó maior x Lá menor,
@@ -29,7 +14,7 @@ const wrap = (tonic) => ((tonic % 12) + 12) % 12;
 
 /** A nota do tom: "Lá (A)", "Dó♯ / Ré♭ (C#/Db)". */
 export function keyLabel(key) {
-  return key ? NOTES[wrap(key.tonic)] : '';
+  return key ? t(`note.${wrap(key.tonic)}`) : '';
 }
 
 /** O mesmo tom subido/descido `semitones` semitons (a nota que a pessoa realmente canta). */
@@ -51,7 +36,7 @@ export function isUncertain(key) {
 
 /** "Lá (A)" ou, quando a estimativa é incerta, "Fá (F) ou Ré (D)". */
 function keyOptions(key) {
-  return isUncertain(key) && key.alt ? `${keyLabel(key)} ou ${keyLabel(key.alt)}` : keyLabel(key);
+  return isUncertain(key) && key.alt ? t('key.or', { a: keyLabel(key), b: keyLabel(key.alt) }) : keyLabel(key);
 }
 
 /**
@@ -60,7 +45,7 @@ function keyOptions(key) {
  */
 export function keySummary(key, pitch = 0) {
   if (!key) return '';
-  const original = `${isUncertain(key) ? 'Tom provável' : 'Tom'}: ${keyOptions(key)}`;
+  const original = t(isUncertain(key) ? 'key.likely' : 'key.original', { notes: keyOptions(key) });
   if (!pitch) return original;
-  return `${original} → ${keyOptions(transposeKey(key, pitch))} com ${pitch > 0 ? '+' : ''}${pitch}`;
+  return t('key.shifted', { original, notes: keyOptions(transposeKey(key, pitch)), shift: `${pitch > 0 ? '+' : ''}${pitch}` });
 }

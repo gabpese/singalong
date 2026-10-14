@@ -1,6 +1,7 @@
 // Prévia do instrumental no celular, com troca de tom. Usa a versão do SoundTouch baseada em ScriptProcessor porque,
 // ao contrário do AudioWorklet, ela funciona em páginas http por IP (o celular entra na sala por http://192.168...).
 // Custo: decodifica a música inteira na memória (alguns MB) e processa na thread principal. Serve bem para ouvir uma prévia.
+import { t } from '../i18n/index.js';
 import { PitchShifter } from '../vendor/soundtouch-legacy/soundtouch.js';
 import { clampPitch } from './lyrics-sync.js';
 
@@ -43,7 +44,7 @@ export function createPreviewPlayer({ onEnded } = {}) {
       const audioCtx = context();
       await audioCtx.resume();
       const response = await fetch(url);
-      if (!response.ok) throw new Error(`Não consegui baixar a música (${response.status}).`);
+      if (!response.ok) throw new Error(t('preview.downloadFail', { status: response.status }));
       const buffer = await audioCtx.decodeAudioData(await response.arrayBuffer());
       if (mine !== token) return false; // outra prévia foi pedida enquanto esta baixava
       shifter = new PitchShifter(audioCtx, buffer, 4096, () => {

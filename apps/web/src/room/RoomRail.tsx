@@ -1,5 +1,6 @@
 // A barra lateral da sala: os atalhos e os ajustes do anfitrião sempre à vista, só com ícones (o texto fica no tooltip e no
 // nome acessível). Em telas largas é uma coluna à esquerda; no celular vira uma faixa logo abaixo do topo.
+import { t } from '../i18n/index.js';
 import { type ReactNode, useState } from 'react';
 import { hostToken } from '../lib/identity.js';
 import type { RoomState } from '../lib/types';
@@ -49,9 +50,9 @@ function Item({ children }: { children: ReactNode }) {
 
 export function RoomRail({ state }: { state: RoomState | null }) {
   const { code, isHost, toast } = useRoom();
-  const scoring = useHostField('scoring', Boolean(state?.scoring), ['Pontuação ligada.', 'Pontuação desligada.']);
-  const voice = useHostField('voice', Boolean(state?.voice), ['Voz nas caixas ligada.', 'Voz nas caixas desligada.']);
-  const fair = useHostField('fair', Boolean(state?.fair), ['Rodízio justo ligado.', 'Rodízio justo desligado.']);
+  const scoring = useHostField('scoring', Boolean(state?.scoring), [t('rail.scoringOn'), t('rail.scoringOff')]);
+  const voice = useHostField('voice', Boolean(state?.voice), [t('rail.voiceOn'), t('rail.voiceOff')]);
+  const fair = useHostField('fair', Boolean(state?.fair), [t('rail.fairOn'), t('rail.fairOff')]);
   const [asking, setAsking] = useState(false);
 
   async function copyText(text: string, okMessage: string) {
@@ -74,31 +75,31 @@ export function RoomRail({ state }: { state: RoomState | null }) {
       box.remove();
     }
     if (copied) toast(okMessage);
-    else window.prompt('Copie o link:', text);
+    else window.prompt(t('rail.prompt'), text);
   }
 
   return (
-    <aside className="room-rail" aria-label="Atalhos e ajustes da sala">
+    <aside className="room-rail" aria-label={t('rail.aria')}>
       <Item>
         <RailButton
           icon="link"
-          label="Copiar link da sala"
-          tip="Copiar o link da sala (quem abrir entra como convidado)"
-          onClick={() => void copyText(`${location.origin}/room.html?room=${code}`, 'Link da sala copiado!')}
+          label={t('rail.copyRoom')}
+          tip={t('rail.copyRoomTip')}
+          onClick={() => void copyText(`${location.origin}/room.html?room=${code}`, t('rail.copiedRoom'))}
         />
       </Item>
       {isHost && !insideOwnerApp && (
         <Item>
-          <RailButton icon="display" label="Abrir TV" tip="Abrir a TV da sala em outra aba" onClick={() => window.open(`tv.html?room=${code}`, '_blank')} />
+          <RailButton icon="display" label={t('rail.openTv')} tip={t('rail.openTvTip')} onClick={() => window.open(`tv.html?room=${code}`, '_blank')} />
         </Item>
       )}
       {isHost && (
         <Item>
           <RailButton
             icon="host"
-            label="Copiar link de anfitrião"
-            tip="Copiar o link de anfitrião: quem abrir controla a sala (use para administrar de outro aparelho)"
-            onClick={() => void copyText(`${location.origin}/room.html?room=${code}#host=${hostToken(code)}`, 'Link de anfitrião copiado! Quem abrir controla a sala.')}
+            label={t('rail.copyHost')}
+            tip={t('rail.copyHostTip')}
+            onClick={() => void copyText(`${location.origin}/room.html?room=${code}#host=${hostToken(code)}`, t('rail.copiedHost'))}
           />
         </Item>
       )}
@@ -106,13 +107,13 @@ export function RoomRail({ state }: { state: RoomState | null }) {
         <>
           <span className="rail-sep" aria-hidden="true" />
           <Item>
-            <RailSwitch icon="mic" label="Pontuação pelo microfone" tip="Pontuação pelo microfone: a TV compara a afinação de quem canta com a voz original (precisa de microfone na TV)" checked={scoring.value} onToggle={scoring.set} />
+            <RailSwitch icon="mic" label={t('rail.scoring')} tip={t('rail.scoringTip')} checked={scoring.value} onToggle={scoring.set} />
           </Item>
           <div className="rail-item has-pop">
             <RailSwitch
               icon="sound"
-              label="Voz do microfone nas caixas de som"
-              tip="Voz nas caixas: a voz de quem canta sai junto com a música (use microfones direcionais, para evitar a microfonia)"
+              label={t('rail.voice')}
+              tip={t('rail.voiceTip')}
               checked={voice.value}
               onToggle={(next) => (next ? setAsking(true) : voice.set(false))}
             />
@@ -121,7 +122,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
             </div>
           </div>
           <Item>
-            <RailSwitch icon="shuffle" label="Rodízio justo" tip="Rodízio justo: a mesma pessoa não canta duas seguidas quando há outra esperando" checked={fair.value} onToggle={fair.set} />
+            <RailSwitch icon="shuffle" label={t('rail.fair')} tip={t('rail.fairTip')} checked={fair.value} onToggle={fair.set} />
           </Item>
         </>
       )}

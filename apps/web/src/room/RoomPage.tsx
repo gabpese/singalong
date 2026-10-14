@@ -1,11 +1,13 @@
 // Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
 import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
 import { api, setUserName, userName } from '../lib/identity.js';
+import { splitQueue } from '../lib/queue-view.js';
 import { stageDismissed, stageItemFor } from '../lib/stage.js';
 import type { LibrarySong, QueueItem, RoomState } from '../lib/types';
 import { AddSong, type AddSongHandle } from './AddSong';
 import { InviteBanner } from './Duet';
-import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast } from './context';
+import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast, type View } from './context';
 import { Library } from './Library';
 import { NowPlaying } from './NowPlaying';
 import { NameDialog } from './NameDialog';
@@ -13,6 +15,7 @@ import { QueueList, Scoreboard } from './QueueList';
 import { PreviewBar, usePreview } from './usePreview';
 import { RoomRail } from './RoomRail';
 import { TabBar, TopBar } from './TopBar';
+import { TvViewer } from './TvViewer';
 import { useRoomConnection } from './useRoomConnection';
 
 declare global {
@@ -22,10 +25,11 @@ declare global {
 }
 
 export function RoomPage({ code }: { code: string }) {
-  const { state, setState, status, gone, position, send } = useRoomConnection(code);
+  const { state, setState, status, gone, position, lyrics, send } = useRoomConnection(code);
   const { toast, show } = useToast();
   const act = useAct(code, setState, show);
   const [tab, setTab] = useState<Tab>('queue');
+  const [view, setView] = useState<View>(() => (new URLSearchParams(location.search).get('view') === 'tv' ? 'tv' : 'room'));
   const [name, setName] = useState<string>(() => userName());
   // o modal do nome só na chegada (quem apaga o campo depois, para digitar outro, não leva um modal na cara)
   const [askName, setAskName] = useState(() => !userName().trim());
@@ -34,6 +38,7 @@ export function RoomPage({ code }: { code: string }) {
   const preview = usePreview(state, act);
 
   const showTab = useCallback((next: Tab) => {
+    setView('room'); // adicionar, ver a fila... sempre levam à sala
     setTab(next);
     window.scrollTo({ top: 0 });
   }, []);
@@ -64,7 +69,7 @@ export function RoomPage({ code }: { code: string }) {
     void loadLibrary();
   }, [readyKey, loadLibrary]);
 
-  const myName = name.trim() || 'Alguém';
+  const myName = name.trim() || t('room.someone');
   const context: RoomContextValue = useMemo(
     () => ({ code, state, isHost: Boolean(state?.me?.is_host), act, toast: show, myName, showTab }),
     [code, state, act, show, myName, showTab],
@@ -90,9 +95,9 @@ export function RoomPage({ code }: { code: string }) {
     const result = await act('POST', '/queue', { ...song, name: myName });
     void loadLibrary();
     showTab('queue');
-    if (result.cached) return 'Adicionada à fila (essa música já estava pronta).';
-    if (result.deduped) return 'Adicionada à fila (essa música já estava sendo preparada).';
-    return 'Adicionada à fila! Ela está sendo preparada e toca quando chegar a vez.';
+    if (result.cached) return t('room.added.cached');
+    if (result.deduped) return t('room.added.deduped');
+    return t('room.added.new');
   }
 
   /** Música do Jukebox escolhida no aviso do painel de adicionar: entra na fila na hora (já está pronta). */
@@ -100,23 +105,23 @@ export function RoomPage({ code }: { code: string }) {
     await act('POST', '/queue', { video_id: song.video_id, name: myName, display_title: song.title ?? undefined });
     void loadLibrary();
     showTab('queue');
-    return 'Adicionada à fila (essa música já estava pronta).';
+    return t('room.added.cached');
   }
 
   async function submitLyrics(videoId: string, body: Record<string, unknown>) {
     await api('PUT', `/api/songs/${videoId}/lyrics`, body, code);
     showTab('queue');
-    return 'Letra enviada. A música volta a ser preparada.';
+    return t('room.lyricsSent');
   }
 
   if (gone) {
     return (
       <RoomProvider value={context}>
         <main className="room-page">
-          <h1>Sala não encontrada</h1>
-          <p>{`A sala ${code} não existe mais (salas paradas há 24 horas são apagadas).`}</p>
+          <h1>{t('room.gone.title')}</h1>
+          <p>{t('room.gone.body', { code })}</p>
           <a href="/" className="button primary">
-            Criar uma nova sala
+            {t('room.gone.create')}
           </a>
         </main>
         <p className={`toast${toast.show ? ' show' : ''}${toast.isError ? ' error' : ''}`} role="status">
@@ -128,11 +133,25 @@ export function RoomPage({ code }: { code: string }) {
 
   return (
     <RoomProvider value={context}>
-      <TopBar state={state} status={status} />
-      <RoomRail state={state} />
+      <a className="skip-link" href="#conteudo">
+        {t('a11y.skip')}
+      </a>
+      <TopBar state={state} status={status} view={view} onView={setView} />
+      <p className="sr-only" role="status" aria-live="polite">
+        {state && splitQueue(state).current
+          ? t('a11y.nowSinging', { who: splitQueue(state).current!.singers, title: splitQueue(state).current!.title ?? '' })
+          : ''}
+      </p>
+      {view === 'room' && <RoomRail state={state} />}
       <InviteBanner />
 
-      <main className="room-page">
+      {view === 'tv' && (
+        <main className="room-page" id="conteudo" tabIndex={-1}>
+          <TvViewer state={state} position={position} lyrics={lyrics} />
+        </main>
+      )}
+
+      <main className="room-page" id={view === 'room' ? 'conteudo' : undefined} tabIndex={-1} hidden={view !== 'room'}>
         <section className="tab" hidden={tab !== 'queue'}>
           {state && (
             <>
@@ -180,7 +199,7 @@ export function RoomPage({ code }: { code: string }) {
         />
       )}
       <PreviewBar preview={preview} />
-      <TabBar tab={tab} onTab={showTab} queueCount={state?.queue.length ?? 0} hidden={false} />
+      <TabBar tab={tab} onTab={showTab} queueCount={state?.queue.length ?? 0} hidden={view !== 'room'} />
       <p className={`toast${toast.show ? ' show' : ''}${toast.isError ? ' error' : ''}`} role="status">
         {toast.text}
       </p>

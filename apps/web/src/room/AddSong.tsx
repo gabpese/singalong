@@ -5,22 +5,13 @@
 // Não sabe nada de salas: quem usa passa as funções que enviam o pedido (submitNew) e que trocam a letra de um item
 // que a pede (submitLyrics).
 import { forwardRef, type FormEvent, useImperativeHandle, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
 import { api } from '../lib/identity.js';
 import { findJukeboxMatches, formatDuration, thumbnailUrl } from '../lib/queue-view.js';
 import { buildSearchQuery, embedUrl, extractVideoId, guessArtistTitle, watchUrl } from '../lib/youtube.js';
 import type { ApiError, LibrarySong } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { JukeboxDialog } from './JukeboxDialog';
-
-const SOURCE_HINTS: Record<string, string> = {
-  lrclib:
-    'Procura a letra com o artista e o nome da música que você confirmou. Se achar uma versão com os tempos certos, usa; senão, a IA sincroniza a letra com a voz da música (cerca de 1 minuto).',
-  auto: 'Usa a legenda do vídeo, se ele tiver uma. Se não tiver, a música entra na fila e eu aviso para você escolher outra opção.',
-  align:
-    'Cole a letra, uma linha por verso. A IA ouve a voz da música e descobre quando cada linha é cantada. Leva cerca de 1 minuto e funciona bem em covers.',
-  none: 'Toca só o instrumental, sem letra na tela.',
-  file: 'Cole o conteúdo de um arquivo .lrc ou .srt (letra com o tempo de cada linha).',
-};
 
 // opções em que a pessoa cola um texto
 const TEXT_SOURCES = ['file', 'align'];
@@ -68,13 +59,13 @@ function VideoFrame({ videoId }: { videoId: string }) {
     <div className="video-frame">
       <iframe
         src={embedUrl(videoId)}
-        title="Prévia do vídeo"
+        title={t('frame.title')}
         allow="autoplay; encrypted-media; picture-in-picture"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
       />
       <a href={watchUrl(videoId)} target="_blank" rel="noopener">
-        Não carregou? Abrir no YouTube
+        {t('frame.fail')}
       </a>
     </div>
   );
@@ -158,7 +149,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   async function runSearch({ skipJukebox = false } = {}) {
     const query: string | null = buildSearchQuery(artist, title);
     if (!query) {
-      setStatus('Informe o artista ou o nome da música para buscar o vídeo.', true);
+      setStatus(t('add.s.needQuery'), true);
       (artist.trim() ? titleRef : artistRef).current?.focus();
       return;
     }
@@ -174,16 +165,16 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
     }
     select(null);
     setSearching(true);
-    setStatus(`Buscando “${query}” no YouTube…`);
+    setStatus(t('add.s.searching', { query }));
     try {
       const found: SearchResult[] = await api('GET', `/api/search?q=${encodeURIComponent(query)}`, undefined, room);
       if (!found.length) {
         clearResults();
-        return setStatus('Nada encontrado. Confira o que você digitou, ou use “Já tenho o link do vídeo”.', true);
+        return setStatus(t('add.s.nothing'), true);
       }
       setPreview(null);
       setResults(found);
-      setStatus('Toque no vídeo certo. Use “Prévia” para ouvir antes de escolher.');
+      setStatus(t('add.s.pick'));
     } catch (err) {
       clearResults();
       setStatus((err as ApiError).message, true);
@@ -204,7 +195,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   /** Sem o nome a fila fica cheia de "Alguém": antes de aceitar uma música, o nome é obrigatório. */
   function nameMissing(): boolean {
     if (userName.trim()) return false;
-    setStatus('Digite o seu nome antes de adicionar uma música.', true);
+    setStatus(t('add.s.needName'), true);
     nameRef.current?.focus();
     nameRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     return true;
@@ -234,7 +225,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
       }
       clearResults();
       reset();
-      setStatus(message ?? 'Pronto!');
+      setStatus(message ?? t('add.s.done'));
     } catch (err) {
       setStatus((err as ApiError).message, true);
     } finally {
@@ -272,7 +263,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
       setConfirmTitle(found.title ?? '');
       setLyricsFor(videoId);
       onShow();
-      setStatus(`${reason ?? 'Preciso que você escolha a letra.'} Escolha uma opção abaixo e toque em “Aplicar letra”.`, true);
+      setStatus(t('add.s.chooseLyrics', { reason: reason ?? t('add.s.chooseLyricsDefault') }), true);
     },
   }));
 
@@ -280,17 +271,17 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
 
   return (
     <article className="card add">
-      <h2>Adicionar música</h2>
+      <h2>{t('add.title')}</h2>
       <form autoComplete="off" onSubmit={onSubmit}>
         <label className="field">
           <span>
-            Seu nome <span className="required" aria-hidden="true">*</span>
+            {t('add.name')} <span className="required" aria-hidden="true">*</span>
           </span>
           <input
             ref={nameRef}
             type="text"
             maxLength={30}
-            placeholder="Como você quer aparecer na fila?"
+            placeholder={t('add.namePh')}
             autoComplete="nickname"
             value={userName}
             onChange={(event) => onUserName(event.target.value)}
@@ -301,7 +292,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
         <div className="search-block" hidden={Boolean(lyricsFor)}>
           <div className="row">
             <label className="field">
-              Artista
+              {t('add.artist')}
               <input
                 ref={artistRef}
                 type="text"
@@ -313,7 +304,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
               />
             </label>
             <label className="field">
-              Nome da música
+              {t('add.songName')}
               <input
                 ref={titleRef}
                 type="text"
@@ -327,7 +318,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
           </div>
           <button type="button" className="wide has-icon" disabled={searching} onClick={() => void runSearch()}>
             <Icon name="search" />
-            Buscar no YouTube
+            {t('add.search')}
           </button>
           <ul className="results" hidden={!results}>
             {(results ?? []).map((result) => {
@@ -354,10 +345,10 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
                     <button
                       type="button"
                       className="preview-toggle"
-                      aria-label={`Ouvir uma prévia de ${result.title}`}
+                      aria-label={t('add.previewAria', { title: result.title })}
                       onClick={() => setPreview(open ? null : { id: result.video_id, where: 'result' })}
                     >
-                      {open ? 'Fechar' : 'Prévia'}
+                      {open ? t('add.close') : t('add.preview')}
                     </button>
                   </div>
                   {open && (
@@ -371,20 +362,20 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
           </ul>
         </div>
         <div className="picked-box" hidden={!selected}>
-          <p className="picked">{selected ? (selected.label ? `Selecionado: ${selected.label}` : `Link reconhecido: ${selected.id}`) : ''}</p>
+          <p className="picked">{selected ? (selected.label ? t('add.selected', { label: selected.label }) : t('add.linkKnown', { id: selected.id })) : ''}</p>
           <button type="button" onClick={togglePreviewOfSelection}>
-            {selectionPreview && selectionPreview.id === selected?.id ? 'Fechar prévia' : 'Ouvir no YouTube'}
+            {selectionPreview && selectionPreview.id === selected?.id ? t('add.closePreview') : t('add.listenYt')}
           </button>
         </div>
         <div className="video-preview" hidden={!selectionPreview}>
           {selectionPreview && <VideoFrame videoId={selectionPreview.id} />}
         </div>
         <details className="link-box" hidden={Boolean(lyricsFor)} open={linkOpen} onToggle={(event) => setLinkOpen(event.currentTarget.open)}>
-          <summary>Já tenho o link do vídeo</summary>
+          <summary>{t('add.haveLink')}</summary>
           <input
             type="text"
             placeholder="https://www.youtube.com/watch?v=…"
-            aria-label="Link do vídeo do YouTube"
+            aria-label={t('add.linkAria')}
             value={url}
             onChange={(event) => onUrlChange(event.target.value)}
           />
@@ -392,11 +383,11 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
 
         {showConfirm && (
           <div className="confirm-box">
-            <h3>Confirme a música</h3>
-            <p className="hint">O artista e o nome são usados para buscar a letra e aparecem na fila. Corrija o que estiver errado.</p>
+            <h3>{t('add.confirm.title')}</h3>
+            <p className="hint">{t('add.confirm.hint')}</p>
             <div className="row">
               <label className="field">
-                Confirme o artista
+                {t('add.confirmArtist')}
                 <input
                   type="text"
                   required={confirmRequired}
@@ -407,7 +398,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
                 />
               </label>
               <label className="field">
-                Confirme o nome da música
+                {t('add.confirmSong')}
                 <input
                   type="text"
                   required={confirmRequired}
@@ -422,22 +413,22 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
         )}
 
         <label className="field">
-          Letra
+          {t('add.lyrics')}
           <select value={source} onChange={(event) => setSource(event.target.value)}>
-            <option value="lrclib">Buscar a letra na internet</option>
-            <option value="auto">Usar a legenda do vídeo, se ele tiver</option>
-            <option value="align">Colar a letra e sincronizar com a voz (IA)</option>
-            <option value="none">Cantar sem letra (só o instrumental)</option>
-            <optgroup label="Avançado">
-              <option value="file">Colar uma letra que já tem tempos (.lrc ou .srt)</option>
+            <option value="lrclib">{t('add.opt.lrclib')}</option>
+            <option value="auto">{t('add.opt.auto')}</option>
+            <option value="align">{t('add.opt.align')}</option>
+            <option value="none">{t('add.opt.none')}</option>
+            <optgroup label={t('add.opt.advanced')}>
+              <option value="file">{t('add.opt.file')}</option>
             </optgroup>
           </select>
         </label>
-        <p className="hint">{SOURCE_HINTS[source] ?? ''}</p>
+        <p className="hint">{['lrclib', 'auto', 'align', 'none', 'file'].includes(source) ? t(`add.hint.${source}`) : ''}</p>
         <textarea
           rows={6}
-          placeholder="Cole a letra aqui"
-          aria-label="Letra"
+          placeholder={t('add.lyricsPh')}
+          aria-label={t('add.lyrics')}
           hidden={!needsText}
           required={needsText}
           value={text}
@@ -446,7 +437,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
 
         <div className="row actions">
           <button type="submit" className="primary" disabled={submitting}>
-            {lyricsFor ? 'Aplicar letra' : 'Adicionar à fila'}
+            {lyricsFor ? t('add.apply') : t('add.submit')}
           </button>
           <button
             type="button"
@@ -456,7 +447,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
               setStatus('');
             }}
           >
-            Cancelar
+            {t('add.cancel')}
           </button>
         </div>
         <p className={`hint${status.isError ? ' error' : ''}`} role="status">

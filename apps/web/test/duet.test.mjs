@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { myPart, PART_NAMES, splitParts } from '../src/lib/duet.js';
+import { myPart, partName, splitParts } from '../src/lib/duet.js';
 
 const cues = (...texts) => texts.map((text, i) => ({ start: i * 4, end: i * 4 + 3, text }));
 
@@ -35,5 +35,5 @@ test('o dono da música é o turquesa e o convidado o violeta', () => {
   assert.equal(myPart({ mine: true, guest_me: false }), 'a');
   assert.equal(myPart({ mine: false, guest_me: true }), 'b');
   assert.equal(myPart(null), 'a');
-  assert.deepEqual(PART_NAMES, { a: 'turquesa', b: 'violeta', both: 'os dois' });
+  assert.deepEqual(['a', 'b', 'both'].map(partName), ['turquesa', 'violeta', 'os dois']);
 });

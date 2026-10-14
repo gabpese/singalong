@@ -10,6 +10,7 @@ export default defineConfig({
   workers: 1, // o servidor de teste é um só e guarda o resultado de busca global
   reporter: [['list']],
   use: {
+    locale: 'pt-BR', // os testes conferem os textos em português
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'retain-on-failure',
     launchOptions: {

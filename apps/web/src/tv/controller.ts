@@ -1,5 +1,6 @@
 // Controlador da TV: liga a sala (WebSocket) ao motor de áudio e à pontuação. Não desenha nada: avisa a tela pelo `ui`.
 // A TV toca o que a sala manda (a fila é do servidor), avisa quando a música termina e a posição para os celulares.
+import { t } from '../i18n/index.js';
 import { createEngine } from '../lib/engine.js';
 import { openVoice, voiceGain } from '../lib/voice.js';
 import { connectRoom } from '../lib/identity.js';
@@ -81,7 +82,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     },
     onError(itemId: number, message: string) {
       // não deixa a sala travada numa música que não carrega: avisa, espera um pouco e passa para a próxima
-      notify(`${message} Pulando…`, 5000);
+      notify(t('ctl.skipping', { message }), 5000);
       setTimeout(() => {
         if (engine.loadedId !== itemId) return; // a sala já mudou de música
         engine.clear();
@@ -111,7 +112,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       shownNotes = '';
       scorer = null;
       scorerFor = null;
-      return setHud({ notice: 'sem melodia de referência para esta música' });
+      return setHud({ notice: t('ctl.noMelody') });
     }
     if (scorerFor === current.id) {
       scorer?.setTranspose(current.pitch);
@@ -136,7 +137,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       });
     } catch {
       shownNotes = '';
-      return setHud({ notice: 'não consegui carregar a melodia' });
+      return setHud({ notice: t('ctl.melodyFail') });
     }
     if (!mic && !micFailed) {
       try {
@@ -146,7 +147,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       }
     }
     shownNotes = '';
-    setHud({ notice: micFailed ? 'microfone indisponível (permita o acesso e abra a TV por http://localhost:3000)' : '' });
+    setHud({ notice: micFailed ? t('ctl.micFail') : '' });
   }
 
   // ~10 leituras por segundo: compara o tom cantado com a melodia no instante atual da música
@@ -201,7 +202,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
         voiceOn = true;
       } catch {
         voiceFailed = true;
-        notify('Microfone indisponível para a voz nas caixas (permita o acesso ao microfone).', 8000);
+        notify(t('ctl.voiceMicFail'), 8000);
       } finally {
         voiceBusy = false;
       }
@@ -229,10 +230,10 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       void apply();
     },
     onStatus(status: string) {
-      notify(status === 'reconnecting' ? 'Reconectando à sala…' : '');
+      notify(status === 'reconnecting' ? t('ctl.reconnecting') : '');
     },
     onGone() {
-      notify('Sala não encontrada. Crie uma nova sala.');
+      notify(t('ctl.gone'));
     },
   });
 
@@ -282,7 +283,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
           }
           await syncPlayback(state.playback);
           if (engine.playing && current.pitch !== 0 && !engine.pitchAvailable) {
-            notify('Troca de tom indisponível aqui: abra a TV por http://localhost:3000 (ou use https).');
+            notify(t('ctl.pitchFail'));
           }
         }
       } while (state !== latest);

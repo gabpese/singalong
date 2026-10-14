@@ -1,6 +1,7 @@
 // Aviso "já temos esta música": quando o artista e o nome digitados batem com músicas prontas no Jukebox, a pessoa
 // escolhe uma delas (entra na fila na hora) ou segue a busca de outra versão no YouTube.
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
 import { keySummary } from '../lib/music.js';
 import { formatDuration, thumbnailUrl } from '../lib/queue-view.js';
 import type { LibrarySong } from '../lib/types';
@@ -38,9 +39,7 @@ export function JukeboxDialog({ songs, busy, onUse, onSearchYoutube, onClose }: 
     >
       <div className="jukebox-body">
         <h2 id="jukebox-title">
-          {plural
-            ? 'Encontramos estas versões prontas no nosso Jukebox, quer selecionar uma destas?'
-            : 'Encontramos esta versão pronta no nosso Jukebox, quer selecioná-la?'}
+          {t(plural ? 'juke.many' : 'juke.one')}
         </h2>
         <ul className="jukebox-options">
           {songs.map((song) => (
@@ -57,7 +56,7 @@ export function JukeboxDialog({ songs, busy, onUse, onSearchYoutube, onClose }: 
                   <strong>{song.title ?? song.video_id}</strong>
                   <small>{[song.artist, song.duration ? formatDuration(song.duration) : null].filter(Boolean).join(' · ')}</small>
                   {song.key && <small>{keySummary(song.key)}</small>}
-                  {song.video_title && <small className="video-title">{`No YouTube: ${song.video_title}`}</small>}
+                  {song.video_title && <small className="video-title">{t('juke.onYoutube', { title: song.video_title })}</small>}
                 </span>
               </label>
             </li>
@@ -65,10 +64,10 @@ export function JukeboxDialog({ songs, busy, onUse, onSearchYoutube, onClose }: 
         </ul>
         <div className="jukebox-actions">
           <button type="button" className="primary" disabled={busy} onClick={() => onUse(chosen)}>
-            {plural ? 'Usar a versão selecionada' : 'Usar esta versão'}
+            {t(plural ? 'juke.useMany' : 'juke.useOne')}
           </button>
           <button type="button" disabled={busy} onClick={onSearchYoutube}>
-            Buscar outra versão no YouTube
+            {t('juke.other')}
           </button>
         </div>
       </div>

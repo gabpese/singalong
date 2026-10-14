@@ -1,5 +1,6 @@
 // Músicas já processadas (biblioteca), com filtro por artista e nome, para entrar na fila na hora ou baixar em MP4.
 import { useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
 import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from '../lib/export-mp4.js';
 import { api } from '../lib/identity.js';
 import { keySummary } from '../lib/music.js';
@@ -11,20 +12,20 @@ function LibraryRow({ song }: { song: LibrarySong }) {
   const { act, toast, myName, code } = useRoom();
   const [pitch, setPitch] = useState(0);
   const [exporting, setExporting] = useState(false);
-  const [exportLabel, setExportLabel] = useState('Baixar MP4');
+  const [exportLabel, setExportLabel] = useState(t('library.exportButton'));
 
   /** Gera o MP4 da música no tom escolhido e baixa quando estiver pronto (o worker leva alguns segundos). */
   async function exportSong() {
     setExporting(true);
     try {
-      toast('Gerando o vídeo… pode levar alguns segundos.');
-      const url = await requestExport((method, path, body) => api(method, path, body, code), song.video_id, pitch, { onWaiting: () => setExportLabel('Gerando…') });
+      toast(t('library.exportStart'));
+      const url = await requestExport((method, path, body) => api(method, path, body, code), song.video_id, pitch, { onWaiting: () => setExportLabel(t('library.exportMaking')) });
       downloadFile(url, exportFileName(song, pitch));
-      toast('Vídeo pronto! O download começou.');
+      toast(t('library.exportDone'));
     } catch (err) {
       toast((err as ApiError).message, true);
     } finally {
-      setExportLabel('Baixar MP4');
+      setExportLabel(t('library.exportButton'));
       setExporting(false);
     }
   }
@@ -32,7 +33,7 @@ function LibraryRow({ song }: { song: LibrarySong }) {
   async function add() {
     try {
       await act('POST', '/queue', { video_id: song.video_id, name: myName, display_title: song.title ?? undefined });
-      toast('Adicionada à fila!');
+      toast(t('library.added'));
     } catch {
       // o erro já apareceu no aviso
     }
@@ -47,21 +48,21 @@ function LibraryRow({ song }: { song: LibrarySong }) {
         {song.key && <span className="muted small">{keySummary(song.key)}</span>}
       </div>
       <button type="button" className="primary" onClick={add}>
-        Adicionar
+        {t('library.add')}
       </button>
       <div className="export-row">
-        <span className="export-label">Vídeo MP4 para cantar offline</span>
+        <span className="export-label">{t('library.exportLabel')}</span>
         <span className="export-controls">
-          <select aria-label="Tom do vídeo MP4" value={pitch} onChange={(event) => setPitch(Number(event.target.value))}>
+          <select aria-label={t('library.exportPitch')} value={pitch} onChange={(event) => setPitch(Number(event.target.value))}>
             {EXPORT_PITCHES.map((value: number) => (
               <option key={value} value={value}>
-                {`Tom ${formatPitch(value)}`}
+                {t('pitch.label', { n: formatPitch(value) })}
               </option>
             ))}
           </select>
           <button
             type="button"
-            title="Baixa um vídeo MP4 com o instrumental e a letra, para cantar offline"
+            title={t('library.exportTitle')}
             disabled={exporting}
             onClick={exportSong}
           >
@@ -79,20 +80,20 @@ export function Library({ songs }: { songs: LibrarySong[] }) {
   const all: LibrarySong[] = sortSongs(songs);
   const trimmed = query.trim();
   const shown: LibrarySong[] = filterSongs(all, trimmed);
-  const count = !all.length ? '' : trimmed ? `(${shown.length} de ${all.length})` : `(${all.length})`;
+  const count = !all.length ? '' : trimmed ? t('library.count', { n: shown.length, total: all.length }) : `(${all.length})`;
 
   return (
     <article className="card">
       <h2>
-        Músicas já processadas <span className="count">{count}</span>
+        {t('library.title')} <span className="count">{count}</span>
       </h2>
-      <p className="hint">Já estão prontas: entram na fila na hora.</p>
+      <p className="hint">{t('library.hint')}</p>
       <div className="filter">
         <input
           ref={filterRef}
           type="search"
-          placeholder="Filtrar por artista ou nome…"
-          aria-label="Filtrar as músicas já processadas"
+          placeholder={t('library.filterPlaceholder')}
+          aria-label={t('library.filterAria')}
           autoComplete="off"
           enterKeyHint="search"
           value={query}
@@ -105,7 +106,7 @@ export function Library({ songs }: { songs: LibrarySong[] }) {
         ))}
       </ul>
       <div className="empty-box" hidden={shown.length > 0}>
-        <p className="hint">{!all.length ? 'Nenhuma música processada ainda.' : `Nenhuma música encontrada para “${trimmed}”.`}</p>
+        <p className="hint">{!all.length ? t('library.none') : t('library.noMatch', { query: trimmed })}</p>
         <button
           type="button"
           hidden={!(trimmed && !shown.length)}
@@ -114,7 +115,7 @@ export function Library({ songs }: { songs: LibrarySong[] }) {
             filterRef.current?.focus();
           }}
         >
-          Limpar filtro
+          {t('library.clear')}
         </button>
       </div>
     </article>

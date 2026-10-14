@@ -1,7 +1,7 @@
 // Estado da sala em tempo real (WebSocket com reconexão) e a posição da música que a TV informa.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { connectRoom } from '../lib/identity.js';
-import type { RoomState, ServerMessage } from '../lib/types';
+import type { LyricCue, RoomState, ServerMessage } from '../lib/types';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
 
@@ -17,6 +17,8 @@ export function useRoomConnection(code: string) {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [gone, setGone] = useState(false);
   const [position, setPosition] = useState<Position>({ ms: 0, at: performance.now(), itemId: null });
+  /** A letra da música atual, repassada pela TV (a aba TV da sala desenha com ela). */
+  const [lyrics, setLyrics] = useState<{ itemId: number; cues: LyricCue[] } | null>(null);
   const connectionRef = useRef<{ send(payload: unknown): void } | null>(null);
   /** Manda uma mensagem à sala pelo WebSocket (ex.: o nome da pessoa). */
   const send = useCallback((payload: unknown) => connectionRef.current?.send(payload), []);
@@ -29,6 +31,8 @@ export function useRoomConnection(code: string) {
           setPosition({ ms: message.state.position_ms, at: performance.now(), itemId: message.state.current_item_id });
         } else if (message.type === 'position') {
           setPosition({ ms: message.ms, at: performance.now(), itemId: message.item_id });
+        } else if (message.type === 'lyrics') {
+          setLyrics({ itemId: message.item_id, cues: message.cues });
         }
       },
       onStatus(next: string) {
@@ -45,5 +49,5 @@ export function useRoomConnection(code: string) {
     };
   }, [code]);
 
-  return { state, setState, status, gone, position, send };
+  return { state, setState, status, gone, position, lyrics, send };
 }

@@ -1,4 +1,5 @@
 // Motor da TV: toca o instrumental (e, se houver, as vozes de apoio) com troca de tom em tempo real e desenha a letra sincronizada.
+import { t } from '../i18n/index.js';
 import { SoundTouchNode } from '../vendor/soundtouch/SoundTouchNode.js';
 import { clampBacking, clampPitch } from './lyrics-sync.js';
 import { createLyricsView } from './lyrics-view.js';
@@ -143,7 +144,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
     render();
   });
   audio.addEventListener('ended', () => onEnded?.(itemId));
-  audio.addEventListener('error', () => onError?.(itemId, 'Não consegui carregar o áudio.'));
+  audio.addEventListener('error', () => onError?.(itemId, t('engine.audioFail')));
 
   return {
     /** Libera o som: precisa ser chamado dentro de um clique (política de autoplay dos navegadores). */
@@ -173,7 +174,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
         view.setCues(loaded);
         onLyrics?.(item.id, loaded);
       } catch (err) {
-        onError?.(item.id, `Não consegui carregar a letra (${err.message}).`);
+        onError?.(item.id, t('engine.lyricsFail', { error: err.message }));
         return;
       }
       audio.src = item.song.media.instrumental;

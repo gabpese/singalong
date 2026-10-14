@@ -435,3 +435,105 @@ Decidido com o dono do projeto: **seguir com HTML/CSS/JS puros até fechar a Fas
 - **O que se aproveita sem reescrever:** toda a lógica pura e testada (`lyrics-sync.js`, `queue-view.js`, `music.js`, `youtube.js`, `identity.js`), `engine.js` e `preview.js` (áudio), o CSS (tokens e telas) e **os 100+ testes de ponta a ponta**, que verificam o comportamento na tela e servem de rede de segurança.
 - **Plano de migração (sugerido):** Vite + React + TypeScript; `apps/web` ganha `src/` e build para `dist/`, que a API serve no lugar de `public/`; migrar uma tela por vez (entrada → controle → TV), mantendo o teste de ponta a ponta verde a cada passo; Tailwind opcional.
 - **Pré-requisito:** a API não muda (REST + WebSocket já são a fronteira).
+
+## 17. Roteiro após a 1.1.0 (decidido em out/2026)
+
+Ideias escolhidas pelo dono do projeto após uma revisão do que o app tem e do que falta. Nada abaixo foi construído ainda. **Decisão:** o processamento no navegador (separar a voz com WebGPU/ONNX) **não** faz parte do plano; a separação continua no worker do servidor ou no agente do dono. "Separar o áudio sem baixar a música" saiu junto, já que o navegador não consegue ler o stream do YouTube.
+
+### Fase A: fundação
+| Item | Observações |
+|---|---|
+| Ambientes de homologação e staging | Já desenhados no TRD 12.13. Feitos primeiro para que as fases seguintes saiam com segurança |
+| Idiomas (i18n) e acessibilidade | Mover todos os textos para um catálogo e traduzir (inglês e espanhol primeiro). Acessibilidade: contraste, foco por teclado, leitor de tela, letra grande na TV. A interface deixa de ser "só em português" como não-objetivo |
+| Sala web com abas, como o app desktop | A página da sala ganha as abas **Sala** e **TV** (e o painel do anfitrião), e a TV vira um modo da mesma página. A rota `tv.html` continua, então nada quebra. **O QR code passa a ser o link da sala:** quem entra por ele cai na sala e escolhe ficar na aba **Sala** ou ir para a aba **TV** ver a letra e as músicas que estão passando. Cuidado: o convidado na aba TV é **só espectador** (sem som e sem microfone, para dois aparelhos nunca tocarem a mesma música); só o aparelho que abriu a TV como player (ou a escolha do anfitrião) toca o áudio, e áudio, microfone e tela cheia precisam continuar estáveis ali |
+
+### Fase B: áudio ao vivo (mesmo motor, feitos juntos)
+| Item | Observações |
+|---|---|
+| Compensação de latência | Calibrar com uma batida e o microfone, salvo por dispositivo; afeta pontuação e letra, então vem antes do guia de melodia |
+| Volume da voz original | Um slider entre o instrumental e a voz original (o `vocals.mp3` já é guardado); serve de guia para quem está aprendendo a música. Mesa de mixagem do anfitrião |
+| Detector de microfonia (apito) | Baseado em FFT; baixa o volume da voz sozinho. Fecha o item "pendente" da 12.14 |
+| Mais de um microfone na saída | Várias entradas no Web Audio com limitador; as configurações escolhem mais de um dispositivo (também no app do dono). Fecha o outro item "pendente" da 12.14 |
+
+### Fase C: a festa
+| Item | Observações |
+|---|---|
+| Reações dos celulares | Aplausos, fogo e emojis enviados pelo WebSocket e animados na TV; limite de envio por pessoa |
+| Estatísticas do dono | Eventos registrados por sala e música: mais cantadas, tempo de processamento, tamanho do cache; ajuda a limpar o cache |
+
+### Fase D: o canto
+| Item | Observações |
+|---|---|
+| Guia de melodia | Extrair a melodia da voz isolada no processamento (pYIN ou CREPE) e desenhá-la como barras na TV, com a afinação do cantor por cima; reaproveita a base da pontuação. Depende da compensação de latência |
+| Dueto com vozes identificadas | Duas camadas. Primeiro **pela letra**: cada linha marcada como voz 1, voz 2 ou ambas (editor, mais uma sugestão por diarização de falantes sobre a voz isolada); o palco mostra quem canta o quê e a pontuação é por trecho. Depois, **pelo áudio**: separação real das duas vozes (pesquisa em aberto, um bônus) |
+
+### Fase E: plataforma
+| Item | Observações |
+|---|---|
+| Modo híbrido (F25) | Por música, escolher se ela também vai para a nuvem (driver S3/R2 já previsto na seção 14). Exige decidir sincronização e custo de armazenamento |
+| macOS, Linux e GPU AMD/Apple (F26) | O motor é montado só para Windows. Primeiro macOS em Apple Silicon (MPS), depois Linux (ROCm para AMD) |
+
+**Versões:** a fase A sai como **1.1.1**; a **1.2.0** é a versão que fecha todas as fases (A a E).
+
+### Ordem e dependências
+A antes de tudo (versões seguras e a base de textos e abas) → B (um motor de áudio) → C (retorno rápido) → D (precisa da B) → E (a maior e mais incerta). Cada item vira um marco próprio, com testes, no formato de sempre (seção 16).
+
+### Status da Fase A (versão 1.1.1)
+- **Feito:** a página da sala tem a alternância **Sala | TV** (a aba TV é só para assistir: sem som e sem microfone; o QR code é o link da sala) e a interface existe em **português (Brasil), inglês e espanhol** (`apps/web/src/i18n/`: um catálogo por idioma, seletor de idioma na entrada e na sala, o idioma do navegador como padrão; um teste confere que os três catálogos têm as mesmas chaves e que toda chave usada no código existe).
+- **Mensagens do servidor:** a API ainda responde em português; o cliente traduz os códigos de erro que os convidados veem (chaves `apierr.*`) e usa o texto do servidor nos demais.
+- **Acessibilidade (feita):** verificação automática com axe-core em todas as telas e diálogos (WCAG 2.1 A/AA, na suíte de ponta a ponta); botões de **tamanho da letra** (A−/A+, e `+`/`−` na TV) compartilhados pela TV, pelo palco e pela aba TV; link "ir para o conteúdo"; aviso para leitor de tela de quem está cantando; `aria-current` nas abas; suporte a `prefers-reduced-motion` e `prefers-contrast`; correção de contraste na fila da TV.
+- **Adiado:** os ambientes de homologação e staging (seção 18) ficam fora da 1.1.1: dependem das configurações da VM da Oracle, que não puderam ser conferidas (sem acesso à conta). Voltam assim que for possível; os marcos H1 a H3 não precisam da VM.
+
+## 18. Plano: ambientes de homologação (`hml`) e de staging (`stg`)
+
+Desenho por trás do TRD 12.13. Nada abaixo foi construído ainda; as decisões em aberto estão no fim e o plano supõe a resposta recomendada para cada uma.
+
+### Objetivo
+Uma versão é testada primeiro em `hml`, depois em `stg`, e só então promovida para produção **por uma pessoa**, com a **mesma imagem** em todos os passos (a tag é o commit; nada é reconstruído).
+
+### Caminho de uma versão (recomendado)
+| Evento | Vai para | Como |
+|---|---|---|
+| Push em `release/**` (CI verde) | `hml` | automático; o dono testa com celulares e TV de verdade **antes** de mesclar |
+| Merge na `main` (CI verde) | `stg` | automático; uma cópia da produção com o commit exato que vai sair |
+| Botão "Promover" (workflow manual, com aprovação) | produção | `workflow_dispatch` com o ambiente e a tag; os **Environments** do GitHub (`hml`, `stg`, `production`) com um revisor obrigatório dão a etapa de aprovação |
+
+Hoje todo merge na `main` vai direto para a produção; isso muda no último passo (a produção deixa de seguir a `main`).
+
+### Infraestrutura (a mesma VM gratuita)
+- **Três pilhas, uma VM:** um projeto Docker Compose por ambiente (`sg-hml`, `sg-stg`, `sg-prod`), cada um com a própria API, Redis, volumes e pasta `storage/`. A VM Ampere gratuita (2 OCPU, 12 GB) comporta as três; a alternativa AMD de 1 GB **não**.
+- **Uma entrada (Caddy) numa pilha "edge" separada:** o Caddy escuta em 80/443 e roteia três nomes para os containers `api` numa rede Docker compartilhada (`singalong-net`). Hoje o Caddy mora dentro da pilha de produção, então um deploy de produção o reinicia; tirá-lo de lá também desfaz esse acoplamento. O volume dos certificados (`caddy-data`) é **mantido** (movido, não recriado) para não esbarrar nos limites do Let's Encrypt.
+- **DNS:** `singalong-hml.duckdns.org` e `singalong-stg.duckdns.org` apontam para o mesmo IP da produção.
+- **Pastas:** `/opt/singalong` continua sendo a produção (sem mudar de lugar); `/opt/singalong-hml`, `/opt/singalong-stg` e `/opt/singalong-edge` são novas.
+
+### Isolamento (o que nunca pode ser compartilhado)
+- **Dados:** cada ambiente tem volumes, banco, Redis, `ADMIN_TOKEN` e `ADMIN_PATH` próprios.
+- **E-mail:** `hml`/`stg` **não** têm `BREVO_API_KEY` (o servidor já responde `email_disabled`) e têm um `PAIR_ALLOWED_EMAILS` só de teste, para ninguém receber um e-mail de teste por engano.
+- **Biblioteca na nuvem:** `ENABLED_TO_SEND_TO_CLOUD` fica vazio em `hml`/`stg`; o `storage/` deles é separado do da produção. O `hml` ganha uma biblioteca pequena de músicas do próprio dono; o `stg` pode receber uma cópia somente leitura da biblioteca da produção (decisão 4).
+- **Marcador visível:** uma nova variável `APP_ENV` (`hml` | `stg` | vazia = produção) sai em `/api/config`; as páginas web mostram uma faixa colorida e o prefixo `[HML]`/`[STG]` no título, para ninguém confundir um ambiente com outro.
+
+### Deploy e volta atrás
+- `deploy.sh <ambiente> <tag>` substitui o `deploy.sh` atual: usa a pasta do ambiente, define `IMAGE_TAG`, baixa exatamente aquela tag e espera a API ficar saudável.
+- O `deploy.yml` deixa de mover o `latest` sozinho: publica `ghcr.io/…/singalong-api:<sha>`, faz o deploy em `hml`/`stg` conforme a tabela acima, e um segundo workflow, **Promover**, publica uma tag escolhida em qualquer ambiente (serve também de **rollback**: promover a tag anterior).
+- Manter as últimas 5 tags na VM (o `docker image prune` preserva as recentes).
+
+### O app do dono
+O endereço do servidor já é uma configuração do app: para `hml`/`stg` o instalador é apontado para o endereço deles à mão, e as variáveis do aviso de atualização (`APP_LATEST_VERSION`, `APP_MIN_VERSION`, …) são por ambiente, o que permite testar o fluxo de atualização com uma versão "mais nova" falsa antes de publicar a Release.
+
+### Marcos
+1. **H1 – Compose parametrizado** (nome do projeto, `IMAGE_TAG`, `singalong-net` compartilhada), produção igual. Teste: a produção continua publicando do mesmo jeito.
+2. **H2 – Pilha edge** (Caddy fora da produção) só com o nome da produção; uma parada curta e planejada da produção para movê-lo.
+3. **H3 – `APP_ENV` e a faixa** (API, web, testes).
+4. **H4 – `deploy.sh <ambiente> <tag>`, `deploy.yml` e o workflow Promover**, com os Environments do GitHub.
+5. **H5 – Criar o `hml`** na VM (DNS, `.env`, biblioteca pequena) e publicar nele uma branch `release/**`.
+6. **H6 – Criar o `stg`** e fazer a `main` alimentá-lo; a produção deixa de seguir a `main`.
+7. **H7 – Documentação** (`deploy/README.md`; o TRD 12.13 vira registro do que foi feito).
+
+### Decisões em aberto (a confirmar)
+1. **Qual VM você tem?** `VM.Standard.A1.Flex` com 12 GB (comporta) ou a AMD de 1 GB (não comporta três pilhas; aí `hml` e `stg` teriam de dividir uma pilha menor).
+2. **O caminho de uma versão:** `release/**` → `hml`, `main` → `stg`, manual → produção (recomendado), ou `main` → `hml` → manual → `stg` → manual → produção (como no TRD 12.13, com uma aprovação a mais).
+3. **Aprovações:** usar os Environments do GitHub com você como revisor obrigatório (recomendado), ou só um workflow manual sem aprovação.
+4. **Biblioteca no `stg`:** uma cópia somente leitura das músicas da produção (realista, mas copia arquivos com direitos autorais para um segundo lugar na mesma VM) ou só algumas músicas suas, como no `hml`.
+5. **Pilha edge:** aceitar uma parada curta e planejada da produção para tirar o Caddy de dentro dela (recomendado), ou manter o Caddy na produção e deixar `hml`/`stg` entrarem na rede dele.
+6. **Nomes:** manter `singalong-hml.duckdns.org` e `singalong-stg.duckdns.org`.
+7. **Transição:** manter a produção seguindo a `main` até o H6 ficar pronto (recomendado), para nada mudar antes de o novo caminho estar provado.

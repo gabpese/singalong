@@ -1,7 +1,9 @@
 // Entrada: criar uma sala (e abrir a TV) ou entrar numa sala pelo código.
 import { type FormEvent, useState } from 'react';
 import { api, setHostToken } from '../lib/identity.js';
+import { t } from '../i18n/index.js';
 import { Icon } from '../ui/Icon';
+import { LanguageSwitch } from '../ui/LanguageSwitch';
 
 interface ApiError extends Error {
   status?: number;
@@ -31,41 +33,42 @@ export function Landing() {
       location.href = `room.html?room=${roomCode}`;
     } catch (err) {
       const error = err as ApiError;
-      setMessage(error.status === 404 ? `Não achei a sala ${roomCode}. Confira o código.` : error.message);
+      setMessage(error.status === 404 ? t('landing.join.notFound', { code: roomCode }) : error.message);
     }
   }
 
   return (
     <main className="landing-page">
+      <LanguageSwitch />
       <h1>
         <Icon name="singing" />
         Singalong
       </h1>
-      <p className="lead">Karaokê de qualquer vídeo do YouTube: o instrumental, a letra sincronizada e a fila da festa.</p>
+      <p className="lead">{t('landing.lead')}</p>
 
       <section className="card">
-        <h2>Criar uma sala</h2>
-        <p className="hint">Você será o anfitrião: escolhe a ordem, pula e pausa. A TV abre em outra aba.</p>
+        <h2>{t('landing.create.title')}</h2>
+        <p className="hint">{t('landing.create.hint')}</p>
         <button type="button" className="primary big" onClick={createRoom}>
-          Criar sala e abrir a TV
+          {t('landing.create.button')}
         </button>
       </section>
 
       <section className="card">
-        <h2>Entrar numa sala</h2>
+        <h2>{t('landing.join.title')}</h2>
         <form className="row" autoComplete="off" onSubmit={join}>
           <input
             className="join-code"
             type="text"
             inputMode="text"
             maxLength={8}
-            placeholder="Código (ex.: K7QM)"
-            aria-label="Código da sala"
+            placeholder={t('landing.join.placeholder')}
+            aria-label={t('landing.join.aria')}
             required
             value={code}
             onChange={(event) => setCode(event.target.value)}
           />
-          <button type="submit">Entrar</button>
+          <button type="submit">{t('landing.join.button')}</button>
         </form>
       </section>
 
