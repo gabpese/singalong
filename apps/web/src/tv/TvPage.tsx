@@ -14,6 +14,7 @@ import { InviteNotice, respondInvite } from '../room/Duet';
 import { createTvController, type FinalResult, type HudState, type TvController } from './controller';
 import { LatencyDialog } from './LatencyDialog';
 import { MicsDialog } from './MicsDialog';
+import { PitchGuide } from './PitchGuide';
 import { QrCode } from './QrCode';
 import { QueueBox, titleOf } from './QueueBox';
 
@@ -124,6 +125,7 @@ export function TvPage({ code }: { code: string }) {
   const [calibrating, setCalibrating] = useState(false);
   const [choosingMics, setChoosingMics] = useState(false);
   const reactions = useReactionLayer();
+  const [guideReady, setGuideReady] = useState(false); // o guia de melodia tem notas para desenhar
 
   const stageRef = useRef<HTMLElement>(null);
   const lyricsRefs = {
@@ -140,7 +142,7 @@ export function TvPage({ code }: { code: string }) {
     // as linhas da letra pertencem ao motor de áudio (ele desenha cada palavra com o seu preenchimento): o React só as entrega
     const controller = createTvController(
       code,
-      { setRoom, notify: setNotice, setUnlock: setUnlockVisible, setHud, setProgress, setFinal, addReaction: reactions.push },
+      { setRoom, notify: setNotice, setUnlock: setUnlockVisible, setHud, setProgress, setFinal, addReaction: reactions.push, setGuideReady },
       {
         prev: lyricsRefs.prev.current!,
         current: lyricsRefs.current.current!,
@@ -176,10 +178,11 @@ export function TvPage({ code }: { code: string }) {
   const next = room ? nextUp(room) : null;
   const { upcoming } = room ? playOrder(room) : { upcoming: [] as QueueItem[] };
   const hasQueue = Boolean(current) || upcoming.length > 0;
+  const showGuide = Boolean(room?.melody_bars) && guideReady && Boolean(current);
   const nextLabel = next ? `${titleOf(next.item)}${next.preparing ? ` ${t('next.preparing')}` : ''}` : '';
 
   return (
-    <main className={`tv-stage${hasQueue ? ' has-queue' : ''}`} ref={stageRef}>
+    <main className={`tv-stage${hasQueue ? ' has-queue' : ''}${showGuide ? ' has-guide' : ''}`} ref={stageRef}>
       <div className="tv-invites">
         <InviteNotice state={room} onRespond={(item, accept) => void respondInvite(code, item, accept)} />
       </div>
@@ -238,6 +241,8 @@ export function TvPage({ code }: { code: string }) {
           {current && <JoinCard code={code} />}
         </div>
       </div>
+
+      {showGuide && <PitchGuide controller={controllerRef.current} />}
 
       <footer className="tv-bottom">
         <div className="tv-progress" aria-hidden="true">

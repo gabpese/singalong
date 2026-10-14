@@ -164,3 +164,52 @@ test('a nota da dupla vai para o placar com os dois nomes', async () => {
   assert.deepEqual(scoreboard.find((row) => row.score === 91)?.name, 'Ana & Bia');
   assert.ok(ana.state());
 });
+
+// --- a divisão da letra do dueto: quem canta cada linha, escolhido pelos cantores ---
+const putParts = (code, videoId, client, parts, host) =>
+  app.inject({ method: 'PUT', url: `/api/rooms/${code}/songs/${videoId}/parts`, headers: { 'x-client-id': client, ...(host ? { 'x-host-token': host } : {}) }, payload: { parts } })
+    .then((res) => ({ status: res.statusCode, body: res.body ? res.json() : null }));
+
+async function duetOf(code, host) {
+  const { itemId } = await (async () => {
+    const queued = (await call('GET', `/rooms/${code}`, ANA)).body.queue.find((i) => i.video_id === SONGS[1]);
+    return { itemId: queued.id };
+  })();
+  await call('POST', `/rooms/${code}/queue/${itemId}/invite`, ANA, { pid: pidOf(BIA) });
+  await call('POST', `/rooms/${code}/queue/${itemId}/invite/respond`, BIA, { accept: true });
+  return itemId;
+}
+
+test('dueto: os cantores escolhem quem canta cada linha; o anfitrião também; outra pessoa não', async () => {
+  const { code, room, ana, caio } = await setup();
+  const itemId = await duetOf(code);
+  assert.equal(item((await call('GET', `/rooms/${code}`, ANA)).body, itemId).parts, null); // padrão: automático
+
+  assert.equal((await putParts(code, SONGS[1], ANA, 'ab*-ab')).status, 200); // o dono da música
+  assert.equal(item((await call('GET', `/rooms/${code}`, ANA)).body, itemId).parts, 'ab*-ab');
+  assert.equal((await putParts(code, SONGS[1], BIA, 'ba*-ba')).status, 200); // o convidado que aceitou
+  assert.equal(item((await call('GET', `/rooms/${code}`, BIA)).body, itemId).parts, 'ba*-ba');
+  assert.equal((await putParts(code, SONGS[1], CAIO, 'aaaa')).status, 403); // outra pessoa, sem ser anfitrião
+  assert.equal((await putParts(code, SONGS[1], CAIO, 'aabb', room.host_token)).status, 200); // o anfitrião
+  assert.equal((await putParts(code, SONGS[1], ANA, null)).body.queue.find((i) => i.id === itemId).parts, null); // null volta ao automático
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(item(ana.state(), itemId).parts, null);
+  assert.equal(JSON.stringify(caio.state()).includes(ANA), false);
+});
+
+test('dueto: só vale com letras a, b, * e -; o tamanho é limitado; a divisão só aparece em música com dueto aceito', async () => {
+  const { code, room } = await setup();
+  const itemId = await duetOf(code);
+  for (const bad of ['abc', 'AB', 'a b', 'ab\n', 'a'.repeat(3001), 42]) {
+    assert.equal((await putParts(code, SONGS[1], ANA, bad)).status, 400, String(bad).slice(0, 12));
+  }
+  assert.equal((await putParts(code, SONGS[1], ANA, 'a'.repeat(3000))).status, 200); // o limite exato vale
+  assert.equal((await putParts(code, SONGS[1], ANA, '')).status, 200); // vazio também volta ao automático
+
+  // a música da Caio (sem dueto) não mostra a divisão, mesmo que o anfitrião a defina
+  await putParts(code, SONGS[0], ANA, 'abab', room.host_token);
+  const state = (await call('GET', `/rooms/${code}`, ANA)).body;
+  assert.equal(state.queue.find((i) => i.video_id === SONGS[0]).parts, null);
+  assert.equal(item(state, itemId).parts, null);
+});

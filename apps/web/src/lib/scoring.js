@@ -118,9 +118,12 @@ export const classNameOf = (pc) => (pc == null ? '—' : NAMES[pc]);
 /**
  * Pontua a música em blocos de 2 s. `melody` = { hop, midi: [nota | -1] }; `transpose` = tom escolhido (semitones).
  * Em cada bloco confere UMA nota: a que o cantor mais cantou contra as notas principais que a original sustenta nele,
- * ignorando a oitava. `onBlock(linha)` é chamada quando um bloco termina (depuração). Só contam os quadros em que a voz original canta; quadros já avaliados (seek) não contam duas vezes.
+ * ignorando a oitava. `include(t)` (opcional, dueto): só os instantes em que este cantor canta contam. `onBlock(linha)` é chamada quando um bloco termina (depuração). Só contam os quadros em que a voz original canta; quadros já avaliados (seek) não contam duas vezes.
+ *
+ * @param {{ hop: number, midi: number[] }} melody
+ * @param {{ transpose?: number, onBlock?: ((linha: object) => void) | null, include?: ((t: number) => boolean) | null }} [options]
  */
-export function createScorer(melody, { transpose = 0, onBlock = null } = {}) {
+export function createScorer(melody, { transpose = 0, onBlock = null, include = null } = {}) {
   const { hop } = melody;
   const midi = smoothMelody(melody.midi); // a referência é a melodia estável, não a crua
   const blockFrames = Math.round(BLOCK_SECONDS / hop);
@@ -210,7 +213,7 @@ export function createScorer(melody, { transpose = 0, onBlock = null } = {}) {
       const ref = idx >= 0 && idx < midi.length ? refOf(block) : null;
       reference = ref ? ref.display + shift : null;
       sungNow = blocks.has(block) ? sungNoteOf(blocks.get(block)) : null;
-      if (!ref || midi[idx] < 0 || seen[idx]) return this.score();
+      if (!ref || midi[idx] < 0 || seen[idx] || (include && !include(t))) return this.score();
       seen[idx] = 1;
       counted++;
       const blk = blocks.get(block) ?? { n: 0, heard: 0, hist: new Map(), notes: new Map() };

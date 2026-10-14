@@ -6,6 +6,8 @@ import { clampLatency, loadLatency, saveLatency, sungPosition } from '../lib/lat
 import { loadMics, micsKey, openVoice, saveMics, voiceGain } from '../lib/voice.js';
 import { connectRoom } from '../lib/identity.js';
 import { splitQueue } from '../lib/queue-view.js';
+import { type MelodyNote, melodyNotes, pushTrail } from '../lib/melody-guide.js';
+import { singsAt, splitParts } from '../lib/duet.js';
 import { createScorer, noteName, openMic } from '../lib/scoring.js';
 import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.js';
 import type { QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types';
@@ -36,6 +38,19 @@ export interface TvUi {
   setFinal(result: FinalResult | null): void;
   /** Uma reação dos celulares (aplauso, fogo...) para subir pela tela. */
   addReaction(kind: ReactionKind, name?: string): void;
+  /** O guia de melodia tem notas para desenhar (a sala o ligou e a música tem melodia)? */
+  setGuideReady(ready: boolean): void;
+}
+
+/** O que o desenho do guia de melodia precisa a cada quadro. */
+export interface GuideFrame {
+  notes: MelodyNote[];
+  /** Tom escolhido (semitons): as notas da original sobem ou descem junto. */
+  transpose: number;
+  /** A posição (s) da música que se ouve agora. */
+  position: number;
+  /** O que o microfone captou: tempo da música em que foi cantado e a nota (null = sem tom). */
+  trail: { t: number; midi: number | null }[];
 }
 
 type Connection = { send(payload: unknown): void; close(): void };
@@ -55,6 +70,9 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   // pontuação pelo microfone (só quando o anfitrião liga e a música tem a melodia de referência)
   let mic: Awaited<ReturnType<typeof openMic>> | null = null;
   let micFailed = false;
+  // dueto com dois microfones: o segundo microfone e um pontuador por cantor (cada um conta só as linhas dele)
+  let micB: Awaited<ReturnType<typeof openMic>> | null = null;
+  let scorerB: ReturnType<typeof createScorer> | null = null;
   let scorer: ReturnType<typeof createScorer> | null = null;
   let scorerFor: number | null = null; // item que o `scorer` acompanha
   let hud: HudState = { visible: false, score: 0, notice: '', original: '', sung: '' };
@@ -100,54 +118,35 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     },
   });
 
-  // --- pontuação ---
+  // --- pontuação e guia de melodia: os dois leem a melodia da música e o microfone ---
+  let melodyFor: number | null = null; // o item cuja melodia está carregada
+  let melodyData: { hop: number; midi: number[] } | null = null;
+  let guideNotes: MelodyNote[] = [];
+  let guidePitch = 0; // tom escolhido da música atual
+  let partsNow: string | null | undefined = null; // a divisão da letra do dueto na música atual (pode mudar no meio dela)
+  let guideOn = false; // a sala pediu o guia de melodia
+  let trail: { t: number; midi: number | null }[] = [];
+
   function stopScoring() {
     mic?.stop();
     mic = null;
+    micB?.stop();
+    micB = null;
+    scorerB = null;
     micFailed = false;
     scorer = null;
     scorerFor = null;
+    melodyFor = null;
+    melodyData = null;
+    guideNotes = [];
+    guideOn = false;
+    trail = [];
     shownNotes = '';
     setHud({ visible: false });
+    ui.setGuideReady(false);
   }
 
-  /** Prepara (ou mantém) a pontuação da música atual. */
-  async function prepareScoring(state: RoomState, current: QueueItem | null) {
-    if (!state.scoring) return stopScoring();
-    setHud({ visible: Boolean(current) });
-    if (!current) return;
-    const melodyUrl = current.song.media?.melody;
-    if (!melodyUrl) {
-      shownNotes = '';
-      scorer = null;
-      scorerFor = null;
-      return setHud({ notice: t('ctl.noMelody') });
-    }
-    if (scorerFor === current.id) {
-      scorer?.setTranspose(current.pitch);
-      return;
-    }
-    scorerFor = current.id;
-    scorer = null;
-    shownNotes = '';
-    setHud({ score: 0, notice: '' });
-    try {
-      const res = await fetch(melodyUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const melody = await res.json();
-      if (scorerFor !== current.id) return; // a sala já mudou de música
-      scorer = createScorer(melody, {
-        transpose: current.pitch,
-        // depuração: descomente para um log por bloco de 2 s (trecho, nota original, nota cantada e o resultado da comparação)
-        // onBlock: (b) => console.log(
-        //   `[pontuação] ${b.trecho} | original ${b.original} (principais ${b.principais || '—'}) | cantada ${b.cantada} | `
-        //   + `distância ${b.distancia ?? '—'} → acerto ${b.acerto} | leituras ${b.leituras} (participação ${b.participacao})`,
-        // ),
-      });
-    } catch {
-      shownNotes = '';
-      return setHud({ notice: t('ctl.melodyFail') });
-    }
+  async function ensureMic() {
     if (!mic && !micFailed) {
       try {
         mic = await openMic(micsChosen[0]?.id);
@@ -155,17 +154,120 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
         micFailed = true;
       }
     }
-    shownNotes = '';
-    setHud({ notice: micFailed ? t('ctl.micFail') : '' });
+    // dueto pontuado por voz: o segundo microfone é o da voz 2 (se não abrir, a música é pontuada inteira pelo primeiro)
+    if (scorerB && !micB) {
+      try {
+        micB = await openMic(micsChosen[1]?.id);
+      } catch {
+        scorerB = null;
+      }
+    }
   }
 
-  // ~10 leituras por segundo: compara o tom cantado com a melodia no instante atual da música
+  /** Os pontuadores da música: um só, ou um por cantor no dueto com dois microfones (cada um conta só as linhas dele). */
+  function makeScorers(melody: { hop: number; midi: number[] }, current: QueueItem) {
+    const duet = current.guest?.status === 'accepted' && micsChosen.length >= 2;
+    if (!duet) {
+      scorerB = null;
+      return createScorer(melody, { transpose: current.pitch });
+    }
+    const include = (me: 'a' | 'b') => (t: number) => {
+      const cues = engine.cues;
+      return singsAt(cues, splitParts(cues, partsNow), t + engine.offset, me); // a letra anda `offset` s à frente da melodia (o ajuste da letra)
+    };
+    scorerB = createScorer(melody, { transpose: current.pitch, include: include('b') });
+    return createScorer(melody, { transpose: current.pitch, include: include('a') });
+  }
+
+  /** Prepara (ou mantém) a pontuação e o guia de melodia da música atual. */
+  async function prepareScoring(state: RoomState, current: QueueItem | null) {
+    const wantScore = Boolean(state.scoring);
+    const wantGuide = Boolean(state.melody_bars);
+    if (!wantScore && !wantGuide) return stopScoring();
+    guideOn = wantGuide;
+    setHud({ visible: wantScore && Boolean(current) });
+    if (!current) return ui.setGuideReady(false);
+    const melodyUrl = current.song.media?.melody;
+    if (!melodyUrl) {
+      shownNotes = '';
+      scorer = null;
+      scorerFor = null;
+      melodyFor = null;
+      guideNotes = [];
+      ui.setGuideReady(false);
+      return setHud({ notice: wantScore ? t('ctl.noMelody') : '' });
+    }
+    guidePitch = current.pitch;
+    partsNow = current.parts;
+    if (melodyFor === current.id) {
+      scorer?.setTranspose(current.pitch);
+      scorerB?.setTranspose(current.pitch);
+      // o anfitrião ligou ou desligou a pontuação no meio da música: a melodia já está aqui
+      if (wantScore && !scorer && melodyData) {
+        scorer = makeScorers(melodyData, current);
+        scorerFor = current.id;
+        shownNotes = '';
+        setHud({ score: 0, notice: '' });
+      }
+      if (!wantScore && scorer) {
+        scorer = null;
+        scorerB = null;
+        scorerFor = null;
+      }
+      ui.setGuideReady(wantGuide && guideNotes.length > 0);
+      return ensureMic();
+    }
+    melodyFor = current.id;
+    melodyData = null;
+    scorer = null;
+    scorerB = null;
+    scorerFor = null;
+    guideNotes = [];
+    trail = [];
+    shownNotes = '';
+    ui.setGuideReady(false);
+    if (wantScore) setHud({ score: 0, notice: '' });
+    try {
+      const res = await fetch(melodyUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const melody = await res.json();
+      if (melodyFor !== current.id) return; // a sala já mudou de música
+      melodyData = melody;
+      guideNotes = melodyNotes(melody);
+      if (wantScore) {
+        scorer = makeScorers(melody, current);
+        scorerFor = current.id;
+      }
+    } catch {
+      melodyFor = null;
+      shownNotes = '';
+      return setHud({ notice: wantScore ? t('ctl.melodyFail') : '' });
+    }
+    ui.setGuideReady(wantGuide && guideNotes.length > 0);
+    await ensureMic();
+    shownNotes = '';
+    setHud({ notice: wantScore && micFailed ? t('ctl.micFail') : '' });
+  }
+
+  // ~10 leituras por segundo: o microfone alimenta a trilha do guia e a pontuação (a nota cantada contra a melodia no instante)
   const scoreTimer = setInterval(() => {
-    if (!scorer || !mic || !engine.playing || engine.loadedId !== scorerFor) return;
+    if (!mic || !engine.playing || engine.loadedId === null || engine.loadedId !== melodyFor) return;
     const { midi } = mic.read();
-    const live = scorer.tick(sungPosition(engine.currentTime, latency), midi);
-    const original = noteName(scorer.reference);
-    const sung = noteName(scorer.sung);
+    const at = sungPosition(engine.currentTime, latency);
+    if (guideOn) trail = pushTrail(trail, { t: at, midi });
+    if (!scorer || engine.loadedId !== scorerFor) return;
+    let live: number | null = scorer.tick(at, midi);
+    let shown = scorer; // de quem são as notas mostradas no quadro: no dueto, de quem canta agora
+    if (scorerB && micB) {
+      const liveB = scorerB.tick(at, micB.read().midi);
+      const cues = engine.cues;
+      const parts = splitParts(cues, partsNow);
+      if (singsAt(cues, parts, at + engine.offset, 'b') && !singsAt(cues, parts, at + engine.offset, 'a')) shown = scorerB;
+      const values = [live, liveB].filter((value): value is number => value !== null);
+      live = values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null; // o quadro mostra a média da dupla
+    }
+    const original = noteName(shown.reference);
+    const sung = noteName(shown.sung);
     const key = `${original}|${sung}`;
     if (key !== shownNotes) {
       shownNotes = key;
@@ -176,9 +278,25 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
 
   /** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */
   function reportScore(itemId: number) {
-    if (!scorer || scorerFor !== itemId || scorer.evaluated < MIN_SCORED_FRAMES) return;
+    if (!scorer || scorerFor !== itemId) return;
+    const item = latest?.queue.find((entry) => entry.id === itemId);
+    if (scorerB) {
+      // dueto pontuado por voz: cada cantor tem a sua nota (só das linhas dele); a nota da música é a média das que valem
+      const a = scorer.evaluated >= MIN_SCORED_FRAMES ? (scorer.score() as number) : null;
+      const b = scorerB.evaluated >= MIN_SCORED_FRAMES ? (scorerB.score() as number) : null;
+      const values = [a, b].filter((value): value is number => value !== null);
+      if (!values.length) return;
+      const average = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+      const names = [a !== null ? `${item?.added_by ?? ''} ${a}` : null, b !== null ? `${item?.guest?.name ?? ''} ${b}` : null].filter(Boolean);
+      connection.send({ type: 'score', item_id: itemId, score: average });
+      ui.setFinal({ score: average, singer: names.join(' · '), message: finalMessage(average) });
+      clearTimeout(finalTimer);
+      finalTimer = setTimeout(() => ui.setFinal(null), FINAL_SECONDS * 1000);
+      return;
+    }
+    if (scorer.evaluated < MIN_SCORED_FRAMES) return;
     const score = scorer.score() as number;
-    const singer = latest?.queue.find((item) => item.id === itemId)?.singers ?? '';
+    const singer = item?.singers ?? '';
     // depuração: descomente para ver a nota final e a tabela com todos os blocos
     // console.log(`[pontuação] fim da música: ${score} pontos`);
     // console.table(scorer.report());
@@ -312,7 +430,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
             engine.setBacking(current.backing);
             engine.setGuide(current.guide);
             engine.setOffset(current.lyric_offset);
-            engine.setDuet(current.guest?.status === 'accepted');
+            engine.setDuet(current.guest?.status === 'accepted', current.parts);
           }
           await syncPlayback(state.playback);
           if (engine.playing && current.pitch !== 0 && !engine.pitchAvailable) {
@@ -344,6 +462,10 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     engine,
     get mics() {
       return micsChosen;
+    },
+    /** O quadro do guia de melodia: as notas, o tom, a posição que se ouve e o que foi cantado há pouco. */
+    guideFrame(): GuideFrame {
+      return { notes: guideNotes, transpose: guidePitch, position: engine.heardTime, trail };
     },
     /** Escolhe os microfones da saída (e da pontuação, o primeiro); a voz reabre sozinha com a nova escolha. */
     setMics(next: { id: string; label: string }[]) {

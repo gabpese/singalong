@@ -17,9 +17,15 @@ const MIN_CHORUS_CHARS = 8;
  *  - linhas que se REPETEM (o refrão) são cantadas pelos dois ('both');
  *  - as demais se alternam, uma linha para cada cantor (a, b, a, b...), começando por quem adicionou a música;
  *  - linhas vazias não têm parte (null) e não contam na alternância.
+ * Se os cantores escolheram a divisão (`assigned`, texto a b * -) e ela combina com a letra, vale ela.
  * Devolve um array do mesmo tamanho de `cues`.
+ *
+ * @param {Array<{ text?: string }>} cues
+ * @param {string | null | undefined} [assigned] a divisão escolhida pelos cantores
  */
-export function splitParts(cues) {
+export function splitParts(cues, assigned = null) {
+  const chosen = decodeParts(assigned, cues?.length ?? 0);
+  if (chosen) return chosen;
   const keys = (cues ?? []).map((cue) => normalize(cue?.text));
   const counts = new Map();
   for (const key of keys) if (key.length >= MIN_CHORUS_CHARS) counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -29,6 +35,43 @@ export function splitParts(cues) {
     if ((counts.get(key) ?? 0) > 1) return 'both';
     return turn++ % 2 === 0 ? 'a' : 'b';
   });
+}
+
+const PART_BY_CHAR = { a: 'a', b: 'b', '*': 'both', '-': null };
+const CHAR_BY_PART = { a: 'a', b: 'b', both: '*' };
+
+/**
+ * A divisão escolhida pelos cantores (texto com `a`, `b`, `*` = os dois e `-` = ninguém, uma letra por linha da letra) como
+ * a lista de partes. Se não existe, não tem o tamanho da letra (a letra mudou) ou tem letras estranhas: null, e vale a automática.
+ */
+export function decodeParts(text, lines) {
+  if (typeof text !== 'string' || text.length !== lines || !/^[ab*-]+$/.test(text)) return null;
+  return [...text].map((char) => PART_BY_CHAR[char]);
+}
+
+/** A lista de partes ('a' | 'b' | 'both' | null) como o texto que o servidor guarda. */
+export const encodeParts = (parts) => parts.map((part) => CHAR_BY_PART[part] ?? '-').join('');
+
+/**
+ * A parte que canta no instante `t` (s): a da linha da letra que está no ar ('a', 'b' ou 'both'), ou null entre as linhas.
+ * @param {Array<{ start: number, end: number }>} cues
+ * @param {Array<'a' | 'b' | 'both' | null>} parts a divisão (uma parte por linha)
+ */
+export function partAtTime(cues, parts, t) {
+  const index = (cues ?? []).findIndex((cue) => cue.start <= t && t < cue.end);
+  return index < 0 ? null : parts[index] ?? null;
+}
+
+/**
+ * O cantor `me` ('a' ou 'b') canta no instante `t`? (as linhas "juntos" contam para os dois)
+ * @param {Array<{ start: number, end: number }>} cues
+ * @param {Array<'a' | 'b' | 'both' | null>} parts
+ * @param {number} t
+ * @param {'a' | 'b'} me
+ */
+export function singsAt(cues, parts, t, me) {
+  const part = partAtTime(cues, parts, t);
+  return part === me || part === 'both';
 }
 
 /** Qual é a minha parte no palco? Quem adicionou a música é o 'a' (turquesa, círculo); o convidado, o 'b' (violeta, quadrado). */

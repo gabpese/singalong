@@ -135,3 +135,20 @@ test('createScorer: a nota cantada mostrada tem a oitava de quem canta', () => {
   assert.equal(noteName(s.sung), 'A4');
   assert.equal(s.score(), 100); // a oitava não muda a pontuação
 });
+
+test('createScorer com include (dueto): só os instantes deste cantor contam; o silêncio fora deles não pune', () => {
+  const midi = [...hold(60, FRAMES), ...hold(67, FRAMES)]; // 0–2 s: nota 60 (voz 1); 2–4 s: nota 67 (voz 2)
+  const voiceOne = (t) => t < 2;
+  const voiceTwo = (t) => t >= 2;
+  // a voz 1 acerta a parte dela e fica calada na da voz 2; a voz 2 faz o inverso
+  const one = run(midi, (i) => (i < FRAMES ? 60 : null), { include: voiceOne });
+  const two = run(midi, (i) => (i >= FRAMES ? 67 : null), { include: voiceTwo });
+  assert.equal(one.score(), 100);
+  assert.equal(two.score(), 100);
+  // sem include, ficar calado na parte do outro custaria metade da nota
+  assert.equal(run(midi, (i) => (i < FRAMES ? 60 : null)).score(), 50);
+  // quem erra a própria parte continua sendo cobrado
+  assert.equal(run(midi, (i) => (i < FRAMES ? 62 : null), { include: voiceOne }).score() < 100, true);
+  // e os quadros do outro cantor nem entram na conta (menos quadros avaliados)
+  assert.ok(one.evaluated < run(midi, () => null).evaluated);
+});

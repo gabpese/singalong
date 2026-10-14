@@ -77,7 +77,8 @@ Rooms and the queue live in a SQLite database in the Docker volume `api-data`.
 | `GET /api/rooms/:code` | state: queue, what is playing, `tv_connected`, `me.is_host` |
 | `POST /api/rooms/:code/queue` `{url \| video_id, lyrics?, artist?, title?, name?, pitch?}` | adds to the queue (and requests processing right away) |
 | `DELETE /api/rooms/:code/queue/:item` · `POST …/move {direction}` · `PATCH …/queue/:item {pitch}` | remove · move (`down` = yield the turn, the owner may; `up` host only) · key |
-| `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair}` | control (host) |
+| `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair, scoring, voice, voice_volume, melody_bars}` | control and room settings (host) |
+| `PUT /api/rooms/:code/songs/:id/parts {parts}` | who sings each lyric line in a duet (`a b * -`; the singers or the host) |
 | `PUT /api/rooms/:code/songs/:id/offset {offset}` | lyrics offset, in seconds (host) |
 | `WS /api/rooms/:code/ws?role=tv\|controller` | real-time state; the TV sends `ended` and `position` |
 | `GET /api/search?q=` | searches YouTube videos (served by the worker; 10-minute cache) |

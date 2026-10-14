@@ -31,7 +31,7 @@ function RailSwitch({ icon, label, tip, checked, onToggle }: { icon: IconName; l
 }
 
 /** Ajuste do anfitrião que vai no PATCH da sala. */
-function useHostField(field: 'fair' | 'scoring' | 'voice', checked: boolean, names: [string, string]) {
+function useHostField(field: 'fair' | 'scoring' | 'voice' | 'melody_bars', checked: boolean, names: [string, string]) {
   const { act, toast } = useRoom();
   const [pending, setPending] = useState<boolean | null>(null);
   const set = (value: boolean) => {
@@ -52,6 +52,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
   const { code, isHost, toast } = useRoom();
   const scoring = useHostField('scoring', Boolean(state?.scoring), [t('rail.scoringOn'), t('rail.scoringOff')]);
   const voice = useHostField('voice', Boolean(state?.voice), [t('rail.voiceOn'), t('rail.voiceOff')]);
+  const melody = useHostField('melody_bars', Boolean(state?.melody_bars), [t('rail.melodyOn'), t('rail.melodyOff')]);
   const fair = useHostField('fair', Boolean(state?.fair), [t('rail.fairOn'), t('rail.fairOff')]);
   const [asking, setAsking] = useState(false);
 
@@ -121,6 +122,9 @@ export function RoomRail({ state }: { state: RoomState | null }) {
               <VoiceVolume />
             </div>
           </div>
+          <Item>
+            <RailSwitch icon="melody" label={t('rail.melody')} tip={t('rail.melodyTip')} checked={melody.value} onToggle={melody.set} />
+          </Item>
           <Item>
             <RailSwitch icon="shuffle" label={t('rail.fair')} tip={t('rail.fairTip')} checked={fair.value} onToggle={fair.set} />
           </Item>

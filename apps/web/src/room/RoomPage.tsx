@@ -4,7 +4,7 @@ import { t } from '../i18n/index.js';
 import { api, setUserName, userName } from '../lib/identity.js';
 import { splitQueue } from '../lib/queue-view.js';
 import { stageDismissed, stageItemFor } from '../lib/stage.js';
-import type { LibrarySong, QueueItem, RoomState } from '../lib/types';
+import type { LibrarySong, LyricCue, QueueItem, RoomState } from '../lib/types';
 import { AddSong, type AddSongHandle } from './AddSong';
 import { InviteBanner } from './Duet';
 import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast, type View } from './context';
@@ -71,10 +71,37 @@ export function RoomPage({ code }: { code: string }) {
     void loadLibrary();
   }, [readyKey, loadLibrary]);
 
+  /** A letra de uma música: do servidor; no computador do dono só a da música que toca (a TV a repassa pelo servidor). */
+  const loadCues = useCallback(
+    async (item: QueueItem): Promise<LyricCue[] | null> => {
+      const media = item.song.media;
+      if (!media) return null;
+      if (media.local) return lyrics && lyrics.itemId === item.id ? lyrics.cues : null;
+      try {
+        const res = await fetch(media.lyrics);
+        const cues = res.ok ? await res.json() : null;
+        return Array.isArray(cues) ? cues : null;
+      } catch {
+        return null;
+      }
+    },
+    [lyrics],
+  );
+
   const myName = name.trim() || t('room.someone');
   const context: RoomContextValue = useMemo(
-    () => ({ code, state, isHost: Boolean(state?.me?.is_host), act, toast: show, myName, showTab, react: (kind) => send({ type: 'reaction', kind }) }),
-    [code, state, act, show, myName, showTab, send],
+    () => ({
+      code,
+      state,
+      isHost: Boolean(state?.me?.is_host),
+      act,
+      toast: show,
+      myName,
+      showTab,
+      react: (kind) => send({ type: 'reaction', kind }),
+      loadCues,
+    }),
+    [code, state, act, show, myName, showTab, send, loadCues],
   );
 
   useEffect(() => {

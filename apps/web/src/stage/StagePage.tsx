@@ -97,7 +97,7 @@ export function StagePage({ code }: { code: string }) {
       itemRef.current = mine;
       itemInfo.current = current;
       setItem(current);
-      view.current?.setDuet(current?.guest?.status === 'accepted');
+      view.current?.setDuet(current?.guest?.status === 'accepted', current?.parts);
       clock.current.reset();
       clock.current.position(state.position_ms);
       const waiting = pendingLyrics.current;
@@ -106,7 +106,7 @@ export function StagePage({ code }: { code: string }) {
     if (state.current_item_id === itemRef.current) {
       itemInfo.current = current ?? itemInfo.current;
       if (current) setItem(current); // título, cantor e ajuste da letra sempre atuais
-      view.current?.setDuet(current?.guest?.status === 'accepted'); // dueto: a letra ganha as duas cores
+      view.current?.setDuet(current?.guest?.status === 'accepted', current?.parts); // dueto: a letra ganha as duas cores
       clock.current.setPlaying(state.playback === 'playing');
       view.current?.setOffset(current?.lyric_offset ?? 0);
       // com a música no servidor (ou na nuvem) a letra vem direto; no computador do dono só a TV a alcança e a repassa pelo servidor

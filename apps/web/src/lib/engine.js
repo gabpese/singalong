@@ -208,7 +208,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const loaded = await res.json();
         if (token !== loadToken) return; // outra música foi pedida no meio do caminho
-        view.setDuet(item.guest?.status === 'accepted'); // dueto: a letra ganha as duas cores
+        view.setDuet(item.guest?.status === 'accepted', item.parts); // dueto: a letra ganha as duas cores (a divisão dos cantores, se houver)
         view.setCues(loaded);
         onLyrics?.(item.id, loaded);
       } catch (err) {
@@ -318,9 +318,13 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
       render();
     },
 
-    /** Dueto ligado ou desligado para a música atual (vale também no meio dela). */
-    setDuet(on) {
-      view.setDuet(on);
+    /**
+     * Dueto ligado ou desligado para a música atual (vale também no meio dela).
+     * @param {boolean} on
+     * @param {string | null} [chosen] a divisão escolhida pelos cantores (texto a b * -)
+     */
+    setDuet(on, chosen = null) {
+      view.setDuet(on, chosen);
       render();
     },
 

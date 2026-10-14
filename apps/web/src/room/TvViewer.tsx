@@ -67,7 +67,7 @@ export function TvViewer({ state, position, lyrics }: Props) {
   useEffect(() => {
     clock.current.setPlaying(Boolean(current) && state?.playback === 'playing');
     view.current?.setOffset(current?.lyric_offset ?? 0);
-    view.current?.setDuet(current?.guest?.status === 'accepted');
+    view.current?.setDuet(current?.guest?.status === 'accepted', current?.parts);
   }, [current, state?.playback]);
 
   // a posição que a TV informa a cada segundo

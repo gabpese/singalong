@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   scoring         INTEGER NOT NULL DEFAULT 0,       -- pontuação pelo microfone (decidida pelo anfitrião)
   voice           INTEGER NOT NULL DEFAULT 0,       -- a voz do microfone da TV sai nas caixas junto com a música (decidida pelo anfitrião)
   voice_volume    INTEGER NOT NULL DEFAULT 40,      -- volume dessa voz, de 0 a 100
+  melody_bars     INTEGER NOT NULL DEFAULT 0,       -- guia de melodia na TV: as notas da voz original como barras (decidido pelo anfitrião)
   current_item_id INTEGER,
   playback        TEXT NOT NULL DEFAULT 'idle',   -- idle | playing | paused
   last_client_id  TEXT,                           -- quem cantou por último (rodízio justo)
@@ -39,7 +40,8 @@ CREATE TABLE IF NOT EXISTS queue_items (
 CREATE INDEX IF NOT EXISTS idx_items_room ON queue_items (room_code, status, position);
 CREATE TABLE IF NOT EXISTS song_settings (
   video_id     TEXT PRIMARY KEY,
-  lyric_offset REAL NOT NULL DEFAULT 0
+  lyric_offset REAL NOT NULL DEFAULT 0,
+  parts        TEXT                         -- dueto: quem canta cada linha da letra (a b * -), escolhido pelos cantores; nulo = automático
 );
 -- Agente local (o app instalado no computador do dono): dispositivos pareados, códigos de pareamento e sessões.
 CREATE TABLE IF NOT EXISTS devices (
@@ -106,7 +108,7 @@ CREATE TABLE IF NOT EXISTS agent_songs (
 );
 `;
 
-const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
+const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'melody_bars', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
 const ITEM_FIELDS = new Set(['pitch', 'backing', 'guide', 'position', 'status', 'played_at', 'score', 'title', 'artist', 'guest_client_id', 'guest_name', 'guest_status']);
 
 export function openDb(path = ':memory:') {
@@ -114,6 +116,9 @@ export function openDb(path = ':memory:') {
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA);
   // bancos criados antes da limpeza do cache não têm last_played_at
+  if (!db.prepare('PRAGMA table_info(song_settings)').all().some((c) => c.name === 'parts')) {
+    db.exec('ALTER TABLE song_settings ADD COLUMN parts TEXT');
+  }
   if (!db.prepare('PRAGMA table_info(song_settings)').all().some((c) => c.name === 'last_played_at')) {
     db.exec('ALTER TABLE song_settings ADD COLUMN last_played_at INTEGER');
   }
@@ -123,6 +128,7 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('rooms', 'scoring')) db.exec('ALTER TABLE rooms ADD COLUMN scoring INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('rooms', 'voice')) db.exec('ALTER TABLE rooms ADD COLUMN voice INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('rooms', 'voice_volume')) db.exec('ALTER TABLE rooms ADD COLUMN voice_volume INTEGER NOT NULL DEFAULT 40');
+  if (!hasColumn('rooms', 'melody_bars')) db.exec('ALTER TABLE rooms ADD COLUMN melody_bars INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('queue_items', 'score')) db.exec('ALTER TABLE queue_items ADD COLUMN score INTEGER');
   if (!hasColumn('queue_items', 'guest_client_id')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_client_id TEXT');
   if (!hasColumn('queue_items', 'guest_name')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_name TEXT');
@@ -319,6 +325,13 @@ export function openDb(path = ':memory:') {
     /** Músicas em uso (tocando ou na fila de alguma sala): nunca entram na limpeza. */
     activeVideoIds: () => new Set(all("SELECT DISTINCT video_id FROM queue_items WHERE status IN ('queued', 'playing')").map((r) => r.video_id)),
     getOffset: (videoId) => one('SELECT lyric_offset FROM song_settings WHERE video_id = ?', videoId)?.lyric_offset ?? 0,
+    getParts: (videoId) => one('SELECT parts FROM song_settings WHERE video_id = ?', videoId)?.parts ?? null,
+    setParts: (videoId, parts) =>
+      run(
+        `INSERT INTO song_settings (video_id, parts) VALUES (?, ?)
+         ON CONFLICT(video_id) DO UPDATE SET parts = excluded.parts`,
+        videoId, parts,
+      ),
     setOffset: (videoId, offset) =>
       run(
         `INSERT INTO song_settings (video_id, lyric_offset) VALUES (?, ?)
