@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   scoring         INTEGER NOT NULL DEFAULT 0,       -- pontuação pelo microfone (decidida pelo anfitrião)
   voice           INTEGER NOT NULL DEFAULT 0,       -- a voz do microfone da TV sai nas caixas junto com a música (decidida pelo anfitrião)
   voice_volume    INTEGER NOT NULL DEFAULT 40,      -- volume dessa voz, de 0 a 100
+  melody_bars     INTEGER NOT NULL DEFAULT 0,       -- guia de melodia na TV: as notas da voz original como barras (decidido pelo anfitrião)
   current_item_id INTEGER,
   playback        TEXT NOT NULL DEFAULT 'idle',   -- idle | playing | paused
   last_client_id  TEXT,                           -- quem cantou por último (rodízio justo)
@@ -106,7 +107,7 @@ CREATE TABLE IF NOT EXISTS agent_songs (
 );
 `;
 
-const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
+const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'melody_bars', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
 const ITEM_FIELDS = new Set(['pitch', 'backing', 'guide', 'position', 'status', 'played_at', 'score', 'title', 'artist', 'guest_client_id', 'guest_name', 'guest_status']);
 
 export function openDb(path = ':memory:') {
@@ -123,6 +124,7 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('rooms', 'scoring')) db.exec('ALTER TABLE rooms ADD COLUMN scoring INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('rooms', 'voice')) db.exec('ALTER TABLE rooms ADD COLUMN voice INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('rooms', 'voice_volume')) db.exec('ALTER TABLE rooms ADD COLUMN voice_volume INTEGER NOT NULL DEFAULT 40');
+  if (!hasColumn('rooms', 'melody_bars')) db.exec('ALTER TABLE rooms ADD COLUMN melody_bars INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('queue_items', 'score')) db.exec('ALTER TABLE queue_items ADD COLUMN score INTEGER');
   if (!hasColumn('queue_items', 'guest_client_id')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_client_id TEXT');
   if (!hasColumn('queue_items', 'guest_name')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_name TEXT');

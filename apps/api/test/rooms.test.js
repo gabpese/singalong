@@ -582,3 +582,14 @@ test('voz original (guia): o nível (0..100) segue as mesmas regras das vozes de
   assert.equal((await itemOf()).guide, 10);
   assert.equal((await setting(ANA, { guide: 'alto' })).status, 400);
 });
+
+test('guia de melodia: só o anfitrião liga, começa desligado e um ajuste não mexe nos outros', async () => {
+  const { code, host } = await newRoom();
+  assert.equal((await call('GET', `/rooms/${code}`)).body.melody_bars, false);
+  assert.equal((await call('PATCH', `/rooms/${code}`, { client: BIA, body: { melody_bars: true } })).status, 403);
+  const on = await call('PATCH', `/rooms/${code}`, { host, body: { melody_bars: true } });
+  assert.deepEqual([on.body.melody_bars, on.body.scoring, on.body.voice, on.body.fair], [true, false, false, false]);
+  assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: { scoring: true } })).body.melody_bars, true); // outro ajuste não o desliga
+  assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: { melody_bars: 'sim' } })).status, 400);
+  assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: { melody_bars: false } })).body.melody_bars, false);
+});

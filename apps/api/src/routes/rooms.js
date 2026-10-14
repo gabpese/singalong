@@ -41,7 +41,7 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
       body: {
         type: 'object',
         additionalProperties: false,
-        properties: { fair: { type: 'boolean' }, scoring: { type: 'boolean' }, voice: { type: 'boolean' }, voice_volume: { type: 'integer', minimum: 0, maximum: 100 } },
+        properties: { fair: { type: 'boolean' }, scoring: { type: 'boolean' }, voice: { type: 'boolean' }, voice_volume: { type: 'integer', minimum: 0, maximum: 100 }, melody_bars: { type: 'boolean' } },
         minProperties: 1,
       },
     },

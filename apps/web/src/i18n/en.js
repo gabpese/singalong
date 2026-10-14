@@ -375,4 +375,10 @@ export default {
   'react.heart': 'Love it',
   'react.party': 'Party',
   'react.wow': 'Wow',
+
+  'melody.aria': 'Melody guide: the notes of the song and your pitch',
+  'rail.melody': 'Melody guide',
+  'rail.melodyTip': "Melody guide: the TV shows the notes of the song as bars and the singer's pitch on top (needs a microphone on the TV)",
+  'rail.melodyOn': 'Melody guide on.',
+  'rail.melodyOff': 'Melody guide off.',
 };

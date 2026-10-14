@@ -375,4 +375,10 @@ export default {
   'react.heart': 'Me encanta',
   'react.party': 'Fiesta',
   'react.wow': 'Guau',
+
+  'melody.aria': 'Guía de melodía: las notas de la canción y tu afinación',
+  'rail.melody': 'Guía de melodía',
+  'rail.melodyTip': 'Guía de melodía: la TV muestra las notas de la canción como barras y la afinación de quien canta por encima (necesita micrófono en la TV)',
+  'rail.melodyOn': 'Guía de melodía activada.',
+  'rail.melodyOff': 'Guía de melodía desactivada.',
 };

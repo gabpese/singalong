@@ -66,6 +66,8 @@ export interface RoomState {
   /** A voz do microfone da TV sai nas caixas junto com a música (o anfitrião liga) e o volume dela, de 0 a 100. */
   voice: boolean;
   voice_volume: number;
+  /** Guia de melodia na TV: as notas da voz original como barras, com a afinação de quem canta por cima. */
+  melody_bars: boolean;
   scoreboard: ScoreRow[];
   play_order: number[];
   playback: Playback;

@@ -259,6 +259,7 @@ export function createRoomService({
       scoring: Boolean(room.scoring),
       voice: Boolean(room.voice),
       voice_volume: room.voice_volume ?? 40,
+      melody_bars: Boolean(room.melody_bars),
       scoreboard: db.listScored(room.code).map((r) => ({ id: r.id, name: r.guest_status === 'accepted' ? `${r.added_by} & ${r.guest_name}` : r.added_by, title: r.title, score: r.score })),
       // quem está na sala agora (para convidar para um dueto): só o nome e uma identificação que não revela o client_id
       people: hub.people(room.code).map((p) => ({ pid: pidOf(p.clientId), name: p.name })),
@@ -493,7 +494,7 @@ export function createRoomService({
 
     /**
      * Ajustes da sala, só do anfitrião: `fair` (rodízio justo), `scoring` (pontuação pelo microfone), `voice` (a voz do
-     * microfone da TV sai nas caixas junto com a música) e `voice_volume` (0 a 100).
+     * microfone da TV sai nas caixas junto com a música), `voice_volume` (0 a 100) e `melody_bars` (o guia de melodia na TV).
      */
     setSettings(code, settings, actor) {
       return mutate(code, actor, (room) => {
@@ -502,6 +503,7 @@ export function createRoomService({
         if (typeof settings.fair === 'boolean') fields.fair = settings.fair ? 1 : 0;
         if (typeof settings.scoring === 'boolean') fields.scoring = settings.scoring ? 1 : 0;
         if (typeof settings.voice === 'boolean') fields.voice = settings.voice ? 1 : 0;
+        if (typeof settings.melody_bars === 'boolean') fields.melody_bars = settings.melody_bars ? 1 : 0;
         if (Number.isInteger(settings.voice_volume)) fields.voice_volume = Math.min(100, Math.max(0, settings.voice_volume));
         db.updateRoom(room.code, fields);
       });

@@ -41,7 +41,7 @@ export function QrCode({ code, compact = false }: { code: string; compact?: bool
 
   return (
     <>
-      <div className="qr" aria-label={t('tvp.qrAria')} dangerouslySetInnerHTML={{ __html: join?.svg ?? '' }} />
+      <div className="qr" role="img" aria-label={t('tvp.qrAria')} dangerouslySetInnerHTML={{ __html: join?.svg ?? '' }} />
       <p className="hint" hidden={compact}>
         {join?.url}
         {join?.localhostWarning ? t('tvp.qrLocalhost') : ''}
