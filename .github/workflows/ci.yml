@@ -165,7 +165,7 @@ jobs:
             start=$(date +%s)
             if "$MOTOR/python/bin/python3" -m demucs --two-stems=vocals -n htdemucs -d "$device" -o "bench-$device" bench.wav > "bench-$device.log" 2>&1; then status=ok; else status="FALHOU"; fi
             echo "$device $status $(( $(date +%s) - start ))" >> bench.txt
-            tail -3 "bench-$device.log"
+            tail -12 "bench-$device.log"
           done
           { echo "### Demucs em 30 s de áudio (macOS do CI)"; echo '```'; cat bench.txt; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
 
