@@ -45,23 +45,35 @@ export function signatureScript(file) {
   ].join('\n');
 }
 
-/** Lê a assinatura de um arquivo. O script vai codificado (UTF-16 em base64): nenhuma aspas do caminho passa pelo shell. */
+/**
+ * Lê a assinatura de um arquivo. O script vai codificado (UTF-16 em base64): nenhuma aspas do caminho passa pelo shell.
+ * O `powershell.exe` (5.1) herda o PSModulePath do PowerShell 7 quando o build roda dentro dele (como nos executores do GitHub) e
+ * então não consegue carregar o módulo de segurança: por isso a variável é limpa para ele; se ainda falhar, tenta o `pwsh`.
+ */
 export async function readSignature(file) {
   const encoded = Buffer.from(signatureScript(file), 'utf16le').toString('base64');
-  let stdout = '';
-  let stderr = '';
-  for (const shell of ['powershell.exe', 'pwsh']) {
+  const { PSModulePath: _ignored, ...cleanEnv } = process.env;
+  let last = null;
+  let problem = '';
+  for (const [shell, env] of [['powershell.exe', cleanEnv], ['pwsh', process.env]]) {
+    let stdout = '';
     try {
-      ({ stdout, stderr } = await run(shell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }));
+      ({ stdout } = await run(shell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout: 120_000, maxBuffer: 4 * 1024 * 1024, env }));
     } catch (error) {
-      stderr = `${shell}: ${error.stderr || error.message}`;
-      continue; // tenta o outro
+      problem = `${shell}: ${error.stderr || error.message}`;
+      continue; // não existe ou falhou: tenta o outro
     }
-    if (stdout.trim()) break;
+    const text = stdout.trim().replace(/^﻿/, '');
+    if (!text) {
+      problem = `${shell}: não devolveu nada`;
+      continue;
+    }
+    const report = parseSignatureReport(text);
+    if (!report.failed) return report;
+    last = report; // o PowerShell respondeu, mas não conseguiu ler: tenta o outro antes de desistir
   }
-  const text = stdout.trim().replace(/^\uFEFF/, '');
-  if (!text) throw new Error(`Não consegui ler a assinatura de ${file}: o PowerShell não devolveu nada.${stderr ? ` Erro: ${stderr.trim()}` : ''}`);
-  return parseSignatureReport(text);
+  if (last) return last;
+  throw new Error(`Não consegui ler a assinatura de ${file}. ${problem.trim()}`);
 }
 
 /** Aplica as exigências: devolve a lista de problemas (vazia = tudo certo). */
