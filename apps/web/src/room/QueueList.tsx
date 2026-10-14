@@ -5,6 +5,7 @@ import { api } from '../lib/identity.js';
 import { keySummary } from '../lib/music.js';
 import { canRetry, playOrder, songChip, thumbnailUrl } from '../lib/queue-view.js';
 import type { ApiError, QueueItem, RoomState } from '../lib/types';
+import { BetaTag } from '../ui/BetaTag';
 import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
 import { BackingControl, GuideControl } from './BackingControl';
@@ -154,7 +155,9 @@ export function QueueList({
 export function Scoreboard({ state }: { state: RoomState }) {
   return (
     <article className="card" hidden={!state.scoring && !state.scoreboard?.length}>
-      <h2>{t('score.title')}</h2>
+      <h2>
+        {t('score.title')} <BetaTag />
+      </h2>
       <ol className="scoreboard">
         {(state.scoreboard ?? []).map((row) => (
           <li key={row.id}>

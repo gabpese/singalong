@@ -178,3 +178,18 @@ test('o QR code da sala continua na TV com a música tocando (ao lado de quem es
   await expect(page.locator('.room-tag')).toContainText(room.code); // o código escrito continua no cabeçalho
   await expect(page.locator('.singer.is-now')).toBeVisible();
 });
+
+test('pontuação e guia de melodia estão marcados como beta (interruptores, guia e quadro da TV)', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await hostPatch(request, room, { scoring: true, melody_bars: true });
+  await page.goto(room.hostUrl);
+  await expect(page.getByRole('switch', { name: 'Pontuação pelo microfone (beta)' })).toBeVisible();
+  await expect(page.getByRole('switch', { name: 'Guia de melodia (beta)' })).toBeVisible();
+  const tv = await page.context().newPage();
+  await tv.goto(room.tvUrl);
+  await expect.poll(() => tv.evaluate(() => window.tv.engine.playing)).toBe(true);
+  await expect(tv.locator('.score-hud .beta-tag')).toBeVisible();
+  await expect(tv.locator('.guide-card .beta-tag')).toBeVisible();
+  await expect(tv.locator('.guide-card .beta-tag')).toHaveAttribute('title', /ainda não é totalmente fiel/);
+});

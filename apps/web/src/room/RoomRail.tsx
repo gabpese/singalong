@@ -21,10 +21,11 @@ function RailButton({ icon, label, tip, onClick }: { icon: IconName; label: stri
 }
 
 /** Um ajuste ligado/desligado (switch): o clique vale na hora e volta atrás só se o servidor recusar. */
-function RailSwitch({ icon, label, tip, checked, onToggle }: { icon: IconName; label: string; tip: string; checked: boolean; onToggle: (next: boolean) => void }) {
+function RailSwitch({ icon, label, tip, checked, onToggle, beta = false }: { icon: IconName; label: string; tip: string; checked: boolean; onToggle: (next: boolean) => void; beta?: boolean }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} data-tip={tip} className={`rail-switch${checked ? ' on' : ''}`} onClick={() => onToggle(!checked)}>
+    <button type="button" role="switch" aria-checked={checked} aria-label={beta ? `${label} (${t('beta.tag')})` : label} data-tip={beta ? `${tip}. ${t('beta.note')}` : tip} className={`rail-switch${checked ? ' on' : ''}`} onClick={() => onToggle(!checked)}>
       <Icon name={icon} />
+      {beta && <span className="beta-dot" aria-hidden="true">{t('beta.tag')}</span>}
       <span className="sw" aria-hidden="true" />
     </button>
   );
@@ -108,7 +109,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
         <>
           <span className="rail-sep" aria-hidden="true" />
           <Item>
-            <RailSwitch icon="mic" label={t('rail.scoring')} tip={t('rail.scoringTip')} checked={scoring.value} onToggle={scoring.set} />
+            <RailSwitch icon="mic" label={t('rail.scoring')} tip={t('rail.scoringTip')} checked={scoring.value} onToggle={scoring.set} beta />
           </Item>
           <div className={`rail-item has-pop${voice.value ? ' voice-on' : ''}`}>
             <RailSwitch
@@ -125,7 +126,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
             </div>
           </div>
           <Item>
-            <RailSwitch icon="melody" label={t('rail.melody')} tip={t('rail.melodyTip')} checked={melody.value} onToggle={melody.set} />
+            <RailSwitch icon="melody" label={t('rail.melody')} tip={t('rail.melodyTip')} checked={melody.value} onToggle={melody.set} beta />
           </Item>
           <Item>
             <RailSwitch icon="shuffle" label={t('rail.fair')} tip={t('rail.fairTip')} checked={fair.value} onToggle={fair.set} />

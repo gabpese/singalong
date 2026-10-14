@@ -235,6 +235,8 @@ export default {
   'rail.prompt': 'Copia el enlace:',
   'rail.scoring': 'Puntuación por micrófono',
   'rail.scoringTip': 'Puntuación por micrófono: la TV compara la afinación de quien canta con la voz original (necesita micrófono en la TV)',
+  'beta.tag': 'beta',
+  'beta.note': "En fase beta: aún no es totalmente fiel a la voz original, así que tómalo como diversión.",
   'rail.scoringOn': 'Puntuación activada.',
   'rail.scoringOff': 'Puntuación desactivada.',
   'rail.voice': 'Voz del micrófono en los altavoces',

@@ -15,6 +15,7 @@ import { createTvController, type FinalResult, type HudState, type TvController 
 import { LatencyDialog } from './LatencyDialog';
 import { MicsDialog } from './MicsDialog';
 import { PitchGuide } from './PitchGuide';
+import { BetaTag } from '../ui/BetaTag';
 import { QrCode } from './QrCode';
 import { QueueBox, titleOf } from './QueueBox';
 
@@ -39,7 +40,9 @@ function JoinCard({ code }: { code: string }) {
 function ScoreHud({ hud }: { hud: HudState }) {
   return (
     <aside className="score-hud" hidden={!hud.visible} aria-live="off">
-      <span className="label">{t('tvp.score')}</span>
+      <span className="label">
+        {t('tvp.score')} <BetaTag />
+      </span>
       <strong>{hud.score}</strong>
       <small>
         {hud.notice ||
@@ -58,7 +61,9 @@ function ScoreHud({ hud }: { hud: HudState }) {
 function ScoreFinal({ final, room }: { final: FinalResult | null; room: RoomState | null }) {
   return (
     <section className="score-final" hidden={!final} role="status">
-      <span className="label">{t('tvp.finalScore')}</span>
+      <span className="label">
+        {t('tvp.finalScore')} <BetaTag />
+      </span>
       <strong>{final?.score}</strong>
       <span>{final?.singer}</span>
       <small>{final?.message}</small>
@@ -246,7 +251,12 @@ export function TvPage({ code }: { code: string }) {
 
       {showLower && (
         <div className="tv-lower">
-          {showGuide && <PitchGuide controller={controllerRef.current} />}
+          {showGuide && (
+            <div className="guide-card">
+              <PitchGuide controller={controllerRef.current} />
+              <BetaTag />
+            </div>
+          )}
           <ScoreHud hud={hud} />
         </div>
       )}
