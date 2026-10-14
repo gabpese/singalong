@@ -137,6 +137,19 @@ jobs:
         run: node apps/engine/src/cli.js assemble --dir "$RUNNER_TEMP/motor" --engine cpu
       - name: Verificar o motor
         run: node apps/engine/src/cli.js verify --dir "$RUNNER_TEMP/motor"
+      # a GPU da Apple (opcional, em beta): o executor pode não ter GPU. Se o Metal funcionar o motor fica "mps"; se não, TEM de voltar para a
+      # CPU e dizer por quê (esse caminho de volta é o que protege quem escolhe a opção). Qualquer outro resultado é falha.
+      - name: Pedir a GPU da Apple (cai para a CPU se não houver Metal)
+        if: runner.os == 'macOS'
+        run: |
+          node apps/engine/src/cli.js assemble --dir "$RUNNER_TEMP/motor-mps" --engine mps
+          node apps/engine/src/cli.js status --dir "$RUNNER_TEMP/motor-mps" | tee "$RUNNER_TEMP/mps.json"
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/mps.json", "utf8"));
+            const ok = s.complete && (s.engine === "mps" || (s.engine === "cpu" && s.fallback_reason));
+            console.log(s.engine === "mps" ? "O Metal funciona neste executor: motor mps." : "Sem Metal neste executor: voltou para a CPU (" + s.fallback_reason + ").");
+            process.exit(ok ? 0 : 1);
+          '
 
   desktop:
     name: App do dono (controlador em ${{ matrix.os }}; janela só no Windows)

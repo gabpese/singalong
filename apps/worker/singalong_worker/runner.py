@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .backend import Job
 from .cookies import CookiePolicy, load_policy
+from .devices import engine_device
 from .errors import AUTO, MANUAL, JobError, classify
 from .pipeline import Limits, NeedsLyrics, process
 from .storage import LocalStorage
@@ -48,7 +49,7 @@ class Settings:
             redis_url=env.get("REDIS_URL", "redis://localhost:6379/0"),
             storage_root=env.get("STORAGE_ROOT", "./storage"),
             cookies=load_policy(env),
-            device=env.get("DEMUCS_DEVICE") or None,
+            device=env.get("DEMUCS_DEVICE") or engine_device(env),
             langs=env.get("LANGS", "pt,en").split(","),
             stale_seconds=int(env.get("WORKER_STALE_SECONDS", "1800")),
             heartbeat_file=Path(env.get("WORKER_HEARTBEAT_FILE", "/tmp/worker-heartbeat")),

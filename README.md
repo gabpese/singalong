@@ -197,11 +197,22 @@ python -m singalong_worker --version                                       # ins
 python -m singalong_worker --check-update --agent-url https://your-server  # is there a newer one?
 python -m singalong_worker --hardware [--selftest]                         # GPU/CPU and the recommended engine; --selftest runs a real test on the GPU
 cd apps\engine
-node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121]   # builds the engine (Python, ffmpeg, deno, torch...) from the official sources
+node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121|rocm6.2|mps]   # builds the engine (Python, ffmpeg, deno, torch...) from the official sources
 node src\cli.js verify   --dir D:\Singalong\engine
 ```
 
 `assemble` needs only Node 22+ and Windows 10/11 (it uses Windows' own `tar.exe`); nothing is installed on the system, and it continues where it stopped if interrupted. The `cu121` engine takes about 5.6 GB. On the server, `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` define the update notice (below the minimum, the agent stops receiving jobs until it is updated).
+
+**GPU engines (F26 / M5).** The engine picks the video card by itself, tests it for real after installing, and goes back to the CPU (saying why) if the test fails:
+
+| Engine | Card | Notes |
+|---|---|---|
+| `cu121` | NVIDIA (CUDA 12.1) | driver 527.41+ (Windows) or 525.60+ (Linux), 3 GB of memory or more, GTX 750 up to RTX 40 |
+| `rocm6.2` | AMD (Linux only) | **Radeon RX 6800/6900 (gfx1030) and RX 7600/7700/7800/7900 (gfx1100-1102)**, and Instinct; 3 GB or more. Your user must be in the `render` and `video` groups (access to `/dev/kfd`). Other Radeons (RX 6600, RX 6700...) are not officially supported by ROCm and stay on the CPU, with the reason shown. The torch for ROCm is a **~4 GB download** |
+| `mps` | Apple Silicon (**beta**) | **never picked automatically**: on a Mac the automatic choice is the CPU. Choose "GPU da Apple (beta)" in the settings. Demucs runs on Metal; the lyrics alignment stays on the CPU (Metal lacks operations it uses); if the separation fails on the GPU it is redone on the CPU |
+| `cpu` | any | the fallback of all the others |
+
+`node src/cli.js assemble --dir <folder> --engine auto|cpu|cu121|rocm6.2|mps`. **The AMD and Apple GPUs were not measured on real hardware** (CI has no such GPUs): they are protected by the real test and the fallback to the CPU, and the benefit over the CPU is unknown. The backing-vocals separation (`audio-separator`, ONNX) still runs on the CPU on every engine.
 
 **The owner's app (milestone M3).** An Electron window that does everything above without a terminal: prepares the engine, pairs, starts the session, creates rooms, signs in to YouTube and imports files.
 

@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from .cookies import load_policy
+from .devices import engine_device
 from .errors import classify
 from .logsetup import setup_logging
 from .pipeline import NeedsLyrics, process
@@ -166,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lyrics", choices=["auto", "video", "lrclib", "file", "text", "align", "none"], default="auto")
     p.add_argument("--loose", action="store_true", help="aceita letra online de versão com duração diferente da do vídeo")
     p.add_argument("--lyrics-file", type=Path, help="com --lyrics file: .lrc/.srt/.vtt com tempos; com --lyrics text ou align: texto puro, uma linha por verso")
-    p.add_argument("--device", choices=["cpu", "cuda"], default=os.environ.get("DEMUCS_DEVICE") or None, help="dispositivo do demucs (padrão: automático)")
+    p.add_argument("--device", choices=["cpu", "cuda", "mps"], default=os.environ.get("DEMUCS_DEVICE") or engine_device(os.environ), help="dispositivo do demucs (padrão: o que o motor instalado pede, ou automático)")
     p.add_argument("--langs", default="pt,en", help="idiomas de legenda, separados por vírgula")
     p.add_argument("--storage-root", default=os.environ.get("STORAGE_ROOT", "./storage"))
     p.add_argument("--cookies", type=Path, default=None, help="cookies.txt (formato Netscape) para o yt-dlp: com ele, sempre usa a conta (sem ele vale YTDLP_COOKIES_POLICY)")
@@ -174,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--import-url", metavar="LINK", help="importa a faixa de um link de SoundCloud, Bandcamp ou Internet Archive (sem cookies; só quando o autor permite baixar)")
     p.add_argument("--youtube-login", nargs="?", const="auto", metavar="NAVEGADOR", help="entra no YouTube pelo Chrome ou pelo Edge (perfil só do agente) e guarda os cookies; NAVEGADOR: chrome, edge ou auto")
     p.add_argument("--youtube-status", action="store_true", help="confere se o login do YouTube do agente está valendo")
-    p.add_argument("--hardware", action="store_true", help="mostra o hardware detectado e o motor recomendado (cu121 ou cpu)")
+    p.add_argument("--hardware", action="store_true", help="mostra o hardware detectado e o motor recomendado (cu121, rocm6.2 ou cpu)")
     p.add_argument("--selftest", action="store_true", help="com --hardware: roda uma convolução na GPU para confirmar que ela funciona")
     p.add_argument("--version", action="store_true", help="mostra a versão instalada do app")
     p.add_argument("--check-update", action="store_true", help="pergunta ao servidor (--agent-url) se há versão nova do app")

@@ -6,9 +6,9 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { assemble, loadManifest, manifestHash, refreshWorker, resolveManifest } from '../src/assemble.js';
+import { assemble, isAccelerated, loadManifest, manifestHash, refreshWorker, resolveManifest, torchIndexFor } from '../src/assemble.js';
 import { extract, installFiles, resolveGlob, tarCommand } from '../src/extract.js';
-import { launchEnv, paths, readState, workerCommand } from '../src/engine.js';
+import { engineEnv, launchEnv, paths, readState, workerCommand } from '../src/engine.js';
 
 process.env.SINGALONG_ENGINE_ANY_PLATFORM = '1';
 
@@ -294,4 +294,57 @@ test('installFiles mantém os links relativos (o bin/python3 do Linux aponta par
   await rm(extracted, { recursive: true, force: true }); // como o montador faz depois de instalar
   assert.equal(await readlink(join(root, 'python', 'bin', 'python3')), 'python3.11');
   assert.equal(await readFile(join(root, 'python', 'bin', 'python3'), 'utf8'), 'PY'); // o link ainda abre
+});
+
+test('motor AMD (ROCm 6.2): o torch vem do índice rocm6.2 e o teste da GPU é o da AMD', { skip: !canTar }, async (t) => {
+  const s = await scenario(t, { hardware: { engine: 'rocm6.2', reason: 'AMD Radeon RX 7900 XTX (gfx1100) pelo ROCm 6.2', gpus: [{ name: 'AMD' }], cpu_cores: 16, ram_mb: 32000 } });
+  const state = await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl });
+  assert.equal(state.engine, 'rocm6.2');
+  assert.equal(state.complete, true);
+  assert.ok(s.commands.some((c) => c.includes('torch==2.5.1') && c.includes('--index-url https://idx/rocm6.2')));
+  assert.ok(s.commands.some((c) => c.includes('gpu_selftest("rocm6.2")'))); // a GPU é conferida com o teste da AMD, não o do CUDA
+});
+
+test('a placa AMD falha no teste real: volta para a CPU, troca só o torch e registra o motivo', { skip: !canTar }, async (t) => {
+  const s = await scenario(t, { hardware: { engine: 'rocm6.2', reason: 'AMD', gpus: [], cpu_cores: 8, ram_mb: 16000 }, selftest: { ok: false, detail: 'HIP error: invalid device function' } });
+  const state = await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl });
+  assert.equal(state.engine, 'cpu');
+  assert.equal(state.fallback_reason, 'HIP error: invalid device function');
+  assert.equal(s.commands.filter((c) => c.includes('torch==2.5.1') && c.includes('install')).length, 2);
+});
+
+test('GPU da Apple (mps): só por escolha, usa o índice cpu do PyTorch (o do macOS já traz o Metal) e o teste do Metal', { skip: !canTar }, async (t) => {
+  const auto = await scenario(t, { hardware: { engine: 'cpu', reason: 'Mac: o automático usa a CPU', gpus: [{ name: 'Apple M2' }], cpu_cores: 8, ram_mb: 16000 } });
+  assert.equal((await assemble({ root: auto.root, manifest: auto.manifest, workerSource: auto.worker, fetchImpl: auto.fetchImpl, runImpl: auto.runImpl })).engine, 'cpu'); // o automático no Mac é a CPU
+
+  const chosen = await scenario(t, { hardware: { engine: 'cpu', reason: 'Mac', gpus: [{ name: 'Apple M2' }], cpu_cores: 8, ram_mb: 16000 } });
+  const state = await assemble({ root: chosen.root, manifest: chosen.manifest, workerSource: chosen.worker, fetchImpl: chosen.fetchImpl, runImpl: chosen.runImpl, engine: 'mps' });
+  assert.equal(state.engine, 'mps');
+  assert.equal(state.engine_reason, 'escolhido: mps');
+  assert.ok(chosen.commands.some((c) => c.includes('torch==2.5.1') && c.includes('--index-url https://idx/cpu')));
+  assert.ok(chosen.commands.some((c) => c.includes('gpu_selftest("mps")')));
+  assert.equal(state.fallback_reason, undefined);
+
+  const broken = await scenario(t, { selftest: { ok: false, detail: 'NotImplementedError: aten::stft não existe no MPS' } });
+  const fell = await assemble({ root: broken.root, manifest: broken.manifest, workerSource: broken.worker, fetchImpl: broken.fetchImpl, runImpl: broken.runImpl, engine: 'mps' });
+  assert.equal(fell.engine, 'cpu'); // o Metal falhou no teste: CPU, com o motivo
+  assert.match(fell.fallback_reason, /aten::stft/);
+});
+
+test('os motores: quais têm GPU e qual índice do PyTorch cada um usa', () => {
+  assert.deepEqual(['cpu', 'cu121', 'rocm6.2', 'mps'].map(isAccelerated), [false, true, true, true]);
+  assert.deepEqual(['cpu', 'cu121', 'rocm6.2', 'mps'].map(torchIndexFor), ['cpu', 'cu121', 'rocm6.2', 'cpu']);
+});
+
+test('o worker recebe o motor instalado (SINGALONG_ENGINE) e, no Mac, o desvio das operações que o Metal não tem', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'singalong-env-'));
+  assert.deepEqual(engineEnv(dir, 'linux'), {}); // motor ainda não montado: nada muda
+  await writeFile(join(dir, 'engine.json'), JSON.stringify({ engine: 'rocm6.2', complete: true }));
+  assert.deepEqual(engineEnv(dir, 'linux'), { SINGALONG_ENGINE: 'rocm6.2' });
+  assert.deepEqual(engineEnv(dir, 'darwin'), { SINGALONG_ENGINE: 'rocm6.2', PYTORCH_ENABLE_MPS_FALLBACK: '1' });
+  await writeFile(join(dir, 'engine.json'), 'não é json');
+  assert.deepEqual(engineEnv(dir, 'win32'), {}); // arquivo ilegível: nada muda
+  await writeFile(join(dir, 'engine.json'), JSON.stringify({ engine: 'mps' }));
+  assert.equal(launchEnv(dir, {}, { PATH: '/usr/bin' }).SINGALONG_ENGINE, 'mps');
+  assert.equal(launchEnv(dir, { SINGALONG_ENGINE: 'cpu' }, { PATH: '/usr/bin' }).SINGALONG_ENGINE, 'cpu'); // `extra` sobrescreve
 });

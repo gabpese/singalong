@@ -1,4 +1,5 @@
 // A janela do app: só mostra o estado que vem do processo principal e chama as ações. Nenhum texto de fora entra como HTML.
+import { engineInUse, gpuChoices as chooseGpu, kindOf, machineLine } from './gpu.js';
 import { renderStats } from './stats.js';
 
 const $ = (id) => document.getElementById(id);
@@ -224,13 +225,7 @@ new ResizeObserver(reportLayout).observe($('chrome'));
 // --- configurações ---
 /** As opções de placa de vídeo (a das configurações e a da primeira sessão usam a mesma lista). */
 function gpuChoices() {
-  const gpu = hardwareInfo?.gpus?.[0];
-  const options = [['auto', hardwareInfo ? `Automático (recomendado: ${hardwareInfo.engine === 'cu121' ? 'placa de vídeo' : 'processador'})` : 'Automático']];
-  if (gpu) options.push(['cu121', `Placa de vídeo: ${gpu.name}`]);
-  options.push(['cpu', 'Processador (mais lento)']);
-  const current = state.engine.kind;
-  const wanted = current === 'cu121' ? 'cu121' : current === 'cpu' ? 'cpu' : 'auto';
-  return { gpu, options, current, wanted };
+  return chooseGpu(hardwareInfo, state.engine.kind);
 }
 
 function renderGpu() {
@@ -243,8 +238,7 @@ function renderGpu() {
     select.value = options.some(([value]) => value === wanted) ? wanted : 'auto';
     select.dataset.signature = JSON.stringify(options) + wanted;
   }
-  const machine = hardwareInfo ? `${hardwareInfo.cpu_cores} núcleos · ${hardwareInfo.ram_mb ? Math.round(hardwareInfo.ram_mb / 1024) : '?'} GB de memória · ${gpu ? `${gpu.name} (driver ${gpu.driver})` : 'sem placa NVIDIA'}` : '';
-  $('gpu-info').textContent = `Em uso: ${current === 'cu121' ? 'placa de vídeo' : 'processador'}${state.engine.reason ? ` (${state.engine.reason})` : ''}. ${machine}`;
+  $('gpu-info').textContent = `Em uso: ${engineInUse(current)}${state.engine.reason ? ` (${state.engine.reason})` : ''}. ${machineLine(hardwareInfo, gpu)}`;
 }
 
 async function loadMicrophones(select = $('mic-select')) {
@@ -301,7 +295,7 @@ async function openSetup() {
   const select = $('setup-gpu');
   select.replaceChildren(...options.map(([value, label]) => Object.assign(document.createElement('option'), { value, textContent: label })));
   select.value = wanted;
-  $('setup-gpu-info').textContent = hardwareInfo ? `${hardwareInfo.cpu_cores} núcleos · ${gpu ? `${gpu.name} (driver ${gpu.driver})` : 'sem placa NVIDIA'}. Trocar a placa reinstala parte dos componentes e leva alguns minutos.` : '';
+  $('setup-gpu-info').textContent = hardwareInfo ? `${machineLine(hardwareInfo, gpu)}. Trocar a placa reinstala parte dos componentes e leva alguns minutos.` : '';
   $('setup').hidden = false;
   await loadMicrophones($('setup-mic'));
 }
@@ -324,7 +318,7 @@ $('setup-go').addEventListener('click', async (e) => {
   const { current } = gpuChoices();
   await act('settings', { microphone: mic.value ? { id: mic.value, label: option.textContent } : null, setupDone: true }, e.currentTarget);
   $('setup').hidden = true;
-  if (kind !== 'auto' && kind !== (current === 'cu121' ? 'cu121' : 'cpu')) {
+  if (kind !== 'auto' && kind !== kindOf(current)) {
     await act('buildEngine', { engine: kind, switchEngine: true }); // reinstala o motor; a sessão começa no próximo clique
     return;
   }
@@ -377,7 +371,7 @@ $('library-change').addEventListener('click', async () => {
 
 $('gpu-apply').addEventListener('click', async (e) => {
   const kind = $('gpu-select').value;
-  const current = state.engine.kind === 'cu121' ? 'cu121' : 'cpu';
+  const current = kindOf(state.engine.kind);
   if (kind !== 'auto' && kind === current) return;
   if (!confirm('Trocar a placa de vídeo? O aplicativo vai reinstalar parte dos componentes.')) return;
   await act('settingsOpen', false);

@@ -202,11 +202,22 @@ python -m singalong_worker --version                                       # ver
 python -m singalong_worker --check-update --agent-url https://seu-servidor # há uma versão mais nova?
 python -m singalong_worker --hardware [--selftest]                         # GPU/CPU e o motor recomendado; --selftest faz um teste real na GPU
 cd apps\engine
-node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121]   # monta o motor (Python, ffmpeg, deno, torch...) a partir das fontes oficiais
+node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121|rocm6.2|mps]   # monta o motor (Python, ffmpeg, deno, torch...) a partir das fontes oficiais
 node src\cli.js verify   --dir D:\Singalong\engine
 ```
 
 O `assemble` precisa só do Node 22+ e do Windows 10/11 (usa o `tar.exe` do próprio Windows); nada é instalado no sistema e, se for interrompido, continua de onde parou. O motor `cu121` ocupa cerca de 5,6 GB. No servidor, `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` definem o aviso de atualização (abaixo da mínima, o agente deixa de receber jobs até atualizar).
+
+**Motores com GPU (F26 / M5).** O motor escolhe a placa de vídeo sozinho, testa de verdade depois de instalar e volta para a CPU (dizendo o motivo) se o teste falhar:
+
+| Motor | Placa | Observações |
+|---|---|---|
+| `cu121` | NVIDIA (CUDA 12.1) | driver 527.41+ (Windows) ou 525.60+ (Linux), 3 GB de memória ou mais, da GTX 750 até a RTX 40 |
+| `rocm6.2` | AMD (só Linux) | **Radeon RX 6800/6900 (gfx1030) e RX 7600/7700/7800/7900 (gfx1100-1102)**, e Instinct; 3 GB ou mais. O seu usuário precisa estar nos grupos `render` e `video` (acesso ao `/dev/kfd`). As outras Radeon (RX 6600, RX 6700...) não têm suporte oficial no ROCm e ficam na CPU, com o motivo na tela. O torch do ROCm é um **download de ~4 GB** |
+| `mps` | Apple Silicon (**beta**) | **nunca é escolhido sozinho**: no Mac o automático é a CPU. Escolha "GPU da Apple (beta)" nas configurações. O Demucs roda no Metal; o alinhamento da letra fica na CPU (o Metal não tem operações que ele usa); se a separação falhar na GPU, ela é refeita na CPU |
+| `cpu` | qualquer | a volta de todos os outros |
+
+`node src/cli.js assemble --dir <pasta> --engine auto|cpu|cu121|rocm6.2|mps`. **As GPUs da AMD e da Apple não foram medidas em hardware de verdade** (o CI não tem essas placas): elas contam com o teste real e a volta para a CPU, e o ganho sobre a CPU é desconhecido. A separação das vozes de apoio (`audio-separator`, ONNX) continua na CPU em todos os motores.
 
 **O app do dono (marco M3).** Uma janela Electron que faz tudo isso sem terminal: prepara o motor, pareia, inicia a sessão, cria salas, entra no YouTube e importa arquivos.
 
