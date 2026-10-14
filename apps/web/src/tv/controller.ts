@@ -7,6 +7,7 @@ import { loadMics, micsKey, openVoice, saveMics, voiceGain } from '../lib/voice.
 import { connectRoom } from '../lib/identity.js';
 import { splitQueue } from '../lib/queue-view.js';
 import { type MelodyNote, melodyNotes, pushTrail } from '../lib/melody-guide.js';
+import { singsAt, splitParts } from '../lib/duet.js';
 import { createScorer, noteName, openMic } from '../lib/scoring.js';
 import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.js';
 import type { QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types';
@@ -69,6 +70,9 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   // pontuação pelo microfone (só quando o anfitrião liga e a música tem a melodia de referência)
   let mic: Awaited<ReturnType<typeof openMic>> | null = null;
   let micFailed = false;
+  // dueto com dois microfones: o segundo microfone e um pontuador por cantor (cada um conta só as linhas dele)
+  let micB: Awaited<ReturnType<typeof openMic>> | null = null;
+  let scorerB: ReturnType<typeof createScorer> | null = null;
   let scorer: ReturnType<typeof createScorer> | null = null;
   let scorerFor: number | null = null; // item que o `scorer` acompanha
   let hud: HudState = { visible: false, score: 0, notice: '', original: '', sung: '' };
@@ -119,12 +123,16 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   let melodyData: { hop: number; midi: number[] } | null = null;
   let guideNotes: MelodyNote[] = [];
   let guidePitch = 0; // tom escolhido da música atual
+  let partsNow: string | null | undefined = null; // a divisão da letra do dueto na música atual (pode mudar no meio dela)
   let guideOn = false; // a sala pediu o guia de melodia
   let trail: { t: number; midi: number | null }[] = [];
 
   function stopScoring() {
     mic?.stop();
     mic = null;
+    micB?.stop();
+    micB = null;
+    scorerB = null;
     micFailed = false;
     scorer = null;
     scorerFor = null;
@@ -139,12 +147,36 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   }
 
   async function ensureMic() {
-    if (mic || micFailed) return;
-    try {
-      mic = await openMic(micsChosen[0]?.id);
-    } catch {
-      micFailed = true;
+    if (!mic && !micFailed) {
+      try {
+        mic = await openMic(micsChosen[0]?.id);
+      } catch {
+        micFailed = true;
+      }
     }
+    // dueto pontuado por voz: o segundo microfone é o da voz 2 (se não abrir, a música é pontuada inteira pelo primeiro)
+    if (scorerB && !micB) {
+      try {
+        micB = await openMic(micsChosen[1]?.id);
+      } catch {
+        scorerB = null;
+      }
+    }
+  }
+
+  /** Os pontuadores da música: um só, ou um por cantor no dueto com dois microfones (cada um conta só as linhas dele). */
+  function makeScorers(melody: { hop: number; midi: number[] }, current: QueueItem) {
+    const duet = current.guest?.status === 'accepted' && micsChosen.length >= 2;
+    if (!duet) {
+      scorerB = null;
+      return createScorer(melody, { transpose: current.pitch });
+    }
+    const include = (me: 'a' | 'b') => (t: number) => {
+      const cues = engine.cues;
+      return singsAt(cues, splitParts(cues, partsNow), t + engine.offset, me); // a letra anda `offset` s à frente da melodia (o ajuste da letra)
+    };
+    scorerB = createScorer(melody, { transpose: current.pitch, include: include('b') });
+    return createScorer(melody, { transpose: current.pitch, include: include('a') });
   }
 
   /** Prepara (ou mantém) a pontuação e o guia de melodia da música atual. */
@@ -166,17 +198,20 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       return setHud({ notice: wantScore ? t('ctl.noMelody') : '' });
     }
     guidePitch = current.pitch;
+    partsNow = current.parts;
     if (melodyFor === current.id) {
       scorer?.setTranspose(current.pitch);
+      scorerB?.setTranspose(current.pitch);
       // o anfitrião ligou ou desligou a pontuação no meio da música: a melodia já está aqui
       if (wantScore && !scorer && melodyData) {
-        scorer = createScorer(melodyData, { transpose: current.pitch });
+        scorer = makeScorers(melodyData, current);
         scorerFor = current.id;
         shownNotes = '';
         setHud({ score: 0, notice: '' });
       }
       if (!wantScore && scorer) {
         scorer = null;
+        scorerB = null;
         scorerFor = null;
       }
       ui.setGuideReady(wantGuide && guideNotes.length > 0);
@@ -185,6 +220,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     melodyFor = current.id;
     melodyData = null;
     scorer = null;
+    scorerB = null;
     scorerFor = null;
     guideNotes = [];
     trail = [];
@@ -199,14 +235,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       melodyData = melody;
       guideNotes = melodyNotes(melody);
       if (wantScore) {
-        scorer = createScorer(melody, {
-          transpose: current.pitch,
-          // depuração: descomente para um log por bloco de 2 s (trecho, nota original, nota cantada e o resultado da comparação)
-          // onBlock: (b) => console.log(
-          //   `[pontuação] ${b.trecho} | original ${b.original} (principais ${b.principais || '—'}) | cantada ${b.cantada} | `
-          //   + `distância ${b.distancia ?? '—'} → acerto ${b.acerto} | leituras ${b.leituras} (participação ${b.participacao})`,
-          // ),
-        });
+        scorer = makeScorers(melody, current);
         scorerFor = current.id;
       }
     } catch {
@@ -227,9 +256,18 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     const at = sungPosition(engine.currentTime, latency);
     if (guideOn) trail = pushTrail(trail, { t: at, midi });
     if (!scorer || engine.loadedId !== scorerFor) return;
-    const live = scorer.tick(at, midi);
-    const original = noteName(scorer.reference);
-    const sung = noteName(scorer.sung);
+    let live: number | null = scorer.tick(at, midi);
+    let shown = scorer; // de quem são as notas mostradas no quadro: no dueto, de quem canta agora
+    if (scorerB && micB) {
+      const liveB = scorerB.tick(at, micB.read().midi);
+      const cues = engine.cues;
+      const parts = splitParts(cues, partsNow);
+      if (singsAt(cues, parts, at + engine.offset, 'b') && !singsAt(cues, parts, at + engine.offset, 'a')) shown = scorerB;
+      const values = [live, liveB].filter((value): value is number => value !== null);
+      live = values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null; // o quadro mostra a média da dupla
+    }
+    const original = noteName(shown.reference);
+    const sung = noteName(shown.sung);
     const key = `${original}|${sung}`;
     if (key !== shownNotes) {
       shownNotes = key;
@@ -240,9 +278,25 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
 
   /** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */
   function reportScore(itemId: number) {
-    if (!scorer || scorerFor !== itemId || scorer.evaluated < MIN_SCORED_FRAMES) return;
+    if (!scorer || scorerFor !== itemId) return;
+    const item = latest?.queue.find((entry) => entry.id === itemId);
+    if (scorerB) {
+      // dueto pontuado por voz: cada cantor tem a sua nota (só das linhas dele); a nota da música é a média das que valem
+      const a = scorer.evaluated >= MIN_SCORED_FRAMES ? (scorer.score() as number) : null;
+      const b = scorerB.evaluated >= MIN_SCORED_FRAMES ? (scorerB.score() as number) : null;
+      const values = [a, b].filter((value): value is number => value !== null);
+      if (!values.length) return;
+      const average = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+      const names = [a !== null ? `${item?.added_by ?? ''} ${a}` : null, b !== null ? `${item?.guest?.name ?? ''} ${b}` : null].filter(Boolean);
+      connection.send({ type: 'score', item_id: itemId, score: average });
+      ui.setFinal({ score: average, singer: names.join(' · '), message: finalMessage(average) });
+      clearTimeout(finalTimer);
+      finalTimer = setTimeout(() => ui.setFinal(null), FINAL_SECONDS * 1000);
+      return;
+    }
+    if (scorer.evaluated < MIN_SCORED_FRAMES) return;
     const score = scorer.score() as number;
-    const singer = latest?.queue.find((item) => item.id === itemId)?.singers ?? '';
+    const singer = item?.singers ?? '';
     // depuração: descomente para ver a nota final e a tabela com todos os blocos
     // console.log(`[pontuação] fim da música: ${score} pontos`);
     // console.table(scorer.report());

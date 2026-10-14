@@ -82,7 +82,8 @@ Salas e fila ficam num SQLite no volume `api-data` do Docker.
 | `GET /api/rooms/:code` | estado: fila, o que toca, `tv_connected`, `me.is_host` |
 | `POST /api/rooms/:code/queue` `{url \| video_id, lyrics?, artist?, title?, name?, pitch?}` | adiciona à fila (e já pede o processamento) |
 | `DELETE /api/rooms/:code/queue/:item` · `POST …/move {direction}` · `PATCH …/queue/:item {pitch}` | remover · mover (`down` = ceder a vez, o dono pode; `up` só o anfitrião) · tom |
-| `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair}` | controle (anfitrião) |
+| `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair, scoring, voice, voice_volume, melody_bars}` | controle e ajustes da sala (anfitrião) |
+| `PUT /api/rooms/:code/songs/:id/parts {parts}` | quem canta cada linha da letra num dueto (`a b * -`; os cantores ou o anfitrião) |
 | `PUT /api/rooms/:code/songs/:id/offset {offset}` | ajuste da letra, em segundos (anfitrião) |
 | `WS /api/rooms/:code/ws?role=tv\|controller` | estado em tempo real; a TV envia `ended` e `position` |
 | `GET /api/search?q=` | pesquisa vídeos no YouTube (atendida pelo worker; cache de 10 min) |

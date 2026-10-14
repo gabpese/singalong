@@ -101,3 +101,33 @@ test('quem não canta a música não vê o botão de dividir a letra', async ({ 
   await expect(caio.page.getByRole('button', { name: 'Dividir a letra' })).toHaveCount(0);
   for (const p of [ana, bia, caio]) await p.context.close();
 });
+
+test('dueto com dois microfones: cada cantor é pontuado nas linhas dele e o placar mostra a nota de cada um', async ({ browser, page: tv, request }) => {
+  test.setTimeout(90_000);
+  const { room, ana, bia } = await duetRoom(browser, request);
+  // a TV usa os dois microfones (os dois "Fake Audio Input" do Chromium de teste): o 1º é a voz 1, o 2º é a voz 2
+  await tv.goto(room.tvUrl);
+  await tv.evaluate(async () => {
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default');
+    localStorage.setItem('voiceMics', JSON.stringify(devices.slice(0, 2).map((d) => ({ id: d.deviceId, label: d.label }))));
+  });
+  await request.patch(`/api/rooms/${room.code}`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data: { scoring: true } });
+  await tv.reload();
+  await expect.poll(() => tvPlaying(tv)).toBe(true);
+  await request.post(`/api/rooms/${room.code}/player/skip`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host } }); // entra a dupla Ana & Bia
+  await expect(tv.locator('.singer.is-now')).toContainText('Ana & Bia');
+  await expect(tv.locator('.score-hud')).toBeVisible();
+
+  // a letra do teste só tem 9 s de canto: com todas as linhas "juntas" os dois cantores são cobrados nelas
+  await request.put(`/api/rooms/${room.code}/songs/${SONGS.bravo.id}/parts`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data: { parts: '***' } });
+  await expect.poll(() => tv.evaluate(() => window.tv.engine.currentTime), { timeout: 30_000 }).toBeGreaterThan(11.5); // as linhas passaram
+
+  // perto do fim da música: tempo para as duas notas valerem (o mínimo é 5 s com voz na original, em cada cantor)
+  await request.post(`/api/rooms/${room.code}/player/seek`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data: { seconds: 20 } });
+  await expect(tv.locator('.score-final')).toBeVisible({ timeout: 40_000 });
+  await expect(tv.locator('.score-final')).toContainText('Ana'); // "Ana 80 · Bia 70": a nota de cada um
+  await expect(tv.locator('.score-final')).toContainText('Bia');
+  await expect(tv.locator('.score-final strong')).toHaveText(/^\d+$/);
+  await expect.poll(async () => (await roomState(request, room.code)).scoreboard.length).toBe(1); // a nota da música é uma só, a média
+  for (const p of [ana, bia]) await p.context.close();
+});
