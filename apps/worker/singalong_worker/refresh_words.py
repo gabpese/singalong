@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from .align import align_lyrics, attach_words
+from .devices import engine_device
 from .logsetup import setup_logging
 from .melody import extract_melody
 from .pipeline import keys
@@ -20,7 +21,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("ids", nargs="*")
     p.add_argument("--melody", action="store_true", help="refaz também a melodia que já existe (ex.: depois de mudar o filtro)")
-    p.add_argument("--device", choices=["cpu", "cuda"], default=os.environ.get("DEMUCS_DEVICE") or None)
+    p.add_argument("--device", choices=["cpu", "cuda", "mps"], default=os.environ.get("DEMUCS_DEVICE") or engine_device(os.environ))
     p.add_argument("--storage-root", default=os.environ.get("STORAGE_ROOT", "./storage"))
     args = p.parse_args()
     setup_logging(level="INFO")

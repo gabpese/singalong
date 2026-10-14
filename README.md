@@ -12,7 +12,13 @@ Documentation: [PRD](PRD.md) (product requirements), [TRD](TRD.md) (technical re
 
 ## Download
 
-The Windows app (installer `singalong_karaoke.exe`) is on the [latest release](https://github.com/gabpese/singalong/releases/latest). It is free and open source (MIT).
+The app is on the [latest release](https://github.com/gabpese/singalong/releases/latest). It is free and open source (MIT). Pick the file for your system:
+
+| System | File | Notes |
+|---|---|---|
+| Windows 10/11 (x64) | `singalong_karaoke.exe` | not signed yet: SmartScreen may warn ("More info" > "Run anyway") |
+| macOS (Apple Silicon: M1 and newer) | `singalong_karaoke-mac-arm64.dmg` | no Apple signature yet: the first time, right-click the app > **Open** (or `xattr -dr com.apple.quarantine "/Applications/singalong_karaoke.app"`); it does not update itself, "Update now" opens the download of the new DMG. **Intel Macs are not supported** |
+| Linux (x64) | `singalong_karaoke-linux-x86_64.AppImage` | `chmod +x` the file and run it (on Ubuntu 22.04 or newer, AppImage needs `libfuse2`: `sudo apt install libfuse2`). It updates itself. On GNOME the tray icon needs the AppIndicator extension |
 
 ## Privacy
 
@@ -191,11 +197,22 @@ python -m singalong_worker --version                                       # ins
 python -m singalong_worker --check-update --agent-url https://your-server  # is there a newer one?
 python -m singalong_worker --hardware [--selftest]                         # GPU/CPU and the recommended engine; --selftest runs a real test on the GPU
 cd apps\engine
-node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121]   # builds the engine (Python, ffmpeg, deno, torch...) from the official sources
+node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121|rocm6.2|mps]   # builds the engine (Python, ffmpeg, deno, torch...) from the official sources
 node src\cli.js verify   --dir D:\Singalong\engine
 ```
 
 `assemble` needs only Node 22+ and Windows 10/11 (it uses Windows' own `tar.exe`); nothing is installed on the system, and it continues where it stopped if interrupted. The `cu121` engine takes about 5.6 GB. On the server, `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` define the update notice (below the minimum, the agent stops receiving jobs until it is updated).
+
+**GPU engines (F26 / M5).** The engine picks the video card by itself, tests it for real after installing, and goes back to the CPU (saying why) if the test fails:
+
+| Engine | Card | Notes |
+|---|---|---|
+| `cu121` | NVIDIA (CUDA 12.1) | driver 527.41+ (Windows) or 525.60+ (Linux), 3 GB of memory or more, GTX 750 up to RTX 40 |
+| `rocm6.2` | AMD (Linux only) | **Radeon RX 6800/6900 (gfx1030) and RX 7600/7700/7800/7900 (gfx1100-1102)**, and Instinct; 3 GB or more. Your user must be in the `render` and `video` groups (access to `/dev/kfd`). Other Radeons (RX 6600, RX 6700...) are not officially supported by ROCm and stay on the CPU, with the reason shown. The torch for ROCm is a **~4 GB download** |
+| `mps` | Apple Silicon (**off**) | **measured and turned off**: on a real Metal GPU (macOS runner of CI, torch 2.5.1) Demucs fails with `Output channels > 65536 not supported at the MPS device`, and `PYTORCH_ENABLE_MPS_FALLBACK` does not cover it. On the Mac the engine is the CPU. `SINGALONG_APPLE_GPU=1` shows the option again ("GPU da Apple (beta)") for whoever wants to measure with another torch version; Demucs would run on Metal, the lyrics alignment on the CPU, and a failed separation is redone on the CPU |
+| `cpu` | any | the fallback of all the others |
+
+`node src/cli.js assemble --dir <folder> --engine auto|cpu|cu121|rocm6.2|mps`. **The AMD GPU was not measured on real hardware** (CI has no AMD card): it is protected by the real test and the fallback to the CPU, and its benefit over the CPU is unknown. The Apple GPU was measured and does not work with Demucs (see the table). The backing-vocals separation (`audio-separator`, ONNX) still runs on the CPU on every engine.
 
 **The owner's app (milestone M3).** An Electron window that does everything above without a terminal: prepares the engine, pairs, starts the session, creates rooms, signs in to YouTube and imports files.
 
@@ -218,7 +235,17 @@ npm run dist                         # builds dist\singalong_karaoke.exe (+ late
 dist\singalong_karaoke.exe           # installs for your user only; Windows' SmartScreen may warn: "More info" > "Run anyway"
 ```
 
-To publish an update (**the version and the message can also be published on the administrator page**, no `.env` edit and no deploy): raise the version in `apps/desktop/package.json`, `apps/desktop/src/controller.js` and `apps/worker/singalong_worker/version.py` (a test checks they match), run `npm run dist`, put `singalong_karaoke.exe` and `latest.yml` in a **private** folder and set on the server `APP_LATEST_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` (that folder's address). Every installed app then shows "Update now". Using a **GitHub Release** as that folder works: attach `singalong_karaoke.exe` and `latest.yml` to the release and set `APP_DOWNLOAD_URL=https://github.com/<owner>/<repo>/releases/latest/download/` (note: the Releases of a public repository are public, so anyone can download the installer). `node scripts/test-update.mjs <installed.exe> <new-version-folder> <data-folder>` tests the whole thing on a computer.
+**Linux and macOS installers (F26).** Each one is built on its own system (the DMG only on a Mac); the file names are fixed (`apps/desktop/src/installers.js`):
+
+```bash
+cd apps/desktop
+npm run dist:linux     # dist/singalong_karaoke-linux-x86_64.AppImage (+ latest-linux.yml)
+npm run dist:mac       # dist/singalong_karaoke-mac-arm64.dmg, with an ad-hoc signature (Apple Silicon refuses unsigned programs)
+```
+
+Without a Linux or a Mac at hand, use the workflow **Actions > "Instaladores de Linux e macOS" > Run workflow** with the release tag (e.g. `v1.3.0`): it builds both and attaches them to the release (it creates a draft if the release does not exist yet). The Windows installer is still built and attached by you (`npm run dist`). On the server, `APP_DOWNLOAD_URL` stays the single base (`.../releases/latest/download/`): the home page and the app add the file name of each system. The engine for each system (Python, ffmpeg, deno) is assembled on the user's computer, as on Windows; on the Mac the ffmpeg has no `rubberband`, so the key change of the exported MP4 uses `asetrate`/`atempo`.
+
+To publish an update (**the version and the message can also be published on the administrator page**, no `.env` edit and no deploy): raise the version in `apps/desktop/package.json`, `apps/desktop/src/controller.js` and `apps/worker/singalong_worker/version.py` (a test checks they match), run `npm run dist`, put `singalong_karaoke.exe` and `latest.yml` in a **private** folder and set on the server `APP_LATEST_VERSION`, `APP_NOTES` and `APP_DOWNLOAD_URL` (that folder's address). Every installed app then shows "Update now". Using a **GitHub Release** as that folder works: attach `singalong_karaoke.exe` and `latest.yml` to the release and set `APP_DOWNLOAD_URL=https://github.com/<owner>/<repo>/releases/latest/download/` (note: the Releases of a public repository are public, so anyone can download the installer). That one address serves the three systems: the home page detects the visitor's system and offers its file (`singalong_karaoke.exe`, `singalong_karaoke-mac-arm64.dmg` or `singalong_karaoke-linux-x86_64.AppImage`), always listing the other systems too; on a Mac it first asks "Which Mac do you have?" (the browser cannot tell Intel from Apple Silicon, and Intel is not supported). Pasting the release page (`.../releases/latest`) instead of the folder is fixed automatically. `GET /api/config` returns `app_downloads` (the list) and `app_page_url` (the page with all versions). `node scripts/test-update.mjs <installed.exe> <new-version-folder> <data-folder>` tests the whole thing on a computer.
 
 #### Signing the installer (code signing)
 

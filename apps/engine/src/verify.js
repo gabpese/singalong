@@ -7,6 +7,8 @@ import { launchEnv, paths } from './engine.js';
 // rubberband = troca de tom; subtitles (libass) = letra queimada no vídeo.
 export const FFMPEG_ENCODERS = ['libx264', 'aac', 'libmp3lame'];
 export const FFMPEG_FILTERS = ['rubberband', 'subtitles'];
+// os ffmpeg estáticos do macOS não têm o rubberband: lá a troca de tom usa o asetrate/atempo (o worker detecta e escolhe sozinho)
+export const filtersFor = (platform = process.platform) => (platform === 'darwin' ? FFMPEG_FILTERS.filter((name) => name !== 'rubberband') : FFMPEG_FILTERS);
 
 const PY_IMPORTS = ['torch', 'torchaudio', 'demucs', 'stable_whisper', 'librosa', 'yt_dlp', 'audio_separator', 'onnxruntime', 'websockets', 'redis', 'langdetect'];
 
@@ -39,9 +41,11 @@ export async function verifyEngine(root, { runImpl = run } = {}) {
     return FFMPEG_ENCODERS.join(', ');
   });
   await check('ffmpeg: filtros (tom e letra)', async () => {
-    const missing = missingNames(await exec(join(p.bin, `ffmpeg${ext}`), ['-hide_banner', '-filters']), FFMPEG_FILTERS);
+    const wanted = filtersFor();
+    const output = await exec(join(p.bin, `ffmpeg${ext}`), ['-hide_banner', '-filters']);
+    const missing = missingNames(output, wanted);
     if (missing.length) throw new Error(`faltam: ${missing.join(', ')}`);
-    return FFMPEG_FILTERS.join(', ');
+    return wanted.length === FFMPEG_FILTERS.length ? wanted.join(', ') : `${wanted.join(', ')} (sem rubberband: o tom usa asetrate/atempo)`;
   });
   await check('ffprobe', async () => (await exec(join(p.bin, `ffprobe${ext}`), ['-version'])).split(/\r?\n/)[0]);
   await check('deno (desafios do YouTube)', async () => (await exec(join(p.bin, `deno${ext}`), ['--version'])).split(/\r?\n/)[0]);

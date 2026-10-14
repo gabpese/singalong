@@ -602,3 +602,75 @@ Found while using 1.2.0 on a real TV and microphone:
 
 ### Fixes and additions of 1.2.6
 - **Scoring and melody guide marked as beta:** both follow the original voice by approximation and are not yet fully faithful, so the app now says so. A small "beta" tag appears on the two switches of the host rail (with the explanation in the tip and the accessible name, e.g. "Pontuação pelo microfone (beta)"), on the TV (melody guide, score card and final score), on the scoreboard of the room and on the singer's own score on the stage page; the tag's tooltip explains it. The README (both languages) carries the same notice. Nothing in how the scoring works changed.
+
+## 19. 1.3.0 plan: the app for macOS and Linux (F26)
+
+**1.3.0 includes only F26.** The hybrid cloud mode (F25) and the `hml`/`stg` environments (section 18) come later.
+
+**Decisions (answered)**
+1. **Systems:** **Linux x64** (AppImage) and **macOS Apple Silicon** (DMG). **Intel Macs are out**: PyTorch 2.5.1 has no build for them.
+2. **macOS without an Apple signature for now:** the user opens it with right-click → Open the first time and updates by downloading the new version (no automatic update on the Mac; Linux updates itself). The home page and the README explain it. Signing and notarizing (Apple Developer, ~US$ 99/year) is left as a later step.
+3. **AMD (ROCm) and Apple (MPS) GPUs only after measuring the gain:** first everything on CPU (and NVIDIA on Linux). Part of the separator models run through `onnxruntime` (which today falls back to the CPU even on Windows), so the real gain is unknown.
+4. **Links per system:** `APP_DOWNLOAD_URL` stays a single value (GitHub `…/releases/latest/download/` base) and the server appends the **fixed file name** of each system: `singalong_karaoke.exe`, `singalong_karaoke-mac-arm64.dmg`, `singalong_karaoke-linux-x86_64.AppImage`. One version for the three systems.
+
+**What changes**
+| Part | Today | In F26 |
+|---|---|---|
+| Engine manifest | one platform (`win32-x64`) | `platforms` with one block per system (`win32-x64`, `linux-x64`, `darwin-arm64`): Python (python-build-standalone), ffmpeg and deno for each, with URL and SHA-256 |
+| Paths and extraction | `python.exe`, `bin/*.exe` | `python/bin/python3`, binaries without `.exe`; `tar` as the default outside Windows (already planned) |
+| Hardware (`hardware.py`) | NVIDIA → `cu121` or CPU | Linux: NVIDIA (`cu121`) or CPU; macOS: CPU (MPS and ROCm only in the last milestone) |
+| Browser for cookies | Windows only | macOS and Linux: detect the default browser (Chrome, Edge, Firefox, Safari where applicable) |
+| Packaging | NSIS | AppImage (Linux) and DMG (macOS), with fixed `artifactName`s; `latest.yml`, `latest-linux.yml` and `latest-mac.yml` |
+| CI | engine on ubuntu and windows; installer on windows | engine also on macOS (arm64); jobs that build the AppImage and the DMG |
+| Home (`/`) | one Windows button | the visitor's detected system becomes the main button ("Download for macOS (Apple Silicon) – vX"); an always-visible "Other systems" list; on macOS it asks "Which Mac do you have?" (the browser cannot tell Intel from Apple Silicon) and warns that Intel is not supported; phones still explain that the app is for computers |
+| `/api/config` | `app_download_url`, `app_latest_version` | adds `app_downloads` (a list of `{system, url, label}` built from the base) |
+
+**Milestones**
+1. **M1 – Engine on Linux x64** (CPU and NVIDIA): per-platform manifest, paths, hardware, CI tests (ubuntu).
+2. **M2 – Engine on macOS Apple Silicon** (CPU): the Mac components, default browser, CI tests (macOS arm64).
+3. **M3 – Packaging and release:** AppImage and DMG in CI; a release with several files; Linux updates; a manual-update notice on the Mac.
+4. **M4 – The home page:** system detection, other-systems list, the Mac question, `app_downloads`; texts in the three languages; tests and axe.
+5. **M5 – AMD and Apple GPU:** measure the gain of ROCm and MPS in separation and scoring; it only goes in if it pays off.
+
+**Limits and risks**
+- **No real Mac or Linux here:** CI tests the assembly and the code, but has no GPU or microphone; testing on real machines is left to the owner.
+- **YouTube cookies:** reading the browser cookies differs per system (Keychain on the Mac, keyring on Linux); the `youtube_cookies.txt` file may be needed as an alternative.
+- **`torch` per platform:** Linux uses the `cpu` or `cu121` index; macOS uses the default PyPI package (which already ships MPS).
+
+**M1 status (engine on Linux x64): done.**
+- **Per-system manifest:** `manifest.json` now has `platforms` (`win32-x64` and `linux-x64`), and `resolveManifest`/`loadManifest` pick the components of the system (Python from python-build-standalone, GPL ffmpeg from BtbN and deno, all with an official URL and SHA-256). The **Windows manifest hash did not change** (`28529b9dc9631f40`, with a test): whoever already built the engine on Windows does not have to rebuild it. A system without an engine gets a clear message.
+- **Defects that only showed up on a real Linux (fixed):** the Linux Python has `bin/python3 -> python3.11` and the copy kept the path of the temporary folder (the link broke when it was deleted); links now stay relative (`verbatimSymlinks`). A lean Linux lacks `xz` and `unzip` (the Linux ffmpeg is a `.tar.xz` and deno a `.zip`): the engine's own Python opens both as a fallback. Programs in `bin/` get the execute permission. The worker's `PATH` includes `python/bin`.
+- **Default browser on Linux:** `detectDefaultBrowser` asks `xdg-settings` (Chrome/Chromium/Brave = `chrome`, Edge = `edge`, other = automatic); the worker also finds Chrome in `/opt/google/chrome` and Edge in `/opt/microsoft/msedge`.
+- **Proof with everything real:** the engine was built from scratch in a lean Debian container (no `xz`, no `unzip`) with real downloads, the CPU torch and all packages, and the verification passed (ffmpeg with `libx264`/`aac`/`libmp3lame` and the `rubberband`/`subtitles` filters, deno, Python 3.11.17 and torch 2.5.1+cpu, and the worker starts). CI gained the **Real engine on Linux** job, which repeats it on every change.
+- **Still unproven:** the `cu121` torch (NVIDIA) on Linux uses the same path as Windows (the official PyTorch index) but was not tried on a real card.
+
+**M2 status (engine on macOS Apple Silicon): done.**
+- **`darwin-arm64` manifest:** Python (python-build-standalone, aarch64), deno and **GPL ffmpeg 9.0.2 from martin-riedl.de** (BtbN does not build for the Mac), with `ffmpeg` and `ffprobe` as separate files. All have a pinned SHA-256 and the binaries come signed (required on Apple Silicon).
+- **The Mac ffmpeg has no `rubberband`** (neither this one nor osxexperts). Only the exported MP4 video uses ffmpeg's pitch change, so the worker now **detects the filter** (`has_rubberband`) and, without it, changes the pitch with `aresample`+`asetrate`+`atempo` (it changes the sample rate and gives the duration back; tested: the duration holds from -12 to +12 semitones). It sounds a little less natural than rubberband but it suits the karaoke video. The engine check on the Mac requires only the `subtitles` filter and says "no rubberband".
+- **Hardware:** on macOS the reason for the choice is "the engine runs on the CPU for now (the Apple GPU is left for a future version)".
+- **Default browser on the Mac:** the app reads the LaunchServices handlers (`plutil`): Chrome/Brave/Vivaldi = `chrome`, Edge = `edge`, Safari or no choice = automatic.
+- **Proof with everything real:** CI builds the engine from scratch on an Apple Silicon macOS (real downloads, torch 2.5.1 and all packages) and the check passes (ffmpeg with `libx264`/`aac`/`libmp3lame` and `subtitles`, deno `aarch64-apple-darwin`, Python 3.11.17, torch 2.5.1 and the worker starts). The engine and app tests also run on macOS.
+- **Known limits:** the Mac ffmpeg URL is a pinned version from martin-riedl.de (if it ever goes away, change `url` and `sha256`); Intel Macs still have no engine (the message says the system is not supported); the app has not yet been opened on a real Mac (only the engine and the controller tests).
+
+**M3 status (packaging and release): done.**
+- **Three installers with fixed names** (`apps/desktop/src/installers.js`, checked by a test against `package.json`): `singalong_karaoke.exe`, `singalong_karaoke-mac-arm64.dmg` and `singalong_karaoke-linux-x86_64.AppImage`. `build-installer.mjs` builds the one of the system it runs on (`--platform=win|mac|linux`; the DMG only on a Mac) and **checks the result**: name, size, executable ELF and `latest-linux.yml` on Linux, a valid ad-hoc signature (`codesign --verify`) on the Mac and the Windows signature as before.
+- **macOS:** explicit ad-hoc signature (`identity: "-"`, `hardenedRuntime: false`; electron-builder does not do ad-hoc by itself and Apple Silicon kills unsigned programs). Without an Apple signature macOS refuses to swap the app by itself, so on the Mac "Update now" **opens the download of the new DMG** (`installerUrl`); the app keeps the system menu (it gives Cmd+C/V) and reopens from the Dock (`activate`).
+- **Linux:** the AppImage updates itself through `latest-linux.yml`. On distributions that restrict user namespaces (Ubuntu 24.04+) the AppImage does not start with Chrome's sandbox; only then the app turns on `--no-sandbox` (`needsNoSandbox`, tested), elsewhere the sandbox stays on.
+- **Window:** `showWindow()` reopens a window that was really closed (before, the tray and the second instance called `show()` on a destroyed window).
+- **1024 px icon** (macOS and AppImage need at least 512): `make-icon.cjs` now also generates a large `build/icon.png` (and I fixed the script: without handling `window-all-closed` Electron quit when the first window closed).
+- **CI:** the **Linux / macOS installer** job builds and checks each one on every change. The manual workflow **Instaladores de Linux e macOS** (`release-installers.yml`) builds both and attaches them to the release of the given tag (a draft if it does not exist); the Windows one is still built and attached by the owner.
+- **Proof:** the AppImage was really built (120 MB) and **opened** on a virtual Linux (Debian with a fake screen): the "Singalong Karaoke" window opened and loaded the interface. The DMG is built on the CI's Apple Silicon macOS and the ad-hoc signature passes `codesign --verify` (the Mac app is called `singalong_karaoke.app`; electron-builder skips signing on pull-request builds, so the script forces `CSC_FOR_PULL_REQUEST` only for the ad-hoc one, which uses no secret).
+- **Still unproven:** opening the app in a real window on a Mac (CI only builds and checks the DMG) and the AppImage update flow.
+
+**M4 status (the home page): done.**
+- **Server:** `apps/api/src/installers.js` builds the link of each system from the single base (`downloadsFor`) and `GET /api/config` gains `app_downloads` (windows, macos, linux) and `app_page_url` (the page with all versions, since GitHub's `…/releases/latest/download/` folder does not open in a browser). Whoever pastes the release page (`…/releases/latest`) instead of the folder gets the mistake fixed (`downloadBase`). A test checks that the names are the same as the app's and electron-builder's.
+- **Home page:** the visitor's system (`detectSystem`: Windows, macOS, Linux, phone/tablet/Chromebook = no installer) becomes the main button ("Download for Linux (v1.3.0)"), with the AppImage tip (`chmod +x`); the other systems stay **always visible** in a list; "See all versions" goes to the release page. On a **Mac** the browser always says Intel, so the page asks "Which Mac do you have?": only whoever answers Apple Silicon gets the DMG (with the right-click > Open notice) and whoever answers Intel gets the explanation that the app does not work on it. Phones and other systems get the explanation and the list (to take the link to a computer). Texts in Portuguese, English and Spanish; axe passes on every path (Windows, Mac before and after the answer, phone).
+- **Admin page:** the address field now says it is the folder of the installers and that the file name of each system is appended.
+
+**M5 status (AMD and Apple GPU): AMD done (not measured); Apple measured and turned off.**
+- **Agreed:** M5 is in 1.3.0 and the plan's rule stands: it only goes in if it pays off. CI has no AMD card, but the macOS runner **has Metal**, so the Apple GPU could be **really measured**.
+- **Apple (Metal), measured:** the `mps` engine built and passed the self-test (convolution and complex FFT), but when separating 30 s of audio **Demucs fails** on Metal: `NotImplementedError: Output channels > 65536 not supported at the MPS device` (`PYTORCH_ENABLE_MPS_FALLBACK=1` does not cover that error on this torch version). On the CPU the same separation worked (21 to 43 s for 30 s of audio on the runner). With no gain, **the option is not offered** and the Mac uses the CPU, with the reason written ("Demucs on torch 2.5.1 fails on Metal"). torch cannot be raised (Demucs 4.0.1 breaks with another one). `SINGALONG_APPLE_GPU=1` turns the option back on for whoever wants to measure again, and the CI job repeats the measurement on every change (the job summary shows the times), so a future torch version will show up there. The path is ready and tested for that day: the lyrics alignment stays on the CPU, a separation that fails on Metal is redone on the CPU (`devices.py`) and `PYTORCH_ENABLE_MPS_FALLBACK=1` is set on the Mac.
+- **AMD (ROCm 6.2, Linux only):** the worker reads `/sys` (no tools) and finds the card and its architecture (`gfx1100`...). It is only picked automatically if torch 2.5.1/rocm6.2 has kernels for it (`gfx900-942`, `gfx1030`, `gfx1100-1102`), it has 3 GB and the user can access `/dev/kfd`; otherwise it stays on the CPU **with the reason** (e.g. "no access to the AMD card: put your user in the render and video groups"). NVIDIA wins when there are both. torch comes from the `rocm6.2` index (~4 GB; the three packages were confirmed to exist) and the real test checks the ROCm build (`torch.version.hip`) and a convolution. **Without an AMD card in CI it was not measured**: the lesson from Metal is that a small self-test that passes does not prove that the whole Demucs works; the fallback to the CPU covers a failed test but not a failure in the middle of a separation (only a real card shows that).
+- **How the worker knows:** the app puts `SINGALONG_ENGINE` (read from `engine.json`) in the worker's environment; `devices.py` decides the device of each step. Whoever runs the worker by hand or in Docker is not affected.
+- **Settings screen:** the options are now built by `ui/gpu.js` (with tests): NVIDIA, AMD (when it fits), the automatic one and the CPU always; Apple only shows up with the option turned on.
+- **CI:** on macOS the real-engine job asks for `--engine mps` (the engine becomes `mps` because the runner has Metal) and runs Demucs on the CPU and on Metal with 30 s of audio, showing the times in the job summary.

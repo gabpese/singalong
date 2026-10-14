@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Uso (o app de interface chama as mesmas funções; esta linha de comando serve para testar e para quem quiser montar à mão):
-//   node src/cli.js assemble --dir C:\caminho\motor [--engine auto|cpu|cu121]
+//   node src/cli.js assemble --dir C:\caminho\motor [--engine auto|cpu|cu121|rocm6.2|mps]
 //   node src/cli.js verify   --dir C:\caminho\motor
 //   node src/cli.js status   --dir C:\caminho\motor
 import { assemble } from './assemble.js';
@@ -16,7 +16,7 @@ const option = (name, fallback) => {
 const root = option('dir', process.env.SINGALONG_ENGINE_DIR ?? '');
 
 if (!['assemble', 'verify', 'status'].includes(command) || !root) {
-  console.error('uso: node src/cli.js assemble|verify|status --dir PASTA [--engine auto|cpu|cu121]');
+  console.error('uso: node src/cli.js assemble|verify|status --dir PASTA [--engine auto|cpu|cu121|rocm6.2|mps]');
   process.exit(2);
 }
 

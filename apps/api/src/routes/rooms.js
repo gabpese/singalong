@@ -1,6 +1,7 @@
 import { rateLimited } from '../rate-limit.js';
 import { VIDEO_ID_PATTERN } from '../agents.js';
 import { LYRICS_SCHEMA } from './songs.js';
+import { downloadPage, downloadsFor } from '../installers.js';
 import { HttpError, normalizeCode } from '../rooms.js';
 
 const CODE_PARAM = { type: 'string', pattern: '^[A-Za-z0-9]{4,8}$' };
@@ -29,6 +30,8 @@ export async function roomRoutes(app, { rooms, config, limiters, release }) {
       public_url: config.publicUrl || null,
       app_download_url: /^https?:\/\//i.test(published.url ?? '') ? published.url : null,
       app_latest_version: published.latest || null,
+      app_page_url: downloadPage(published.url), // para ver todas as versões (a pasta de arquivos do GitHub não abre no navegador)
+      app_downloads: downloadsFor(published.url), // o instalador de cada sistema, com o nome de arquivo fixo
     };
   });
 

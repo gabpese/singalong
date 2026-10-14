@@ -10,7 +10,13 @@ Documentação: [PRD](PRD.pt-BR.md) (requisitos do produto), [TRD](TRD.pt-BR.md)
 
 ## Download
 
-O app do Windows (instalador `singalong_karaoke.exe`) está na [versão mais recente](https://github.com/gabpese/singalong/releases/latest). É gratuito e de código aberto (MIT).
+O app está na [versão mais recente](https://github.com/gabpese/singalong/releases/latest). É gratuito e de código aberto (MIT). Escolha o arquivo do seu sistema:
+
+| Sistema | Arquivo | Observações |
+|---|---|---|
+| Windows 10/11 (x64) | `singalong_karaoke.exe` | ainda sem assinatura: o SmartScreen pode avisar ("Mais informações" > "Executar assim mesmo") |
+| macOS (Apple Silicon: M1 em diante) | `singalong_karaoke-mac-arm64.dmg` | ainda sem assinatura da Apple: na primeira vez, clique com o botão direito no app > **Abrir** (ou `xattr -dr com.apple.quarantine "/Applications/singalong_karaoke.app"`); ele não se atualiza sozinho, o "Atualizar agora" abre o download do DMG novo. **Mac Intel não é suportado** |
+| Linux (x64) | `singalong_karaoke-linux-x86_64.AppImage` | dê `chmod +x` no arquivo e execute (no Ubuntu 22.04 ou mais novo o AppImage precisa do `libfuse2`: `sudo apt install libfuse2`). Ele se atualiza sozinho. No GNOME o ícone da bandeja precisa da extensão AppIndicator |
 
 ## Privacidade
 
@@ -196,11 +202,22 @@ python -m singalong_worker --version                                       # ver
 python -m singalong_worker --check-update --agent-url https://seu-servidor # há uma versão mais nova?
 python -m singalong_worker --hardware [--selftest]                         # GPU/CPU e o motor recomendado; --selftest faz um teste real na GPU
 cd apps\engine
-node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121]   # monta o motor (Python, ffmpeg, deno, torch...) a partir das fontes oficiais
+node src\cli.js assemble --dir D:\Singalong\engine [--engine auto|cpu|cu121|rocm6.2|mps]   # monta o motor (Python, ffmpeg, deno, torch...) a partir das fontes oficiais
 node src\cli.js verify   --dir D:\Singalong\engine
 ```
 
 O `assemble` precisa só do Node 22+ e do Windows 10/11 (usa o `tar.exe` do próprio Windows); nada é instalado no sistema e, se for interrompido, continua de onde parou. O motor `cu121` ocupa cerca de 5,6 GB. No servidor, `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` definem o aviso de atualização (abaixo da mínima, o agente deixa de receber jobs até atualizar).
+
+**Motores com GPU (F26 / M5).** O motor escolhe a placa de vídeo sozinho, testa de verdade depois de instalar e volta para a CPU (dizendo o motivo) se o teste falhar:
+
+| Motor | Placa | Observações |
+|---|---|---|
+| `cu121` | NVIDIA (CUDA 12.1) | driver 527.41+ (Windows) ou 525.60+ (Linux), 3 GB de memória ou mais, da GTX 750 até a RTX 40 |
+| `rocm6.2` | AMD (só Linux) | **Radeon RX 6800/6900 (gfx1030) e RX 7600/7700/7800/7900 (gfx1100-1102)**, e Instinct; 3 GB ou mais. O seu usuário precisa estar nos grupos `render` e `video` (acesso ao `/dev/kfd`). As outras Radeon (RX 6600, RX 6700...) não têm suporte oficial no ROCm e ficam na CPU, com o motivo na tela. O torch do ROCm é um **download de ~4 GB** |
+| `mps` | Apple Silicon (**desligado**) | **medido e desligado**: numa GPU Metal de verdade (executor macOS do CI, torch 2.5.1) o Demucs falha com `Output channels > 65536 not supported at the MPS device`, e o `PYTORCH_ENABLE_MPS_FALLBACK` não cobre isso. No Mac o motor é a CPU. `SINGALONG_APPLE_GPU=1` mostra a opção de novo ("GPU da Apple (beta)") para quem quiser medir com outra versão do torch; o Demucs rodaria no Metal, o alinhamento da letra na CPU, e uma separação que falhar é refeita na CPU |
+| `cpu` | qualquer | a volta de todos os outros |
+
+`node src/cli.js assemble --dir <pasta> --engine auto|cpu|cu121|rocm6.2|mps`. **A GPU da AMD não foi medida em hardware de verdade** (o CI não tem placa AMD): ela conta com o teste real e a volta para a CPU, e o ganho sobre a CPU é desconhecido. A GPU da Apple foi medida e não funciona com o Demucs (veja a tabela). A separação das vozes de apoio (`audio-separator`, ONNX) continua na CPU em todos os motores.
 
 **O app do dono (marco M3).** Uma janela Electron que faz tudo isso sem terminal: prepara o motor, pareia, inicia a sessão, cria salas, entra no YouTube e importa arquivos.
 
@@ -223,7 +240,17 @@ npm run dist                         # gera dist\singalong_karaoke.exe (+ latest
 dist\singalong_karaoke.exe           # instala só para o seu usuário; o SmartScreen do Windows pode avisar: "Mais informações" > "Executar assim mesmo"
 ```
 
-Para publicar uma atualização (**a versão e a mensagem também podem ser publicadas na página do administrador**, sem editar o `.env` nem fazer deploy): suba a versão em `apps/desktop/package.json`, `apps/desktop/src/controller.js` e `apps/worker/singalong_worker/version.py` (um teste confere que são iguais), rode `npm run dist`, ponha `singalong_karaoke.exe` e `latest.yml` numa pasta **privada** e defina no servidor `APP_LATEST_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` (o endereço dessa pasta). Todo app instalado passa a mostrar "Atualizar agora". Dá para usar uma **Release do GitHub** como essa pasta: anexe `singalong_karaoke.exe` e `latest.yml` à release e defina `APP_DOWNLOAD_URL=https://github.com/<dono>/<repositório>/releases/latest/download/` (atenção: as Releases de um repositório público são públicas, então qualquer pessoa pode baixar o instalador). `node scripts/test-update.mjs <instalado.exe> <pasta-da-versao-nova> <pasta-de-dados>` testa tudo isso num computador.
+**Instaladores de Linux e macOS (F26).** Cada um é gerado no próprio sistema (o DMG só num Mac); os nomes dos arquivos são fixos (`apps/desktop/src/installers.js`):
+
+```bash
+cd apps/desktop
+npm run dist:linux     # dist/singalong_karaoke-linux-x86_64.AppImage (+ latest-linux.yml)
+npm run dist:mac       # dist/singalong_karaoke-mac-arm64.dmg, com assinatura ad-hoc (o Apple Silicon recusa programa sem assinatura)
+```
+
+Sem um Linux ou um Mac à mão, use o workflow **Actions > "Instaladores de Linux e macOS" > Run workflow** com a tag da release (ex.: `v1.3.0`): ele gera os dois e os anexa à release (cria um rascunho se a release ainda não existir). O instalador do Windows continua sendo gerado e anexado por você (`npm run dist`). No servidor, `APP_DOWNLOAD_URL` continua sendo a base única (`.../releases/latest/download/`): a página inicial e o app acrescentam o nome do arquivo de cada sistema. O motor de cada sistema (Python, ffmpeg, deno) é montado no computador do usuário, como no Windows; no Mac o ffmpeg não tem o `rubberband`, então a troca de tom do MP4 exportado usa `asetrate`/`atempo`.
+
+Para publicar uma atualização (**a versão e a mensagem também podem ser publicadas na página do administrador**, sem editar o `.env` nem fazer deploy): suba a versão em `apps/desktop/package.json`, `apps/desktop/src/controller.js` e `apps/worker/singalong_worker/version.py` (um teste confere que são iguais), rode `npm run dist`, ponha `singalong_karaoke.exe` e `latest.yml` numa pasta **privada** e defina no servidor `APP_LATEST_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL` (o endereço dessa pasta). Todo app instalado passa a mostrar "Atualizar agora". Dá para usar uma **Release do GitHub** como essa pasta: anexe `singalong_karaoke.exe` e `latest.yml` à release e defina `APP_DOWNLOAD_URL=https://github.com/<dono>/<repositório>/releases/latest/download/` (atenção: as Releases de um repositório público são públicas, então qualquer pessoa pode baixar o instalador). Esse endereço único serve os três sistemas: a página inicial detecta o sistema do visitante e oferece o arquivo dele (`singalong_karaoke.exe`, `singalong_karaoke-mac-arm64.dmg` ou `singalong_karaoke-linux-x86_64.AppImage`), listando sempre também os outros sistemas; no Mac ela pergunta antes "Qual é o seu Mac?" (o navegador não distingue Intel de Apple Silicon, e Intel não é suportado). Colar a página da release (`.../releases/latest`) em vez da pasta é corrigido sozinho. O `GET /api/config` devolve `app_downloads` (a lista) e `app_page_url` (a página com todas as versões). `node scripts/test-update.mjs <instalado.exe> <pasta-da-versao-nova> <pasta-de-dados>` testa tudo isso num computador.
 
 #### Assinar o instalador (code signing)
 

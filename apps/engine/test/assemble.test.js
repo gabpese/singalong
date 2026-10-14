@@ -1,14 +1,14 @@
 // Montagem do motor com tudo falso (sem rede, sem pip): a ordem das etapas, a retomada, a escolha cpu/cu121 e a volta para a CPU.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { assemble, manifestHash, refreshWorker } from '../src/assemble.js';
+import { assemble, isAccelerated, loadManifest, manifestHash, refreshWorker, resolveManifest, torchIndexFor } from '../src/assemble.js';
 import { extract, installFiles, resolveGlob, tarCommand } from '../src/extract.js';
-import { launchEnv, paths, readState, workerCommand } from '../src/engine.js';
+import { engineEnv, launchEnv, paths, readState, workerCommand } from '../src/engine.js';
 
 process.env.SINGALONG_ENGINE_ANY_PLATFORM = '1';
 
@@ -184,16 +184,59 @@ test('o ambiente do worker põe o ffmpeg do motor na frente do PATH só para o p
   assert.equal(process.env.PYTHONPATH === p.app, false); // o ambiente deste processo não foi alterado
 });
 
-test('o manifesto de verdade: todos os componentes têm URL https, SHA-256 e arquivos a instalar', async () => {
-  const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
-  for (const [name, c] of Object.entries(manifest.components)) {
-    assert.match(c.url, /^https:\/\//, name);
-    assert.match(c.sha256, /^[0-9a-f]{64}$/, name);
-    assert.ok(c.files.length > 0, name);
+test('o manifesto de verdade: cada sistema tem Python, ffmpeg e deno com URL https, SHA-256 e arquivos a instalar', async () => {
+  const raw = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
+  assert.deepEqual(Object.keys(raw.platforms), ['win32-x64', 'linux-x64', 'darwin-arm64']);
+  for (const [platform, { components }] of Object.entries(raw.platforms)) {
+    // o Python vem primeiro (a verificação de hardware usa ele); no macOS o ffprobe é um arquivo à parte
+    assert.deepEqual(Object.keys(components), platform === 'darwin-arm64' ? ['python', 'ffmpeg', 'ffprobe', 'deno'] : ['python', 'ffmpeg', 'deno'], platform);
+    for (const [name, c] of Object.entries(components)) {
+      assert.match(c.url, /^https:\/\//, `${platform} ${name}`);
+      assert.match(c.sha256, /^[0-9a-f]{64}$/, `${platform} ${name}`);
+      assert.ok(c.files.length > 0, `${platform} ${name}`);
+    }
+    assert.ok(components.python.url.includes('python-build-standalone'), platform);
+    assert.ok(components.ffmpeg.version.includes('GPL'), platform);
+    assert.ok(Object.values(components).every((c) => c.files.every((f) => !f.to.endsWith('.exe') || platform === 'win32-x64')), platform); // só o Windows tem .exe
   }
-  assert.ok(manifest.components.python.url.includes('python-build-standalone'));
-  assert.ok(manifest.components.ffmpeg.version.includes('GPL'));
-  assert.equal(manifest.torch.version, '2.5.1'); // o Demucs 4.0.1 quebra com outros
+  assert.match(raw.platforms['win32-x64'].components.ffmpeg.url, /win64-gpl/);
+  assert.match(raw.platforms['linux-x64'].components.ffmpeg.url, /linux64-gpl/);
+  assert.match(raw.platforms['darwin-arm64'].components.python.url, /aarch64-apple-darwin/);
+  assert.match(raw.platforms['darwin-arm64'].components.ffmpeg.url, /macos\/arm64/);
+  assert.match(raw.platforms['darwin-arm64'].components.deno.url, /aarch64-apple-darwin/);
+  assert.deepEqual(raw.platforms['linux-x64'].components.ffmpeg.files.map((f) => f.to), ['bin/ffmpeg', 'bin/ffprobe', 'licenses/ffmpeg-LICENSE.txt']); // sem .exe
+  assert.equal(raw.torch.version, '2.5.1'); // o Demucs 4.0.1 quebra com outros
+});
+
+test('o manifesto resolvido: o Windows continua com o mesmo hash de antes (não refaz o motor de quem já o montou) e sistema sem motor é recusado', async () => {
+  const windows = await loadManifest(undefined, 'win32-x64');
+  assert.equal(windows.platform, 'win32-x64');
+  assert.equal(manifestHash(windows), '28529b9dc9631f40'); // o hash do motor montado antes da F26
+  const linux = await loadManifest(undefined, 'linux-x64');
+  assert.equal(linux.platform, 'linux-x64');
+  assert.notEqual(manifestHash(linux), manifestHash(windows));
+  assert.deepEqual(Object.keys(linux), ['pack_version', 'platform', 'comment', 'components', 'torch', 'pip']);
+  assert.throws(() => resolveManifest({ platforms: { 'win32-x64': { components: {} } } }, 'darwin-x64'), /Não há motor para este computador \(darwin-x64\).*win32-x64/);
+});
+
+test('extrair .zip e .tar.xz: sem unzip nem xz (Linux enxuto) o Python do próprio motor abre o arquivo', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'singalong-zip-'));
+  const python = join(dir, 'python3');
+  await writeFile(python, '');
+  const calls = [];
+  const run = (command) => {
+    calls.push(command);
+    return command === python ? { status: 0 } : { status: 1, error: new Error(`${command} não existe`) };
+  };
+  await extract(join(dir, 'x.zip'), join(dir, 'saida'), { run, python });
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2], python);
+  calls.length = 0;
+  const modules = [];
+  await extract(join(dir, 'ffmpeg.tar.xz'), join(dir, 'saida3'), { run: (command, args) => { calls.push(command); modules.push(args[1]); return command === python ? { status: 0 } : { status: 2, stderr: 'xz: Cannot exec' }; }, python });
+  assert.deepEqual(calls.length, 2); // o tar falha (sem xz) e o Python abre com o tarfile
+  assert.equal(modules[1], 'tarfile');
+  await assert.rejects(extract(join(dir, 'x.zip'), join(dir, 'saida2'), { run: () => ({ status: 1, stderr: 'ruim' }), python }), /Não consegui extrair/);
 });
 
 test('trocar de motor depois de montado: só o torch é reinstalado (com --force-reinstall) e o teste da GPU refeito', { skip: !canTar }, async (t) => {
@@ -238,4 +281,70 @@ test('depois de uma atualização do app, o código do worker dentro do motor é
   await assert.rejects(stat(join(root, 'app', 'singalong_worker', 'velho.py')), { code: 'ENOENT' }); // o que saiu da versão nova não fica para trás
   assert.deepEqual(await refreshWorker({ root, workerSource: source }), { updated: false, from: '1.2.5', to: '1.2.5' }); // já em dia: não mexe
   assert.deepEqual(await refreshWorker({ root, workerSource: join(dir, 'nao-existe') }), { updated: false, from: null, to: null }); // sem fonte: não faz nada
+});
+
+test('installFiles mantém os links relativos (o bin/python3 do Linux aponta para python3.11, e a pasta temporária é apagada depois)', { skip: process.platform === 'win32' }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'singalong-link-'));
+  const extracted = join(dir, 'extraido');
+  await mkdir(join(extracted, 'python', 'bin'), { recursive: true });
+  await writeFile(join(extracted, 'python', 'bin', 'python3.11'), 'PY');
+  await symlink('python3.11', join(extracted, 'python', 'bin', 'python3'));
+  const root = join(dir, 'motor');
+  await installFiles(extracted, [{ from: 'python', to: 'python' }], root);
+  await rm(extracted, { recursive: true, force: true }); // como o montador faz depois de instalar
+  assert.equal(await readlink(join(root, 'python', 'bin', 'python3')), 'python3.11');
+  assert.equal(await readFile(join(root, 'python', 'bin', 'python3'), 'utf8'), 'PY'); // o link ainda abre
+});
+
+test('motor AMD (ROCm 6.2): o torch vem do índice rocm6.2 e o teste da GPU é o da AMD', { skip: !canTar }, async (t) => {
+  const s = await scenario(t, { hardware: { engine: 'rocm6.2', reason: 'AMD Radeon RX 7900 XTX (gfx1100) pelo ROCm 6.2', gpus: [{ name: 'AMD' }], cpu_cores: 16, ram_mb: 32000 } });
+  const state = await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl });
+  assert.equal(state.engine, 'rocm6.2');
+  assert.equal(state.complete, true);
+  assert.ok(s.commands.some((c) => c.includes('torch==2.5.1') && c.includes('--index-url https://idx/rocm6.2')));
+  assert.ok(s.commands.some((c) => c.includes('gpu_selftest("rocm6.2")'))); // a GPU é conferida com o teste da AMD, não o do CUDA
+});
+
+test('a placa AMD falha no teste real: volta para a CPU, troca só o torch e registra o motivo', { skip: !canTar }, async (t) => {
+  const s = await scenario(t, { hardware: { engine: 'rocm6.2', reason: 'AMD', gpus: [], cpu_cores: 8, ram_mb: 16000 }, selftest: { ok: false, detail: 'HIP error: invalid device function' } });
+  const state = await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl });
+  assert.equal(state.engine, 'cpu');
+  assert.equal(state.fallback_reason, 'HIP error: invalid device function');
+  assert.equal(s.commands.filter((c) => c.includes('torch==2.5.1') && c.includes('install')).length, 2);
+});
+
+test('GPU da Apple (mps): só por escolha, usa o índice cpu do PyTorch (o do macOS já traz o Metal) e o teste do Metal', { skip: !canTar }, async (t) => {
+  const auto = await scenario(t, { hardware: { engine: 'cpu', reason: 'Mac: o automático usa a CPU', gpus: [{ name: 'Apple M2' }], cpu_cores: 8, ram_mb: 16000 } });
+  assert.equal((await assemble({ root: auto.root, manifest: auto.manifest, workerSource: auto.worker, fetchImpl: auto.fetchImpl, runImpl: auto.runImpl })).engine, 'cpu'); // o automático no Mac é a CPU
+
+  const chosen = await scenario(t, { hardware: { engine: 'cpu', reason: 'Mac', gpus: [{ name: 'Apple M2' }], cpu_cores: 8, ram_mb: 16000 } });
+  const state = await assemble({ root: chosen.root, manifest: chosen.manifest, workerSource: chosen.worker, fetchImpl: chosen.fetchImpl, runImpl: chosen.runImpl, engine: 'mps' });
+  assert.equal(state.engine, 'mps');
+  assert.equal(state.engine_reason, 'escolhido: mps');
+  assert.ok(chosen.commands.some((c) => c.includes('torch==2.5.1') && c.includes('--index-url https://idx/cpu')));
+  assert.ok(chosen.commands.some((c) => c.includes('gpu_selftest("mps")')));
+  assert.equal(state.fallback_reason, undefined);
+
+  const broken = await scenario(t, { selftest: { ok: false, detail: 'NotImplementedError: aten::stft não existe no MPS' } });
+  const fell = await assemble({ root: broken.root, manifest: broken.manifest, workerSource: broken.worker, fetchImpl: broken.fetchImpl, runImpl: broken.runImpl, engine: 'mps' });
+  assert.equal(fell.engine, 'cpu'); // o Metal falhou no teste: CPU, com o motivo
+  assert.match(fell.fallback_reason, /aten::stft/);
+});
+
+test('os motores: quais têm GPU e qual índice do PyTorch cada um usa', () => {
+  assert.deepEqual(['cpu', 'cu121', 'rocm6.2', 'mps'].map(isAccelerated), [false, true, true, true]);
+  assert.deepEqual(['cpu', 'cu121', 'rocm6.2', 'mps'].map(torchIndexFor), ['cpu', 'cu121', 'rocm6.2', 'cpu']);
+});
+
+test('o worker recebe o motor instalado (SINGALONG_ENGINE) e, no Mac, o desvio das operações que o Metal não tem', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'singalong-env-'));
+  assert.deepEqual(engineEnv(dir, 'linux'), {}); // motor ainda não montado: nada muda
+  await writeFile(join(dir, 'engine.json'), JSON.stringify({ engine: 'rocm6.2', complete: true }));
+  assert.deepEqual(engineEnv(dir, 'linux'), { SINGALONG_ENGINE: 'rocm6.2' });
+  assert.deepEqual(engineEnv(dir, 'darwin'), { SINGALONG_ENGINE: 'rocm6.2', PYTORCH_ENABLE_MPS_FALLBACK: '1' });
+  await writeFile(join(dir, 'engine.json'), 'não é json');
+  assert.deepEqual(engineEnv(dir, 'win32'), {}); // arquivo ilegível: nada muda
+  await writeFile(join(dir, 'engine.json'), JSON.stringify({ engine: 'mps' }));
+  assert.equal(launchEnv(dir, {}, { PATH: '/usr/bin' }).SINGALONG_ENGINE, 'mps');
+  assert.equal(launchEnv(dir, { SINGALONG_ENGINE: 'cpu' }, { PATH: '/usr/bin' }).SINGALONG_ENGINE, 'cpu'); // `extra` sobrescreve
 });

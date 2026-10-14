@@ -90,6 +90,9 @@ input[type=range] { accent-color: var(--accent); }
 .home-panel .join-code::placeholder { letter-spacing: normal; text-transform: none; font-size: 1rem; } /* o exemplo inteiro cabe no campo */
 .home-panel .language-switch { justify-self: end; }
 .home-panel .download-more { justify-self: start; }
+.home-panel .download-others { margin: 6px 0 0; color: var(--dim); font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.home-panel .download-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.home-panel .mac-choice { display: grid; gap: 8px; }
 /* no celular a imagem vai em cima (menor) e as ações embaixo */
 @media (max-width: 900px) {
   .home { grid-template-columns: minmax(0, 1fr); min-height: 0; }

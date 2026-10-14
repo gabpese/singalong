@@ -13,7 +13,19 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 export const DEFAULT_MANIFEST = join(here, '..', 'manifest.json');
 export const DEFAULT_WORKER_SOURCE = join(here, '..', '..', 'worker');
 
-export const loadManifest = async (file = DEFAULT_MANIFEST) => JSON.parse(await readFile(file, 'utf8'));
+export const thisPlatform = () => `${process.platform}-${process.arch}`;
+
+/**
+ * O manifesto resolvido para um sistema: os componentes (Python, ffmpeg, deno) são os do `platform`; torch e pip valem para todos.
+ * A ordem das chaves é a de sempre (o hash do manifesto do Windows não pode mudar: mudaria e refaria o motor de quem já o montou).
+ */
+export const resolveManifest = (raw, platform = thisPlatform()) => {
+  const entry = raw.platforms?.[platform];
+  if (!entry) throw new Error(`Não há motor para este computador (${platform}). Sistemas com motor: ${Object.keys(raw.platforms ?? {}).join(', ')}.`);
+  return { pack_version: raw.pack_version, platform, comment: raw.comment, components: entry.components, torch: raw.torch, pip: raw.pip };
+};
+
+export const loadManifest = async (file = DEFAULT_MANIFEST, platform = thisPlatform()) => resolveManifest(JSON.parse(await readFile(file, 'utf8')), platform);
 
 /** Identifica uma versão do manifesto: se mudar (um componente novo), as etapas afetadas são refeitas. */
 export const manifestHash = (manifest) => createHash('sha256').update(JSON.stringify(manifest)).digest('hex').slice(0, 16);
@@ -46,10 +58,18 @@ export function probeHardware(root, { forceCpu = false, runImpl = run } = {}) {
   return pythonJson(root, `import json,sys;sys.path.insert(0,${app});from singalong_worker import hardware;print(json.dumps(hardware.probe(force_cpu=${forceCpu ? 'True' : 'False'})))`, runImpl);
 }
 
+/** Os motores com GPU: NVIDIA (CUDA 12.1), AMD (ROCm 6.2, só Linux) e Apple (Metal, só Mac, opcional). O outro é a CPU. */
+export const ACCELERATED_ENGINES = ['cu121', 'rocm6.2', 'mps'];
+export const ENGINES = ['cpu', ...ACCELERATED_ENGINES];
+export const isAccelerated = (engine) => ACCELERATED_ENGINES.includes(engine);
+
+/** O índice do PyTorch de cada motor. O do Mac usa o índice `cpu` (que no macOS tem os pacotes arm64 com Metal incluído). */
+export const torchIndexFor = (engine) => (engine === 'mps' ? 'cpu' : engine);
+
 /** O teste de verdade da GPU, dentro do motor já instalado. */
-export function gpuSelftest(root, { runImpl = run } = {}) {
+export function gpuSelftest(root, { runImpl = run, engine = 'cu121' } = {}) {
   const app = JSON.stringify(paths(root).app);
-  return pythonJson(root, `import json,sys;sys.path.insert(0,${app});from singalong_worker import hardware;print(json.dumps(hardware.gpu_selftest()))`, runImpl);
+  return pythonJson(root, `import json,sys;sys.path.insert(0,${app});from singalong_worker import hardware;print(json.dumps(hardware.gpu_selftest(${JSON.stringify(engine)})))`, runImpl);
 }
 
 /** Copia o código do worker para dentro do motor (apaga a cópia anterior: arquivos que saíram da versão nova não ficam para trás). */
@@ -82,7 +102,7 @@ export async function refreshWorker({ root, workerSource = DEFAULT_WORKER_SOURCE
 
 /**
  * Monta (ou conclui) o motor em `root`.
- *  engine: "auto" (decide pelo hardware), "cpu" ou "cu121".
+ *  engine: "auto" (decide pelo hardware), "cpu", "cu121" (NVIDIA), "rocm6.2" (AMD, Linux) ou "mps" (GPU da Apple, Mac).
  *  switchEngine: com o motor já montado, troca para o `engine` pedido (só o torch é reinstalado: o resto fica como está).
  *  workerSource: pasta apps/worker (singalong_worker + requirements.txt) que vai junto no instalador.
  *  onProgress({ step, label, done, total, line }) alimenta a barra de progresso do instalador.
@@ -90,8 +110,8 @@ export async function refreshWorker({ root, workerSource = DEFAULT_WORKER_SOURCE
  */
 export async function assemble({ root, manifest, engine = 'auto', switchEngine = false, workerSource = DEFAULT_WORKER_SOURCE, onProgress = () => {}, runImpl = run, fetchImpl = fetch, retryWait }) {
   manifest ??= await loadManifest();
-  if (`${process.platform}-${process.arch}` !== manifest.platform && !process.env.SINGALONG_ENGINE_ANY_PLATFORM) {
-    throw new Error(`Este motor é para ${manifest.platform}; este computador é ${process.platform}-${process.arch}.`);
+  if (thisPlatform() !== manifest.platform && !process.env.SINGALONG_ENGINE_ANY_PLATFORM) {
+    throw new Error(`Este motor é para ${manifest.platform}; este computador é ${thisPlatform()}.`);
   }
   const p = paths(root);
   await mkdir(p.downloads, { recursive: true });
@@ -111,7 +131,7 @@ export async function assemble({ root, manifest, engine = 'auto', switchEngine =
     await download({ url: component.url, dest: archive, sha256: component.sha256, fetchImpl, retryWait, onProgress: ({ done: d, total }) => progress(step, `Baixando ${name}`, { done: d, total }) });
     progress(step, `Instalando ${name}`);
     const tmp = join(p.downloads, `extraido-${name}`);
-    await extract(archive, tmp);
+    await extract(archive, tmp, { python: p.python });
     await installFiles(tmp, component.files, root);
     await rm(tmp, { recursive: true, force: true });
     await save({ components: { ...state.components, [name]: { version: component.version, sha256: component.sha256 } } });
@@ -129,7 +149,7 @@ export async function assemble({ root, manifest, engine = 'auto', switchEngine =
   if (!state.engine) {
     progress('hardware', 'Verificando o computador');
     const probe = await probeHardware(root, { forceCpu: engine === 'cpu', runImpl });
-    const chosen = engine === 'cu121' ? 'cu121' : engine === 'cpu' ? 'cpu' : probe.engine;
+    const chosen = ENGINES.includes(engine) ? engine : probe.engine;
     await save({ engine: chosen, engine_reason: engine === 'auto' ? probe.reason : `escolhido: ${engine}`, hardware: { gpus: probe.gpus, cpu_cores: probe.cpu_cores, ram_mb: probe.ram_mb } });
   }
 
@@ -147,13 +167,13 @@ export async function assemble({ root, manifest, engine = 'auto', switchEngine =
     }
   }
 
-  // 4) pacotes pip (torch pelo índice oficial do PyTorch, cpu ou cu121)
+  // 4) pacotes pip (torch pelo índice oficial do PyTorch: cpu, cu121 ou rocm6.2; no Mac, o do cpu)
   await installPip({ root, manifest, state, save, done, progress, runImpl, engine: state.engine, force: switching });
 
   // 5) o teste real da GPU; se falhar, troca o torch para a versão de CPU e registra o motivo
-  if (state.engine === 'cu121' && !state.steps.selftest) {
+  if (isAccelerated(state.engine) && !state.steps.selftest) {
     progress('selftest', 'Testando a placa de vídeo');
-    const result = await gpuSelftest(root, { runImpl });
+    const result = await gpuSelftest(root, { runImpl, engine: state.engine });
     if (!result.ok) {
       progress('selftest', 'A placa não funcionou: usando a CPU');
       await save({ fallback_reason: result.detail, engine: 'cpu' });
@@ -171,7 +191,7 @@ export async function assemble({ root, manifest, engine = 'auto', switchEngine =
 
 async function installPip({ root, manifest, state, save, done, progress, runImpl, engine, force = false }) {
   const p = paths(root);
-  const index = manifest.torch.index.replace('{engine}', engine);
+  const index = manifest.torch.index.replace('{engine}', torchIndexFor(engine));
   for (const [i, step] of manifest.pip.entries()) {
     const key = `pip:${i}`;
     if (state.steps[key] && !(force && step.torchIndex)) continue; // no retorno para CPU só o torch/torchvision é trocado

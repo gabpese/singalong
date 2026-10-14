@@ -86,14 +86,22 @@ test('o heartbeat devolve o aviso e abaixo da mínima o servidor recusa trabalho
 test('GET /api/config: o endereço do app e a versão só saem se estiverem configurados (e o link precisa ser http/https)', async () => {
   const configured = await build({ appLatestVersion: '1.3.0', appDownloadUrl: 'https://github.com/dono/repo/releases/latest', publicUrl: 'https://sing.example' });
   const body = (await configured.inject({ method: 'GET', url: '/api/config' })).json();
-  assert.deepEqual(body, { public_url: 'https://sing.example', app_download_url: 'https://github.com/dono/repo/releases/latest', app_latest_version: '1.3.0' });
+  assert.deepEqual([body.public_url, body.app_download_url, body.app_latest_version], ['https://sing.example', 'https://github.com/dono/repo/releases/latest', '1.3.0']);
+  // a página da release virou a pasta de arquivos (o engano mais comum), e cada sistema ganha o seu link com o nome fixo
+  assert.equal(body.app_page_url, 'https://github.com/dono/repo/releases/latest');
+  assert.deepEqual(body.app_downloads.map((d) => [d.system, d.arch, d.url]), [
+    ['windows', 'x64', 'https://github.com/dono/repo/releases/latest/download/singalong_karaoke.exe'],
+    ['macos', 'arm64', 'https://github.com/dono/repo/releases/latest/download/singalong_karaoke-mac-arm64.dmg'],
+    ['linux', 'x64', 'https://github.com/dono/repo/releases/latest/download/singalong_karaoke-linux-x86_64.AppImage'],
+  ]);
   await configured.close();
 
   const bare = await build({});
-  assert.deepEqual((await bare.inject({ method: 'GET', url: '/api/config' })).json(), { public_url: null, app_download_url: null, app_latest_version: null });
+  assert.deepEqual((await bare.inject({ method: 'GET', url: '/api/config' })).json(), { public_url: null, app_download_url: null, app_latest_version: null, app_page_url: null, app_downloads: [] });
   await bare.close();
 
   const unsafe = await build({ appDownloadUrl: 'javascript:alert(1)' }); // um link que não é http(s) nunca vai para um botão
-  assert.equal((await unsafe.inject({ method: 'GET', url: '/api/config' })).json().app_download_url, null);
+  const unsafeBody = (await unsafe.inject({ method: 'GET', url: '/api/config' })).json();
+  assert.deepEqual([unsafeBody.app_download_url, unsafeBody.app_page_url, unsafeBody.app_downloads], [null, null, []]);
   await unsafe.close();
 });
