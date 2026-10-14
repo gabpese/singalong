@@ -1,4 +1,5 @@
 // Topo da sala (código e estado da TV) e a barra de abas. Os atalhos e ajustes ficam na barra lateral (RoomRail).
+import { useEffect, useRef } from 'react';
 import type { RoomState } from '../lib/types';
 import { t } from '../i18n/index.js';
 import { Icon } from '../ui/Icon';
@@ -19,9 +20,20 @@ function tvStatusText(state: RoomState | null, status: ConnectionStatus) {
 
 export function TopBar({ state, status, view, onView }: { state: RoomState | null; status: ConnectionStatus; view: View; onView: (view: View) => void }) {
   const { code } = useRoom();
+  const header = useRef<HTMLElement>(null);
+  // a barra lateral fica logo abaixo do topo, qualquer que seja a altura dele (idioma, estado da TV...): o topo diz a sua medida
+  useEffect(() => {
+    const element = header.current;
+    if (!element) return undefined;
+    const publish = () => document.documentElement.style.setProperty('--topbar-h', `${element.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <header className="topbar">
+    <header className="topbar" ref={header}>
       <div className="topbar-main">
         <h1>
           <Icon name="singing" />

@@ -396,4 +396,7 @@ export default {
   'parts.cancel': 'Cancel',
   'parts.saved': 'Lyrics split saved.',
   'parts.reset': 'Back to the automatic split.',
+
+  'mics.filter': 'Reduce voice noise and echo',
+  'mics.filterHint': 'a low-cut filter and a noise gate: the microphone goes down when nobody sings. Turn it off if your voice is being cut.',
 };

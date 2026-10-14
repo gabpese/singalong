@@ -1,0 +1,89 @@
+// Ajustes da 1.2.1: a letra não passa por cima da outra, a que já passou some, a pontuação fica à direita (fora do guia de
+// melodia), a barra lateral fica abaixo do topo e o volume da voz só aparece quando se procura por ele.
+import { expect, test } from '@playwright/test';
+import { addToQueue, ANA, createRoom, hostPatch, SONGS } from './helpers.mjs';
+
+const tvPlaying = (page) => page.evaluate(() => window.tv.engine.playing && window.tv.engine.duration > 0 && window.tv.engine.currentTime > 1.2);
+const box = (locator) => locator.evaluate((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom }; });
+const overlap = (a, b) => a.x < b.right && b.x < a.right && a.y < b.bottom && b.y < a.bottom;
+
+test('a letra se ajusta ao cartão: nenhuma linha passa por cima da outra, mesmo com a fonte grande e a tela pequena', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await page.addInitScript(() => localStorage.setItem('lyricsScale', '1.8'));
+  await page.setViewportSize({ width: 560, height: 380 });
+  await page.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(page)).toBe(true);
+  await expect(page.locator('.line.current')).toContainText('Segunda linha cantada agora');
+  await page.waitForTimeout(400);
+  const lines = await Promise.all(['.line.current', '.line.next', '.line.next2'].map((selector) => box(page.locator(selector))));
+  for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) if (lines[i].h > 0 && lines[j].h > 0) expect(overlap(lines[i], lines[j]), `linhas ${i} e ${j} se sobrepõem`).toBe(false);
+  expect(await page.locator('.lyrics').evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true); // tudo cabe no cartão
+});
+
+test('a letra que já passou não fica à mostra', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await page.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(page)).toBe(true);
+  await expect(page.locator('.line.current')).toContainText('Segunda linha cantada agora');
+  await expect(page.locator('.line.prev')).toBeHidden();
+});
+
+test('a pontuação fica na extrema direita e não cobre o guia de melodia', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await hostPatch(request, room, { scoring: true, melody_bars: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(page)).toBe(true);
+  await expect(page.locator('canvas.pitch-guide')).toBeVisible();
+  const hud = await box(page.locator('.score-hud'));
+  const guide = await box(page.locator('canvas.pitch-guide'));
+  expect(hud.right).toBeGreaterThan(1280 - 48); // colado na direita
+  expect(overlap(hud, guide)).toBe(false); // o guia termina antes do cartão
+  expect(guide.w).toBeGreaterThan(700); // e continua largo
+});
+
+test('sem o guia de melodia o cartão da pontuação também fica à direita', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await hostPatch(request, room, { scoring: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(room.tvUrl);
+  await expect(page.locator('.score-hud')).toBeVisible();
+  expect((await box(page.locator('.score-hud'))).right).toBeGreaterThan(1280 - 48);
+});
+
+test.describe('sala no computador', () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
+  test('o seletor de idioma não estica o topo e a barra lateral fica abaixo dele', async ({ page, request }) => {
+    const room = await createRoom(request);
+    await page.goto(room.hostUrl);
+    const header = await box(page.locator('header.topbar'));
+    const select = await box(page.locator('header.topbar .language-switch'));
+    const rail = await box(page.locator('aside.room-rail'));
+    expect(select.w).toBeLessThan(260); // antes ocupava o topo inteiro
+    expect(header.h).toBeLessThan(110);
+    expect(rail.y).toBeGreaterThanOrEqual(header.bottom - 1); // a barra não fica atrás do topo
+  });
+
+  test('o volume da voz ao lado do interruptor só aparece com o mouse em cima (e não fica aberto depois do clique)', async ({ page, request }) => {
+    const room = await createRoom(request);
+    await hostPatch(request, room, { voice: true });
+    await page.goto(room.hostUrl);
+    const popup = page.locator('.rail-pop');
+    const voiceSwitch = page.getByRole('switch', { name: /Voz do microfone/ });
+    await expect(voiceSwitch).toBeVisible();
+    await page.mouse.move(700, 500);
+    await expect(popup).toHaveCSS('opacity', '0');
+    await voiceSwitch.hover();
+    await expect(popup).toHaveCSS('opacity', '1');
+    const pop = await box(popup);
+    const sw = await box(voiceSwitch);
+    expect(Math.abs((pop.y + pop.h / 2) - (sw.y + sw.h / 2))).toBeLessThan(8); // centrado no interruptor
+    await page.mouse.move(900, 600);
+    await expect(popup).toHaveCSS('opacity', '0');
+  });
+});

@@ -61,6 +61,21 @@ export function createLyricsView(els) {
     lastDashes = -1;
   }
 
+  /**
+   * Encaixa a letra no cartão: se as linhas não cabem na altura (uma frase que quebra em três linhas, uma tela pequena), reduz
+   * o tamanho das fontes aos poucos (`--fit`) em vez de deixar uma linha passar por cima da outra.
+   */
+  function fit() {
+    const box = els.current.parentElement;
+    if (!box) return;
+    let scale = 1;
+    box.style.setProperty('--fit', '1');
+    while (box.scrollHeight > box.clientHeight + 1 && scale > 0.4) {
+      scale = Math.round((scale - 0.06) * 100) / 100;
+      box.style.setProperty('--fit', String(scale));
+    }
+  }
+
   function paintGap(dashes) {
     if (dashes === lastDashes) return;
     lastDashes = dashes;
@@ -125,6 +140,7 @@ export function createLyricsView(els) {
         mark(els.current, gap ? '' : part(current));
         mark(els.next, part(current >= 0 ? current + 1 : next));
         mark(els.next2, part(current >= 0 ? current + 2 : next + 1));
+        fit();
       }
       if (gap) paintGap(gap.dashes);
       else paintCurrentLine(current >= 0 ? lineProgress(cues[current], t) : 0, current >= 0 ? wordFills(cues[current], words.length, t) : null);

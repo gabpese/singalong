@@ -396,4 +396,7 @@ export default {
   'parts.cancel': 'Cancelar',
   'parts.saved': 'División de la letra guardada.',
   'parts.reset': 'Volvió a la división automática.',
+
+  'mics.filter': 'Reducir ruido y eco de la voz',
+  'mics.filterHint': 'un filtro de graves y una puerta de ruido: el micrófono baja cuando nadie canta. Desactívalo si se corta la voz.',
 };

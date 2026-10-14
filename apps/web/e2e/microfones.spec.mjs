@@ -14,15 +14,16 @@ test('sem escolha vale o microfone padrão; marcando dois, os dois entram na sa�
 
   await page.getByRole('button', { name: 'Microfones' }).click();
   const dialog = page.getByRole('dialog', { name: 'Microfones da TV' });
-  await expect(dialog.getByRole('checkbox')).toHaveCount(2); // os dois "Fake Audio Input" do Chromium de teste
-  await dialog.getByRole('checkbox').nth(0).check();
+  const mics = dialog.locator('.mic-list').getByRole('checkbox');
+  await expect(mics).toHaveCount(2); // os dois "Fake Audio Input" do Chromium de teste
+  await mics.nth(0).check();
   await expect.poll(() => page.evaluate(() => window.tv.engine.voiceMics)).toBe(1);
-  await dialog.getByRole('checkbox').nth(1).check();
+  await mics.nth(1).check();
   await expect.poll(() => page.evaluate(() => window.tv.engine.voiceMics)).toBe(2);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('voiceMics')).length)).toBe(2);
   await expect(dialog.locator('small', { hasText: 'faz a pontuação' })).toHaveCount(1); // só o primeiro
 
-  await dialog.getByRole('checkbox').nth(0).uncheck();
+  await mics.nth(0).uncheck();
   await expect.poll(() => page.evaluate(() => window.tv.engine.voiceMics)).toBe(1);
   await dialog.getByRole('button', { name: 'Fechar' }).click();
 
@@ -61,4 +62,35 @@ test('o apito de um microfone corta só o volume dele, e o aviso diz qual', asyn
   expect(factors.second).toBeLessThan(1);
   expect(factors.first).toBe(1); // o primeiro microfone segue normal
   await expect(page.getByText(/Microfonia no microfone 2/)).toBeVisible();
+});
+
+test('reduzir ruído e eco: vem ligado, o portão fecha no silêncio e abre com a voz, e dá para desligar (fica guardado)', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { name: 'Ana' });
+  await page.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(page)).toBe(true);
+  await hostPatch(request, room, { voice: true, voice_volume: 50 });
+  await expect.poll(() => page.evaluate(() => window.tv.engine.voiceMics)).toBe(1);
+  expect(await page.evaluate(() => window.tv.engine.voiceFilter)).toBe(true); // ligado por padrão
+
+  // o portão: silêncio fecha (só um fiozinho passa), voz abre; o ganho acompanha
+  const closed = await page.evaluate(() => window.tv.engine.stepGate(0.0001, 100000)); // -80 dBFS
+  expect(closed).toBeLessThan(0.2);
+  await expect.poll(() => page.evaluate(() => window.tv.engine.voiceGateGain), { timeout: 5000 }).toBeLessThan(0.5);
+  const open = await page.evaluate(() => window.tv.engine.stepGate(0.1, 100050)); // -20 dBFS: a voz entrou
+  expect(open).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.tv.engine.voiceGateGain), { timeout: 5000 }).toBeGreaterThan(0.9);
+
+  // desligar no diálogo: o portão deixa de fechar, na hora, e a escolha fica nesta TV
+  await page.getByRole('button', { name: 'Microfones' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Microfones da TV' });
+  const filter = dialog.getByRole('checkbox', { name: /Reduzir ruído e eco/ });
+  await expect(filter).toBeChecked();
+  await filter.uncheck();
+  expect(await page.evaluate(() => window.tv.engine.voiceFilter)).toBe(false);
+  expect(await page.evaluate(() => window.tv.engine.stepGate(0.0001, 300000))).toBe(1); // silêncio, mas o portão está desligado
+  expect(await page.evaluate(() => localStorage.getItem('voiceFilter'))).toBe('off');
+  await dialog.getByRole('button', { name: 'Fechar' }).click();
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.tv.engine.voiceFilter)).toBe(false); // continua desligado
 });
