@@ -167,7 +167,7 @@ test('sem pontuação ligada o quadro não aparece', async ({ page, request }) =
   await expect(page.locator('.score-hud')).toBeHidden();
 });
 
-test('o QR code da sala continua na TV com a música tocando (cartão ao lado da fila)', async ({ page, request }) => {
+test('o QR code da sala continua na TV com a música tocando (ao lado de quem está cantando)', async ({ page, request }) => {
   const room = await createRoom(request);
   await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
   await page.goto(room.tvUrl);
@@ -175,5 +175,6 @@ test('o QR code da sala continua na TV com a música tocando (cartão ao lado da
   const card = page.getByRole('complementary', { name: 'Entrar na sala' });
   await expect(card).toBeVisible();
   await expect(card.getByLabel('QR code para entrar na sala').locator('svg')).toBeVisible();
-  await expect(card).toContainText(room.code);
+  await expect(page.locator('.room-tag')).toContainText(room.code); // o código escrito continua no cabeçalho
+  await expect(page.locator('.singer.is-now')).toBeVisible();
 });
