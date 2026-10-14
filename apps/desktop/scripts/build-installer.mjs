@@ -7,7 +7,7 @@
 // Windows: sem certificado configurado sai sem assinar (o SmartScreen avisa); com CSC_LINK + CSC_KEY_PASSWORD, ou com o Azure Trusted Signing,
 // sai assinado e carimbado (scripts/signing.mjs). SINGALONG_REQUIRE_SIGNING=1 falha sem certificado.
 // macOS: sai com assinatura "ad-hoc" (o Apple Silicon só abre programas assinados; sem conta Apple Developer não há como notarizar).
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { Arch, build, Platform } from 'electron-builder';
@@ -39,6 +39,9 @@ if (signing) {
   console.log(`Assinatura: ${signing.summary}`);
   if (signing.mode === 'none') process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'; // nunca "descobre" um certificado do computador por conta própria
 }
+
+// a assinatura ad-hoc do Mac não usa segredo nenhum; sem isto o electron-builder a pula nos builds de pull request e o app sairia sem assinatura
+if (chosen === 'mac') process.env.CSC_FOR_PULL_REQUEST = 'true';
 
 const output = process.env.SINGALONG_DIST || 'dist';
 const result = await build({
@@ -86,12 +89,18 @@ if (chosen === 'win') {
   }
   if (chosen === 'mac') {
     // o Apple Silicon encerra qualquer programa sem assinatura: a ad-hoc tem de estar válida
-    const app = join(output, 'mac-arm64', 'Singalong Karaoke.app');
-    try {
-      execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'pipe' });
-      console.log(`  ${app}: assinatura ad-hoc válida ✓`);
-    } catch (error) {
-      problem(`a assinatura de ${app} não confere: ${String(error.stderr ?? error.message).trim()}`);
+    const folder = join(output, 'mac-arm64');
+    const name = existsSync(folder) ? readdirSync(folder).find((entry) => entry.endsWith('.app')) : null;
+    if (!name) {
+      problem(`não achei o .app em ${folder} (${existsSync(folder) ? readdirSync(folder).join(', ') || 'pasta vazia' : 'a pasta não existe'})`);
+    } else {
+      const app = join(folder, name);
+      try {
+        execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'pipe' });
+        console.log(`  ${app}: assinatura ad-hoc válida ✓`);
+      } catch (error) {
+        problem(`a assinatura de ${app} não confere: ${String(error.stderr ?? error.message).trim()}`);
+      }
     }
   }
 }
