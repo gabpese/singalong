@@ -12,14 +12,6 @@ Documentation: [PRD](PRD.md) (product requirements), [TRD](TRD.md) (technical re
 
 The Windows app (installer `singalong_karaoke.exe`) is on the [latest release](https://github.com/gabpese/singalong/releases/latest). It is free and open source (MIT).
 
-## Code signing policy
-
-Free code signing for the Windows installer is provided by [SignPath.io](https://signpath.io), with the certificate issued by the [SignPath Foundation](https://signpath.org). Releases built before the certificate was granted are unsigned.
-
-- **Authors, reviewers and approvers:** [@gabpese](https://github.com/gabpese) (the only maintainer). Every release is built by [GitHub Actions](.github/workflows/ci.yml) from this repository and each signing request is approved manually.
-- **What is signed:** only the binaries built from this repository (the app, the installer and the uninstaller). Third-party components, such as Electron, keep their own signatures.
-- **Two-factor authentication** is required for the maintainer's GitHub and SignPath accounts.
-
 ## Privacy
 
 The app and the server do not send any data to the project's authors or to third parties. The app talks only to the Singalong server you set up (yours, or the one you were invited to), and the server runs on your own machine. Fetching songs uses YouTube from that server, under your own cookies, as described below.
