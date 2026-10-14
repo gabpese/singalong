@@ -2,9 +2,11 @@
 // A janela tem a interface do app (abas "Sessão", "Anfitrião" e "TV") e, nas duas últimas, páginas do servidor embutidas.
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session as electronSession, shell, Tray, WebContentsView } from 'electron';
 import electronUpdater from 'electron-updater';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BROWSER_NAMES, createController, UserError } from './controller.js';
+import { installerUrl, needsNoSandbox } from './installers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const testMode = process.env.SINGALONG_DESKTOP_TEST === '1';
@@ -13,6 +15,7 @@ const ICON = join(here, '..', 'ui', 'icon.png');
 if (process.env.SINGALONG_USER_DATA) app.setPath('userData', process.env.SINGALONG_USER_DATA);
 if (!testMode && !app.requestSingleInstanceLock()) app.quit();
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required'); // a TV toca sem precisar de um clique
+if (needsNoSandbox({ read: (path) => readFileSync(path, 'utf8') })) app.commandLine.appendSwitch('no-sandbox'); // AppImage em distribuição que restringe namespaces (veja src/installers.js)
 
 let win = null;
 let tray = null;
@@ -201,6 +204,13 @@ async function applyUpdate() {
     await shell.openExternal(info.url);
     return { opened: true };
   }
+  if (process.platform === 'darwin') {
+    // o app do Mac não tem assinatura da Apple: o macOS recusa trocar um app sem ela por si só, então a atualização é baixar o DMG novo
+    const link = installerUrl(info.url);
+    if (!allowedExternal(link)) throw new UserError('no_update', 'Não há atualização para baixar.');
+    await shell.openExternal(link);
+    return { opened: true };
+  }
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowDowngrade = false;
@@ -333,7 +343,7 @@ function createWindow() {
     backgroundColor: '#14141c',
     webPreferences: { preload: join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  win.setMenuBarVisibility(false);
+  win.setMenuBarVisibility(false); // no macOS o menu do app fica (é ele que dá o Cmd+C e o Cmd+V nos campos)
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' })); // links nunca abrem janelas do Electron
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   // a janela volta da bandeja: confere se saiu versão nova (o app pode ficar dias aberto)
@@ -356,10 +366,18 @@ function createTray() {
   tray = new Tray(nativeImage.createFromPath(ICON));
   tray.setToolTip('Singalong Karaoke');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Abrir', click: () => { win.show(); win.focus(); } },
+    { label: 'Abrir', click: showWindow },
     { label: 'Sair', click: () => app.quit() },
   ]));
-  tray.on('click', () => { win.show(); win.focus(); });
+  tray.on('click', showWindow);
+}
+
+/** Traz a janela de volta; se ela foi fechada de verdade (sessão parada), abre outra. */
+function showWindow() {
+  if (!app.isReady()) return; // um segundo aberto muito cedo (a primeira instância ainda está subindo)
+  if (!win || win.isDestroyed()) createWindow();
+  win.show();
+  win.focus();
 }
 
 app.whenReady().then(async () => {
@@ -370,7 +388,8 @@ app.whenReady().then(async () => {
   if (!testMode) createTray();
 });
 
-app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
+app.on('second-instance', showWindow);
+app.on('activate', showWindow); // macOS: o clique no ícone do Dock
 app.on('window-all-closed', () => { if (quitting) app.quit(); });
 app.on('before-quit', (event) => {
   if (quitting) return;

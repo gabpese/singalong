@@ -1,5 +1,6 @@
 // Gera o ícone do app (ui/icon.png e build/icon.ico) a partir de build/singing.svg: o desenho preto sobre um quadrado
 // arredondado amarelo (a cor da marca), para aparecer bem na barra de tarefas escura e na clara.
+// build/icon.png sai em 1024 px: o macOS (.icns) e o Linux (AppImage) exigem pelo menos 512 px.
 //   node_modules\electron\dist\electron.exe scripts\make-icon.cjs      (sem ELECTRON_RUN_AS_NODE)
 const { app, BrowserWindow, nativeImage } = require('electron');
 const { readFileSync, writeFileSync } = require('node:fs');
@@ -21,6 +22,8 @@ async function render(size) {
   win.destroy();
   return image;
 }
+
+app.on('window-all-closed', () => {}); // sem isto o Electron encerra ao fechar a primeira janela e a segunda renderização falha
 
 app.whenReady().then(async () => {
   const pngs = [];
@@ -44,6 +47,6 @@ app.whenReady().then(async () => {
     return entry;
   });
   writeFileSync(join(root, 'build', 'icon.ico'), Buffer.concat([header, ...entries, ...pngs]));
-  writeFileSync(join(root, 'build', 'icon.png'), pngs[0]);
+  writeFileSync(join(root, 'build', 'icon.png'), (await render(1024)).toPNG());
   app.quit();
 });

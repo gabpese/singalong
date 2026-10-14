@@ -1,0 +1,61 @@
+name: Instaladores de Linux e macOS
+
+# Gera o AppImage (Linux) e o DMG (macOS Apple Silicon) e os anexa à release do GitHub. Roda só quando você manda:
+# Actions → "Instaladores de Linux e macOS" → Run workflow, com a tag da release (ex.: v1.3.0).
+# O instalador do Windows continua sendo gerado e publicado por você (npm run dist), com ou sem assinatura.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da release (ex.: v1.3.0). Se a release ainda não existir, ela é criada como RASCUNHO."
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Preparar a release ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Criar o rascunho se a release não existir
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A release $TAG já existe: os arquivos serão anexados a ela."
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" --title "Singalong Karaoke ${TAG#v}" --notes ""
+          fi
+
+  installer:
+    name: Gerar e anexar (${{ matrix.system }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            system: Linux
+            files: dist/singalong_karaoke-linux-x86_64.AppImage dist/latest-linux.yml
+          - os: macos-latest
+            system: macOS
+            files: dist/singalong_karaoke-mac-arm64.dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run dist
+      - name: Anexar à release
+        run: gh release upload "$TAG" ${{ matrix.files }} --repo "$GITHUB_REPOSITORY" --clobber

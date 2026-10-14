@@ -229,6 +229,31 @@ jobs:
       - name: Conferir a assinatura
         run: node scripts/verify-signature.mjs dist/singalong_karaoke.exe
 
+  # o AppImage (Linux) e o DMG (macOS Apple Silicon) são gerados de verdade; o build confere o nome fixo, o tamanho, o executável do Linux
+  # e a assinatura ad-hoc do app do Mac (o Apple Silicon encerra programa sem assinatura). Nada é guardado nem publicado.
+  installer-unix:
+    name: Instalador do ${{ matrix.system }} (gera, sem publicar)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            system: Linux
+          - os: macos-latest
+            system: macOS
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run dist
+
   docker-api:
     name: Imagem da API (build)
     runs-on: ubuntu-latest
