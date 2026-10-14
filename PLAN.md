@@ -480,7 +480,7 @@ A before everything (safe releases and the base for text and tabs) → B (one au
 - **Done:** the room page has the **Room | TV** switch (the TV tab is a viewer: no sound, no microphone; the QR code is the room link) and the interface is available in **Portuguese (Brazil), English and Spanish** (`apps/web/src/i18n/`: one catalog per language, a language selector on the entry page and in the room, the browser's language as the default; a test checks that the three catalogs have the same keys and that every key used in the code exists).
 - **Server messages:** the API still answers in Portuguese; the client translates the error codes guests see (`apierr.*` keys) and falls back to the server's text for the others.
 - **Accessibility (done):** automatic checks with axe-core on every screen and dialog (WCAG 2.1 A/AA, in the end-to-end suite); **lyrics size** buttons (A−/A+, also `+`/`−` on the TV) shared by the TV, the stage and the TV tab; a "skip to content" link; a screen-reader announcement of who is singing; `aria-current` on the tabs; `prefers-reduced-motion` and `prefers-contrast` support; a contrast fix on the TV queue.
-- **Left:** the homologation/staging environments.
+- **Postponed:** the homologation/staging environments (section 18) are out of 1.1.1: they depend on the Oracle VM settings, which could not be checked (no access to the account). They return as soon as that is possible; milestones H1 to H3 do not need the VM.
 
 ## 18. Plan: homologation (`hml`) and staging (`stg`) environments
 

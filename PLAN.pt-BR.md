@@ -482,7 +482,7 @@ A antes de tudo (versões seguras e a base de textos e abas) → B (um motor de 
 - **Feito:** a página da sala tem a alternância **Sala | TV** (a aba TV é só para assistir: sem som e sem microfone; o QR code é o link da sala) e a interface existe em **português (Brasil), inglês e espanhol** (`apps/web/src/i18n/`: um catálogo por idioma, seletor de idioma na entrada e na sala, o idioma do navegador como padrão; um teste confere que os três catálogos têm as mesmas chaves e que toda chave usada no código existe).
 - **Mensagens do servidor:** a API ainda responde em português; o cliente traduz os códigos de erro que os convidados veem (chaves `apierr.*`) e usa o texto do servidor nos demais.
 - **Acessibilidade (feita):** verificação automática com axe-core em todas as telas e diálogos (WCAG 2.1 A/AA, na suíte de ponta a ponta); botões de **tamanho da letra** (A−/A+, e `+`/`−` na TV) compartilhados pela TV, pelo palco e pela aba TV; link "ir para o conteúdo"; aviso para leitor de tela de quem está cantando; `aria-current` nas abas; suporte a `prefers-reduced-motion` e `prefers-contrast`; correção de contraste na fila da TV.
-- **Falta:** os ambientes de homologação e staging.
+- **Adiado:** os ambientes de homologação e staging (seção 18) ficam fora da 1.1.1: dependem das configurações da VM da Oracle, que não puderam ser conferidas (sem acesso à conta). Voltam assim que for possível; os marcos H1 a H3 não precisam da VM.
 
 ## 18. Plano: ambientes de homologação (`hml`) e de staging (`stg`)
 
