@@ -97,6 +97,8 @@ export function renderStats(container, data) {
 
   const bars = activityBars(server.by_day, server.days);
   const max = Math.max(1, ...bars.map((bar) => bar.songs));
+  const chartBox = make('div', 'stats-chart-box');
+  chartBox.append(make('div', 'muted', `Músicas por dia (últimos ${bars.length} dias)`));
   const chart = make('div', 'stats-chart');
   chart.setAttribute('role', 'img');
   chart.setAttribute('aria-label', `Músicas por dia nos últimos ${bars.length} dias`);
@@ -106,9 +108,13 @@ export function renderStats(container, data) {
     column.title = `${bar.day.slice(8, 10)}/${bar.day.slice(5, 7)}: ${bar.songs}`;
     chart.append(column);
   }
-  container.append(chart);
+  const ends = make('div', 'stats-chart-ends');
+  ends.append(make('span', '', `${bars[0].day.slice(8, 10)}/${bars[0].day.slice(5, 7)}`), make('span', '', 'hoje'));
+  chartBox.append(chart, ends);
+  container.append(chartBox);
 
-  container.append(
+  const columns = make('div', 'stats-columns');
+  columns.append(
     list('Mais tocadas', server.top_songs.slice(0, 5).map((song) => [songName(song), `${song.plays}×${song.avg_score === null ? '' : ` · nota ${formatScore(song.avg_score)}`}`])),
     list('Quem mais cantou', server.top_singers.slice(0, 5).map((singer) => [singer.name, `${singer.songs} música${singer.songs === 1 ? '' : 's'}${singer.avg_score === null ? '' : ` · nota ${formatScore(singer.avg_score)}`}`])),
     list('Mais aplaudidas', server.most_cheered.slice(0, 3).map((song) => [songName(song), `${song.cheers} aplausos`]), 'Ninguém aplaudiu ainda.'),
@@ -128,5 +134,6 @@ export function renderStats(container, data) {
     }
     local.append(make('p', 'muted', 'As que mais ocupam espaço:'), ol);
   }
-  container.append(local);
+  columns.append(local);
+  container.append(columns);
 }

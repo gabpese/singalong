@@ -179,10 +179,11 @@ export function TvPage({ code }: { code: string }) {
   const { upcoming } = room ? playOrder(room) : { upcoming: [] as QueueItem[] };
   const hasQueue = Boolean(current) || upcoming.length > 0;
   const showGuide = Boolean(room?.melody_bars) && guideReady && Boolean(current);
+  const showLower = showGuide || hud.visible; // a faixa de baixo: o guia de melodia e a pontuação (ela nunca flutua sobre o resto)
   const nextLabel = next ? `${titleOf(next.item)}${next.preparing ? ` ${t('next.preparing')}` : ''}` : '';
 
   return (
-    <main className={`tv-stage${hasQueue ? ' has-queue' : ''}${showGuide ? ' has-guide' : ''}`} ref={stageRef}>
+    <main className={`tv-stage${hasQueue ? ' has-queue' : ''}${showGuide ? ' has-guide' : ''}${showLower ? ' has-lower' : ''}`} ref={stageRef}>
       <div className="tv-invites">
         <InviteNotice state={room} onRespond={(item, accept) => void respondInvite(code, item, accept)} />
       </div>
@@ -235,14 +236,18 @@ export function TvPage({ code }: { code: string }) {
           <p className="line next2" ref={lyricsRefs.next2} />
           {current?.guest?.status === 'accepted' && <DuetLegend first={current.added_by} second={current.guest.name} />}
         </section>
-        <ScoreHud hud={hud} />
         <div className="tv-side">
           <QueueBox current={current} upcoming={upcoming} />
           {current && <JoinCard code={code} />}
         </div>
       </div>
 
-      {showGuide && <PitchGuide controller={controllerRef.current} />}
+      {showLower && (
+        <div className="tv-lower">
+          {showGuide && <PitchGuide controller={controllerRef.current} />}
+          <ScoreHud hud={hud} />
+        </div>
+      )}
 
       <footer className="tv-bottom">
         <div className="tv-progress" aria-hidden="true">

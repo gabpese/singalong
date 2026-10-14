@@ -87,3 +87,32 @@ test.describe('sala no computador', () => {
     await expect(popup).toHaveCSS('opacity', '0');
   });
 });
+
+// a janela do app do dono é bem menor que uma TV: nada pode ficar por cima de nada
+for (const size of [{ width: 1100, height: 740 }, { width: 1280, height: 720 }, { width: 1920, height: 1080 }, { width: 900, height: 600 }]) {
+  test(`com o guia e a pontuação ligados, nenhum cartão se sobrepõe a outro (${size.width}x${size.height})`, async ({ page, request }) => {
+    const room = await createRoom(request);
+    await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+    await hostPatch(request, room, { scoring: true, melody_bars: true });
+    await page.setViewportSize(size);
+    await page.goto(room.tvUrl);
+    await expect.poll(() => tvPlaying(page)).toBe(true);
+    await expect(page.locator('canvas.pitch-guide')).toBeVisible();
+    await expect(page.locator('.score-hud')).toBeVisible();
+    await page.waitForTimeout(300);
+    const cards = {
+      lyrics: await box(page.locator('.lyrics')),
+      queue: await box(page.locator('.tv-queue')),
+      qr: await box(page.locator('.tv-join')),
+      guide: await box(page.locator('canvas.pitch-guide')),
+      hud: await box(page.locator('.score-hud')),
+      progress: await box(page.locator('.tv-progress')),
+    };
+    const names = Object.keys(cards);
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) expect(overlap(cards[names[i]], cards[names[j]]), `${names[i]} sobre ${names[j]}`).toBe(false);
+    }
+    expect(cards.hud.right).toBeGreaterThan(size.width - 48); // continua colado na direita
+    expect(cards.hud.bottom).toBeLessThanOrEqual(size.height); // e cabe na tela
+  });
+}
