@@ -150,6 +150,24 @@ jobs:
             console.log(s.engine === "mps" ? "O Metal funciona neste executor: motor mps." : "Sem Metal neste executor: voltou para a CPU (" + s.fallback_reason + ").");
             process.exit(ok ? 0 : 1);
           '
+      # a medição que faltava: o MESMO Demucs na CPU e no Metal, com 30 s de áudio. Só informa (não falha): o resultado vai para o resumo do job.
+      - name: Medir a separação na CPU e no Metal
+        if: runner.os == 'macOS'
+        run: |
+          MOTOR="$RUNNER_TEMP/motor-mps"
+          export PATH="$MOTOR/bin:$PATH" PYTORCH_ENABLE_MPS_FALLBACK=1 TORCH_HOME="$MOTOR/models" PYTHONNOUSERSITE=1
+          cd "$RUNNER_TEMP"
+          ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=330:duration=30" -f lavfi -i "anoisesrc=d=30:c=pink:a=0.2" -filter_complex "amix=inputs=2,aformat=channel_layouts=stereo" -ar 44100 bench.wav
+          # aquecimento: baixa o modelo (htdemucs) com um trecho curto, para o download não entrar na conta de nenhum dos dois
+          ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=330:duration=3" -ac 2 -ar 44100 warm.wav
+          "$MOTOR/python/bin/python3" -m demucs --two-stems=vocals -n htdemucs -d cpu -o bench-warm warm.wav > bench-warm.log 2>&1 || true
+          for device in cpu mps; do
+            start=$(date +%s)
+            if "$MOTOR/python/bin/python3" -m demucs --two-stems=vocals -n htdemucs -d "$device" -o "bench-$device" bench.wav > "bench-$device.log" 2>&1; then status=ok; else status="FALHOU"; fi
+            echo "$device $status $(( $(date +%s) - start ))" >> bench.txt
+            tail -3 "bench-$device.log"
+          done
+          { echo "### Demucs em 30 s de áudio (macOS do CI)"; echo '```'; cat bench.txt; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
 
   desktop:
     name: App do dono (controlador em ${{ matrix.os }}; janela só no Windows)
