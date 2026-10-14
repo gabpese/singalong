@@ -118,6 +118,22 @@ jobs:
           node-version: 24
       - run: npm test
 
+  # a prova do motor do Linux com tudo de verdade: baixa os componentes oficiais (confere o SHA-256 de cada um), instala o torch de CPU
+  # e os pacotes, e roda a verificação (ffmpeg com os filtros do karaokê, deno, python e todas as bibliotecas)
+  engine-linux:
+    name: Motor real no Linux (baixa e monta, em CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Montar o motor
+        run: node apps/engine/src/cli.js assemble --dir "$RUNNER_TEMP/motor" --engine cpu
+      - name: Verificar o motor
+        run: node apps/engine/src/cli.js verify --dir "$RUNNER_TEMP/motor"
+
   desktop:
     name: App do dono (controlador em ${{ matrix.os }}; janela só no Windows)
     strategy:

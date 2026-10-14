@@ -1,12 +1,12 @@
 // Montagem do motor com tudo falso (sem rede, sem pip): a ordem das etapas, a retomada, a escolha cpu/cu121 e a volta para a CPU.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { assemble, manifestHash, refreshWorker } from '../src/assemble.js';
+import { assemble, loadManifest, manifestHash, refreshWorker, resolveManifest } from '../src/assemble.js';
 import { extract, installFiles, resolveGlob, tarCommand } from '../src/extract.js';
 import { launchEnv, paths, readState, workerCommand } from '../src/engine.js';
 
@@ -184,16 +184,54 @@ test('o ambiente do worker põe o ffmpeg do motor na frente do PATH só para o p
   assert.equal(process.env.PYTHONPATH === p.app, false); // o ambiente deste processo não foi alterado
 });
 
-test('o manifesto de verdade: todos os componentes têm URL https, SHA-256 e arquivos a instalar', async () => {
-  const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
-  for (const [name, c] of Object.entries(manifest.components)) {
-    assert.match(c.url, /^https:\/\//, name);
-    assert.match(c.sha256, /^[0-9a-f]{64}$/, name);
-    assert.ok(c.files.length > 0, name);
+test('o manifesto de verdade: cada sistema tem Python, ffmpeg e deno com URL https, SHA-256 e arquivos a instalar', async () => {
+  const raw = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
+  assert.deepEqual(Object.keys(raw.platforms), ['win32-x64', 'linux-x64']);
+  for (const [platform, { components }] of Object.entries(raw.platforms)) {
+    assert.deepEqual(Object.keys(components), ['python', 'ffmpeg', 'deno'], platform); // o Python vem primeiro (a verificação de hardware usa ele)
+    for (const [name, c] of Object.entries(components)) {
+      assert.match(c.url, /^https:\/\//, `${platform} ${name}`);
+      assert.match(c.sha256, /^[0-9a-f]{64}$/, `${platform} ${name}`);
+      assert.ok(c.files.length > 0, `${platform} ${name}`);
+    }
+    assert.ok(components.python.url.includes('python-build-standalone'), platform);
+    assert.ok(components.ffmpeg.version.includes('GPL'), platform);
   }
-  assert.ok(manifest.components.python.url.includes('python-build-standalone'));
-  assert.ok(manifest.components.ffmpeg.version.includes('GPL'));
-  assert.equal(manifest.torch.version, '2.5.1'); // o Demucs 4.0.1 quebra com outros
+  assert.match(raw.platforms['win32-x64'].components.ffmpeg.url, /win64-gpl/);
+  assert.match(raw.platforms['linux-x64'].components.ffmpeg.url, /linux64-gpl/);
+  assert.deepEqual(raw.platforms['linux-x64'].components.ffmpeg.files.map((f) => f.to), ['bin/ffmpeg', 'bin/ffprobe', 'licenses/ffmpeg-LICENSE.txt']); // sem .exe
+  assert.equal(raw.torch.version, '2.5.1'); // o Demucs 4.0.1 quebra com outros
+});
+
+test('o manifesto resolvido: o Windows continua com o mesmo hash de antes (não refaz o motor de quem já o montou) e sistema sem motor é recusado', async () => {
+  const windows = await loadManifest(undefined, 'win32-x64');
+  assert.equal(windows.platform, 'win32-x64');
+  assert.equal(manifestHash(windows), '28529b9dc9631f40'); // o hash do motor montado antes da F26
+  const linux = await loadManifest(undefined, 'linux-x64');
+  assert.equal(linux.platform, 'linux-x64');
+  assert.notEqual(manifestHash(linux), manifestHash(windows));
+  assert.deepEqual(Object.keys(linux), ['pack_version', 'platform', 'comment', 'components', 'torch', 'pip']);
+  assert.throws(() => resolveManifest({ platforms: { 'win32-x64': { components: {} } } }, 'darwin-x64'), /Não há motor para este computador \(darwin-x64\).*win32-x64/);
+});
+
+test('extrair .zip e .tar.xz: sem unzip nem xz (Linux enxuto) o Python do próprio motor abre o arquivo', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'singalong-zip-'));
+  const python = join(dir, 'python3');
+  await writeFile(python, '');
+  const calls = [];
+  const run = (command) => {
+    calls.push(command);
+    return command === python ? { status: 0 } : { status: 1, error: new Error(`${command} não existe`) };
+  };
+  await extract(join(dir, 'x.zip'), join(dir, 'saida'), { run, python });
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2], python);
+  calls.length = 0;
+  const modules = [];
+  await extract(join(dir, 'ffmpeg.tar.xz'), join(dir, 'saida3'), { run: (command, args) => { calls.push(command); modules.push(args[1]); return command === python ? { status: 0 } : { status: 2, stderr: 'xz: Cannot exec' }; }, python });
+  assert.deepEqual(calls.length, 2); // o tar falha (sem xz) e o Python abre com o tarfile
+  assert.equal(modules[1], 'tarfile');
+  await assert.rejects(extract(join(dir, 'x.zip'), join(dir, 'saida2'), { run: () => ({ status: 1, stderr: 'ruim' }), python }), /Não consegui extrair/);
 });
 
 test('trocar de motor depois de montado: só o torch é reinstalado (com --force-reinstall) e o teste da GPU refeito', { skip: !canTar }, async (t) => {
@@ -238,4 +276,17 @@ test('depois de uma atualização do app, o código do worker dentro do motor é
   await assert.rejects(stat(join(root, 'app', 'singalong_worker', 'velho.py')), { code: 'ENOENT' }); // o que saiu da versão nova não fica para trás
   assert.deepEqual(await refreshWorker({ root, workerSource: source }), { updated: false, from: '1.2.5', to: '1.2.5' }); // já em dia: não mexe
   assert.deepEqual(await refreshWorker({ root, workerSource: join(dir, 'nao-existe') }), { updated: false, from: null, to: null }); // sem fonte: não faz nada
+});
+
+test('installFiles mantém os links relativos (o bin/python3 do Linux aponta para python3.11, e a pasta temporária é apagada depois)', { skip: process.platform === 'win32' }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'singalong-link-'));
+  const extracted = join(dir, 'extraido');
+  await mkdir(join(extracted, 'python', 'bin'), { recursive: true });
+  await writeFile(join(extracted, 'python', 'bin', 'python3.11'), 'PY');
+  await symlink('python3.11', join(extracted, 'python', 'bin', 'python3'));
+  const root = join(dir, 'motor');
+  await installFiles(extracted, [{ from: 'python', to: 'python' }], root);
+  await rm(extracted, { recursive: true, force: true }); // como o montador faz depois de instalar
+  assert.equal(await readlink(join(root, 'python', 'bin', 'python3')), 'python3.11');
+  assert.equal(await readFile(join(root, 'python', 'bin', 'python3'), 'utf8'), 'PY'); // o link ainda abre
 });

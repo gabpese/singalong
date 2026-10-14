@@ -1,6 +1,6 @@
 // Extração dos arquivos baixados e cópia só do que o motor precisa. No Windows 10/11 o tar.exe (bsdtar) lê .zip e .tar.gz.
 import { spawnSync } from 'node:child_process';
-import { cp, mkdir, readdir, rm } from 'node:fs/promises';
+import { chmod, cp, mkdir, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 
@@ -11,11 +11,16 @@ export function tarCommand() {
   return existsSync(system) ? system : 'tar';
 }
 
-export async function extract(archive, dest, { run = spawnSync } = {}) {
+/**
+ * `python`: o Python do próprio motor (já instalado, ele é o primeiro componente) serve de reserva no Linux enxuto, onde o tar do GNU
+ * não lê .zip e pode faltar o `unzip` e o `xz` (o ffmpeg do Linux vem em .tar.xz).
+ */
+export async function extract(archive, dest, { run = spawnSync, python = null } = {}) {
   await rm(dest, { recursive: true, force: true });
   await mkdir(dest, { recursive: true });
   const attempts = [[tarCommand(), ['-xf', archive, '-C', dest]]];
   if (archive.endsWith('.zip')) attempts.push(['unzip', ['-q', '-o', archive, '-d', dest]]); // tar do GNU (Linux) não lê zip
+  if (python && existsSync(python)) attempts.push([python, ['-m', archive.endsWith('.zip') ? 'zipfile' : 'tarfile', '-e', archive, dest]]);
   let last;
   for (const [command, args] of attempts) {
     const done = run(command, args, { encoding: 'utf8', windowsHide: true });
@@ -58,6 +63,7 @@ export async function installFiles(extracted, files, root) {
     if (!target.startsWith(resolve(root) + sep)) throw new Error(`Destino fora do motor: ${to}`);
     await rm(target, { recursive: true, force: true });
     await mkdir(dirname(target), { recursive: true });
-    await cp(source, target, { recursive: true });
+    await cp(source, target, { recursive: true, verbatimSymlinks: true }); // o Python do Linux tem bin/python3 -> python3.11: o link tem de continuar relativo, não apontar para a pasta temporária
+    if (process.platform !== 'win32' && /^bin\//.test(to)) await chmod(target, 0o755); // zip aberto pelo Python não guarda a permissão de executar
   }
 }

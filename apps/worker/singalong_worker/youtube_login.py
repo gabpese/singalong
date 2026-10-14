@@ -49,8 +49,15 @@ def find_browser(preferred: str | None = None, env=os.environ, search_system: bo
     if explicit and Path(explicit).is_file():
         return "navegador", Path(explicit)
     system_paths = {
-        "chrome": [Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"), Path("/usr/bin/google-chrome"), Path("/usr/bin/google-chrome-stable"), Path("/usr/bin/chromium")],
-        "edge": [Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"), Path("/usr/bin/microsoft-edge")],
+        "chrome": [
+            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            Path("/usr/bin/google-chrome"), Path("/usr/bin/google-chrome-stable"), Path("/opt/google/chrome/chrome"),
+            Path("/usr/bin/chromium"), Path("/usr/bin/chromium-browser"),  # o Chromium do snap não serve: o perfil do agente fica numa pasta oculta que ele não lê
+        ],
+        "edge": [
+            Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+            Path("/usr/bin/microsoft-edge"), Path("/usr/bin/microsoft-edge-stable"), Path("/opt/microsoft/msedge/msedge"),
+        ],
     }
     program_files = [Path(path) for path in (_env(env, name) for name in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")) if path]
     candidates = {

@@ -335,11 +335,24 @@ test('o navegador padrão do Windows vem do registro (Chrome, Edge ou outro = au
   const answer = (progId, error = null) => (command, args, options, callback) => callback(error, `
     ProgId    REG_SZ    ${progId}
 `);
-  if (process.platform !== 'win32') return; // o registro só existe no Windows: nos outros sistemas a resposta é sempre "auto"
-  assert.equal(await detectDefaultBrowser(answer('ChromeHTML')), 'chrome');
-  assert.equal(await detectDefaultBrowser(answer('MSEdgeHTM')), 'edge');
-  assert.equal(await detectDefaultBrowser(answer('FirefoxURL-308046B0AF4A39CB')), 'auto');
-  assert.equal(await detectDefaultBrowser(answer('', new Error('sem chave'))), 'auto');
+  assert.equal(await detectDefaultBrowser(answer('ChromeHTML'), 'win32'), 'chrome');
+  assert.equal(await detectDefaultBrowser(answer('MSEdgeHTM'), 'win32'), 'edge');
+  assert.equal(await detectDefaultBrowser(answer('FirefoxURL-308046B0AF4A39CB'), 'win32'), 'auto');
+  assert.equal(await detectDefaultBrowser(answer('', new Error('sem chave')), 'win32'), 'auto');
+});
+
+test('o navegador padrão do Linux vem do xdg-settings; macOS e sistemas sem resposta ficam em automático', async () => {
+  const desktop = (name, error = null) => (command, args, options, callback) => {
+    assert.equal(command, 'xdg-settings');
+    assert.deepEqual(args, ['get', 'default-web-browser']);
+    callback(error, `${name}\n`);
+  };
+  assert.equal(await detectDefaultBrowser(desktop('google-chrome.desktop'), 'linux'), 'chrome');
+  assert.equal(await detectDefaultBrowser(desktop('chromium_chromium.desktop'), 'linux'), 'chrome'); // o Chromium (snap) lê os cookies do mesmo jeito
+  assert.equal(await detectDefaultBrowser(desktop('microsoft-edge.desktop'), 'linux'), 'edge');
+  assert.equal(await detectDefaultBrowser(desktop('firefox.desktop'), 'linux'), 'auto');
+  assert.equal(await detectDefaultBrowser(desktop('', new Error('xdg-settings não existe')), 'linux'), 'auto');
+  assert.equal(await detectDefaultBrowser(() => assert.fail('não deve consultar nada'), 'darwin'), 'auto'); // macOS: M2
 });
 
 test('o login do YouTube usa o navegador padrão e não deixa escolher outro', async () => {

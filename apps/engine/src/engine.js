@@ -36,7 +36,7 @@ export function launchEnv(root, extra = {}, base = process.env) {
   const p = paths(root);
   return {
     ...base,
-    PATH: [p.bin, p.pythonDir, join(p.pythonDir, 'Scripts'), base.PATH ?? base.Path ?? ''].join(delimiter),
+    PATH: [p.bin, p.pythonDir, join(p.pythonDir, 'Scripts'), join(p.pythonDir, 'bin'), base.PATH ?? base.Path ?? ''].join(delimiter),
     PYTHONPATH: p.app,
     PYTHONNOUSERSITE: '1',
     PYTHONUNBUFFERED: '1',

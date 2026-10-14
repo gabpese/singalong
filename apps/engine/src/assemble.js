@@ -13,7 +13,19 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 export const DEFAULT_MANIFEST = join(here, '..', 'manifest.json');
 export const DEFAULT_WORKER_SOURCE = join(here, '..', '..', 'worker');
 
-export const loadManifest = async (file = DEFAULT_MANIFEST) => JSON.parse(await readFile(file, 'utf8'));
+export const thisPlatform = () => `${process.platform}-${process.arch}`;
+
+/**
+ * O manifesto resolvido para um sistema: os componentes (Python, ffmpeg, deno) são os do `platform`; torch e pip valem para todos.
+ * A ordem das chaves é a de sempre (o hash do manifesto do Windows não pode mudar: mudaria e refaria o motor de quem já o montou).
+ */
+export const resolveManifest = (raw, platform = thisPlatform()) => {
+  const entry = raw.platforms?.[platform];
+  if (!entry) throw new Error(`Não há motor para este computador (${platform}). Sistemas com motor: ${Object.keys(raw.platforms ?? {}).join(', ')}.`);
+  return { pack_version: raw.pack_version, platform, comment: raw.comment, components: entry.components, torch: raw.torch, pip: raw.pip };
+};
+
+export const loadManifest = async (file = DEFAULT_MANIFEST, platform = thisPlatform()) => resolveManifest(JSON.parse(await readFile(file, 'utf8')), platform);
 
 /** Identifica uma versão do manifesto: se mudar (um componente novo), as etapas afetadas são refeitas. */
 export const manifestHash = (manifest) => createHash('sha256').update(JSON.stringify(manifest)).digest('hex').slice(0, 16);
@@ -90,8 +102,8 @@ export async function refreshWorker({ root, workerSource = DEFAULT_WORKER_SOURCE
  */
 export async function assemble({ root, manifest, engine = 'auto', switchEngine = false, workerSource = DEFAULT_WORKER_SOURCE, onProgress = () => {}, runImpl = run, fetchImpl = fetch, retryWait }) {
   manifest ??= await loadManifest();
-  if (`${process.platform}-${process.arch}` !== manifest.platform && !process.env.SINGALONG_ENGINE_ANY_PLATFORM) {
-    throw new Error(`Este motor é para ${manifest.platform}; este computador é ${process.platform}-${process.arch}.`);
+  if (thisPlatform() !== manifest.platform && !process.env.SINGALONG_ENGINE_ANY_PLATFORM) {
+    throw new Error(`Este motor é para ${manifest.platform}; este computador é ${thisPlatform()}.`);
   }
   const p = paths(root);
   await mkdir(p.downloads, { recursive: true });
@@ -111,7 +123,7 @@ export async function assemble({ root, manifest, engine = 'auto', switchEngine =
     await download({ url: component.url, dest: archive, sha256: component.sha256, fetchImpl, retryWait, onProgress: ({ done: d, total }) => progress(step, `Baixando ${name}`, { done: d, total }) });
     progress(step, `Instalando ${name}`);
     const tmp = join(p.downloads, `extraido-${name}`);
-    await extract(archive, tmp);
+    await extract(archive, tmp, { python: p.python });
     await installFiles(tmp, component.files, root);
     await rm(tmp, { recursive: true, force: true });
     await save({ components: { ...state.components, [name]: { version: component.version, sha256: component.sha256 } } });
