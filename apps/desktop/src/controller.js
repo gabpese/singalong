@@ -4,12 +4,12 @@
 import { execFile, spawn } from 'node:child_process';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assemble } from '@singalong/engine/src/assemble.js';
+import { assemble, refreshWorker } from '@singalong/engine/src/assemble.js';
 import { paths, readState, workerCommand } from '@singalong/engine/src/engine.js';
 import { verifyEngine } from '@singalong/engine/src/verify.js';
 import { libraryStats } from './library-stats.js';
 
-export const APP_VERSION = '1.2.4'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
+export const APP_VERSION = '1.2.5'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
 const MAX_LOGS = 300;
 const POLL_MS = 5000;
 
@@ -56,6 +56,7 @@ export function createController({
   fetchImpl = fetch,
   spawnImpl = spawn,
   assembleImpl = assemble,
+  refreshWorkerImpl = refreshWorker,
   verifyImpl = verifyEngine,
   detectBrowser = detectDefaultBrowser,
   now = Date.now,
@@ -152,6 +153,15 @@ export function createController({
     browser = await detectBrowser().catch(() => 'auto');
     const engineState = await readState(config.engine_dir);
     if (engineState?.complete) {
+      // o app se atualizou: leva junto o código do worker (senão o computador seguiria com o worker antigo e o servidor o recusaria)
+      if (workerSource) {
+        try {
+          const refreshed = await refreshWorkerImpl({ root: config.engine_dir, workerSource });
+          if (refreshed.updated) log(`Aplicativo do motor atualizado: ${refreshed.from ?? 'antigo'} → ${refreshed.to}.`);
+        } catch (error) {
+          log(`Não consegui atualizar o aplicativo do motor: ${error.message}`, 'error');
+        }
+      }
       state.engine = { status: 'ready', progress: null, error: null, kind: engineState.engine, reason: engineState.fallback_reason ?? engineState.engine_reason };
     } else {
       state.engine = { status: 'missing', progress: null, error: null, kind: null, reason: null };

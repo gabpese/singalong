@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { assemble, manifestHash } from '../src/assemble.js';
+import { assemble, manifestHash, refreshWorker } from '../src/assemble.js';
 import { extract, installFiles, resolveGlob, tarCommand } from '../src/extract.js';
 import { launchEnv, paths, readState, workerCommand } from '../src/engine.js';
 
@@ -217,4 +217,25 @@ test('trocar de motor depois de montado: só o torch é reinstalado (com --force
   s.commands.length = 0;
   await assemble({ root: s.root, manifest: s.manifest, workerSource: s.worker, fetchImpl: s.fetchImpl, runImpl: s.runImpl, engine: 'cpu', switchEngine: true });
   assert.equal(s.commands.filter((c) => c.includes('install')).length, 0);
+});
+
+test('depois de uma atualização do app, o código do worker dentro do motor é trocado (e só quando a versão difere)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'singalong-refresh-'));
+  const source = join(dir, 'worker');
+  const root = join(dir, 'motor');
+  const put = async (base, version, extra = {}) => {
+    await mkdir(join(base, 'singalong_worker'), { recursive: true });
+    await writeFile(join(base, 'singalong_worker', 'version.py'), `__version__ = "${version}"\n`);
+    await writeFile(join(base, 'requirements.txt'), `req-${version}\n`);
+    for (const [name, text] of Object.entries(extra)) await writeFile(join(base, 'singalong_worker', name), text);
+  };
+  await put(join(root, 'app'), '0.4.0', { 'velho.py': 'saiu da versão nova' });
+  await put(source, '1.2.5', { 'cloud.py': 'novo' });
+
+  assert.deepEqual(await refreshWorker({ root, workerSource: source }), { updated: true, from: '0.4.0', to: '1.2.5' });
+  assert.equal(await readFile(join(root, 'app', 'singalong_worker', 'cloud.py'), 'utf8'), 'novo');
+  assert.equal(await readFile(join(root, 'app', 'requirements.txt'), 'utf8'), 'req-1.2.5\n');
+  await assert.rejects(stat(join(root, 'app', 'singalong_worker', 'velho.py')), { code: 'ENOENT' }); // o que saiu da versão nova não fica para trás
+  assert.deepEqual(await refreshWorker({ root, workerSource: source }), { updated: false, from: '1.2.5', to: '1.2.5' }); // já em dia: não mexe
+  assert.deepEqual(await refreshWorker({ root, workerSource: join(dir, 'nao-existe') }), { updated: false, from: null, to: null }); // sem fonte: não faz nada
 });

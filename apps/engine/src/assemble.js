@@ -52,6 +52,34 @@ export function gpuSelftest(root, { runImpl = run } = {}) {
   return pythonJson(root, `import json,sys;sys.path.insert(0,${app});from singalong_worker import hardware;print(json.dumps(hardware.gpu_selftest()))`, runImpl);
 }
 
+/** Copia o código do worker para dentro do motor (apaga a cópia anterior: arquivos que saíram da versão nova não ficam para trás). */
+async function copyWorker(p, workerSource) {
+  await rm(p.app, { recursive: true, force: true });
+  await mkdir(p.app, { recursive: true });
+  await cp(join(workerSource, 'singalong_worker'), join(p.app, 'singalong_worker'), {
+    recursive: true,
+    filter: (source) => !/__pycache__|\.pyc$/.test(source),
+  });
+  await cp(join(workerSource, 'requirements.txt'), join(p.app, 'requirements.txt'));
+}
+
+const versionOf = async (dir) => (/__version__\s*=\s*["']([^"']+)["']/.exec(await readFile(join(dir, 'singalong_worker', 'version.py'), 'utf8').catch(() => ''))?.[1] ?? null);
+
+/**
+ * O app se atualiza sozinho, mas o código do worker dentro do motor só era copiado na montagem: depois de uma atualização o
+ * computador continuava com o worker antigo (e o servidor o via como uma versão velha demais). Troca a cópia quando a versão difere.
+ * Devolve `{ updated, from, to }`; sem motor montado ou sem fonte não faz nada.
+ */
+export async function refreshWorker({ root, workerSource = DEFAULT_WORKER_SOURCE }) {
+  const p = paths(root);
+  const to = await versionOf(workerSource);
+  if (!to) return { updated: false, from: null, to: null };
+  const from = await versionOf(p.app);
+  if (from === to) return { updated: false, from, to };
+  await copyWorker(p, workerSource);
+  return { updated: true, from, to };
+}
+
 /**
  * Monta (ou conclui) o motor em `root`.
  *  engine: "auto" (decide pelo hardware), "cpu" ou "cu121".
@@ -93,13 +121,7 @@ export async function assemble({ root, manifest, engine = 'auto', switchEngine =
   // 2) o código do worker (vai junto no instalador) e os requisitos
   if (!state.steps.worker) {
     progress('worker', 'Copiando o aplicativo');
-    await rm(p.app, { recursive: true, force: true });
-    await mkdir(p.app, { recursive: true });
-    await cp(join(workerSource, 'singalong_worker'), join(p.app, 'singalong_worker'), {
-      recursive: true,
-      filter: (source) => !/__pycache__|\.pyc$/.test(source),
-    });
-    await cp(join(workerSource, 'requirements.txt'), join(p.app, 'requirements.txt'));
+    await copyWorker(p, workerSource);
     await done('worker');
   }
 
