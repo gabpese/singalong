@@ -56,7 +56,6 @@ const downloads = (base) => [
   { system: 'macos', arch: 'arm64', file: 'singalong_karaoke-mac-arm64.dmg', url: `${base}/singalong_karaoke-mac-arm64.dmg` },
   { system: 'linux', arch: 'x64', file: 'singalong_karaoke-linux-x86_64.AppImage', url: `${base}/singalong_karaoke-linux-x86_64.AppImage` },
 ];
-const CONFIG_WITHOUT_VERSION = { public_url: null, app_download_url: 'https://example.test/x/', app_latest_version: null, app_page_url: 'https://example.test/x', app_downloads: downloads('https://example.test/x') };
 
 test.describe('computador', () => {
   test.use({ viewport: { width: 1280, height: 720 }, userAgent: WINDOWS_UA });
@@ -71,20 +70,26 @@ test.describe('computador', () => {
     expect(artBox.x + artBox.width).toBeLessThanOrEqual(panelBox.x + 1); // a imagem termina antes de o painel começar
     await expect(page.getByRole('button', { name: 'Criar sala e abrir a TV' })).toBeVisible();
     await expect(page.getByLabel('Código da sala')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Baixar para Windows (v1.2.3)' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Baixar para Windows', exact: true })).toBeVisible();
   });
 
-  test('o botão do Windows abre o instalador numa nova aba; os outros sistemas ficam sempre à vista', async ({ page }) => {
+  test('o botão do Windows abre o instalador numa nova aba; os outros sistemas ficam sempre à vista, também como botões', async ({ page }) => {
     await page.goto('/');
-    const link = page.getByRole('link', { name: /Baixar para Windows/ });
+    const link = page.getByRole('link', { name: 'Baixar para Windows', exact: true });
     await expect(link).toHaveAttribute('href', `${BASE}/singalong_karaoke.exe`);
     await expect(link).toHaveAttribute('target', '_blank');
     await expect(link).toHaveAttribute('rel', /noopener/);
     const card = page.locator('.download-card');
     await expect(card.getByRole('heading', { name: 'Outros sistemas' })).toBeVisible();
-    await expect(card.getByRole('link', { name: 'macOS (Apple Silicon)' })).toHaveAttribute('href', `${BASE}/singalong_karaoke-mac-arm64.dmg`);
-    await expect(card.getByRole('link', { name: 'Linux' })).toHaveAttribute('href', `${BASE}/singalong_karaoke-linux-x86_64.AppImage`);
-    await expect(card.getByRole('link', { name: 'Windows', exact: true })).toHaveCount(0); // o do seu sistema já é o botão
+    const mac = card.getByRole('link', { name: 'Baixar para macOS (Apple Silicon)', exact: true });
+    const linux = card.getByRole('link', { name: 'Baixar para Linux', exact: true });
+    await expect(mac).toHaveAttribute('href', `${BASE}/singalong_karaoke-mac-arm64.dmg`);
+    await expect(linux).toHaveAttribute('href', `${BASE}/singalong_karaoke-linux-x86_64.AppImage`);
+    for (const button of [link, mac, linux]) {
+      await expect(button).toHaveClass(/\bbutton\b/); // todos são botões, do mesmo jeito
+      expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(40);
+    }
+    await expect(card.getByRole('link', { name: 'Baixar para Windows' })).toHaveCount(1); // o do seu sistema aparece uma vez só (é o primeiro)
     await expect(card.getByRole('link', { name: 'Ver todas as versões' })).toHaveAttribute('href', 'https://example.test/releases/latest');
   });
 
@@ -95,10 +100,14 @@ test.describe('computador', () => {
     await expect(page.getByRole('heading', { name: 'Baixar o app' })).toHaveCount(0);
   });
 
-  test('sem a versão, o botão não mostra o número', async ({ page }) => {
-    await page.route('**/api/config', (route) => route.fulfill({ json: CONFIG_WITHOUT_VERSION }));
+  test('os botões não mostram a versão que está sendo baixada (o servidor tem uma versão configurada)', async ({ page }) => {
+    const config = await (await page.request.get('/api/config')).json();
+    expect(config.app_latest_version).toBeTruthy(); // há versão publicada, e mesmo assim ela não aparece
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Baixar para Windows', exact: true })).toBeVisible();
+    const card = page.locator('.download-card');
+    await expect(card.getByRole('link', { name: 'Baixar para Windows', exact: true })).toBeVisible();
+    await expect(card).not.toContainText(config.app_latest_version);
+    await expect(card).not.toContainText(/\bv\d+\.\d+/);
   });
 });
 
@@ -112,9 +121,8 @@ test.describe('celular', () => {
     expect(art.y + art.height).toBeLessThanOrEqual(create.y + 1);
     expect(art.width).toBeLessThanOrEqual(390);
     await expect(page.getByText('O app é para computadores com Windows, macOS ou Linux')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Baixar para/ })).toHaveCount(0); // não há botão principal: só a lista, para quem quiser levar o link a um computador
     const card = page.locator('.download-card');
-    await expect(card.getByRole('link', { name: /^(Windows|macOS \(Apple Silicon\)|Linux)$/ })).toHaveCount(3);
+    await expect(card.getByRole('link', { name: /^Baixar para (Windows|macOS \(Apple Silicon\)|Linux)$/ })).toHaveCount(3); // sem sistema detectado: os três, como botões
     await expect(card.getByRole('link', { name: 'Ver todas as versões' })).toHaveAttribute('href', 'https://example.test/releases/latest');
     // nada transborda para os lados
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -126,7 +134,7 @@ test('a página inicial muda de idioma, inclusive o bloco do app', async ({ brow
   const page = await context.newPage();
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Download the app' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Download for Windows (v1.2.3)' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Download for Windows', exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: /karaoke with the TV/ })).toBeVisible();
   await context.close();
 });
@@ -134,36 +142,83 @@ test('a página inicial muda de idioma, inclusive o bloco do app', async ({ brow
 test.describe('Linux', () => {
   test.use({ viewport: { width: 1280, height: 720 }, userAgent: LINUX_UA });
 
-  test('o botão é o do AppImage, com a dica de dar permissão, e Windows e macOS ficam na lista', async ({ page }) => {
+  test('o botão é o do AppImage, com a dica de dar permissão, e Windows e macOS ficam abaixo como botões', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Baixar para Linux (v1.2.3)' })).toHaveAttribute('href', `${BASE}/singalong_karaoke-linux-x86_64.AppImage`);
-    await expect(page.getByText('chmod +x')).toBeVisible();
     const card = page.locator('.download-card');
-    await expect(card.getByRole('link', { name: 'Windows', exact: true })).toHaveAttribute('href', `${BASE}/singalong_karaoke.exe`);
-    await expect(card.getByRole('link', { name: 'macOS (Apple Silicon)' })).toBeVisible();
-    await expect(card.getByRole('link', { name: 'Linux', exact: true })).toHaveCount(0);
+    await expect(card.getByRole('link', { name: 'Baixar para Linux', exact: true })).toHaveAttribute('href', `${BASE}/singalong_karaoke-linux-x86_64.AppImage`);
+    await expect(page.getByText('chmod +x')).toBeVisible();
+    await expect(card.getByRole('link', { name: 'Baixar para Windows', exact: true })).toHaveAttribute('href', `${BASE}/singalong_karaoke.exe`);
+    await expect(card.getByRole('link', { name: 'Baixar para macOS (Apple Silicon)', exact: true })).toBeVisible();
+    await expect(card.getByRole('link', { name: 'Baixar para Linux' })).toHaveCount(1);
   });
 });
+
+const INTEL_TEXT = 'O app não funciona em Macs com processador Intel. Para cantar, não precisa dele: basta criar ou entrar numa sala.';
 
 test.describe('macOS', () => {
   test.use({ viewport: { width: 1280, height: 720 }, userAgent: MAC_UA });
 
-  test('o navegador não sabe se o Mac é Intel: a pessoa responde, e só o Apple Silicon recebe o DMG', async ({ page }) => {
+  test('o botão do Mac vem direto (sem pergunta), com a dica do Intel ao lado, e a assinatura da Apple é explicada', async ({ page }) => {
     await page.goto('/');
     const card = page.locator('.download-card');
-    await expect(card.getByText('Qual é o seu Mac?')).toBeVisible();
-    await expect(card.getByRole('link', { name: /Baixar para macOS/ })).toHaveCount(0); // antes de responder não há arquivo
-    // Intel: a explicação, nenhum arquivo
-    await card.getByRole('button', { name: 'Intel' }).click();
-    await expect(card.getByRole('button', { name: 'Intel' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(card.getByText('O app não funciona em Macs com processador Intel').first()).toBeVisible();
-    await expect(card.getByRole('link', { name: /Baixar para macOS/ })).toHaveCount(0);
-    // Apple Silicon: o DMG e o aviso sobre a assinatura
-    await card.getByRole('button', { name: 'Apple Silicon (M1 ou mais novo)' }).click();
-    await expect(card.getByRole('link', { name: 'Baixar para macOS (Apple Silicon) (v1.2.3)' })).toHaveAttribute('href', `${BASE}/singalong_karaoke-mac-arm64.dmg`);
+    await expect(card.getByText('Qual é o seu Mac?')).toHaveCount(0); // a pergunta saiu: a dica ao lado do botão faz o papel
+    const mac = card.getByRole('link', { name: 'Baixar para macOS (Apple Silicon)', exact: true });
+    await expect(mac).toHaveAttribute('href', `${BASE}/singalong_karaoke-mac-arm64.dmg`);
     await expect(card.getByText('clique com o botão direito no app e escolha Abrir')).toBeVisible();
-    // Windows e Linux continuam na lista
-    await expect(card.getByRole('link', { name: 'Windows', exact: true })).toBeVisible();
-    await expect(card.getByRole('link', { name: 'Linux', exact: true })).toBeVisible();
+    await expect(card.getByRole('link', { name: 'Baixar para Windows', exact: true })).toBeVisible();
+    await expect(card.getByRole('link', { name: 'Baixar para Linux', exact: true })).toBeVisible();
+    // a dica fica ao lado do botão do Mac, na mesma linha
+    const tip = card.getByRole('button', { name: 'Sobre o Mac Intel' });
+    const [macBox, tipBox] = [await mac.boundingBox(), await tip.boundingBox()];
+    expect(tipBox.x).toBeGreaterThanOrEqual(macBox.x + macBox.width - 1);
+    expect(Math.abs(tipBox.y + tipBox.height / 2 - (macBox.y + macBox.height / 2))).toBeLessThan(8);
+  });
+
+  test('a dica do Intel abre com o mouse, com o foco do teclado e com um clique, e fecha com Esc', async ({ page }) => {
+    await page.goto('/');
+    const card = page.locator('.download-card');
+    const tip = card.getByRole('button', { name: 'Sobre o Mac Intel' });
+    const text = card.getByRole('tooltip');
+    await expect(text).toBeHidden();
+    await tip.hover();
+    await expect(text).toBeVisible();
+    await expect(text).toHaveText(INTEL_TEXT);
+    await page.mouse.move(5, 5);
+    await expect(text).toBeHidden();
+    await tip.focus();
+    await expect(text).toBeVisible(); // o teclado também vê a dica
+    await page.keyboard.press('Escape');
+    await tip.click(); // o toque no celular: não existe "mouse em cima"
+    await expect(tip).toHaveAttribute('aria-expanded', 'true');
+    await expect(text).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(tip).toHaveAttribute('aria-expanded', 'false');
+    await expect(tip).toHaveAttribute('aria-describedby', 'mac-tip'); // o leitor de tela lê o texto junto com o botão
+  });
+});
+
+test.describe('dica do Intel fora do Mac', () => {
+  test.use({ viewport: { width: 1280, height: 720 }, userAgent: WINDOWS_UA });
+
+  test('quem está no Windows também a vê ao lado do botão do macOS', async ({ page }) => {
+    await page.goto('/');
+    const tip = page.locator('.download-card').getByRole('button', { name: 'Sobre o Mac Intel' });
+    await tip.hover();
+    await expect(page.locator('.download-card').getByRole('tooltip')).toHaveText(INTEL_TEXT);
+  });
+});
+
+test.describe('celular (dica)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, userAgent: PHONE_UA });
+
+  test('no celular a dica cabe na tela e abre com um toque', async ({ page }) => {
+    await page.goto('/');
+    const card = page.locator('.download-card');
+    await card.getByRole('button', { name: 'Sobre o Mac Intel' }).click();
+    const text = card.getByRole('tooltip');
+    await expect(text).toBeVisible();
+    const box = await text.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
   });
 });

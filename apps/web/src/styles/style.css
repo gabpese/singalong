@@ -90,9 +90,15 @@ input[type=range] { accent-color: var(--accent); }
 .home-panel .join-code::placeholder { letter-spacing: normal; text-transform: none; font-size: 1rem; } /* o exemplo inteiro cabe no campo */
 .home-panel .language-switch { justify-self: end; }
 .home-panel .download-more { justify-self: start; }
+.home-panel .download-row { display: flex; align-items: center; gap: 8px; }
+.home-panel .download-row .button { flex: 1 1 auto; }
 .home-panel .download-others { margin: 6px 0 0; color: var(--dim); font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
-.home-panel .download-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.home-panel .mac-choice { display: grid; gap: 8px; }
+/* a dica ao lado do botão: abre com o mouse, o foco ou um toque */
+.info-tip { position: relative; flex: 0 0 auto; }
+.info-tip-btn { width: 28px; height: 28px; min-height: 0; padding: 0; border-radius: 50%; font-weight: 700; font-style: italic; font-family: Georgia, serif; line-height: 1; color: var(--dim); }
+.info-tip-btn:hover, .info-tip-btn:focus-visible { color: var(--fg); border-color: var(--accent); }
+.info-tip-text { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: min(280px, 78vw); padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--fg); font-size: .85rem; line-height: 1.35; box-shadow: 0 8px 24px #0008; opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none; }
+.info-tip:hover .info-tip-text, .info-tip-btn:focus-visible + .info-tip-text, .info-tip-text.open { opacity: 1; visibility: visible; }
 /* no celular a imagem vai em cima (menor) e as ações embaixo */
 @media (max-width: 900px) {
   .home { grid-template-columns: minmax(0, 1fr); min-height: 0; }
