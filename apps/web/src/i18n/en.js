@@ -344,4 +344,16 @@ export default {
   'lat.error': "I couldn't use the microphone. Allow access and try again.",
 
   'ctl.feedback': 'Feedback detected ({hz} Hz): I lowered the voice volume by myself. Move the microphone away from the speakers or lower the voice volume.',
+
+  'ctl.feedbackMic': 'Feedback on microphone {n} ({hz} Hz): I lowered only its volume. Move it away from the speakers.',
+  'ctl.someMicsFail': 'Only {open} of {total} microphones opened. Check that the others are connected.',
+  'mics.button': 'Microphones',
+  'mics.buttonTip': 'Choose the microphones that come out in the speakers (M)',
+  'mics.title': 'TV microphones',
+  'mics.intro': 'Tick the microphones that should come out in the speakers together with the music (up to {max}), one per singer. The first one ticked also does the scoring. With none ticked, the default microphone of the device is used.',
+  'mics.loading': 'Looking for microphones…',
+  'mics.none': 'No microphone found on this device.',
+  'mics.first': 'does the scoring',
+  'mics.max': 'That is already {max} microphones: untick one to pick another.',
+  'mics.close': 'Close',
 };

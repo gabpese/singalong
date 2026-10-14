@@ -344,4 +344,16 @@ export default {
   'lat.error': 'No pude usar el micrófono. Permite el acceso e inténtalo de nuevo.',
 
   'ctl.feedback': 'Acople detectado ({hz} Hz): bajé el volumen de la voz automáticamente. Aleja el micrófono de los altavoces o baja el volumen de la voz.',
+
+  'ctl.feedbackMic': 'Acople en el micrófono {n} ({hz} Hz): bajé solo su volumen. Aléjalo de los altavoces.',
+  'ctl.someMicsFail': 'Solo se abrieron {open} de {total} micrófonos. Comprueba que los demás estén conectados.',
+  'mics.button': 'Micrófonos',
+  'mics.buttonTip': 'Elegir los micrófonos que salen en los altavoces (M)',
+  'mics.title': 'Micrófonos de la TV',
+  'mics.intro': 'Marca los micrófonos que deben salir en los altavoces junto con la música (hasta {max}), uno por cantante. El primero marcado también hace la puntuación. Sin ninguno marcado, vale el micrófono predeterminado del dispositivo.',
+  'mics.loading': 'Buscando micrófonos…',
+  'mics.none': 'No se encontró ningún micrófono en este dispositivo.',
+  'mics.first': 'hace la puntuación',
+  'mics.max': 'Ya son {max} micrófonos: desmarca uno para elegir otro.',
+  'mics.close': 'Cerrar',
 };

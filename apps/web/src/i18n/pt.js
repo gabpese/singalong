@@ -344,4 +344,16 @@ export default {
   'lat.error': 'Não consegui usar o microfone. Permita o acesso e tente de novo.',
 
   'ctl.feedback': 'Microfonia detectada ({hz} Hz): reduzi o volume da voz sozinho. Afaste o microfone das caixas ou abaixe o volume da voz.',
+
+  'ctl.feedbackMic': 'Microfonia no microfone {n} ({hz} Hz): reduzi só o volume dele. Afaste-o das caixas.',
+  'ctl.someMicsFail': 'Só {open} de {total} microfones abriram. Confira se os outros estão conectados.',
+  'mics.button': 'Microfones',
+  'mics.buttonTip': 'Escolher os microfones que saem nas caixas (M)',
+  'mics.title': 'Microfones da TV',
+  'mics.intro': 'Marque os microfones que devem sair nas caixas junto com a música (até {max}), um por cantor. O primeiro marcado também faz a pontuação. Sem nenhum marcado, vale o microfone padrão do aparelho.',
+  'mics.loading': 'Procurando microfones…',
+  'mics.none': 'Nenhum microfone encontrado neste aparelho.',
+  'mics.first': 'faz a pontuação',
+  'mics.max': 'Já são {max} microfones: desmarque um para escolher outro.',
+  'mics.close': 'Fechar',
 };

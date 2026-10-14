@@ -96,3 +96,12 @@ test('diálogo do atraso do som', async ({ page, request }) => {
   await expect(page.getByRole('dialog')).toBeVisible();
   expect(await violations(page)).toEqual([]);
 });
+
+test('diálogo dos microfones', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.tvUrl);
+  await page.keyboard.press('m');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('checkbox').first()).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});

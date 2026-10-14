@@ -35,16 +35,14 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
   let pitchAvailable = true;
   let loadToken = 0;
   let outputMs = 0; // atraso do som até os ouvidos (caixa, Bluetooth): a letra mostra o que se ouve agora
-  // a voz do microfone da TV na saída: microfone -> ganho -> saída (não passa pelo SoundTouch: a troca de tom é da música, não da voz)
-  let voiceStream = null;
-  let voiceSource = null;
-  let voiceNode = null;
+  // a voz dos microfones da TV na saída (não passa pelo SoundTouch: a troca de tom é da música, não da voz):
+  //   cada microfone -> analisador (detector de microfonia) + ganho próprio (a guarda corta só o microfone que apita)
+  //   -> soma (volume da voz, igual para todos) -> limitador (vários microfones somados não estouram) -> saída
+  let mics = []; // { stream, source, analyser, gain, guard, spectrum }
+  let voiceNode = null; // a soma, com o volume da voz
+  let limiter = null;
   let voiceGainValue = 0;
-  // detector de microfonia: um analisador escuta o microfone ANTES do ganho e a guarda corta o volume se aparecer um apito
-  const feedbackGuard = createFeedbackGuard();
-  let voiceAnalyser = null;
   let feedbackTimer = null;
-  let spectrum = null;
 
   // --- áudio: <audio> -> SoundTouch (tom) -> saída; sem AudioWorklet (página http fora de localhost) toca sem tom ---
   function ensureGraph() {
@@ -75,17 +73,20 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
   }
 
   function applyVoice() {
-    // o volume pedido vezes o fator da guarda; uma rampa curta evita estalo ao cortar
-    if (voiceNode) voiceNode.gain.setTargetAtTime(voiceGainValue * feedbackGuard.factor, ctx.currentTime, 0.02);
+    // o volume pedido na soma e, em cada microfone, o fator da guarda; uma rampa curta evita estalo ao cortar
+    if (voiceNode) voiceNode.gain.setTargetAtTime(voiceGainValue, ctx.currentTime, 0.02);
+    for (const mic of mics) mic.gain.gain.setTargetAtTime(mic.guard.factor, ctx.currentTime, 0.02);
   }
 
-  /** Confere um espectro (dB) do microfone: se for um apito, corta a voz e avisa. O temporizador chama isto; os testes também. */
-  function checkFeedback(spectrumDb, nowMs) {
-    const result = feedbackGuard.update(spectrumDb, nowMs, ctx?.sampleRate ?? 48000);
+  /** Confere um espectro (dB) de um microfone: se for um apito, corta só a voz dele e avisa. O temporizador chama isto; os testes também. */
+  function checkFeedback(spectrumDb, nowMs, index = 0) {
+    const mic = mics[index];
+    if (!mic) return { factor: 1, triggered: false, hz: null };
+    const result = mic.guard.update(spectrumDb, nowMs, ctx?.sampleRate ?? 48000);
     if (result.triggered) {
       applyVoice();
-      onFeedback?.({ hz: result.hz, factor: result.factor });
-    } else if (voiceNode && Math.abs(voiceNode.gain.value - voiceGainValue * result.factor) > 0.01) {
+      onFeedback?.({ hz: result.hz, factor: result.factor, mic: index, mics: mics.length });
+    } else if (Math.abs(mic.gain.gain.value - result.factor) > 0.01) {
       applyVoice(); // o volume está voltando devagar
     }
     return result;
@@ -205,40 +206,54 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
       render();
     },
 
-    /** Liga o microfone (`stream`) na saída de áudio, junto com a música. O volume vem de `setVoiceGain`. */
-    async attachVoice(stream) {
+    /** Liga um ou mais microfones (`streams`) na saída de áudio, junto com a música. O volume vem de `setVoiceGain`. */
+    async attachVoice(streams) {
       await ensureGraph();
       this.detachVoice();
-      voiceStream = stream;
-      voiceSource = ctx.createMediaStreamSource(stream);
-      voiceNode ??= ctx.createGain();
-      voiceSource.connect(voiceNode);
-      voiceNode.connect(ctx.destination);
-      voiceAnalyser = ctx.createAnalyser();
-      voiceAnalyser.fftSize = 2048;
-      voiceAnalyser.smoothingTimeConstant = 0;
-      voiceSource.connect(voiceAnalyser);
-      spectrum = new Float32Array(voiceAnalyser.frequencyBinCount);
-      feedbackGuard.reset();
-      clearInterval(feedbackTimer);
+      if (!voiceNode) {
+        voiceNode = ctx.createGain();
+        // limitador: dois ou mais cantores somados não podem estourar a saída
+        limiter = ctx.createDynamicsCompressor();
+        limiter.threshold.value = -6;
+        limiter.knee.value = 0;
+        limiter.ratio.value = 20;
+        limiter.attack.value = 0.003;
+        limiter.release.value = 0.1;
+        voiceNode.connect(limiter);
+        limiter.connect(ctx.destination);
+      }
+      for (const stream of Array.isArray(streams) ? streams : [streams]) {
+        const source = ctx.createMediaStreamSource(stream);
+        const gain = ctx.createGain();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0;
+        source.connect(analyser); // o detector escuta ANTES do ganho
+        source.connect(gain);
+        gain.connect(voiceNode);
+        mics.push({ stream, source, analyser, gain, guard: createFeedbackGuard(), spectrum: new Float32Array(analyser.frequencyBinCount) });
+      }
       feedbackTimer = setInterval(() => {
-        if (!voiceAnalyser || voiceGainValue <= 0) return; // voz desligada ou muda: não há apito possível
-        voiceAnalyser.getFloatFrequencyData(spectrum);
-        checkFeedback(spectrum, performance.now());
+        if (voiceGainValue <= 0) return; // voz desligada ou muda: não há apito possível
+        mics.forEach((mic, index) => {
+          mic.analyser.getFloatFrequencyData(mic.spectrum);
+          checkFeedback(mic.spectrum, performance.now(), index);
+        });
       }, 50);
       applyVoice();
     },
 
-    /** Desliga a voz e libera o microfone. */
+    /** Desliga a voz e libera os microfones. */
     detachVoice() {
       clearInterval(feedbackTimer);
       feedbackTimer = null;
-      voiceAnalyser?.disconnect();
-      voiceAnalyser = null;
-      voiceSource?.disconnect();
-      voiceSource = null;
-      for (const track of voiceStream?.getTracks() ?? []) track.stop();
-      voiceStream = null;
+      for (const mic of mics) {
+        mic.analyser.disconnect();
+        mic.source.disconnect();
+        mic.gain.disconnect();
+        for (const track of mic.stream.getTracks()) track.stop();
+      }
+      mics = [];
     },
 
     /** Ganho da voz na saída (0 = muda). */
@@ -319,12 +334,14 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
         gain: backingGain?.gain.value ?? null, ctx: ctx?.state ?? null, graph: Boolean(stNode),
       };
     },
-    get voiceAttached() { return voiceStream !== null; },
+    get voiceAttached() { return mics.length > 0; },
+    /** Quantos microfones estão na saída. */
+    get voiceMics() { return mics.length; },
     get voiceGain() { return voiceGainValue; },
     /** Quanto a guarda de microfonia deixa passar do volume pedido (1 = tudo; menos = cortado por causa do apito). */
-    get voiceFactor() { return feedbackGuard.factor; },
+    get voiceFactor() { return mics.length ? Math.min(...mics.map((mic) => mic.guard.factor)) : 1; },
     /** O ganho que está de fato na saída (o pedido vezes o fator da guarda). */
-    get voiceOutputGain() { return voiceNode ? voiceNode.gain.value : 0; },
+    get voiceOutputGain() { return voiceNode && mics.length ? voiceNode.gain.value * Math.max(...mics.map((mic) => mic.gain.gain.value)) : 0; },
     checkFeedback,
     /** Taxa de amostragem do contexto de áudio (os testes montam espectros no tamanho certo). */
     get sampleRateForTests() { return ctx?.sampleRate ?? 48000; },

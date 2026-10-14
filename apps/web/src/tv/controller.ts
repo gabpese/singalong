@@ -3,7 +3,7 @@
 import { t } from '../i18n/index.js';
 import { createEngine } from '../lib/engine.js';
 import { clampLatency, loadLatency, saveLatency, sungPosition } from '../lib/latency.js';
-import { openVoice, voiceGain } from '../lib/voice.js';
+import { loadMics, micsKey, openVoice, saveMics, voiceGain } from '../lib/voice.js';
 import { connectRoom } from '../lib/identity.js';
 import { splitQueue } from '../lib/queue-view.js';
 import { createScorer, noteName, openMic } from '../lib/scoring.js';
@@ -43,6 +43,7 @@ const FINAL_SECONDS = 9;
 export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HTMLElement; current: HTMLElement; next: HTMLElement; next2: HTMLElement }) {
   let latest: RoomState | null = null; // último estado da sala
   let latency = loadLatency(); // atraso do som e do microfone deste aparelho (veja lib/latency.js)
+  let micsChosen = loadMics(); // microfones escolhidos nesta TV (vazio = o padrão); o primeiro também serve à pontuação
   let applying = false;
   let endedFor: number | null = null; // evita avisar duas vezes que a mesma música terminou
   let resumed = false; // só a primeira música carregada depois de abrir a página retoma de uma posição anterior
@@ -83,8 +84,8 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       connection.send({ type: 'lyrics', item_id: itemId, cues });
     },
     // o apito (microfonia) apareceu: o motor já cortou o volume da voz; a TV avisa por alguns segundos
-    onFeedback({ hz }: { hz: number | null }) {
-      notify(t('ctl.feedback', { hz: hz ?? 0 }), 10000);
+    onFeedback({ hz, mic, mics }: { hz: number | null; mic?: number; mics?: number }) {
+      notify(mics && mics > 1 ? t('ctl.feedbackMic', { hz: hz ?? 0, n: (mic ?? 0) + 1 }) : t('ctl.feedback', { hz: hz ?? 0 }), 10000);
     },
     onError(itemId: number, message: string) {
       // não deixa a sala travada numa música que não carrega: avisa, espera um pouco e passa para a próxima
@@ -147,7 +148,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     }
     if (!mic && !micFailed) {
       try {
-        mic = await openMic();
+        mic = await openMic(micsChosen[0]?.id);
       } catch {
         micFailed = true;
       }
@@ -189,6 +190,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   let voiceOn = false;
   let voiceFailed = false;
   let voiceBusy = false;
+  let voiceKey = ''; // quais microfones estão abertos na saída
 
   /** Mantém a voz de acordo com a sala: liga/desliga o microfone e põe o volume (mudo enquanto nada toca). */
   async function syncVoice() {
@@ -201,11 +203,29 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       }
       return;
     }
+    if (voiceOn && voiceKey !== micsKey(micsChosen)) {
+      // a escolha de microfones mudou: solta os atuais e abre os novos
+      engine.detachVoice();
+      voiceOn = false;
+      voiceFailed = false;
+    }
     if (!voiceOn && !voiceFailed && !voiceBusy) {
       voiceBusy = true;
       try {
-        await engine.attachVoice(await openVoice());
+        const ids = micsChosen.length ? micsChosen.map((mic) => mic.id) : ['']; // sem escolha: o microfone padrão, como sempre
+        const streams: MediaStream[] = [];
+        for (const id of ids) {
+          try {
+            streams.push(await openVoice(id));
+          } catch {
+            // este microfone não abriu (desconectado, sem permissão): os outros seguem
+          }
+        }
+        if (!streams.length) throw new Error('no microphone');
+        await engine.attachVoice(streams);
+        voiceKey = micsKey(micsChosen);
         voiceOn = true;
+        if (streams.length < ids.length) notify(t('ctl.someMicsFail', { open: streams.length, total: ids.length }), 8000);
       } catch {
         voiceFailed = true;
         notify(t('ctl.voiceMicFail'), 8000);
@@ -315,6 +335,17 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
 
   return {
     engine,
+    get mics() {
+      return micsChosen;
+    },
+    /** Escolhe os microfones da saída (e da pontuação, o primeiro); a voz reabre sozinha com a nova escolha. */
+    setMics(next: { id: string; label: string }[]) {
+      micsChosen = saveMics(next);
+      stopScoring(); // a pontuação reabre o microfone com o primeiro da lista
+      void apply();
+      void syncVoice();
+      return micsChosen;
+    },
     get latency() {
       return latency;
     },

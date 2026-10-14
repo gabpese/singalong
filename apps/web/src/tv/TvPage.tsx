@@ -12,6 +12,7 @@ import { Icon } from '../ui/Icon';
 import { InviteNotice, respondInvite } from '../room/Duet';
 import { createTvController, type FinalResult, type HudState, type TvController } from './controller';
 import { LatencyDialog } from './LatencyDialog';
+import { MicsDialog } from './MicsDialog';
 import { QrCode } from './QrCode';
 import { QueueBox, titleOf } from './QueueBox';
 
@@ -120,6 +121,7 @@ export function TvPage({ code }: { code: string }) {
   const [progress, setProgress] = useState(0);
   const [final, setFinal] = useState<FinalResult | null>(null);
   const [calibrating, setCalibrating] = useState(false);
+  const [choosingMics, setChoosingMics] = useState(false);
 
   const stageRef = useRef<HTMLElement>(null);
   const lyricsRefs = {
@@ -160,6 +162,7 @@ export function TvPage({ code }: { code: string }) {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (event.key === 'f' || event.key === 'F') toggleFullscreen();
       else if (event.key === 'l' || event.key === 'L') setCalibrating(true);
+      else if (event.key === 'm' || event.key === 'M') setChoosingMics(true);
       else if (event.key === '+' || event.key === '=') changeLyricsScale(1);
       else if (event.key === '-') changeLyricsScale(-1);
     };
@@ -207,6 +210,9 @@ export function TvPage({ code }: { code: string }) {
             {t('room.word')} <strong>{code}</strong>
           </span>
           <LyricsSize />
+          <button type="button" title={t('mics.buttonTip')} onClick={() => setChoosingMics(true)}>
+            {t('mics.button')}
+          </button>
           <button type="button" title={t('lat.buttonTip')} onClick={() => setCalibrating(true)}>
             {t('lat.button')}
           </button>
@@ -258,6 +264,7 @@ export function TvPage({ code }: { code: string }) {
       </section>
 
       <ScoreFinal final={final} room={room} />
+      {choosingMics && <MicsDialog controller={controllerRef.current} onClose={() => setChoosingMics(false)} />}
       {calibrating && <LatencyDialog controller={controllerRef.current} onClose={() => setCalibrating(false)} />}
 
       <button
