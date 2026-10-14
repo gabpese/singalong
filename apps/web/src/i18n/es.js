@@ -342,4 +342,6 @@ export default {
   'lat.result': 'Retraso medido: {total} ms (sonido {output} ms + micrófono {input} ms). Ya está en vigor.',
   'lat.fail': 'No oí los chasquidos. Sube el volumen de la TV, acerca el micrófono a los altavoces e inténtalo de nuevo en un lugar silencioso.',
   'lat.error': 'No pude usar el micrófono. Permite el acceso e inténtalo de nuevo.',
+
+  'ctl.feedback': 'Acople detectado ({hz} Hz): bajé el volumen de la voz automáticamente. Aleja el micrófono de los altavoces o baja el volumen de la voz.',
 };

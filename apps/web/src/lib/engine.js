@@ -1,6 +1,7 @@
 // Motor da TV: toca o instrumental (e, se houver, as vozes de apoio) com troca de tom em tempo real e desenha a letra sincronizada.
 import { t } from '../i18n/index.js';
 import { SoundTouchNode } from '../vendor/soundtouch/SoundTouchNode.js';
+import { createFeedbackGuard } from './feedback.js';
 import { heardPosition } from './latency.js';
 import { clampBacking, clampPitch } from './lyrics-sync.js';
 import { createLyricsView } from './lyrics-view.js';
@@ -10,8 +11,9 @@ import { createLyricsView } from './lyrics-view.js';
  * @param onEnded   (itemId) => void   chamada quando a música termina
  * @param onError   (itemId, mensagem) => void
  * @param onLyrics  (itemId, linhas) => void   a letra da música carregou (a TV a repassa ao palco dos cantores)
+ * @param onFeedback ({ hz, factor }) => void   o apito (microfonia) foi detectado e o volume da voz foi cortado
  */
-export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
+export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback }) {
   const audio = new Audio();
   audio.crossOrigin = 'anonymous';
   audio.preload = 'auto';
@@ -38,6 +40,11 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
   let voiceSource = null;
   let voiceNode = null;
   let voiceGainValue = 0;
+  // detector de microfonia: um analisador escuta o microfone ANTES do ganho e a guarda corta o volume se aparecer um apito
+  const feedbackGuard = createFeedbackGuard();
+  let voiceAnalyser = null;
+  let feedbackTimer = null;
+  let spectrum = null;
 
   // --- áudio: <audio> -> SoundTouch (tom) -> saída; sem AudioWorklet (página http fora de localhost) toca sem tom ---
   function ensureGraph() {
@@ -68,7 +75,20 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
   }
 
   function applyVoice() {
-    if (voiceNode) voiceNode.gain.value = voiceGainValue;
+    // o volume pedido vezes o fator da guarda; uma rampa curta evita estalo ao cortar
+    if (voiceNode) voiceNode.gain.setTargetAtTime(voiceGainValue * feedbackGuard.factor, ctx.currentTime, 0.02);
+  }
+
+  /** Confere um espectro (dB) do microfone: se for um apito, corta a voz e avisa. O temporizador chama isto; os testes também. */
+  function checkFeedback(spectrumDb, nowMs) {
+    const result = feedbackGuard.update(spectrumDb, nowMs, ctx?.sampleRate ?? 48000);
+    if (result.triggered) {
+      applyVoice();
+      onFeedback?.({ hz: result.hz, factor: result.factor });
+    } else if (voiceNode && Math.abs(voiceNode.gain.value - voiceGainValue * result.factor) > 0.01) {
+      applyVoice(); // o volume está voltando devagar
+    }
+    return result;
   }
 
   function applyPitch() {
@@ -194,11 +214,27 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
       voiceNode ??= ctx.createGain();
       voiceSource.connect(voiceNode);
       voiceNode.connect(ctx.destination);
+      voiceAnalyser = ctx.createAnalyser();
+      voiceAnalyser.fftSize = 2048;
+      voiceAnalyser.smoothingTimeConstant = 0;
+      voiceSource.connect(voiceAnalyser);
+      spectrum = new Float32Array(voiceAnalyser.frequencyBinCount);
+      feedbackGuard.reset();
+      clearInterval(feedbackTimer);
+      feedbackTimer = setInterval(() => {
+        if (!voiceAnalyser || voiceGainValue <= 0) return; // voz desligada ou muda: não há apito possível
+        voiceAnalyser.getFloatFrequencyData(spectrum);
+        checkFeedback(spectrum, performance.now());
+      }, 50);
       applyVoice();
     },
 
     /** Desliga a voz e libera o microfone. */
     detachVoice() {
+      clearInterval(feedbackTimer);
+      feedbackTimer = null;
+      voiceAnalyser?.disconnect();
+      voiceAnalyser = null;
       voiceSource?.disconnect();
       voiceSource = null;
       for (const track of voiceStream?.getTracks() ?? []) track.stop();
@@ -285,6 +321,13 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
     },
     get voiceAttached() { return voiceStream !== null; },
     get voiceGain() { return voiceGainValue; },
+    /** Quanto a guarda de microfonia deixa passar do volume pedido (1 = tudo; menos = cortado por causa do apito). */
+    get voiceFactor() { return feedbackGuard.factor; },
+    /** O ganho que está de fato na saída (o pedido vezes o fator da guarda). */
+    get voiceOutputGain() { return voiceNode ? voiceNode.gain.value : 0; },
+    checkFeedback,
+    /** Taxa de amostragem do contexto de áudio (os testes montam espectros no tamanho certo). */
+    get sampleRateForTests() { return ctx?.sampleRate ?? 48000; },
     get offset() { return view.offset; },
     get cues() { return view.cues; },
   };

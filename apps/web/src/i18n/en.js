@@ -342,4 +342,6 @@ export default {
   'lat.result': 'Measured delay: {total} ms (sound {output} ms + microphone {input} ms). It is already in effect.',
   'lat.fail': "I didn't hear the clicks. Turn the TV volume up, bring the microphone closer to the speakers and try again somewhere quiet.",
   'lat.error': "I couldn't use the microphone. Allow access and try again.",
+
+  'ctl.feedback': 'Feedback detected ({hz} Hz): I lowered the voice volume by myself. Move the microphone away from the speakers or lower the voice volume.',
 };

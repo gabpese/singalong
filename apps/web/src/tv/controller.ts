@@ -82,6 +82,10 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     onLyrics(itemId: number, cues: unknown[]) {
       connection.send({ type: 'lyrics', item_id: itemId, cues });
     },
+    // o apito (microfonia) apareceu: o motor já cortou o volume da voz; a TV avisa por alguns segundos
+    onFeedback({ hz }: { hz: number | null }) {
+      notify(t('ctl.feedback', { hz: hz ?? 0 }), 10000);
+    },
     onError(itemId: number, message: string) {
       // não deixa a sala travada numa música que não carrega: avisa, espera um pouco e passa para a próxima
       notify(t('ctl.skipping', { message }), 5000);

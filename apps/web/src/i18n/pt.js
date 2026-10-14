@@ -342,4 +342,6 @@ export default {
   'lat.result': 'Atraso medido: {total} ms (som {output} ms + microfone {input} ms). Já está valendo.',
   'lat.fail': 'Não ouvi os estalos. Aumente o volume da TV, aproxime o microfone das caixas e tente de novo em um lugar silencioso.',
   'lat.error': 'Não consegui usar o microfone. Permita o acesso e tente de novo.',
+
+  'ctl.feedback': 'Microfonia detectada ({hz} Hz): reduzi o volume da voz sozinho. Afaste o microfone das caixas ou abaixe o volume da voz.',
 };

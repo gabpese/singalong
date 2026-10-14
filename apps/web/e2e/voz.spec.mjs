@@ -81,3 +81,29 @@ test('na TV: com a voz ligada o microfone entra na saída com o volume escolhido
   await hostPatch(request, room, { voice: false });
   await expect.poll(async () => (await voice(page)).attached).toBe(false); // desligar solta o microfone
 });
+
+test('microfonia: um apito (tom puro que cresce) corta o volume da voz sozinho, a TV avisa e o volume volta depois', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { name: 'Ana' });
+  await page.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(page)).toBe(true);
+  await hostPatch(request, room, { voice: true, voice_volume: 50 });
+  await expect.poll(async () => (await voice(page)).attached).toBe(true);
+
+  // um espectro de apito: ruído baixo e um pico estreito de 2,4 kHz que sobe a cada quadro de 50 ms
+  const factor = await page.evaluate(() => {
+    const engine = window.tv.engine;
+    const bins = 1024;
+    const bin = Math.round((2400 * 2 * bins) / engine.sampleRateForTests);
+    for (let i = 0; i < 12; i++) {
+      const s = new Float32Array(bins).fill(-80);
+      s[bin] = -40 + i * 1.5;
+      for (const [d, drop] of [[1, 12], [2, 26], [3, 45]]) { s[bin - d] = s[bin] - drop; s[bin + d] = s[bin] - drop; }
+      engine.checkFeedback(s, i * 50);
+    }
+    return engine.voiceFactor;
+  });
+  expect(factor).toBeLessThan(1);
+  await expect(page.getByText(/Microfonia detectada/)).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.tv.engine.voiceOutputGain), { timeout: 5000 }).toBeLessThan(0.6); // 50 % = ganho 1; cortado pela metade
+});
