@@ -360,4 +360,12 @@ export default {
   'guide.label': 'Voz original (guia)',
   'guide.static': 'Voz original (guia) {n}%',
   'guide.aria': 'Volume da voz original, como guia para cantar',
+
+  'home.artAlt': 'Singalong: karaokê com a TV, o notebook e o celular',
+  'home.download.title': 'Baixar o app',
+  'home.download.hint': 'O app prepara músicas novas no seu computador (instrumental, letra e tom) e dispensa servidor e Docker.',
+  'home.download.button': 'Baixar o app para Windows',
+  'home.download.buttonVersion': 'Baixar o app para Windows (v{version})',
+  'home.download.windowsOnly': 'O app é para computadores com Windows. Para cantar, não precisa dele: basta criar ou entrar numa sala.',
+  'home.download.page': 'Ver a página de downloads',
 };

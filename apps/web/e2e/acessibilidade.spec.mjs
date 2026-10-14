@@ -114,3 +114,12 @@ test('sala com as barras das vozes de apoio e da voz original', async ({ page, r
   await expect(page.getByRole('slider', { name: /guia para cantar/ })).toBeVisible();
   expect(await violations(page)).toEqual([]);
 });
+
+test('página inicial no computador, com o bloco do app', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Baixar o app' })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await context.close();
+});

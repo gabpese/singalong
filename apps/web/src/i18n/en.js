@@ -360,4 +360,12 @@ export default {
   'guide.label': 'Original voice (guide)',
   'guide.static': 'Original voice (guide) {n}%',
   'guide.aria': 'Original voice volume, as a guide to sing along',
+
+  'home.artAlt': 'Singalong: karaoke with the TV, the laptop and the phone',
+  'home.download.title': 'Download the app',
+  'home.download.hint': 'The app prepares new songs on your computer (instrumental, lyrics and key) and needs no server or Docker.',
+  'home.download.button': 'Download the app for Windows',
+  'home.download.buttonVersion': 'Download the app for Windows (v{version})',
+  'home.download.windowsOnly': 'The app is for Windows computers. To sing you do not need it: just create or join a room.',
+  'home.download.page': 'See the downloads page',
 };

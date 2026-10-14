@@ -483,10 +483,14 @@ A página de entrada (`/`) ganha o mesmo visual da tela de boas-vindas do app do
 | A imagem | Copiada para `apps/web/public/` (o app mantém a própria cópia: a política de segurança dele só aceita arquivos locais). Ela tem o slogan "Karaokê de qualquer vídeo do YouTube" **desenhado dentro**, e as telas dentro dela mostram o menu antigo: a imagem deve ser reexportada **sem o texto** (o título e o slogan viram texto traduzido) e com as telas atuais. Até lá a página usa a imagem atual e corta o texto com CSS se precisar |
 | Testes | Os testes ponta a ponta da entrada são atualizados; novos para o layout de duas colunas e o de celular, o botão de download (aparece, some sem endereço, explica no celular) e o axe na página nova; os três idiomas ganham os textos novos |
 
-**Decisões em aberto da fase F**
+**Status da fase F (versão 1.1.3):** feita. A `/` agora tem a imagem à esquerda e as ações à direita (no celular, empilhadas: a imagem em cima); o `GET /api/config` devolve `app_download_url` (só links `http(s)`; é o `APP_DOWNLOAD_URL`, hoje o `releases/latest` do repositório) e `app_latest_version`; o bloco do app mostra o link **Baixar o app para Windows (vX.Y.Z)** num computador Windows, uma explicação com um link para a "página de downloads" no celular ou em outro sistema, e nada sem endereço. Foi usada a imagem atual (copiada para `apps/web/public/welcome.png`); reexportá-la sem o slogan em português desenhado dentro e com as telas atuais continua em aberto, e por enquanto só o texto alternativo dela é traduzido.
+
+**Decisões da fase F (respondidas)**
 1. **Onde fica hospedado o instalador?** Hoje o `APP_DOWNLOAD_URL` aponta para uma pasta **privada** (veja o `deploy/README.md`). Um botão público precisa de um link que qualquer pessoa abra: as Releases do GitHub deste repositório (o repositório é público) ou o link que você já usa. Sem um link público o botão fica escondido.
 2. **A imagem:** reexportar sem o texto e com as telas atuais (recomendado, precisa da arte nova de você) ou usar a imagem atual por enquanto.
 3. **Ordem:** a F é independente de A a E. Recomendado: logo depois da fase B (versão 1.1.3), por ser pequena e visível; C, D e E seguem depois.
+
+*Respostas:* (1) o `APP_DOWNLOAD_URL` aponta para o `releases/latest` do repositório; (2) a imagem atual por enquanto; (3) a F vem logo depois da B, como 1.1.3.
 
 **Versões:** a fase A saiu como **1.1.1** e a B como **1.1.2**; a **1.2.0** é a versão que fecha todas as fases (A a F).
 
