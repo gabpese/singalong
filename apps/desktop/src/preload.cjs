@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('karaoke', {
   youtubeStatus: call('youtubeStatus'),
   importFile: call('importFile'),
   hardware: call('hardware'),
+  stats: call('stats'),
   settings: call('settings'),
   checkUpdate: call('checkUpdate'),
   applyUpdate: call('applyUpdate'),

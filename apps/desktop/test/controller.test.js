@@ -33,6 +33,7 @@ before(async () => {
       if (req.method === 'POST' && req.url === '/agent/v1/sessions/s1/rooms') return roomFail ? json(409, { error: 'session_ended', message: 'A sessão já terminou.' }) : json(201, { code: 'AB12', host_token: 'tok-anfitriao', session_id: 's1' });
       if (req.method === 'DELETE' && req.url === '/agent/v1/sessions/s1') { sessionOpen = false; return res.writeHead(204).end(); }
       if (req.method === 'DELETE' && req.url === '/agent/v1/devices/me') return res.writeHead(204).end();
+      if (req.url.startsWith('/agent/v1/stats')) return json(200, { days: Number(new URL(req.url, 'http://x').searchParams.get('days')), totals: { songs: 3, singers: 2, sessions: 1, cheers: 5, avg_score: 80, duets: 0, skipped: 1 }, top_songs: [], top_singers: [], most_cheered: [], by_day: [] });
       json(404, { error: 'not_found' });
     });
   });
@@ -466,4 +467,34 @@ test('a escolha da primeira sessão (placa de vídeo e microfone) é lembrada e 
   assert.equal(snap.setupDone, true);
   assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).setup_done, true);
   assert.equal((await controller.setSettings({ nickname: 'Ana' })).setupDone, true); // outras mudanças não a desfazem
+});
+
+test('estatísticas: junta o que o servidor guardou das salas com o que há na biblioteca deste computador', async () => {
+  const { controller, dataDir } = await make();
+  await assert.rejects(() => controller.stats(), (error) => error.code === 'not_paired');
+  await controller.pair({ server: base, code: 'BOM-CODIGO', name: 'PC' });
+
+  // uma biblioteca com duas músicas prontas (meta.json) e uma pasta parcial (sem meta.json: não conta)
+  const cache = join(dataDir, 'library', 'cache');
+  for (const [id, size, timings] of [['aaaaaaaaaaa', 1000, { download: 10, separate: 50 }], ['bbbbbbbbbbb', 3000, { download: 20, separate: 100 }]]) {
+    await mkdir(join(cache, id), { recursive: true });
+    await writeFile(join(cache, id, 'instrumental.mp3'), Buffer.alloc(size));
+    await writeFile(join(cache, id, 'meta.json'), JSON.stringify({ title: `Música ${id[0]}`, artist: 'Artista', timings_s: timings }));
+  }
+  await mkdir(join(cache, 'ccccccccccc'), { recursive: true });
+  await writeFile(join(cache, 'ccccccccccc', 'instrumental.mp3'), Buffer.alloc(999));
+
+  const result = await controller.stats({ days: 90 });
+  assert.equal(result.server.days, 90);
+  assert.equal(result.server.totals.songs, 3);
+  assert.equal(calls.findLast((c) => c.url.startsWith('/agent/v1/stats')).auth, 'Bearer tok-1');
+  assert.equal(result.library.songs, 2);
+  assert.ok(result.library.bytes >= 4000 && result.library.bytes < 4400); // o mp3 e o meta.json de cada uma
+  assert.equal(result.library.avg_prepare_s, 90); // (60 + 120) / 2
+  assert.equal(result.library.biggest[0].title, 'Música b');
+
+  assert.equal((await controller.stats({ days: 3 })).server.days, 30); // período fora da lista volta ao padrão
+  const empty = await make();
+  await empty.controller.pair({ server: base, code: 'BOM-CODIGO', name: 'PC' });
+  assert.deepEqual((await empty.controller.stats()).library, { songs: 0, bytes: 0, avg_prepare_s: null, biggest: [] }); // biblioteca ainda vazia
 });

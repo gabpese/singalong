@@ -101,6 +101,7 @@ A **local agent** is the worker running on the owner's computer and talking to t
 | `POST /jobs/claim {wait_ms}` · `POST /jobs/:id/progress` · `POST /jobs/:id/complete` | processing jobs (long-poll, up to 25 s) |
 | `POST /search/claim` · `POST /search/:id/result` | YouTube search done by the agent |
 | `POST /exports/claim` · `POST /exports/:id/:pitch/state` | MP4 export |
+| `GET /stats?days=30` | the owner's statistics: songs sung, singers, cheers, average score, most played, who sang most, most cheered and the activity per day (1 to 365 days) |
 
 Pages send the room code in `X-Room` so the search, the lyrics change and the export of a room go to its session's agent. The room state carries `owner: {nickname, online}` (and `null` for rooms without a session, which keep using the classic Redis worker).
 

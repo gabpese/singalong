@@ -262,6 +262,7 @@ function registerIpc() {
   handle('youtubeStatus', () => controller.youtubeStatus());
   handle('importFile', (arg) => controller.importFile(arg));
   handle('hardware', () => controller.hardware());
+  handle('stats', (arg) => controller.stats(arg));
   handle('settings', async (arg) => {
     const snapshot = await controller.setSettings(arg);
     if (arg?.microphone !== undefined) for (const views of roomViews.values()) views.tv.webContents.reload(); // a TV passa a usar o microfone novo

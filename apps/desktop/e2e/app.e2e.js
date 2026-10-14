@@ -180,6 +180,15 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   await page.waitForFunction(() => document.querySelector('[data-testid="agent-status"]').textContent === 'Online', null, { timeout: 60_000 });
   assert.equal(await id('room-create').isEnabled(), true);
 
+  // estatísticas do dono: o cartão carrega sozinho (ainda sem músicas cantadas) e mostra a biblioteca deste computador
+  await id('stats-body').waitFor({ state: 'attached' });
+  await page.waitForFunction(() => document.querySelector('[data-testid="stats-body"]').textContent.includes('músicas cantadas'), null, { timeout: 30_000 });
+  assert.match(await id('stats-body').textContent(), /Biblioteca neste computador/);
+  assert.equal(await id('stats-error').isHidden(), true);
+  await id('stats-days').selectOption('7');
+  await id('stats-refresh').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="stats-body"]').textContent.includes('Biblioteca neste computador'), null, { timeout: 15_000 });
+
   // cria a sala: o servidor a conhece como sala da sessão "Dona Flor"; a tela mostra que está criando
   await id('room-create').click();
   await id('tab-rooms').waitFor();

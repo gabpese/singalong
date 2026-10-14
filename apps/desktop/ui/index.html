@@ -127,6 +127,23 @@
         </div>
         <p id="import-result" class="muted" hidden data-testid="import-result"></p>
       </div>
+
+      <div class="card" id="card-stats">
+        <h2>Estatísticas</h2>
+        <div class="row">
+          <label>Período
+            <select id="stats-days" data-testid="stats-days" aria-label="Período das estatísticas">
+              <option value="7">Últimos 7 dias</option>
+              <option value="30" selected>Últimos 30 dias</option>
+              <option value="90">Últimos 90 dias</option>
+              <option value="365">Último ano</option>
+            </select>
+          </label>
+          <button id="stats-refresh" type="button" data-testid="stats-refresh">Atualizar</button>
+        </div>
+        <p id="stats-error" class="error-text" hidden data-testid="stats-error"></p>
+        <div id="stats-body" data-testid="stats-body"></div>
+      </div>
     </section>
 
     <!-- 5) configurações (a engrenagem) -->

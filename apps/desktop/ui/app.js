@@ -1,4 +1,6 @@
 // A janela do app: só mostra o estado que vem do processo principal e chama as ações. Nenhum texto de fora entra como HTML.
+import { renderStats } from './stats.js';
+
 const $ = (id) => document.getElementById(id);
 const api = window.karaoke;
 
@@ -58,6 +60,7 @@ function render(s) {
   $('screen-pair').hidden = s.phase !== 'pair';
   $('screen-welcome').hidden = !(paired && !running && !settings);
   $('screen-home').hidden = !(paired && running && !settings);
+  maybeLoadStats(!$('screen-home').hidden);
   $('screen-settings').hidden = !settings;
   $('tabs').hidden = !(paired && running);
   $('main').classList.toggle('full', paired && !running && !settings); // a tela de início usa a janela inteira
@@ -394,6 +397,29 @@ $('unpair').addEventListener('click', async (e) => {
   await act('settingsOpen', false);
   await act('unpair', undefined, e.currentTarget);
 });
+
+// estatísticas do dono: carregam quando a aba Sessão aparece e quando o período muda
+async function loadStats() {
+  const box = $('stats-body');
+  $('stats-error').hidden = true;
+  const result = await api.stats({ days: Number($('stats-days').value) });
+  if (!result.ok) {
+    $('stats-error').textContent = result.error.message;
+    $('stats-error').hidden = false;
+    return;
+  }
+  renderStats(box, result.data);
+}
+$('stats-days').addEventListener('change', loadStats);
+$('stats-refresh').addEventListener('click', loadStats);
+let statsLoaded = false;
+function maybeLoadStats(visible) {
+  if (visible && !statsLoaded) {
+    statsLoaded = true;
+    loadStats();
+  }
+  if (!visible) statsLoaded = false; // ao sair da aba, a próxima visita busca de novo
+}
 
 api.onState(render);
 api.onTabs((value) => {
