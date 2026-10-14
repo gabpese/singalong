@@ -37,7 +37,7 @@ const SEARCH_ITEM = {
   required: ['video_id', 'title'],
 };
 
-export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, mailer, storage }) {
+export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, mailer, storage, release }) {
   app.decorateRequest('device', null);
 
   /** Exige o token de dispositivo; deixa o dispositivo em `request.device`. */
@@ -49,7 +49,11 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
   }
   const auth = { preHandler: authenticate };
 
-  const versionConfig = () => ({ latest: config.appLatestVersion, minimum: config.appMinVersion, notes: config.appNotes, url: config.appDownloadUrl });
+  // a versão publicada: pelo painel do administrador ou, sem ele, pelas variáveis APP_* do .env
+  const versionConfig = () => {
+    const { latest, minimum, notes, url } = release.get();
+    return { latest, minimum, notes, url };
+  };
   const reportedVersion = new Map(); // dispositivo → versão do último heartbeat (só em memória: o agente reenvia ao abrir)
 
   /** A sessão ativa do dispositivo (e já conta como sinal de vida); 409 se ele ainda não iniciou uma. */
@@ -184,7 +188,10 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
       },
     },
   }, async (request) => {
-    if (request.body?.version) reportedVersion.set(request.device.id, request.body.version);
+    if (request.body?.version) {
+      reportedVersion.set(request.device.id, request.body.version);
+      agents.recordVersion(request.device, request.body.version);
+    }
     const session = agents.touch(request.device);
     if (session && request.body?.media_base !== undefined) agents.setMediaBase(session, request.body.media_base);
     return { ok: true, session_id: session?.id ?? null, server_time: Date.now(), update: updateInfo(request.body?.version, versionConfig()) };

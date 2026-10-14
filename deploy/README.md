@@ -151,3 +151,14 @@ Guarde o endereço e o token só com você (gerenciador de senhas) e use sempre 
 - A API não tem login: quem souber o endereço e o código de uma sala entra nela. Não divulgue o endereço.
 - Só o Caddy (80/443) fica exposto; a API e o Redis são internos.
 - Para fechar mais, dá para colocar o **Cloudflare Access** ou um usuário/senha no Caddy (`basicauth`) na frente. Não vem ligado, porque atrapalha a TV de quem só quer abrir o link.
+
+### Versão do app e mensagem de atualização
+
+A página do administrador tem o cartão **Versão do app**: ali você publica a **versão mais recente**, a **versão mínima**, a **mensagem** (o que mudou) e o **endereço de download**, e vale **na hora**, sem editar o `.env` nem fazer `./deploy.sh`.
+
+- Quem está **abaixo da mais recente** vê no app "Há uma versão nova" com a mensagem e o botão "Atualizar agora".
+- Quem está **abaixo da mínima** vê "Atualização necessária" e **para de receber trabalho** do servidor até atualizar.
+- A página inicial da web mostra a versão mais recente e o botão de baixar com o endereço publicado.
+- O cartão mostra de onde vem o que vale (**publicada aqui** ou **vem do .env**), uma pré-visualização dos avisos e quantos computadores estão em dia. A tabela de computadores mostra a **versão de cada um** e se está em dia (a versão é a que o app informou na última batida de coração).
+- **Voltar ao .env** apaga o que foi publicado ali e volta a valer `APP_LATEST_VERSION`, `APP_MIN_VERSION`, `APP_NOTES` e `APP_DOWNLOAD_URL`. Sem nada publicado no painel, o `.env` continua valendo como antes.
+- A mensagem é texto puro (até 500 caracteres) e o endereço precisa começar com `http://` ou `https://`.

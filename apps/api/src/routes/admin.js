@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { VIDEO_ID_PATTERN, safeEqual } from '../agents.js';
 import { HttpError } from '../rooms.js';
 import { rateLimited } from '../rate-limit.js';
+import { updateInfo } from '../version.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ASSETS = { '/': ['index.html', 'text/html; charset=utf-8'], '/admin.js': ['admin.js', 'text/javascript; charset=utf-8'], '/admin.css': ['admin.css', 'text/css; charset=utf-8'] };
@@ -14,7 +15,7 @@ const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 // a página só carrega o que é dela e não conversa com mais ninguém
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
-export async function adminRoutes(app, { agents, db, storage, config, limiters, now = Date.now }) {
+export async function adminRoutes(app, { agents, db, storage, config, limiters, release, now = Date.now }) {
   // Sem o token E sem o endereço secreto (ADMIN_PATH) a administração não existe: nenhuma rota é registrada (tudo é 404).
   if (!config.adminToken || !/^[A-Za-z0-9_-]{16,64}$/.test(config.adminPath ?? '')) return; // (o config.js já filtra; aqui também, por garantia)
   const base = `/${config.adminPath}`;
@@ -65,18 +66,54 @@ export async function adminRoutes(app, { agents, db, storage, config, limiters, 
         cloud.push({ id: entry.id, title: meta.title ?? null, artist: meta.artist ?? null, size: entry.size, updated: entry.updated, origin: meta.origin ?? 'youtube' });
       }
       cloud.sort((a, b) => b.updated - a.updated);
+      const published = release.get();
       return {
+        // a versão do app publicada (pelo painel ou, sem ele, pelo .env) e o que o .env diria se a do painel fosse limpa
+        release: { ...published, env: release.env() },
         mail: { enabled: Boolean(config.brevoApiKey && config.mailFrom) },
         emails: {
           rules: db.listEmailRules().map((r) => ({ email: r.email, can_pair: r.can_pair === 1, can_cloud: r.can_cloud === 1 })),
           fixed: { pair: config.pairAllowedEmails ?? [], cloud: config.cloudUploadEmails ?? [] }, // vêm do .env: só se mudam lá
         },
-        devices: db.listDevices().map((d) => ({ id: d.id, name: d.name, email: d.email, created_at: d.created_at, last_seen: d.last_seen, revoked: Boolean(d.revoked_at), cloud: agents.canUploadToCloud(d) })),
+        devices: db.listDevices().map((d) => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          created_at: d.created_at,
+          last_seen: d.last_seen,
+          revoked: Boolean(d.revoked_at),
+          cloud: agents.canUploadToCloud(d),
+          // a versão do app dele e se está em dia: ok | update_available | update_required | unknown
+          version: d.app_version ?? null,
+          update_status: updateInfo(d.app_version, published).status,
+        })),
         cloud,
         cloud_total: cloud.reduce((sum, s) => sum + s.size, 0),
         blocked: db.listBlockedSongs(),
       };
     });
+
+    // publica a versão do app: quem tem o app abaixo dela vê o aviso (e, abaixo da mínima, o servidor recusa trabalho até atualizar)
+    api.put('/release', {
+      schema: {
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { latest: { type: 'string', maxLength: 40 }, minimum: { type: 'string', maxLength: 40 }, notes: { type: 'string', maxLength: 1000 }, url: { type: 'string', maxLength: 600 } },
+          required: ['latest', 'minimum', 'notes', 'url'],
+        },
+      },
+    }, async (request) => {
+      try {
+        release.set(request.body);
+      } catch (error) {
+        throw new HttpError(400, error.code ?? 'bad_release', error.message);
+      }
+      return { ok: true, release: release.get() };
+    });
+
+    // volta a valer o .env (APP_LATEST_VERSION, APP_MIN_VERSION, APP_NOTES, APP_DOWNLOAD_URL)
+    api.delete('/release', async () => ({ ok: true, removed: release.clear(), release: release.get() }));
 
     // cria ou altera as permissões de um e-mail ("*" em pareamento = qualquer e-mail)
     api.put('/emails', {

@@ -11,10 +11,13 @@ test('package.json, controlador e worker têm a mesma versão', async () => {
   assert.equal(worker, APP_VERSION);
 });
 
-test('o instalador se chama singalong_karaoke.exe e instala só para o usuário, sem assinatura', async () => {
+test('o instalador se chama singalong_karaoke.exe e instala só para o usuário; a assinatura vem do ambiente (scripts/signing.mjs), nunca fixa no package.json', async () => {
   const { build } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(build.win.artifactName, 'singalong_karaoke.${ext}');
   assert.equal(build.nsis.artifactName, 'singalong_karaoke.${ext}');
   assert.equal(build.nsis.perMachine, false); // sem administrador
-  assert.equal(build.win.signExecutable, false);
+  // nenhum certificado nem senha fica escrito no package.json: quem decide se assina é o ambiente do build
+  assert.equal(build.win.signtoolOptions, undefined);
+  assert.equal(build.win.azureSignOptions, undefined);
+  assert.equal(build.win.certificateFile, undefined);
 });

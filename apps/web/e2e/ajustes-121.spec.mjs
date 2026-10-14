@@ -1,7 +1,7 @@
 // Ajustes da 1.2.1: a letra não passa por cima da outra, a que já passou some, a pontuação fica à direita (fora do guia de
 // melodia), a barra lateral fica abaixo do topo e o volume da voz só aparece quando se procura por ele.
 import { expect, test } from '@playwright/test';
-import { addToQueue, ANA, createRoom, hostPatch, SONGS } from './helpers.mjs';
+import { addToQueue, ANA, BIA, createRoom, hostPatch, SONGS } from './helpers.mjs';
 
 const tvPlaying = (page) => page.evaluate(() => window.tv.engine.playing && window.tv.engine.duration > 0 && window.tv.engine.currentTime > 1.2);
 const box = (locator) => locator.evaluate((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom }; });
@@ -89,10 +89,12 @@ test.describe('sala no computador', () => {
 });
 
 // a janela do app do dono é bem menor que uma TV: nada pode ficar por cima de nada
-for (const size of [{ width: 1100, height: 740 }, { width: 1280, height: 720 }, { width: 1920, height: 1080 }, { width: 900, height: 600 }]) {
+for (const size of [{ width: 1100, height: 740 }, { width: 1100, height: 800 }, { width: 1280, height: 720 }, { width: 1366, height: 768 }, { width: 1920, height: 1080 }, { width: 1000, height: 600 }, { width: 960, height: 560 }]) {
   test(`com o guia e a pontuação ligados, nenhum cartão se sobrepõe a outro (${size.width}x${size.height})`, async ({ page, request }) => {
     const room = await createRoom(request);
-    await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+    // a fila cheia: a música que toca e mais sete esperando (a coluna da direita fica no máximo de altura)
+    const songs = [SONGS.alpha, SONGS.bravo, SONGS.charlie, SONGS.delta];
+    for (let i = 0; i < 8; i++) await addToQueue(request, room.code, songs[i % 4], { client: i % 2 ? ANA : BIA, name: i % 2 ? 'Ana' : 'Bia' });
     await hostPatch(request, room, { scoring: true, melody_bars: true });
     await page.setViewportSize(size);
     await page.goto(room.tvUrl);
@@ -114,5 +116,7 @@ for (const size of [{ width: 1100, height: 740 }, { width: 1280, height: 720 }, 
     }
     expect(cards.hud.right).toBeGreaterThan(size.width - 48); // continua colado na direita
     expect(cards.hud.bottom).toBeLessThanOrEqual(size.height); // e cabe na tela
+    expect(cards.qr.bottom).toBeLessThanOrEqual(size.height); // o QR code também cabe na tela
+    expect(cards.queue.bottom).toBeLessThanOrEqual(cards.qr.y + 1); // e a fila termina antes do QR code
   });
 }

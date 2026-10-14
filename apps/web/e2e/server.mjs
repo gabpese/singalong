@@ -58,7 +58,7 @@ if (!process.env.E2E_STORAGE) await seed(root);
 const jobs = createMemoryJobStore();
 const BIG = { max: 1e6, windowMs: 60_000 };
 // adminToken liga o pareamento do agente local (/agent/v1): os testes de agente.spec.mjs fazem o papel do app do dono
-const app = buildApp({ config: { publicDir, publicUrl: '', appDownloadUrl: 'https://example.test/releases/latest', appLatestVersion: '1.2.3', adminToken: 'e2e-admin', rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG } }, storage: new LocalStorage(root), jobs });
+const app = buildApp({ config: { publicDir, publicUrl: '', adminPath: 'e2e-painel-secreto-0123456789', appDownloadUrl: 'https://example.test/releases/latest', appLatestVersion: '1.2.3', adminToken: 'e2e-admin', rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG } }, storage: new LocalStorage(root), jobs });
 
 app.post('/__test/search-results', async (request) => {
   jobs.searchResults = request.body;

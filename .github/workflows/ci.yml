@@ -170,7 +170,34 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      # o instalador NÃO é guardado nem publicado (fica só na máquina do dono): aqui só se confere que ele é gerado
+      # Assinatura do instalador. Com os segredos WINDOWS_CERT_PFX_BASE64 e WINDOWS_CERT_PASSWORD (e, se quiser, a variável WINDOWS_PUBLISHER)
+      # ele sai assinado de verdade e o build FALHA se a assinatura não funcionar. Sem eles, o CI assina com um certificado de TESTE
+      # descartável (autoassinado), só para provar que o caminho da assinatura funciona (o Windows não confia nele: é esperado).
+      - name: Preparar a assinatura
+        shell: pwsh
+        env:
+          CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          PUBLISHER: ${{ vars.WINDOWS_PUBLISHER }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'singalong-sign.pfx'
+          if ($env:CERT_PFX_BASE64) {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
+            "CSC_LINK=$pfx" >> $env:GITHUB_ENV
+            "CSC_KEY_PASSWORD=$env:CERT_PASSWORD" >> $env:GITHUB_ENV
+            "SINGALONG_REQUIRE_SIGNING=1" >> $env:GITHUB_ENV
+            if ($env:PUBLISHER) { "SINGALONG_PUBLISHER=$env:PUBLISHER" >> $env:GITHUB_ENV }
+            'assinatura: certificado de verdade (segredos do repositório)'
+          } else {
+            $password = [Guid]::NewGuid().ToString('N')
+            $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Singalong CI (teste)' -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(2) -KeyExportPolicy Exportable
+            Export-PfxCertificate -Cert $cert -FilePath $pfx -Password (ConvertTo-SecureString $password -AsPlainText -Force) | Out-Null
+            "::add-mask::$password"
+            "CSC_LINK=$pfx" >> $env:GITHUB_ENV
+            "CSC_KEY_PASSWORD=$password" >> $env:GITHUB_ENV
+            'assinatura: certificado de TESTE descartável (o Windows não confia nele)'
+          }
+      # o instalador NÃO é guardado nem publicado (fica só na máquina do dono): aqui só se confere que ele é gerado (e assinado)
       - run: npm run dist
       - name: Conferir o arquivo gerado
         shell: pwsh
@@ -179,6 +206,8 @@ jobs:
           if ($exe.Length -lt 50MB) { throw "instalador pequeno demais: $($exe.Length)" }
           if (-not (Test-Path dist/latest.yml)) { throw "faltou o latest.yml" }
           "instalador: {0:N0} MB" -f ($exe.Length / 1MB)
+      - name: Conferir a assinatura
+        run: node scripts/verify-signature.mjs dist/singalong_karaoke.exe
 
   docker-api:
     name: Imagem da API (build)

@@ -21,13 +21,16 @@ function actorOf(request, { optional = false } = {}) {
 }
 
 /** Plugin Fastify: salas, fila, controle de reprodução e o WebSocket de estado. */
-export async function roomRoutes(app, { rooms, config, limiters }) {
+export async function roomRoutes(app, { rooms, config, limiters, release }) {
   // o que a página inicial precisa: o endereço público (QR code) e, se configurados, onde baixar o app e qual é a versão mais recente
-  app.get('/config', async () => ({
-    public_url: config.publicUrl || null,
-    app_download_url: /^https?:\/\//i.test(config.appDownloadUrl ?? '') ? config.appDownloadUrl : null,
-    app_latest_version: config.appLatestVersion || null,
-  }));
+  app.get('/config', async () => {
+    const published = release.get();
+    return {
+      public_url: config.publicUrl || null,
+      app_download_url: /^https?:\/\//i.test(published.url ?? '') ? published.url : null,
+      app_latest_version: published.latest || null,
+    };
+  });
 
   app.post('/rooms', { preHandler: rateLimited(limiters.createRoom, { message: 'Muitas salas criadas seguidas. Espere um pouco.' }) },
     async (request, reply) => reply.code(201).send(rooms.createRoom()));
