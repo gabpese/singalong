@@ -602,3 +602,37 @@ Found while using 1.2.0 on a real TV and microphone:
 
 ### Fixes and additions of 1.2.6
 - **Scoring and melody guide marked as beta:** both follow the original voice by approximation and are not yet fully faithful, so the app now says so. A small "beta" tag appears on the two switches of the host rail (with the explanation in the tip and the accessible name, e.g. "Pontuação pelo microfone (beta)"), on the TV (melody guide, score card and final score), on the scoreboard of the room and on the singer's own score on the stage page; the tag's tooltip explains it. The README (both languages) carries the same notice. Nothing in how the scoring works changed.
+
+## 19. 1.3.0 plan: the app for macOS and Linux (F26)
+
+**1.3.0 includes only F26.** The hybrid cloud mode (F25) and the `hml`/`stg` environments (section 18) come later.
+
+**Decisions (answered)**
+1. **Systems:** **Linux x64** (AppImage) and **macOS Apple Silicon** (DMG). **Intel Macs are out**: PyTorch 2.5.1 has no build for them.
+2. **macOS without an Apple signature for now:** the user opens it with right-click → Open the first time and updates by downloading the new version (no automatic update on the Mac; Linux updates itself). The home page and the README explain it. Signing and notarizing (Apple Developer, ~US$ 99/year) is left as a later step.
+3. **AMD (ROCm) and Apple (MPS) GPUs only after measuring the gain:** first everything on CPU (and NVIDIA on Linux). Part of the separator models run through `onnxruntime` (which today falls back to the CPU even on Windows), so the real gain is unknown.
+4. **Links per system:** `APP_DOWNLOAD_URL` stays a single value (GitHub `…/releases/latest/download/` base) and the server appends the **fixed file name** of each system: `singalong_karaoke.exe`, `singalong_karaoke-mac-arm64.dmg`, `singalong_karaoke-linux-x86_64.AppImage`. One version for the three systems.
+
+**What changes**
+| Part | Today | In F26 |
+|---|---|---|
+| Engine manifest | one platform (`win32-x64`) | `platforms` with one block per system (`win32-x64`, `linux-x64`, `darwin-arm64`): Python (python-build-standalone), ffmpeg and deno for each, with URL and SHA-256 |
+| Paths and extraction | `python.exe`, `bin/*.exe` | `python/bin/python3`, binaries without `.exe`; `tar` as the default outside Windows (already planned) |
+| Hardware (`hardware.py`) | NVIDIA → `cu121` or CPU | Linux: NVIDIA (`cu121`) or CPU; macOS: CPU (MPS and ROCm only in the last milestone) |
+| Browser for cookies | Windows only | macOS and Linux: detect the default browser (Chrome, Edge, Firefox, Safari where applicable) |
+| Packaging | NSIS | AppImage (Linux) and DMG (macOS), with fixed `artifactName`s; `latest.yml`, `latest-linux.yml` and `latest-mac.yml` |
+| CI | engine on ubuntu and windows; installer on windows | engine also on macOS (arm64); jobs that build the AppImage and the DMG |
+| Home (`/`) | one Windows button | the visitor's detected system becomes the main button ("Download for macOS (Apple Silicon) – vX"); an always-visible "Other systems" list; on macOS it asks "Which Mac do you have?" (the browser cannot tell Intel from Apple Silicon) and warns that Intel is not supported; phones still explain that the app is for computers |
+| `/api/config` | `app_download_url`, `app_latest_version` | adds `app_downloads` (a list of `{system, url, label}` built from the base) |
+
+**Milestones**
+1. **M1 – Engine on Linux x64** (CPU and NVIDIA): per-platform manifest, paths, hardware, CI tests (ubuntu).
+2. **M2 – Engine on macOS Apple Silicon** (CPU): the Mac components, default browser, CI tests (macOS arm64).
+3. **M3 – Packaging and release:** AppImage and DMG in CI; a release with several files; Linux updates; a manual-update notice on the Mac.
+4. **M4 – The home page:** system detection, other-systems list, the Mac question, `app_downloads`; texts in the three languages; tests and axe.
+5. **M5 – AMD and Apple GPU:** measure the gain of ROCm and MPS in separation and scoring; it only goes in if it pays off.
+
+**Limits and risks**
+- **No real Mac or Linux here:** CI tests the assembly and the code, but has no GPU or microphone; testing on real machines is left to the owner.
+- **YouTube cookies:** reading the browser cookies differs per system (Keychain on the Mac, keyring on Linux); the `youtube_cookies.txt` file may be needed as an alternative.
+- **`torch` per platform:** Linux uses the `cpu` or `cu121` index; macOS uses the default PyPI package (which already ships MPS).
