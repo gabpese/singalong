@@ -272,6 +272,7 @@ export default {
   'tvp.fullscreenTip': 'Pantalla completa (F)',
   'tvp.duetAria': 'Colores del dueto',
   'tvp.joinAria': 'Entrar en la sala',
+  'tvp.joinText': 'Entra en la sala **{code}**',
   'tvp.idleLead': 'Entra en la sala **{code}** desde el móvil',
   'tvp.idleNext': 'Siguiente: {who} — {title}',
   'tvp.idleAdd': 'Añade canciones desde el móvil para empezar.',

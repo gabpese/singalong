@@ -31,6 +31,7 @@ function JoinCard({ code }: { code: string }) {
   return (
     <aside className="tv-join" aria-label={t('tvp.joinAria')}>
       <QrCode code={code} compact />
+      <p>{tRich('tvp.joinText', { code })}</p>
     </aside>
   );
 }

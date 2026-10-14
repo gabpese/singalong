@@ -272,6 +272,7 @@ export default {
   'tvp.fullscreenTip': 'Full screen (F)',
   'tvp.duetAria': 'Duet colors',
   'tvp.joinAria': 'Join the room',
+  'tvp.joinText': 'Join room **{code}**',
   'tvp.idleLead': 'Join room **{code}** from your phone',
   'tvp.idleNext': 'Next: {who} — {title}',
   'tvp.idleAdd': 'Add songs from your phone to start.',

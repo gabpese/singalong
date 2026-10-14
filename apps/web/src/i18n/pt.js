@@ -272,6 +272,7 @@ export default {
   'tvp.fullscreenTip': 'Tela cheia (F)',
   'tvp.duetAria': 'Cores do dueto',
   'tvp.joinAria': 'Entrar na sala',
+  'tvp.joinText': 'Entre na sala **{code}**',
   'tvp.idleLead': 'Entre na sala **{code}** pelo celular',
   'tvp.idleNext': 'Próximo: {who} — {title}',
   'tvp.idleAdd': 'Adicione músicas pelo celular para começar.',
