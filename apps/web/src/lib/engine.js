@@ -17,18 +17,27 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
   const audio = new Audio();
   audio.crossOrigin = 'anonymous';
   audio.preload = 'auto';
-  // vozes de apoio: um segundo áudio, no mesmo ponto do instrumental, com o volume que quem escolheu a música definiu
-  const backing = new Audio();
-  backing.crossOrigin = 'anonymous';
-  backing.preload = 'auto';
+  // trilhas extras, no mesmo ponto do instrumental e com o volume que quem escolheu a música definiu:
+  // as vozes de apoio (backing) e a voz original isolada, como guia para cantar (guide)
+  function createStem() {
+    const element = new Audio();
+    element.crossOrigin = 'anonymous';
+    element.preload = 'auto';
+    return {
+      element,
+      url: null, // o arquivo da música atual (null = a música não tem)
+      level: 0, // 0..100 (%)
+      loadedUrl: null, // o que o elemento de áudio já carregou (só baixa quando o nível passa de 0)
+      gain: null,
+    };
+  }
+  const backing = createStem();
+  const guide = createStem();
+  const stems = [backing, guide];
 
   let itemId = null;
   const view = createLyricsView(lyricsEls);
   let pitch = 0;
-  let backingUrl = null; // as vozes de apoio da música atual (null = a música não tem)
-  let backingLevel = 0; // 0..100 (%)
-  let backingLoadedUrl = null; // o que o elemento de áudio já carregou (só baixa quando o nível passa de 0)
-  let backingGain = null;
   let ctx = null;
   let stNode = null;
   let graphReady = null;
@@ -56,13 +65,15 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
         await SoundTouchNode.register(ctx, '/vendor/soundtouch/soundtouch-processor.js');
         stNode = new SoundTouchNode({ context: ctx });
         ctx.createMediaElementSource(audio).connect(stNode);
-        // o apoio entra na mesma entrada do SoundTouch: os dois mudam de tom juntos
-        backingGain = ctx.createGain();
-        ctx.createMediaElementSource(backing).connect(backingGain);
-        backingGain.connect(stNode);
+        // as trilhas extras entram na mesma entrada do SoundTouch: todas mudam de tom juntas
+        for (const stem of stems) {
+          stem.gain = ctx.createGain();
+          ctx.createMediaElementSource(stem.element).connect(stem.gain);
+          stem.gain.connect(stNode);
+        }
         stNode.connect(ctx.destination);
         applyPitch();
-        applyBacking();
+        stems.forEach(applyStem);
       } catch (err) {
         console.warn('troca de tom indisponível:', err);
         pitchAvailable = false;
@@ -96,51 +107,53 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
     if (stNode) stNode.pitchSemitones.value = pitch;
   }
 
-  // --- vozes de apoio ---
-  const backingWanted = () => Boolean(backingUrl) && backingLevel > 0;
+  // --- trilhas extras (vozes de apoio e voz original) ---
+  const stemWanted = (stem) => Boolean(stem.url) && stem.level > 0;
 
-  function applyBacking() {
-    const level = backingLevel / 100;
-    if (backingGain) {
-      backingGain.gain.value = level;
-      // o volume do ELEMENTO vale antes do grafo de áudio: preso em 0 (como ficava, enquanto o grafo não existia) ele cala o apoio
-      backing.volume = 1;
+  function applyStem(stem) {
+    const level = stem.level / 100;
+    if (stem.gain) {
+      stem.gain.gain.value = level;
+      // o volume do ELEMENTO vale antes do grafo de áudio: preso em 0 (como ficava, enquanto o grafo não existia) ele cala a trilha
+      stem.element.volume = 1;
     } else {
-      backing.volume = level; // sem o grafo de áudio (http fora de localhost) o volume do próprio elemento faz o papel
+      stem.element.volume = level; // sem o grafo de áudio (http fora de localhost) o volume do próprio elemento faz o papel
     }
-    if (!backingWanted()) {
-      backing.pause();
+    if (!stemWanted(stem)) {
+      stem.element.pause();
       return;
     }
-    if (backingLoadedUrl !== backingUrl) {
-      backing.src = backingUrl;
-      backing.load();
-      backingLoadedUrl = backingUrl;
+    if (stem.loadedUrl !== stem.url) {
+      stem.element.src = stem.url;
+      stem.element.load();
+      stem.loadedUrl = stem.url;
     }
-    if (!audio.paused) syncBacking();
+    if (!audio.paused) syncStem(stem);
   }
 
-  /** Põe o apoio no mesmo ponto do instrumental e o faz tocar junto. */
-  function syncBacking() {
-    if (!backingWanted()) return;
-    backing.currentTime = audio.currentTime;
-    if (backing.paused) backing.play().catch(() => {}); // sem o gesto de liberar o som, o instrumental também não toca
+  /** Põe a trilha no mesmo ponto do instrumental e a faz tocar junto. */
+  function syncStem(stem) {
+    if (!stemWanted(stem)) return;
+    stem.element.currentTime = audio.currentTime;
+    if (stem.element.paused) stem.element.play().catch(() => {}); // sem o gesto de liberar o som, o instrumental também não toca
   }
 
-  function dropBacking() {
-    backing.pause();
-    if (backingLoadedUrl) {
-      backing.removeAttribute('src');
-      backing.load();
-      backingLoadedUrl = null;
+  function dropStem(stem) {
+    stem.element.pause();
+    if (stem.loadedUrl) {
+      stem.element.removeAttribute('src');
+      stem.element.load();
+      stem.loadedUrl = null;
     }
-    backingUrl = null;
+    stem.url = null;
   }
 
-  // dois elementos de áudio nunca andam exatamente juntos: de meio em meio segundo o apoio é realinhado se escorregou
+  // dois elementos de áudio nunca andam exatamente juntos: de meio em meio segundo cada trilha é realinhada se escorregou
   const driftTimer = setInterval(() => {
-    if (backingWanted() && !audio.paused && !backing.paused && Math.abs(backing.currentTime - audio.currentTime) > 0.08) {
-      backing.currentTime = audio.currentTime;
+    for (const stem of stems) {
+      if (stemWanted(stem) && !audio.paused && !stem.element.paused && Math.abs(stem.element.currentTime - audio.currentTime) > 0.08) {
+        stem.element.currentTime = audio.currentTime;
+      }
     }
   }, 500);
 
@@ -156,14 +169,14 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
 
   audio.addEventListener('play', () => {
     requestAnimationFrame(loop);
-    syncBacking();
+    stems.forEach(syncStem);
   });
   audio.addEventListener('pause', () => {
-    backing.pause();
+    for (const stem of stems) stem.element.pause();
     render();
   });
   audio.addEventListener('seeked', () => {
-    if (backingWanted()) backing.currentTime = audio.currentTime;
+    for (const stem of stems) if (stemWanted(stem)) stem.element.currentTime = audio.currentTime;
     render();
   });
   audio.addEventListener('ended', () => onEnded?.(itemId));
@@ -180,9 +193,11 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
     async load(item) {
       const token = ++loadToken;
       audio.pause();
-      dropBacking();
-      backingUrl = item.song.media.backing ?? null;
-      backingLevel = clampBacking(item.backing);
+      stems.forEach(dropStem);
+      backing.url = item.song.media.backing ?? null;
+      backing.level = clampBacking(item.backing);
+      guide.url = item.song.media.vocals ?? null;
+      guide.level = clampBacking(item.guide);
       itemId = item.id;
       view.setCues([]);
       view.setOffset(item.lyric_offset ?? 0);
@@ -202,7 +217,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
       }
       audio.src = item.song.media.instrumental;
       audio.load();
-      applyBacking();
+      stems.forEach(applyStem);
       render();
     },
 
@@ -285,9 +300,17 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
     /** Nível das vozes de apoio (0..100 %); só baixa o arquivo quando passa de 0. */
     setBacking(level) {
       const next = clampBacking(level);
-      if (next === backingLevel) return;
-      backingLevel = next;
-      applyBacking();
+      if (next === backing.level) return;
+      backing.level = next;
+      applyStem(backing);
+    },
+
+    /** Nível da voz original, como guia (0..100 %); só baixa o arquivo quando passa de 0. */
+    setGuide(level) {
+      const next = clampBacking(level);
+      if (next === guide.level) return;
+      guide.level = next;
+      applyStem(guide);
     },
 
     setOffset(seconds) {
@@ -303,7 +326,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
 
     clear() {
       audio.pause();
-      dropBacking();
+      stems.forEach(dropStem);
       itemId = null;
       view.clear();
     },
@@ -322,16 +345,20 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
     get pitchAvailable() { return pitchAvailable; },
     get unlocked() { return ctx?.state === 'running'; },
     get pitch() { return pitch; },
-    get backingLevel() { return backingLevel; },
-    get hasBacking() { return Boolean(backingUrl); },
-    get backingPlaying() { return !backing.paused; },
-    get backingTime() { return backing.currentTime; },
+    get backingLevel() { return backing.level; },
+    get hasBacking() { return Boolean(backing.url); },
+    get backingPlaying() { return !backing.element.paused; },
+    get backingTime() { return backing.element.currentTime; },
+    get guideLevel() { return guide.level; },
+    get hasGuide() { return Boolean(guide.url); },
+    get guidePlaying() { return !guide.element.paused; },
+    get guideTime() { return guide.element.currentTime; },
     /** Diagnóstico do apoio (elemento de áudio e grafo): para entender por que ele não soa. */
     get backingDebug() {
       return {
-        readyState: backing.readyState, networkState: backing.networkState, error: backing.error?.code ?? null, paused: backing.paused,
-        muted: backing.muted, volume: backing.volume, src: backing.currentSrc, duration: backing.duration,
-        gain: backingGain?.gain.value ?? null, ctx: ctx?.state ?? null, graph: Boolean(stNode),
+        readyState: backing.element.readyState, networkState: backing.element.networkState, error: backing.element.error?.code ?? null, paused: backing.element.paused,
+        muted: backing.element.muted, volume: backing.element.volume, src: backing.element.currentSrc, duration: backing.element.duration,
+        gain: backing.gain?.gain.value ?? null, ctx: ctx?.state ?? null, graph: Boolean(stNode),
       };
     },
     get voiceAttached() { return mics.length > 0; },

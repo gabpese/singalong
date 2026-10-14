@@ -39,6 +39,7 @@ async function seed(root) {
     await mkdir(dir, { recursive: true });
     await copyFile(join(here, 'fixtures', 'tone.mp3'), join(dir, 'instrumental.mp3'));
     if (song.backing) await copyFile(join(here, 'fixtures', 'tone-440.mp3'), join(dir, 'backing.mp3')); // só algumas músicas têm vozes de apoio (num tom diferente do instrumental: a soma dos dois fica mensurável)
+    if (song.backing) await copyFile(join(here, 'fixtures', 'tone-440.mp3'), join(dir, 'vocals.mp3')); // a voz original (guia) existe nas mesmas músicas
     await writeFile(join(dir, 'lyrics.json'), JSON.stringify(LYRICS));
     await writeFile(join(dir, 'melody.json'), JSON.stringify(MELODY));
     await writeFile(
@@ -100,7 +101,7 @@ const mediaServer = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return res.writeHead(204, cors).end();
   const path = req.url.split('?')[0];
   if (path === '/e2e/ping') return res.writeHead(200, { ...cors, 'Content-Type': 'application/json' }).end('{"ok":true}');
-  const match = /^\/e2e\/cache\/([A-Za-z0-9_-]{11})\/(instrumental\.mp3|lyrics\.json|melody\.json|backing\.mp3)$/.exec(path);
+  const match = /^\/e2e\/cache\/([A-Za-z0-9_-]{11})\/(instrumental\.mp3|lyrics\.json|melody\.json|backing\.mp3|vocals\.mp3)$/.exec(path);
   const file = match && join(root, 'cache', match[1], match[2]);
   const info = file && (await stat(file).catch(() => null));
   if (!info) return res.writeHead(404, cors).end();

@@ -47,6 +47,7 @@ def entry_for(storage, video_id: str) -> dict | None:
             "lyrics": True,
             "melody": storage.exists(f"{base}/melody.json"),
             "backing": storage.exists(f"{base}/backing.mp3"),
+            "vocals": storage.exists(f"{base}/vocals.mp3"),
             "exports": exports_of(storage, video_id),
         },
     }

@@ -356,4 +356,8 @@ export default {
   'mics.first': 'does the scoring',
   'mics.max': 'That is already {max} microphones: untick one to pick another.',
   'mics.close': 'Close',
+
+  'guide.label': 'Original voice (guide)',
+  'guide.static': 'Original voice (guide) {n}%',
+  'guide.aria': 'Original voice volume, as a guide to sing along',
 };

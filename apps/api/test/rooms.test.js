@@ -563,3 +563,22 @@ test('vozes de apoio: a URL do backing.mp3 só aparece nas músicas que o têm',
   assert.equal(queue.find((i) => i.video_id === READY_A).song.media.backing, null);
   assert.match(queue.find((i) => i.video_id === READY_B).song.media.backing, /backing\.mp3$/);
 });
+
+test('voz original (guia): o nível (0..100) segue as mesmas regras das vozes de apoio e não mexe nas outras', async () => {
+  const { code, host } = await newRoom();
+  const a = (await add(code, READY_A, { client: ANA })).body;
+  const setting = (client, body, opts = {}) => call('PATCH', `/rooms/${code}/queue/${a.item_id}`, { client, body, ...opts });
+  const itemOf = async () => (await call('GET', `/rooms/${code}`)).body.queue.find((i) => i.id === a.item_id);
+
+  assert.equal((await itemOf()).guide, 0); // padrão: desligado
+  assert.equal((await setting(ANA, { guide: 35 })).status, 200);
+  assert.deepEqual([(await itemOf()).guide, (await itemOf()).backing, (await itemOf()).pitch], [35, 0, 0]);
+  await setting(ANA, { guide: 300 });
+  assert.equal((await itemOf()).guide, 100);
+  assert.equal((await setting(ANA, { backing: 20, guide: 60 })).status, 200);
+  assert.deepEqual([(await itemOf()).backing, (await itemOf()).guide], [20, 60]);
+  assert.equal((await setting(BIA, { guide: 10 })).status, 403);
+  assert.equal((await setting(BIA, { guide: 10 }, { host })).status, 200);
+  assert.equal((await itemOf()).guide, 10);
+  assert.equal((await setting(ANA, { guide: 'alto' })).status, 400);
+});

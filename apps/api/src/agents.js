@@ -53,7 +53,7 @@ function checkLibraryEntry(entry) {
     videoId: String(entry.id),
     meta: entry.meta,
     // só o que o servidor usa: o instrumental e a letra são obrigatórios; o resto é opcional
-    files: { instrumental: files.instrumental === true, lyrics: files.lyrics === true, melody: files.melody === true, backing: files.backing === true, exports },
+    files: { instrumental: files.instrumental === true, lyrics: files.lyrics === true, melody: files.melody === true, backing: files.backing === true, vocals: files.vocals === true, exports },
   };
 }
 

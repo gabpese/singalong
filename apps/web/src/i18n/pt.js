@@ -356,4 +356,8 @@ export default {
   'mics.first': 'faz a pontuação',
   'mics.max': 'Já são {max} microfones: desmarque um para escolher outro.',
   'mics.close': 'Fechar',
+
+  'guide.label': 'Voz original (guia)',
+  'guide.static': 'Voz original (guia) {n}%',
+  'guide.aria': 'Volume da voz original, como guia para cantar',
 };

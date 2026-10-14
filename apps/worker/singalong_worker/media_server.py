@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 log = logging.getLogger("worker.media")
 
-SERVED = re.compile(r"^(instrumental\.mp3|lyrics\.json|melody\.json|backing\.mp3|karaoke(_p[+-][1-6])?\.mp4)$")
+SERVED = re.compile(r"^(instrumental\.mp3|lyrics\.json|melody\.json|backing\.mp3|vocals\.mp3|karaoke(_p[+-][1-6])?\.mp4)$")
 VIDEO_ID = re.compile(r"^([A-Za-z0-9_-]{11}|f-[0-9a-f]{12})$")
 CONTENT_TYPES = {".mp3": "audio/mpeg", ".json": "application/json; charset=utf-8", ".mp4": "video/mp4"}
 CHUNK = 64 * 1024

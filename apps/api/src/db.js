@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS queue_items (
   client_id   TEXT NOT NULL,
   pitch       INTEGER NOT NULL DEFAULT 0,
   backing     INTEGER NOT NULL DEFAULT 0,         -- nível das vozes de apoio (0..100 %)
+  guide       INTEGER NOT NULL DEFAULT 0,         -- nível da voz original, como guia para cantar (0..100 %)
   position    INTEGER NOT NULL,
   status      TEXT NOT NULL DEFAULT 'queued',     -- queued | playing | done | skipped
   created_at  INTEGER NOT NULL,
@@ -80,14 +81,14 @@ CREATE TABLE IF NOT EXISTS agent_songs (
   device_id   TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
   video_id    TEXT NOT NULL,
   meta        TEXT NOT NULL,                         -- o meta.json da música (JSON)
-  files       TEXT NOT NULL,                         -- { instrumental, lyrics, melody, backing, exports: [tons] }
+  files       TEXT NOT NULL,                         -- { instrumental, lyrics, melody, backing, vocals, exports: [tons] }
   updated_at  INTEGER NOT NULL,
   PRIMARY KEY (device_id, video_id)
 );
 `;
 
 const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
-const ITEM_FIELDS = new Set(['pitch', 'backing', 'position', 'status', 'played_at', 'score', 'title', 'artist', 'guest_client_id', 'guest_name', 'guest_status']);
+const ITEM_FIELDS = new Set(['pitch', 'backing', 'guide', 'position', 'status', 'played_at', 'score', 'title', 'artist', 'guest_client_id', 'guest_name', 'guest_status']);
 
 export function openDb(path = ':memory:') {
   const db = new DatabaseSync(path);
@@ -108,6 +109,7 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('queue_items', 'guest_name')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_name TEXT');
   if (!hasColumn('queue_items', 'guest_status')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_status TEXT');
   if (!hasColumn('queue_items', 'backing')) db.exec('ALTER TABLE queue_items ADD COLUMN backing INTEGER NOT NULL DEFAULT 0');
+  if (!hasColumn('queue_items', 'guide')) db.exec('ALTER TABLE queue_items ADD COLUMN guide INTEGER NOT NULL DEFAULT 0');
   // bancos criados antes do agente local não têm a sessão da sala (nula = sala sem dono de sessão: o worker clássico)
   if (!hasColumn('rooms', 'session_id')) db.exec('ALTER TABLE rooms ADD COLUMN session_id TEXT REFERENCES sessions(id)');
   // onde o navegador busca a mídia da sessão (o servidor local de mídia do agente); nulo = a mídia está no armazenamento do servidor

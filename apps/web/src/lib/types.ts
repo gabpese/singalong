@@ -21,7 +21,7 @@ export interface SongView {
   lyrics_source: string | null;
   key: SongKey | null;
   /** `local`: os arquivos estão no computador do dono (servidor local de mídia), não no servidor. */
-  media: { instrumental: string; lyrics: string; melody: string | null; backing: string | null; local?: boolean } | null;
+  media: { instrumental: string; lyrics: string; melody: string | null; backing: string | null; vocals?: string | null; local?: boolean } | null;
 }
 
 export interface QueueItem {
@@ -41,6 +41,8 @@ export interface QueueItem {
   pitch: number;
   /** Nível das vozes de apoio (0..100 %); só vale se a música tem o arquivo de apoio. */
   backing: number;
+  /** Nível da voz original, como guia para cantar (0..100 %). */
+  guide: number;
   status: string;
   lyric_offset: number;
   mine: boolean;

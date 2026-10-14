@@ -21,7 +21,7 @@ def make_song(root: Path, vid: str = VID, extra: tuple = ()) -> None:
     (folder / "instrumental.mp3").write_bytes(AUDIO)
     (folder / "lyrics.json").write_text('[{"start":1,"end":2,"text":"oi"}]', encoding="utf-8")
     (folder / "meta.json").write_text(json.dumps({"video_id": vid, "title": "Tempo Perdido", "artist": "Legião Urbana", "duration": 300}), encoding="utf-8")
-    (folder / "vocals.mp3").write_bytes(b"segredo: a voz isolada nao e servida")
+    (folder / "vocals.mp3").write_bytes(b"voz original isolada: guia para cantar")
     (folder / "source.json").write_text('{"url":"x"}', encoding="utf-8")
     for name in extra:
         (folder / name).write_bytes(b"x" * 100)
@@ -31,7 +31,7 @@ class MediaServerTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        make_song(self.root, extra=("melody.json", "backing.mp3", "karaoke.mp4", "karaoke_p+2.mp4", "karaoke_p-3.mp4"))
+        make_song(self.root, extra=("melody.json", "backing.mp3", "vocals.mp3", "karaoke.mp4", "karaoke_p+2.mp4", "karaoke_p-3.mp4"))
         self.server = MediaServer(self.root, [ORIGIN], port=0, token="tok123")
         self.base = self.server.start()
         self.addCleanup(self.server.stop)
@@ -96,8 +96,8 @@ class MediaServerTests(unittest.TestCase):
     def test_so_serve_os_arquivos_da_lista(self):
         for name in ("instrumental.mp3", "lyrics.json", "melody.json", "backing.mp3", "karaoke.mp4", "karaoke_p+2.mp4", "karaoke_p-3.mp4"):
             self.assertEqual(self.media(name)[0], 200, name)
-        for name in ("vocals.mp3", "source.json", "meta.json", "karaoke_p+9.mp4", "karaoke_p2.mp4", "outro.txt", ".env", "instrumental.mp3.tmp"):
-            self.assertEqual(self.media(name)[0], 404, name)  # a voz isolada nunca sai do computador
+        for name in ("source.json", "meta.json", "karaoke_p+9.mp4", "karaoke_p2.mp4", "outro.txt", ".env", "instrumental.mp3.tmp"):
+            self.assertEqual(self.media(name)[0], 404, name)  # a voz isolada só sai do computador para a TV dele (guia para cantar), nunca para a nuvem
 
     def test_token_errado_e_tentativas_de_sair_da_pasta(self):
         self.assertEqual(self.request(f"/errado/cache/{VID}/instrumental.mp3")[0], 404)
@@ -181,7 +181,7 @@ class CatalogTests(unittest.TestCase):
         entry = catalog.entry_for(self.storage, VID)
         self.assertEqual(entry["id"], VID)
         self.assertEqual(entry["meta"]["title"], "Tempo Perdido")
-        self.assertEqual(entry["files"], {"instrumental": True, "lyrics": True, "melody": False, "backing": False, "exports": []})
+        self.assertEqual(entry["files"], {"instrumental": True, "lyrics": True, "melody": False, "backing": False, "vocals": True, "exports": []})
 
     def test_arquivos_opcionais_e_os_tons_exportados(self):
         make_song(self.root, extra=("melody.json", "backing.mp3", "karaoke.mp4", "karaoke_p+2.mp4", "karaoke_p-3.mp4", "karaoke_p+x.mp4", "karaoke_p+9.mp4.tmp"))
