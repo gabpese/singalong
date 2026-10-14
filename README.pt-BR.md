@@ -6,6 +6,8 @@ Karaokê próprio e colaborativo: pesquise uma música no YouTube e o Singalong 
 
 Documentação: [PRD](PRD.pt-BR.md) (requisitos do produto), [TRD](TRD.pt-BR.md) (requisitos técnicos e a proposta do instalador/agente) e [PLAN](PLAN.pt-BR.md) (decisões e histórico). Cada um tem também a versão em inglês.
 
+> **Beta.** A pontuação pelo microfone e o guia de melodia estão em fase beta: seguem a voz original por aproximação e ainda não são totalmente fiéis, então valem como diversão. Aparecem marcados como "beta" no app.
+
 ## Download
 
 O app do Windows (instalador `singalong_karaoke.exe`) está na [versão mais recente](https://github.com/gabpese/singalong/releases/latest). É gratuito e de código aberto (MIT).

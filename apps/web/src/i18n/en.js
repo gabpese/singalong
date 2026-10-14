@@ -235,6 +235,8 @@ export default {
   'rail.prompt': 'Copy the link:',
   'rail.scoring': 'Microphone scoring',
   'rail.scoringTip': "Microphone scoring: the TV compares the singer's pitch with the original voice (needs a microphone on the TV)",
+  'beta.tag': 'beta',
+  'beta.note': "Beta: not yet fully faithful to the original voice, so take it as fun.",
   'rail.scoringOn': 'Scoring on.',
   'rail.scoringOff': 'Scoring off.',
   'rail.voice': 'Microphone voice in the speakers',

@@ -1,6 +1,7 @@
 // Palco: a tela de canto do celular. Mostra a letra no ritmo da TV (que toca a música) e devolve o cantor à sala quando acaba.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
+import { BetaTag } from '../ui/BetaTag';
 import { LyricsSize } from '../ui/LyricsSize';
 import { ReactionLayer, useReactionLayer } from '../ui/ReactionLayer';
 import { createSyncClock } from '../lib/clock.js';
@@ -206,7 +207,11 @@ export function StagePage({ code }: { code: string }) {
         {ended ? (
           <div className="stage-end">
             <strong>{t('stage.over')}</strong>
-            {ended.score !== null ? <span>{t('stage.yourScore', { score: ended.score })}</span> : null}
+            {ended.score !== null ? (
+              <span>
+                {t('stage.yourScore', { score: ended.score })} <BetaTag />
+              </span>
+            ) : null}
             <small>{t('stage.returning')}</small>
           </div>
         ) : status === 'reconnecting' ? (

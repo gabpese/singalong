@@ -8,6 +8,8 @@ Documentation: [PRD](PRD.md) (product requirements), [TRD](TRD.md) (technical re
 
 > The app's interface is in Brazilian Portuguese. Where this README quotes a button or label, the Portuguese text follows in parentheses.
 
+> **Beta.** The microphone scoring and the melody guide are in beta: they follow the original voice by approximation and are not yet fully faithful, so take them as fun. They are marked "beta" in the app.
+
 ## Download
 
 The Windows app (installer `singalong_karaoke.exe`) is on the [latest release](https://github.com/gabpese/singalong/releases/latest). It is free and open source (MIT).
