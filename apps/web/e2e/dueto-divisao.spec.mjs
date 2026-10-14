@@ -131,3 +131,49 @@ test('dueto com dois microfones: cada cantor é pontuado nas linhas dele e o pla
   await expect.poll(async () => (await roomState(request, room.code)).scoreboard.length).toBe(1); // a nota da música é uma só, a média
   for (const p of [ana, bia]) await p.context.close();
 });
+
+test('guia de melodia no dueto: as barras ganham a cor de quem canta (turquesa e violeta, como a letra)', async ({ browser, page: tv, request }) => {
+  const { room, ana, bia } = await duetRoom(browser, request);
+  await request.patch(`/api/rooms/${room.code}`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data: { melody_bars: true } });
+  await tv.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(tv)).toBe(true);
+  await request.post(`/api/rooms/${room.code}/player/skip`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host } }); // entra a dupla
+  await expect(tv.locator('canvas.pitch-guide')).toBeVisible();
+  await expect.poll(() => tv.evaluate(() => window.tv.engine.currentTime), { timeout: 20_000 }).toBeGreaterThan(5.5); // as linhas da Ana (1–4 s) e da Bia (5–8 s) estão na janela
+
+  const colorsSeen = () =>
+    tv.evaluate(() => {
+      const canvas = document.querySelector('canvas.pitch-guide');
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      const near = (r, g, b, [tr, tg, tb]) => Math.abs(r - tr) < 24 && Math.abs(g - tg) < 24 && Math.abs(b - tb) < 24;
+      let turquoise = 0;
+      let violet = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 200) continue;
+        if (near(data[i], data[i + 1], data[i + 2], [16, 184, 200])) turquoise++;
+        if (near(data[i], data[i + 1], data[i + 2], [139, 92, 246])) violet++;
+      }
+      return { turquoise, violet };
+    });
+  await expect.poll(async () => (await colorsSeen()).turquoise, { timeout: 10_000 }).toBeGreaterThan(200); // a parte da Ana
+  await expect.poll(async () => (await colorsSeen()).violet, { timeout: 10_000 }).toBeGreaterThan(200); // a parte da Bia
+  for (const p of [ana, bia]) await p.context.close();
+});
+
+test('guia de melodia fora do dueto: as barras ficam na cor do tema (sem turquesa nem violeta)', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await request.patch(`/api/rooms/${room.code}`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data: { melody_bars: true } });
+  await page.goto(room.tvUrl);
+  await expect.poll(() => tvPlaying(page)).toBe(true);
+  await expect(page.locator('canvas.pitch-guide')).toBeVisible();
+  await page.waitForTimeout(800);
+  const seen = await page.evaluate(() => {
+    const canvas = document.querySelector('canvas.pitch-guide');
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let violet = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200 && Math.abs(data[i] - 139) < 20 && Math.abs(data[i + 1] - 92) < 20 && Math.abs(data[i + 2] - 246) < 20) violet++;
+    return violet;
+  });
+  expect(seen).toBe(0);
+});

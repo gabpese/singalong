@@ -110,7 +110,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
           <Item>
             <RailSwitch icon="mic" label={t('rail.scoring')} tip={t('rail.scoringTip')} checked={scoring.value} onToggle={scoring.set} />
           </Item>
-          <div className="rail-item has-pop">
+          <div className={`rail-item has-pop${voice.value ? ' voice-on' : ''}`}>
             <RailSwitch
               icon="sound"
               label={t('rail.voice')}
@@ -119,6 +119,8 @@ export function RoomRail({ state }: { state: RoomState | null }) {
               onToggle={(next) => (next ? setAsking(true) : voice.set(false))}
             />
             <div className="rail-pop">
+              {/* com a voz ligada o balão junta a explicação do interruptor e o volume (a dica em separado cobriria o volume) */}
+              {voice.value && <p className="pop-tip">{t('rail.voiceTip')}</p>}
               <VoiceVolume />
             </div>
           </div>

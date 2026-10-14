@@ -27,6 +27,25 @@ export function openVoice(deviceId = '', getUserMedia = (constraints) => navigat
 }
 
 const KEY = 'voiceMics';
+const FILTER_KEY = 'voiceFilter';
+
+/** Reduzir o ruído e o eco da voz (filtro de graves e portão de ruído)? Ligado por padrão; a escolha fica nesta TV. */
+export function loadVoiceFilter() {
+  try {
+    return localStorage.getItem(FILTER_KEY) !== 'off';
+  } catch {
+    return true; // sem armazenamento (ou fora do navegador)
+  }
+}
+
+export function saveVoiceFilter(on) {
+  try {
+    localStorage.setItem(FILTER_KEY, on ? 'on' : 'off');
+  } catch {
+    // sem armazenamento: vale só até recarregar
+  }
+  return Boolean(on);
+}
 
 /** Os microfones escolhidos nesta TV: [{ id, label }], no máximo MAX_MICS. Vazio = o microfone padrão (como sempre foi). */
 export function loadMics() {

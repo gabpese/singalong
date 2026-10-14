@@ -2,8 +2,8 @@
 // (verde = no tom, vermelho = fora). O "agora" fica a 1/4 da esquerda; o que vem aí, à direita, para a pessoa se preparar.
 import { useEffect, useRef } from 'react';
 import { t } from '../i18n/index.js';
-import { easeRange, foldToNearestOctave, isGood, makeScale, noteAt, notesInWindow, pitchRange, SECONDS_AFTER, SECONDS_BEFORE } from '../lib/melody-guide.js';
-import type { TvController } from './controller';
+import { easeRange, foldToNearestOctave, isGood, makeScale, noteAt, notesInWindow, PART_COLORS, pitchRange, SECONDS_AFTER, SECONDS_BEFORE } from '../lib/melody-guide.js';
+import type { GuideFrame, TvController } from './controller';
 
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
@@ -32,7 +32,7 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
       context.clearRect(0, 0, width, height);
 
       const frameData = controller.guideFrame();
-      const { notes, transpose, position, trail } = frameData;
+      const { notes, transpose, position, trail, trailB, partAt } = frameData;
       const visible = notesInWindow(notes, position - SECONDS_BEFORE, position + SECONDS_AFTER);
       range = easeRange(range, pitchRange(visible, transpose));
       const scale = makeScale({ position, width, height: height - 8, range });
@@ -58,11 +58,21 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
         const x2 = scale.x(n.end);
         const y = top + scale.y(n.note + transpose) - scale.barHeight / 2;
         const active = n.start <= position && position < n.end;
-        context.fillStyle = active ? colors.fg : n.end <= position ? colors.dim : colors.accent;
-        context.globalAlpha = n.end <= position ? 0.45 : 1;
+        const part = partAt ? partAt((n.start + n.end) / 2) : null; // dueto: a cor de quem canta esta nota
+        const base = part === 'a' ? PART_COLORS.a : part === 'b' ? PART_COLORS.b : partAt && !part ? colors.dim : colors.accent;
+        const left = Math.max(0, x1);
+        context.fillStyle = base;
+        context.globalAlpha = n.end <= position ? 0.4 : 1;
         context.beginPath();
-        context.roundRect(Math.max(0, x1), y, Math.max(3, x2 - Math.max(0, x1)), scale.barHeight, scale.barHeight / 2);
+        context.roundRect(left, y, Math.max(3, x2 - left), scale.barHeight, scale.barHeight / 2);
         context.fill();
+        if (active) {
+          // a nota do momento ganha um contorno claro, sem perder a cor de quem a canta
+          context.globalAlpha = 1;
+          context.strokeStyle = colors.fg;
+          context.lineWidth = 2;
+          context.stroke();
+        }
       }
       context.globalAlpha = 1;
 
@@ -75,34 +85,38 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
       context.stroke();
       context.globalAlpha = 1;
 
-      // o que a pessoa cantou (na oitava mais perto da nota da original, para aparecer junto da barra)
-      let lastReference: number | null = null;
-      let previous: { x: number; y: number } | null = null;
-      for (const point of trail) {
-        const reference = noteAt(notes, point.t, transpose);
-        if (reference !== null) lastReference = reference;
-        if (point.midi === null || lastReference === null) {
-          previous = null;
-          continue;
-        }
-        const sung = foldToNearestOctave(point.midi, lastReference);
-        const x = scale.nowX + (point.t - position) * (width / (SECONDS_BEFORE + SECONDS_AFTER));
-        const y = top + scale.y(sung);
-        const good = isGood(point.midi, reference ?? lastReference);
-        context.strokeStyle = good ? colors.ok : colors.bad;
-        context.fillStyle = good ? colors.ok : colors.bad;
-        if (previous && x - previous.x < 40) {
-          context.lineWidth = 3;
+      // o que cada pessoa cantou (na oitava mais perto da nota da original, para aparecer junto da barra)
+      const drawTrail = (points: GuideFrame['trail']) => {
+        let lastReference: number | null = null;
+        let previous: { x: number; y: number } | null = null;
+        for (const point of points) {
+          const reference = noteAt(notes, point.t, transpose);
+          if (reference !== null) lastReference = reference;
+          if (point.midi === null || lastReference === null) {
+            previous = null;
+            continue;
+          }
+          const sung = foldToNearestOctave(point.midi, lastReference);
+          const x = scale.nowX + (point.t - position) * (width / (SECONDS_BEFORE + SECONDS_AFTER));
+          const y = top + scale.y(sung);
+          const good = isGood(point.midi, reference ?? lastReference);
+          context.strokeStyle = good ? colors.ok : colors.bad;
+          context.fillStyle = good ? colors.ok : colors.bad;
+          if (previous && x - previous.x < 40) {
+            context.lineWidth = 3;
+            context.beginPath();
+            context.moveTo(previous.x, previous.y);
+            context.lineTo(x, y);
+            context.stroke();
+          }
           context.beginPath();
-          context.moveTo(previous.x, previous.y);
-          context.lineTo(x, y);
-          context.stroke();
+          context.arc(x, y, 3.5, 0, Math.PI * 2);
+          context.fill();
+          previous = { x, y };
         }
-        context.beginPath();
-        context.arc(x, y, 3.5, 0, Math.PI * 2);
-        context.fill();
-        previous = { x, y };
-      }
+      };
+      drawTrail(trail);
+      drawTrail(trailB);
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);

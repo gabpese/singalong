@@ -3,11 +3,11 @@
 import { t } from '../i18n/index.js';
 import { createEngine } from '../lib/engine.js';
 import { clampLatency, loadLatency, saveLatency, sungPosition } from '../lib/latency.js';
-import { loadMics, micsKey, openVoice, saveMics, voiceGain } from '../lib/voice.js';
+import { loadMics, loadVoiceFilter, micsKey, openVoice, saveMics, saveVoiceFilter, voiceGain } from '../lib/voice.js';
 import { connectRoom } from '../lib/identity.js';
 import { splitQueue } from '../lib/queue-view.js';
 import { type MelodyNote, melodyNotes, pushTrail } from '../lib/melody-guide.js';
-import { singsAt, splitParts } from '../lib/duet.js';
+import { partAtTime, singsAt, splitParts } from '../lib/duet.js';
 import { createScorer, noteName, openMic } from '../lib/scoring.js';
 import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.js';
 import type { QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types';
@@ -51,6 +51,10 @@ export interface GuideFrame {
   position: number;
   /** O que o microfone captou: tempo da música em que foi cantado e a nota (null = sem tom). */
   trail: { t: number; midi: number | null }[];
+  /** A trilha do segundo cantor (dueto com dois microfones). */
+  trailB: { t: number; midi: number | null }[];
+  /** Dueto: de quem é a parte no instante `t` (tempo da música): 'a', 'b', 'both' ou null; sem dueto, null. */
+  partAt: ((t: number) => 'a' | 'b' | 'both' | null) | null;
 }
 
 type Connection = { send(payload: unknown): void; close(): void };
@@ -126,6 +130,9 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   let partsNow: string | null | undefined = null; // a divisão da letra do dueto na música atual (pode mudar no meio dela)
   let guideOn = false; // a sala pediu o guia de melodia
   let trail: { t: number; midi: number | null }[] = [];
+  let trailB: { t: number; midi: number | null }[] = [];
+  let guideDuet = false; // a música atual é um dueto aceito (as barras ganham as cores das partes)
+  let partsMemo: { cues: unknown; chosen: string | null | undefined; parts: ('a' | 'b' | 'both' | null)[] } | null = null;
 
   function stopScoring() {
     mic?.stop();
@@ -141,6 +148,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     guideNotes = [];
     guideOn = false;
     trail = [];
+    trailB = [];
     shownNotes = '';
     setHud({ visible: false });
     ui.setGuideReady(false);
@@ -199,6 +207,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     }
     guidePitch = current.pitch;
     partsNow = current.parts;
+    guideDuet = current.guest?.status === 'accepted';
     if (melodyFor === current.id) {
       scorer?.setTranspose(current.pitch);
       scorerB?.setTranspose(current.pitch);
@@ -224,6 +233,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     scorerFor = null;
     guideNotes = [];
     trail = [];
+    trailB = [];
     shownNotes = '';
     ui.setGuideReady(false);
     if (wantScore) setHud({ score: 0, notice: '' });
@@ -253,13 +263,17 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   const scoreTimer = setInterval(() => {
     if (!mic || !engine.playing || engine.loadedId === null || engine.loadedId !== melodyFor) return;
     const { midi } = mic.read();
+    const midiB = micB ? micB.read().midi : null; // o segundo cantor (dueto com dois microfones)
     const at = sungPosition(engine.currentTime, latency);
-    if (guideOn) trail = pushTrail(trail, { t: at, midi });
+    if (guideOn) {
+      trail = pushTrail(trail, { t: at, midi });
+      if (micB) trailB = pushTrail(trailB, { t: at, midi: midiB });
+    }
     if (!scorer || engine.loadedId !== scorerFor) return;
     let live: number | null = scorer.tick(at, midi);
     let shown = scorer; // de quem são as notas mostradas no quadro: no dueto, de quem canta agora
     if (scorerB && micB) {
-      const liveB = scorerB.tick(at, micB.read().midi);
+      const liveB = scorerB.tick(at, midiB);
       const cues = engine.cues;
       const parts = splitParts(cues, partsNow);
       if (singsAt(cues, parts, at + engine.offset, 'b') && !singsAt(cues, parts, at + engine.offset, 'a')) shown = scorerB;
@@ -457,6 +471,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   }, 1000);
 
   engine.setOutputLatency(latency.output);
+  engine.setVoiceFilter(loadVoiceFilter());
 
   return {
     engine,
@@ -465,7 +480,22 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     },
     /** O quadro do guia de melodia: as notas, o tom, a posição que se ouve e o que foi cantado há pouco. */
     guideFrame(): GuideFrame {
-      return { notes: guideNotes, transpose: guidePitch, position: engine.heardTime, trail };
+      let partAt: GuideFrame['partAt'] = null;
+      if (guideDuet) {
+        const cues = engine.cues;
+        if (!partsMemo || partsMemo.cues !== cues || partsMemo.chosen !== partsNow) partsMemo = { cues, chosen: partsNow, parts: splitParts(cues, partsNow) };
+        const { parts } = partsMemo;
+        partAt = (t: number) => partAtTime(cues, parts, t + engine.offset); // a letra anda `offset` s à frente da melodia
+      }
+      return { notes: guideNotes, transpose: guidePitch, position: engine.heardTime, trail, trailB, partAt };
+    },
+    get voiceFilter() {
+      return engine.voiceFilter;
+    },
+    /** Reduzir o ruído e o eco da voz (filtro de graves e portão de ruído): fica guardado nesta TV. */
+    setVoiceFilter(on: boolean) {
+      engine.setVoiceFilter(saveVoiceFilter(on));
+      return engine.voiceFilter;
     },
     /** Escolhe os microfones da saída (e da pontuação, o primeiro); a voz reabre sozinha com a nova escolha. */
     setMics(next: { id: string; label: string }[]) {

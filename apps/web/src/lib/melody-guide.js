@@ -10,6 +10,9 @@ const MIN_SPAN = 12;
 const PAD = 2;
 /** Até quantos semitons de distância (sem oitava) a nota cantada ainda conta como "no tom". */
 export const GOOD_DISTANCE = 1;
+/** As cores das partes do dueto no guia (as mesmas da letra: turquesa, violeta e, juntos, o amarelo do tema). */
+export const PART_COLORS = { a: '#10B8C8', b: '#8B5CF6' };
+
 /** Quanto tempo a trilha do que foi cantado fica na tela (s). */
 export const TRAIL_SECONDS = 3;
 

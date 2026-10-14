@@ -2,6 +2,7 @@
 import { t } from '../i18n/index.js';
 import { SoundTouchNode } from '../vendor/soundtouch/SoundTouchNode.js';
 import { createFeedbackGuard } from './feedback.js';
+import { blockRms, createGate, GATE } from './voice-gate.js';
 import { heardPosition } from './latency.js';
 import { clampBacking, clampPitch } from './lyrics-sync.js';
 import { createLyricsView } from './lyrics-view.js';
@@ -51,6 +52,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
   let voiceNode = null; // a soma, com o volume da voz
   let limiter = null;
   let voiceGainValue = 0;
+  let voiceFilterOn = true; // filtro de graves e portão de ruído na voz
   let feedbackTimer = null;
 
   // --- áudio: <audio> -> SoundTouch (tom) -> saída; sem AudioWorklet (página http fora de localhost) toca sem tom ---
@@ -101,6 +103,16 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
       applyVoice(); // o volume está voltando devagar
     }
     return result;
+  }
+
+  /** O portão de ruído de um microfone: com o volume (RMS) e o instante, abre ou fecha. O temporizador chama isto; os testes também. */
+  function stepGate(rms, nowMs, index = 0) {
+    const mic = mics[index];
+    if (!mic) return 1;
+    const target = voiceFilterOn ? mic.noiseGate.target(rms, nowMs) : 1;
+    // abre depressa (a primeira sílaba não pode ser cortada) e fecha devagar (sem "pumping" a cada respiração)
+    mic.gate.gain.setTargetAtTime(target, ctx.currentTime, target === 1 ? 0.01 : 0.12);
+    return target;
   }
 
   function applyPitch() {
@@ -239,24 +251,51 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
       }
       for (const stream of Array.isArray(streams) ? streams : [streams]) {
         const source = ctx.createMediaStreamSource(stream);
-        const gain = ctx.createGain();
+        const highpass = ctx.createBiquadFilter(); // tira o estrondo e o ruído de manuseio
+        highpass.type = 'highpass';
+        highpass.Q.value = 0.7;
+        highpass.frequency.value = voiceFilterOn ? GATE.filterHz : 10;
+        const gate = ctx.createGain(); // o portão de ruído: fecha quando ninguém canta
+        const gain = ctx.createGain(); // o ganho da guarda de microfonia
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 2048;
         analyser.smoothingTimeConstant = 0;
-        source.connect(analyser); // o detector escuta ANTES do ganho
-        source.connect(gain);
+        source.connect(analyser); // o detector de microfonia e o portão escutam o microfone ANTES de tudo
+        source.connect(highpass);
+        highpass.connect(gate);
+        gate.connect(gain);
         gain.connect(voiceNode);
-        mics.push({ stream, source, analyser, gain, guard: createFeedbackGuard(), spectrum: new Float32Array(analyser.frequencyBinCount) });
+        mics.push({
+          stream, source, analyser, highpass, gate, gain,
+          noiseGate: createGate(),
+          guard: createFeedbackGuard(),
+          spectrum: new Float32Array(analyser.frequencyBinCount),
+          samples: new Float32Array(analyser.fftSize),
+        });
       }
       feedbackTimer = setInterval(() => {
         if (voiceGainValue <= 0) return; // voz desligada ou muda: não há apito possível
         mics.forEach((mic, index) => {
           mic.analyser.getFloatFrequencyData(mic.spectrum);
           checkFeedback(mic.spectrum, performance.now(), index);
+          if (voiceFilterOn) {
+            mic.analyser.getFloatTimeDomainData(mic.samples);
+            stepGate(blockRms(mic.samples), performance.now(), index);
+          }
         });
       }, 50);
       applyVoice();
     },
+
+    /** Liga ou desliga o filtro de graves e o portão de ruído da voz (valem na hora, também com a voz já ligada). */
+    setVoiceFilter(on) {
+      voiceFilterOn = Boolean(on);
+      for (const mic of mics) {
+        mic.highpass.frequency.value = voiceFilterOn ? GATE.filterHz : 10;
+        if (!voiceFilterOn) mic.gate.gain.setTargetAtTime(1, ctx.currentTime, 0.01);
+      }
+    },
+    stepGate,
 
     /** Desliga a voz e libera os microfones. */
     detachVoice() {
@@ -265,6 +304,8 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
       for (const mic of mics) {
         mic.analyser.disconnect();
         mic.source.disconnect();
+        mic.highpass.disconnect();
+        mic.gate.disconnect();
         mic.gain.disconnect();
         for (const track of mic.stream.getTracks()) track.stop();
       }
@@ -368,6 +409,9 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics, onFeedback
     get voiceAttached() { return mics.length > 0; },
     /** Quantos microfones estão na saída. */
     get voiceMics() { return mics.length; },
+    get voiceFilter() { return voiceFilterOn; },
+    /** O ganho do portão de ruído do primeiro microfone (1 = aberto). */
+    get voiceGateGain() { return mics[0] ? mics[0].gate.gain.value : 1; },
     get voiceGain() { return voiceGainValue; },
     /** Quanto a guarda de microfonia deixa passar do volume pedido (1 = tudo; menos = cortado por causa do apito). */
     get voiceFactor() { return mics.length ? Math.min(...mics.map((mic) => mic.guard.factor)) : 1; },

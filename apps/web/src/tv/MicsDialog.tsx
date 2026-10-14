@@ -10,6 +10,7 @@ export function MicsDialog({ controller, onClose }: { controller: TvController |
   const dialog = useRef<HTMLDialogElement>(null);
   const [devices, setDevices] = useState<Mic[] | null>(null);
   const [chosen, setChosen] = useState<Mic[]>(() => controller?.mics ?? []);
+  const [filter, setFilter] = useState(() => controller?.voiceFilter ?? true);
 
   useEffect(() => {
     const element = dialog.current;
@@ -61,6 +62,13 @@ export function MicsDialog({ controller, onClose }: { controller: TvController |
           })}
         </ul>
         {full && <p className="hint">{t('mics.max', { max: MAX_MICS })}</p>}
+        <label className="check">
+          <input type="checkbox" checked={filter} onChange={(event) => setFilter(controller?.setVoiceFilter(event.target.checked) ?? event.target.checked)} />
+          <span>
+            {t('mics.filter')}
+            <small className="muted"> — {t('mics.filterHint')}</small>
+          </span>
+        </label>
         <div className="jukebox-actions">
           <button type="button" onClick={onClose}>
             {t('mics.close')}
