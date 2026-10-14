@@ -679,3 +679,35 @@ A **1.3.0 inclui só a F26**. O modo híbrido na nuvem (F25) e os ambientes `hml
 
 ### Correções e novidades da 1.3.1
 - **Downloads da página inicial, de novo:** todos os sistemas agora são **botões do mesmo estilo** (o do visitante primeiro, os outros abaixo; antes só o do sistema dele era botão e os outros eram links numa lista). **A versão deixou de aparecer** nos botões. A pergunta "Qual é o seu Mac?" saiu: o botão do macOS (Apple Silicon) vem direto e ganhou **uma dica ao lado** (um "i") com o texto "O app não funciona em Macs com processador Intel. Para cantar, não precisa dele: basta criar ou entrar numa sala." A dica abre com o mouse, com o foco do teclado e com um toque (no celular não existe "mouse em cima"), fecha com Esc, é lida por leitores de tela junto com o botão (`aria-describedby`) e passa no axe aberta. Quem usa Windows ou Linux também a vê ao lado do botão do macOS. No celular, sem sistema detectado, os três botões aparecem sem o título "Outros sistemas".
+
+## 20. Plano da 1.4.0: letra e vozes pela IA (F27)
+
+**O problema.** Hoje a letra vem da legenda do vídeo, da LRCLIB (online) ou de um texto colado; o Whisper só **alinha** um texto que já existe. Num **cover** ou numa música obscura nada acha a letra e a música para com "Não achei essa letra". A 1.4.0 faz a IA **ouvir** a voz isolada (que o Demucs já separa) e escrever a letra com o tempo de cada palavra, e descobrir **quem canta cada linha** num dueto.
+
+**Decisões (respondidas)**
+1. **Whisper: uma busca inteligente que mescla o local e a API da OpenAI.** O Whisper do próprio motor roda primeiro (sem custo, offline, a voz fica no computador) e a API só entra **nos trechos em que o local tem dúvida**, se o dono ligou essa opção (com a chave dele e um aviso claro de que trechos da voz isolada vão para a OpenAI). Detalhes abaixo.
+2. **Vozes (diarização): embeddings de voz ECAPA do speechbrain, por linha da letra**, sem conta nem token (o `pyannote` pediria token do Hugging Face e aceite de termos). O resultado preenche a divisão do dueto que já existe (`a b * -`) e a pessoa corrige.
+3. **Quando a IA gera a letra: um botão marcado como beta.** Onde hoje aparece "Não achei essa letra" passa a haver "**Gerar a letra ouvindo a música (beta)**". Nada roda sozinho; o resultado entra como rascunho que dá para corrigir e realinhar.
+
+**A busca inteligente (como o local e a API se mesclam)**
+- **Camada 1 – o catálogo:** a legenda do vídeo e a LRCLIB, como hoje. Texto de catálogo é o mais confiável.
+- **Camada 2 – o Whisper local como sonda e como reserva:** transcreve a voz isolada (com a língua detectada pelo áudio) e mede a **confiança** de cada trecho (probabilidade média das palavras, probabilidade de "sem fala", razão de compressão, repetição). Serve para duas coisas: (a) **escolher entre candidatos do catálogo**: o rascunho do áudio é comparado com os textos da LRCLIB, inclusive os achados por um título "limpo" (sem "cover", "feat.", "ao vivo"); se algum bate (similaridade alta), usa-se **o texto do catálogo com o alinhamento forçado**, que sai mais certo que qualquer transcrição; (b) **sem candidato que bata**, o próprio rascunho vira a letra.
+- **Camada 3 – a API só onde o local duvida:** os trechos de baixa confiança (e só eles) são recortados da voz isolada e enviados à API (`whisper-1`, com tempo por palavra); o resultado **substitui só aqueles trechos**, com o tempo deslocado para a posição certa. Há um **teto por música** (por padrão 60 s de áudio enviado, estimativa do custo mostrada, cerca de US$ 0,006 por minuto) e a chave fica **só no computador do dono** (nunca no servidor). Sem chave ou sem o consentimento, as camadas 1 e 2 funcionam sozinhas.
+- **Filtros contra alucinação** (o ponto fraco do Whisper no canto): descartar trechos repetidos em laço, "[Música]", legendas inventadas em silêncio (uma detecção de voz na faixa isolada antes de transcrever) e linhas com tempo impossível.
+
+**Vozes em dueto (diarização)**
+- Para cada linha da letra (já com o tempo das palavras), recorta-se a **voz isolada** daquele trecho, calcula-se o embedding ECAPA (modelo público de ~85 MB, baixado na primeira vez) e agrupa-se em 2 vozes por distância de cosseno (sem scikit-learn: um k-means simples em numpy). Linhas em que as duas distâncias são parecidas viram `*` (as duas cantam). O botão "**Detectar vozes (beta)**" fica nas configurações do dueto e escreve o `parts` (`a b * -`); a pessoa ajusta.
+- Limite honesto: o canto sobreposto (duas vozes ao mesmo tempo) e vozes parecidas são difíceis. Linhas curtas (< ~1 s) dão embedding ruim e herdam a voz vizinha.
+
+**Marcos**
+1. **T1 – Medir antes de prometer.** Um script (`bench_transcribe`) roda na **biblioteca do dono** e usa as músicas que **já têm letra sincronizada na LRCLIB como gabarito**: mede o erro de palavras (WER) e o erro de tempo de cada modelo (base, small, medium, large-v3-turbo) e o tempo em CPU/GPU, inclusive nos covers. Sem esse número não se escolhe o modelo padrão nem o limiar da camada 3. Não vai áudio protegido para o repositório.
+2. **T2 – A fonte `transcribe` no worker:** transcrição com `stable-ts`, confiança por trecho, filtros, escolha do modelo pelo hardware (GPU: o melhor medido; CPU: o menor que presta), sondagem do catálogo e alinhamento forçado do texto escolhido.
+3. **T3 – O botão e a revisão:** "Gerar a letra ouvindo a música (beta)" onde hoje se falha, a etiqueta "beta" e a **tela para corrigir o texto** (ao salvar, realinha pelo caminho que já existe).
+4. **T4 – A API como complemento:** a chave nas configurações do app (consentimento, teto por música, custo estimado), o envio só dos trechos duvidosos e a mescla.
+5. **T5 – Vozes:** embeddings ECAPA, agrupamento, o botão "Detectar vozes (beta)" e o `parts` pronto.
+
+**Limites e riscos**
+- **Canto não é fala:** o Whisper foi treinado em fala; erra mais em música alta, vibrato e versos longos. Por isso a letra gerada é **rascunho em beta** e o catálogo vence quando bate.
+- **Tempo e disco:** o modelo bom é maior (`medium` ~1,5 GB, `large-v3-turbo` ~1,6 GB) e, na CPU, transcrever demora; o modelo padrão sai das medições do T1.
+- **Privacidade:** nada muda sem a API ligada. Com ela, **só trechos duvidosos** da voz isolada saem do computador, com o consentimento do dono.
+- **Sem GPU AMD/Apple:** o Whisper roda na CPU nesses computadores (como o resto do motor).

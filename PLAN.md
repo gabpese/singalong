@@ -677,3 +677,35 @@ Found while using 1.2.0 on a real TV and microphone:
 
 ### Fixes and additions of 1.3.1
 - **Home page downloads, again:** every system is now a **button of the same style** (the visitor's first, the others below; before, only their own system was a button and the others were links in a list). **The version no longer shows** on the buttons. The "Which Mac do you have?" question is gone: the macOS (Apple Silicon) button comes straight away and got **a tip next to it** (an "i") saying "The app does not work on Macs with an Intel processor. To sing you do not need it: just create or join a room." The tip opens with the mouse, with keyboard focus and with a tap (a phone has no "mouse over"), closes with Esc, is read by screen readers together with the button (`aria-describedby`) and passes axe when open. Whoever uses Windows or Linux also sees it next to the macOS button. On a phone, with no detected system, the three buttons show without the "Other systems" heading.
+
+## 20. 1.4.0 plan: lyrics and voices by AI (F27)
+
+**The problem.** Today the lyrics come from the video subtitles, from LRCLIB (online) or from pasted text; Whisper only **aligns** text that already exists. On a **cover** or an obscure song nothing finds the lyrics and the song stops at "I could not find these lyrics". 1.4.0 makes the AI **listen** to the isolated vocals (which Demucs already separates) and write the lyrics with the time of every word, and find out **who sings each line** in a duet.
+
+**Decisions (answered)**
+1. **Whisper: a smart search that merges local and the OpenAI API.** The engine's own Whisper runs first (no cost, offline, the voice stays on the computer) and the API only comes in **on the passages where the local one is unsure**, if the owner turned that option on (with their own key and a clear notice that passages of the isolated vocals go to OpenAI). Details below.
+2. **Voices (diarization): ECAPA voice embeddings from speechbrain, per line of the lyrics**, with no account or token (`pyannote` would ask for a Hugging Face token and accepting terms). The result fills the duet split that already exists (`a b * -`) and the person fixes it.
+3. **When the AI writes the lyrics: a button marked beta.** Where "I could not find these lyrics" shows today there will be "**Generate the lyrics by listening to the song (beta)**". Nothing runs by itself; the result comes in as a draft that can be corrected and realigned.
+
+**The smart search (how local and API merge)**
+- **Layer 1 – the catalog:** the video subtitles and LRCLIB, as today. Catalog text is the most trustworthy.
+- **Layer 2 – local Whisper as a probe and as a fallback:** it transcribes the isolated vocals (with the language detected from the audio) and measures the **confidence** of each passage (mean word probability, "no speech" probability, compression ratio, repetition). It serves two things: (a) **choosing among catalog candidates**: the audio draft is compared with the LRCLIB texts, including those found with a "clean" title (without "cover", "feat.", "live"); if one matches (high similarity), **the catalog text with forced alignment** is used, which comes out more correct than any transcription; (b) **with no matching candidate**, the draft itself becomes the lyrics.
+- **Layer 3 – the API only where the local one doubts:** the low-confidence passages (and only those) are cut from the isolated vocals and sent to the API (`whisper-1`, with word timing); the result **replaces only those passages**, with the time shifted to the right position. There is a **cap per song** (by default 60 s of audio sent, with the cost estimate shown, about US$ 0.006 per minute) and the key stays **only on the owner's computer** (never on the server). Without a key or without consent, layers 1 and 2 work alone.
+- **Filters against hallucination** (Whisper's weak spot in singing): drop passages repeated in a loop, "[Music]", subtitles invented over silence (a voice detection on the isolated track before transcribing) and lines with an impossible time.
+
+**Voices in a duet (diarization)**
+- For each line of the lyrics (already with word timing), the **isolated vocals** of that passage are cut, the ECAPA embedding is computed (a public model of ~85 MB, downloaded the first time) and the lines are grouped into 2 voices by cosine distance (no scikit-learn: a simple numpy k-means). Lines where the two distances are similar become `*` (both sing). The "**Detect voices (beta)**" button sits in the duet settings and writes the `parts` (`a b * -`); the person adjusts it.
+- Honest limit: overlapping singing (two voices at once) and similar voices are hard. Short lines (< ~1 s) give a bad embedding and inherit the neighbouring voice.
+
+**Milestones**
+1. **T1 – Measure before promising.** A script (`bench_transcribe`) runs on the **owner's library** and uses the songs that **already have synced lyrics on LRCLIB as ground truth**: it measures the word error rate (WER) and the timing error of each model (base, small, medium, large-v3-turbo) and the time on CPU/GPU, covers included. Without that number neither the default model nor the layer 3 threshold is chosen. No copyrighted audio goes into the repository.
+2. **T2 – The `transcribe` source in the worker:** transcription with `stable-ts`, confidence per passage, filters, model choice by hardware (GPU: the best measured; CPU: the smallest that is any good), catalog probing and forced alignment of the chosen text.
+3. **T3 – The button and the review:** "Generate the lyrics by listening to the song (beta)" where it fails today, the "beta" tag and the **screen to correct the text** (saving realigns through the path that already exists).
+4. **T4 – The API as a complement:** the key in the app settings (consent, cap per song, estimated cost), sending only the doubtful passages and the merge.
+5. **T5 – Voices:** ECAPA embeddings, grouping, the "Detect voices (beta)" button and the `parts` ready.
+
+**Limits and risks**
+- **Singing is not speech:** Whisper was trained on speech; it errs more on loud music, vibrato and long verses. That is why the generated lyrics are a **beta draft** and the catalog wins when it matches.
+- **Time and disk:** the good model is bigger (`medium` ~1.5 GB, `large-v3-turbo` ~1.6 GB) and, on the CPU, transcribing takes a while; the default model comes from the T1 measurements.
+- **Privacy:** nothing changes without the API turned on. With it, **only doubtful passages** of the isolated vocals leave the computer, with the owner's consent.
+- **No AMD/Apple GPU:** Whisper runs on the CPU on those computers (like the rest of the engine).
