@@ -214,10 +214,10 @@ O `assemble` precisa só do Node 22+ e do Windows 10/11 (usa o `tar.exe` do pró
 |---|---|---|
 | `cu121` | NVIDIA (CUDA 12.1) | driver 527.41+ (Windows) ou 525.60+ (Linux), 3 GB de memória ou mais, da GTX 750 até a RTX 40 |
 | `rocm6.2` | AMD (só Linux) | **Radeon RX 6800/6900 (gfx1030) e RX 7600/7700/7800/7900 (gfx1100-1102)**, e Instinct; 3 GB ou mais. O seu usuário precisa estar nos grupos `render` e `video` (acesso ao `/dev/kfd`). As outras Radeon (RX 6600, RX 6700...) não têm suporte oficial no ROCm e ficam na CPU, com o motivo na tela. O torch do ROCm é um **download de ~4 GB** |
-| `mps` | Apple Silicon (**beta**) | **nunca é escolhido sozinho**: no Mac o automático é a CPU. Escolha "GPU da Apple (beta)" nas configurações. O Demucs roda no Metal; o alinhamento da letra fica na CPU (o Metal não tem operações que ele usa); se a separação falhar na GPU, ela é refeita na CPU |
+| `mps` | Apple Silicon (**desligado**) | **medido e desligado**: numa GPU Metal de verdade (executor macOS do CI, torch 2.5.1) o Demucs falha com `Output channels > 65536 not supported at the MPS device`, e o `PYTORCH_ENABLE_MPS_FALLBACK` não cobre isso. No Mac o motor é a CPU. `SINGALONG_APPLE_GPU=1` mostra a opção de novo ("GPU da Apple (beta)") para quem quiser medir com outra versão do torch; o Demucs rodaria no Metal, o alinhamento da letra na CPU, e uma separação que falhar é refeita na CPU |
 | `cpu` | qualquer | a volta de todos os outros |
 
-`node src/cli.js assemble --dir <pasta> --engine auto|cpu|cu121|rocm6.2|mps`. **As GPUs da AMD e da Apple não foram medidas em hardware de verdade** (o CI não tem essas placas): elas contam com o teste real e a volta para a CPU, e o ganho sobre a CPU é desconhecido. A separação das vozes de apoio (`audio-separator`, ONNX) continua na CPU em todos os motores.
+`node src/cli.js assemble --dir <pasta> --engine auto|cpu|cu121|rocm6.2|mps`. **A GPU da AMD não foi medida em hardware de verdade** (o CI não tem placa AMD): ela conta com o teste real e a volta para a CPU, e o ganho sobre a CPU é desconhecido. A GPU da Apple foi medida e não funciona com o Demucs (veja a tabela). A separação das vozes de apoio (`audio-separator`, ONNX) continua na CPU em todos os motores.
 
 **O app do dono (marco M3).** Uma janela Electron que faz tudo isso sem terminal: prepara o motor, pareia, inicia a sessão, cria salas, entra no YouTube e importa arquivos.
 

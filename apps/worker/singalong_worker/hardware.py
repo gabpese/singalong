@@ -110,8 +110,15 @@ def amd_gpus(sysfs: Path = Path("/sys"), kfd: Path = Path("/dev/kfd")) -> list[d
     ]
 
 
-def apple_gpus(run=subprocess.run) -> list[dict]:
-    """A GPU do Apple Silicon (memória unificada: a "VRAM" é a memória do Mac). Só no macOS com chip da Apple."""
+def apple_gpus(run=subprocess.run, env=os.environ) -> list[dict]:
+    """A GPU do Apple Silicon (memória unificada: a "VRAM" é a memória do Mac). Só no macOS com chip da Apple, e **desligada**.
+
+    Medido no macOS do CI (Metal de verdade, torch 2.5.1): o autoteste pequeno passa, mas o Demucs falha ao separar uma música com
+    "NotImplementedError: Output channels > 65536 not supported at the MPS device" (o desvio PYTORCH_ENABLE_MPS_FALLBACK não cobre esse caso).
+    Sem ganho (e com a separação refeita na CPU a cada música), a opção não é oferecida. `SINGALONG_APPLE_GPU=1` a liga, para quem quiser
+    medir de novo com outra versão do torch (o job do CI faz essa medição a cada mudança)."""
+    if env.get("SINGALONG_APPLE_GPU") != "1":
+        return []
     if platform.system() != "Darwin" or platform.machine() != "arm64":
         return []
     name = (_run(["sysctl", "-n", "machdep.cpu.brand_string"], run=run) or "").strip() or "Apple Silicon"
@@ -140,7 +147,7 @@ def _ram_mb() -> int | None:
 def choose_engine(gpus: list[dict], force_cpu: bool = False) -> dict:
     """Decide o motor: {"engine": "cu121"|"rocm6.2"|"cpu", "reason": ..., "gpu": {...}|None}. A decisão é só pelas especificações;
     o teste de verdade (`gpu_selftest`) confirma depois de instalar e pode devolver para a CPU. A GPU da Apple (mps) nunca é escolhida
-    sozinha: aparece nas opções, mas o automático no Mac é a CPU (ela ainda não foi medida e é a única que não é a prova de falhas)."""
+    sozinha: aparece nas opções, mas o automático no Mac é a CPU (ela está desligada: veja `apple_gpus`)."""
     if force_cpu:
         return {"engine": "cpu", "reason": "CPU forçada nas configurações", "gpu": None}
     nvidia = [g for g in gpus if g.get("vendor", "nvidia") == "nvidia"]
@@ -152,6 +159,8 @@ def choose_engine(gpus: list[dict], force_cpu: bool = False) -> dict:
         if apple:
             return {"engine": "cpu", "reason": "Mac: o automático usa a CPU; a GPU da Apple (Metal) é opcional e está em beta nas configurações", "gpu": apple[0]}
         if platform.system() == "Darwin":
+            if platform.machine() == "arm64":
+                return {"engine": "cpu", "reason": "Mac com chip da Apple: o motor roda na CPU (a GPU da Apple ainda não separa as músicas: o Demucs do torch 2.5.1 falha no Metal)", "gpu": None}
             return {"engine": "cpu", "reason": "macOS sem chip da Apple (Mac Intel): o motor roda na CPU", "gpu": None}
         return {"engine": "cpu", "reason": "nenhuma placa de vídeo compatível (NVIDIA ou AMD) encontrada", "gpu": None}
     gpus = nvidia

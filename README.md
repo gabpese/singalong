@@ -209,10 +209,10 @@ node src\cli.js verify   --dir D:\Singalong\engine
 |---|---|---|
 | `cu121` | NVIDIA (CUDA 12.1) | driver 527.41+ (Windows) or 525.60+ (Linux), 3 GB of memory or more, GTX 750 up to RTX 40 |
 | `rocm6.2` | AMD (Linux only) | **Radeon RX 6800/6900 (gfx1030) and RX 7600/7700/7800/7900 (gfx1100-1102)**, and Instinct; 3 GB or more. Your user must be in the `render` and `video` groups (access to `/dev/kfd`). Other Radeons (RX 6600, RX 6700...) are not officially supported by ROCm and stay on the CPU, with the reason shown. The torch for ROCm is a **~4 GB download** |
-| `mps` | Apple Silicon (**beta**) | **never picked automatically**: on a Mac the automatic choice is the CPU. Choose "GPU da Apple (beta)" in the settings. Demucs runs on Metal; the lyrics alignment stays on the CPU (Metal lacks operations it uses); if the separation fails on the GPU it is redone on the CPU |
+| `mps` | Apple Silicon (**off**) | **measured and turned off**: on a real Metal GPU (macOS runner of CI, torch 2.5.1) Demucs fails with `Output channels > 65536 not supported at the MPS device`, and `PYTORCH_ENABLE_MPS_FALLBACK` does not cover it. On the Mac the engine is the CPU. `SINGALONG_APPLE_GPU=1` shows the option again ("GPU da Apple (beta)") for whoever wants to measure with another torch version; Demucs would run on Metal, the lyrics alignment on the CPU, and a failed separation is redone on the CPU |
 | `cpu` | any | the fallback of all the others |
 
-`node src/cli.js assemble --dir <folder> --engine auto|cpu|cu121|rocm6.2|mps`. **The AMD and Apple GPUs were not measured on real hardware** (CI has no such GPUs): they are protected by the real test and the fallback to the CPU, and the benefit over the CPU is unknown. The backing-vocals separation (`audio-separator`, ONNX) still runs on the CPU on every engine.
+`node src/cli.js assemble --dir <folder> --engine auto|cpu|cu121|rocm6.2|mps`. **The AMD GPU was not measured on real hardware** (CI has no AMD card): it is protected by the real test and the fallback to the CPU, and its benefit over the CPU is unknown. The Apple GPU was measured and does not work with Demucs (see the table). The backing-vocals separation (`audio-separator`, ONNX) still runs on the CPU on every engine.
 
 **The owner's app (milestone M3).** An Electron window that does everything above without a terminal: prepares the engine, pairs, starts the session, creates rooms, signs in to YouTube and imports files.
 

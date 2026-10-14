@@ -59,10 +59,14 @@ class ChooseEngineTests(unittest.TestCase):
         self.assertEqual(hardware.choose_engine([])["engine"], "cpu")
 
     def test_mac_without_apple_chip_and_other_systems_say_why_it_is_the_cpu(self):
-        with mock.patch.object(hardware.platform, "system", return_value="Darwin"):
+        with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="x86_64"):
             decision = hardware.choose_engine([])
         self.assertEqual(decision["engine"], "cpu")
         self.assertIn("Mac Intel", decision["reason"])
+        with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="arm64"):
+            apple = hardware.choose_engine([])  # o chip da Apple sem a opção da GPU: a CPU, e o motivo diz que o Metal falha com o Demucs
+        self.assertEqual(apple["engine"], "cpu")
+        self.assertIn("falha no Metal", apple["reason"])
         with mock.patch.object(hardware.platform, "system", return_value="Linux"):
             self.assertIn("nenhuma placa de vídeo compatível", hardware.choose_engine([])["reason"])
 
@@ -194,15 +198,22 @@ class AmdAndAppleDetectionTests(unittest.TestCase):
         self.assertFalse(card["access"])
         self.assertEqual(hardware.choose_engine([card])["engine"], "cpu")
 
-    def test_apple_silicon_only_on_a_mac_with_the_apple_chip(self):
+    def test_apple_gpu_is_off_by_default_because_demucs_fails_on_metal(self):
+        # medido no macOS do CI: "Output channels > 65536 not supported at the MPS device" ao separar uma música
+        with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="arm64"):
+            self.assertEqual(hardware.apple_gpus(smi("Apple M2"), env={}), [])
+            self.assertEqual(hardware.apple_gpus(smi("Apple M2"), env={"SINGALONG_APPLE_GPU": "0"}), [])
+
+    def test_apple_silicon_only_on_a_mac_with_the_apple_chip_when_turned_on(self):
+        on = {"SINGALONG_APPLE_GPU": "1"}
         with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="arm64"):
             with mock.patch.object(hardware, "_ram_mb", return_value=16384):
-                (chip,) = hardware.apple_gpus(smi("Apple M2"))
+                (chip,) = hardware.apple_gpus(smi("Apple M2"), env=on)
         self.assertEqual((chip["name"], chip["engine"], chip["vram_mb"]), ("Apple M2", "mps", 16384))
         with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="x86_64"):
-            self.assertEqual(hardware.apple_gpus(smi("Intel")), [])  # Mac Intel
+            self.assertEqual(hardware.apple_gpus(smi("Intel"), env=on), [])  # Mac Intel
         with mock.patch.object(hardware.platform, "system", return_value="Linux"):
-            self.assertEqual(hardware.apple_gpus(smi("x")), [])
+            self.assertEqual(hardware.apple_gpus(smi("x"), env=on), [])
 
 
 class SelftestTests(unittest.TestCase):
