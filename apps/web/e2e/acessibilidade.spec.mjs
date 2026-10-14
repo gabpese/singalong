@@ -123,3 +123,11 @@ test('página inicial no computador, com o bloco do app', async ({ browser }) =>
   expect(await violations(page)).toEqual([]);
   await context.close();
 });
+
+test('sala com os botões de reação', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: BIA, name: 'Bia' });
+  await page.goto(room.guestUrl);
+  await expect(page.getByRole('group', { name: 'Reações' })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});

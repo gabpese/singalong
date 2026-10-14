@@ -7,12 +7,14 @@
 // Estado único por processo (hub em memória). Com várias réplicas da API, o hub passaria a usar Redis pub/sub.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { clampBacking, clampGuide, clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
+import { createBucket, REACTION_KINDS } from './reactions.js';
 import { extractVideoId } from './youtube.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sem 0/O/1/I/L: fácil de ditar e digitar
 export const MAX_QUEUE = 100;
 export const MAX_PER_CLIENT = 20;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
+const PLAY_LOG_TTL_MS = 400 * 24 * 60 * 60 * 1000; // o histórico das músicas fica por mais de um ano
 const TOUCH_EVERY_MS = 60_000;
 
 export class HttpError extends Error {
@@ -201,9 +203,34 @@ export function createRoomService({
     return true;
   }
 
+  /** Uma linha no histórico do dono da sessão (salas sem dono, do worker clássico, não têm estatísticas de dono). */
+  function logPlay(room, item, outcome) {
+    const session = room.session_id ? db.getSession(room.session_id) : null;
+    if (!session || !item) return;
+    try {
+      db.logPlay({
+        deviceId: session.device_id,
+        sessionId: session.id,
+        videoId: item.video_id,
+        title: item.title,
+        artist: item.artist,
+        singer: item.added_by,
+        singerKey: createHash('sha256').update(`${session.device_id}:${item.client_id}`).digest('hex').slice(0, 16),
+        duet: item.guest_status === 'accepted',
+        score: item.score,
+        cheers: item.cheers,
+        outcome: outcome === 'done' ? 'done' : 'skipped',
+        endedAt: now(),
+      });
+    } catch {
+      // o histórico é um extra: nunca derruba a fila
+    }
+  }
+
   function finishCurrent(code, status) {
     const room = db.getRoom(code);
     if (!room?.current_item_id) return;
+    logPlay(room, db.getItem(room.current_item_id), status);
     db.transaction(() => {
       db.updateItem(room.current_item_id, { status });
       db.updateRoom(code, { current_item_id: null, playback: 'idle' });
@@ -537,6 +564,7 @@ export function createRoomService({
         name: name ? cleanName(name) : '',
         isHost: hostCheck(room, hostToken),
         alive: true,
+        reactions: createBucket(), // limite de reações por conexão
       };
       const remove = hub.add(room.code, conn);
       // quem chega no meio da música (o palco do cantor abre depois que ela começou) recebe a letra que a TV já mandou
@@ -554,6 +582,9 @@ export function createRoomService({
       };
     },
 
+    /** As estatísticas de um dono (computador pareado) desde `since` (ms). */
+    statsFor: (deviceId, since) => db.statsFor(deviceId, since),
+
     /** Mensagem recebida por WebSocket (só a TV envia comandos). */
     onMessage(code, conn, raw) {
       let message;
@@ -569,6 +600,15 @@ export function createRoomService({
           conn.name = name;
           publish(code).catch(() => {});
         }
+        return;
+      }
+      // uma reação (aplauso, fogo...): vai para a TV e para quem está olhando a TV ou o palco; conta para a música que toca
+      if (conn.role === 'controller' && message?.type === 'reaction') {
+        if (!REACTION_KINDS.includes(message.kind) || !conn.reactions.take(now())) return;
+        const room = db.getRoom(code);
+        if (!room) return;
+        if (room.current_item_id) db.addCheers(room.current_item_id, 1);
+        hub.broadcast(code, () => ({ type: 'reaction', kind: message.kind, name: conn.name }));
         return;
       }
       if (conn.role !== 'tv') return;
@@ -596,10 +636,12 @@ export function createRoomService({
 
     start({ tickMs = 1500 } = {}) {
       db.deleteInactiveRooms(now() - ROOM_TTL_MS);
+      db.prunePlayLog(now() - PLAY_LOG_TTL_MS);
       timers = [
         setInterval(() => this.tick(), tickMs),
         setInterval(() => hub.heartbeat(), 30_000),
         setInterval(() => db.deleteInactiveRooms(now() - ROOM_TTL_MS), 60 * 60 * 1000),
+        setInterval(() => db.prunePlayLog(now() - PLAY_LOG_TTL_MS), 24 * 60 * 60 * 1000),
       ];
       for (const timer of timers) timer.unref();
     },

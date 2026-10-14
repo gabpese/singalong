@@ -368,4 +368,11 @@ export default {
   'home.download.buttonVersion': 'Download the app for Windows (v{version})',
   'home.download.windowsOnly': 'The app is for Windows computers. To sing you do not need it: just create or join a room.',
   'home.download.page': 'See the downloads page',
+
+  'react.group': 'Reactions',
+  'react.clap': 'Clap',
+  'react.fire': 'Fire',
+  'react.heart': 'Love it',
+  'react.party': 'Party',
+  'react.wow': 'Wow',
 };

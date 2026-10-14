@@ -8,7 +8,7 @@ import { connectRoom } from '../lib/identity.js';
 import { splitQueue } from '../lib/queue-view.js';
 import { createScorer, noteName, openMic } from '../lib/scoring.js';
 import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.js';
-import type { QueueItem, RoomState, ServerMessage } from '../lib/types';
+import type { QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types';
 
 export interface HudState {
   visible: boolean;
@@ -34,6 +34,8 @@ export interface TvUi {
   setProgress(percent: number): void;
   /** Resultado da música que acabou de terminar (some depois de 9 s). */
   setFinal(result: FinalResult | null): void;
+  /** Uma reação dos celulares (aplauso, fogo...) para subir pela tela. */
+  addReaction(kind: ReactionKind, name?: string): void;
 }
 
 type Connection = { send(payload: unknown): void; close(): void };
@@ -247,6 +249,10 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
         const target = message.to ?? engine.currentTime + (message.seconds ?? 0); // ponto de destino ou salto relativo
         engine.seek(Math.min(Math.max(target, 0), limit));
         connection.send({ type: 'position', item_id: engine.loadedId, ms: Math.round(engine.heardTime * 1000) });
+        return;
+      }
+      if (message.type === 'reaction') {
+        ui.addReaction(message.kind, message.name);
         return;
       }
       if (message.type !== 'state') return;

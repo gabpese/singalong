@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
 import { LyricsSize } from '../ui/LyricsSize';
+import { ReactionLayer, useReactionLayer } from '../ui/ReactionLayer';
 import { createSyncClock } from '../lib/clock.js';
 import { myPart, partName } from '../lib/duet.js';
 import { connectRoom } from '../lib/identity.js';
@@ -31,6 +32,9 @@ export function StagePage({ code }: { code: string }) {
     next: useRef<HTMLParagraphElement>(null),
     next2: useRef<HTMLParagraphElement>(null),
   };
+  const reactions = useReactionLayer();
+  const reactionsRef = useRef(reactions.push);
+  reactionsRef.current = reactions.push;
   const clock = useRef(createSyncClock());
   const view = useRef<ReturnType<typeof createLyricsView> | null>(null);
   const itemRef = useRef<number | null>(null); // a música que trouxe o cantor até aqui
@@ -63,6 +67,8 @@ export function StagePage({ code }: { code: string }) {
           setState(message.state);
         } else if (message.type === 'position' && message.item_id === itemRef.current) {
           clock.current.position(message.ms);
+        } else if (message.type === 'reaction') {
+          reactionsRef.current(message.kind, message.name);
         } else if (message.type === 'lyrics') {
           pendingLyrics.current = { itemId: message.item_id, cues: message.cues };
           if (message.item_id === itemRef.current) view.current?.setCues(message.cues);
@@ -213,6 +219,7 @@ export function StagePage({ code }: { code: string }) {
           ''
         )}
       </footer>
+      <ReactionLayer items={reactions.items} />
     </main>
   );
 }

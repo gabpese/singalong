@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS queue_items (
   created_at  INTEGER NOT NULL,
   played_at   INTEGER,
   score       INTEGER,                            -- pontuação final (0..100), quando a sala pontua
+  cheers      INTEGER NOT NULL DEFAULT 0,         -- reações (aplausos, fogo...) que os celulares mandaram enquanto a música tocava
   guest_client_id TEXT,                           -- dueto: a pessoa convidada para cantar junto (o client_id dela nunca sai do servidor)
   guest_name      TEXT,
   guest_status    TEXT                            -- pending (convite enviado) | accepted (vai cantar junto)
@@ -62,6 +63,24 @@ CREATE TABLE IF NOT EXISTS sessions (
   ended_at     INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions (device_id, ended_at);
+-- Histórico das músicas que tocaram nas salas de um computador (dono): alimenta as estatísticas do dono. A fila some com a sala,
+-- o histórico fica (por um ano). Só o que as estatísticas precisam: nada de client_id (a pessoa vira uma chave sem volta).
+CREATE TABLE IF NOT EXISTS play_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id   TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  session_id  TEXT NOT NULL,
+  video_id    TEXT NOT NULL,
+  title       TEXT,
+  artist      TEXT,
+  singer      TEXT NOT NULL,                       -- o nome como a pessoa digitou
+  singer_key  TEXT NOT NULL,                       -- a mesma pessoa, sem o client_id (hash curto)
+  duet        INTEGER NOT NULL DEFAULT 0,
+  score       INTEGER,
+  cheers      INTEGER NOT NULL DEFAULT 0,
+  outcome     TEXT NOT NULL,                       -- done (terminou) | skipped (foi pulada)
+  ended_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_play_log_device ON play_log (device_id, ended_at);
 -- Regras por e-mail, geridas na página do administrador: quem pode receber o código de pareamento e quem envia músicas para a nuvem.
 -- ('*' em can_pair = qualquer e-mail). Somam-se às listas do .env (PAIR_ALLOWED_EMAILS e ENABLED_TO_SEND_TO_CLOUD).
 CREATE TABLE IF NOT EXISTS email_rules (
@@ -110,6 +129,7 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('queue_items', 'guest_status')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_status TEXT');
   if (!hasColumn('queue_items', 'backing')) db.exec('ALTER TABLE queue_items ADD COLUMN backing INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('queue_items', 'guide')) db.exec('ALTER TABLE queue_items ADD COLUMN guide INTEGER NOT NULL DEFAULT 0');
+  if (!hasColumn('queue_items', 'cheers')) db.exec('ALTER TABLE queue_items ADD COLUMN cheers INTEGER NOT NULL DEFAULT 0');
   // bancos criados antes do agente local não têm a sessão da sala (nula = sala sem dono de sessão: o worker clássico)
   if (!hasColumn('rooms', 'session_id')) db.exec('ALTER TABLE rooms ADD COLUMN session_id TEXT REFERENCES sessions(id)');
   // onde o navegador busca a mídia da sessão (o servidor local de mídia do agente); nulo = a mídia está no armazenamento do servidor
@@ -154,6 +174,41 @@ export function openDb(path = ':memory:') {
     updateRoom: (code, fields) => update('rooms', ROOM_FIELDS, 'code', code, fields),
     deleteInactiveRooms: (before) => run('DELETE FROM rooms WHERE last_active_at < ?', before).changes,
 
+    // --- histórico e estatísticas do dono ---
+    logPlay: (entry) =>
+      run(
+        'INSERT INTO play_log (device_id, session_id, video_id, title, artist, singer, singer_key, duet, score, cheers, outcome, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        entry.deviceId, entry.sessionId, entry.videoId, entry.title ?? null, entry.artist ?? null, entry.singer, entry.singerKey,
+        entry.duet ? 1 : 0, entry.score ?? null, entry.cheers ?? 0, entry.outcome, entry.endedAt,
+      ),
+    prunePlayLog: (before) => run('DELETE FROM play_log WHERE ended_at < ?', before).changes,
+    /** As estatísticas de um dono desde `since` (ms): totais, mais tocadas, quem mais cantou, mais aplaudidas e o movimento por dia. */
+    statsFor(deviceId, since) {
+      const done = "device_id = ? AND ended_at >= ? AND outcome = 'done'";
+      const totals = one(
+        `SELECT COUNT(*) AS songs, COUNT(DISTINCT singer_key) AS singers, COUNT(DISTINCT session_id) AS sessions,
+                COALESCE(SUM(cheers), 0) AS cheers, ROUND(AVG(score), 1) AS avg_score, COALESCE(SUM(duet), 0) AS duets
+           FROM play_log WHERE ${done}`, deviceId, since);
+      const skipped = one("SELECT COUNT(*) AS n FROM play_log WHERE device_id = ? AND ended_at >= ? AND outcome = 'skipped'", deviceId, since).n;
+      return {
+        totals: { ...totals, skipped },
+        top_songs: all(
+          `SELECT video_id, MAX(title) AS title, MAX(artist) AS artist, COUNT(*) AS plays, ROUND(AVG(score), 1) AS avg_score
+             FROM play_log WHERE ${done} GROUP BY video_id ORDER BY plays DESC, MAX(ended_at) DESC LIMIT 10`, deviceId, since),
+        top_singers: all(
+          `SELECT singer_key, (SELECT singer FROM play_log p WHERE p.device_id = play_log.device_id AND p.singer_key = play_log.singer_key ORDER BY p.ended_at DESC LIMIT 1) AS name,
+                  COUNT(*) AS songs, ROUND(AVG(score), 1) AS avg_score
+             FROM play_log WHERE ${done} GROUP BY singer_key ORDER BY songs DESC, MAX(ended_at) DESC LIMIT 10`, deviceId, since)
+          .map(({ singer_key, ...rest }) => rest),
+        most_cheered: all(
+          `SELECT video_id, MAX(title) AS title, MAX(artist) AS artist, SUM(cheers) AS cheers
+             FROM play_log WHERE ${done} GROUP BY video_id HAVING cheers > 0 ORDER BY cheers DESC LIMIT 5`, deviceId, since),
+        by_day: all(
+          `SELECT date(ended_at / 1000, 'unixepoch') AS day, COUNT(*) AS songs
+             FROM play_log WHERE ${done} GROUP BY day ORDER BY day`, deviceId, since),
+      };
+    },
+
     // --- fila ---
     addItem: ({ roomCode, videoId, title, artist, addedBy, clientId, pitch, now }) =>
       transaction(() => {
@@ -176,6 +231,7 @@ export function openDb(path = ':memory:') {
       one("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = ? AND client_id = ? AND status = 'queued'", roomCode, clientId).n,
     countQueued: (roomCode) => one("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = ? AND status = 'queued'", roomCode).n,
     updateItem: (id, fields) => update('queue_items', ITEM_FIELDS, 'id', id, fields),
+    addCheers: (id, n = 1) => run('UPDATE queue_items SET cheers = cheers + ? WHERE id = ?', n, id),
     deleteItem: (id) => run('DELETE FROM queue_items WHERE id = ?', id),
     swapPositions: (idA, idB) =>
       transaction(() => {

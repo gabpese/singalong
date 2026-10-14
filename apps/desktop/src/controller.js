@@ -7,8 +7,9 @@ import { join } from 'node:path';
 import { assemble } from '@singalong/engine/src/assemble.js';
 import { paths, readState, workerCommand } from '@singalong/engine/src/engine.js';
 import { verifyEngine } from '@singalong/engine/src/verify.js';
+import { libraryStats } from './library-stats.js';
 
-export const APP_VERSION = '1.1.3'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
+export const APP_VERSION = '1.1.4'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
 const MAX_LOGS = 300;
 const POLL_MS = 5000;
 
@@ -494,6 +495,14 @@ export function createController({
     return snapshot();
   }
 
+  /** As estatísticas do dono: o que tocou nas salas (servidor) e o que há na biblioteca deste computador. */
+  async function stats({ days = 30 } = {}) {
+    if (!(config.server && config.token)) throw new UserError('not_paired', 'Pareie este computador primeiro.');
+    const period = [7, 30, 90, 365].includes(Number(days)) ? Number(days) : 30;
+    const [server, library] = await Promise.all([api('GET', `/stats?days=${period}`), libraryStats(config.library_dir)]);
+    return { server, library };
+  }
+
   const setUpdateProgress = (progress) => { state.updateProgress = progress; publish(); };
 
   /** A pasta onde as músicas baixadas ficam. Só muda com a sessão parada (o agente está usando a pasta atual). */
@@ -515,5 +524,5 @@ export function createController({
     return snapshot();
   }
 
-  return { init, snapshot, refreshUpdate, requestCode, setLibraryDir, cancelBusy, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
+  return { init, snapshot, stats, refreshUpdate, requestCode, setLibraryDir, cancelBusy, setUpdateProgress, buildEngine, pair, unpair, checkUpdate, startAgent, stopAgent, createRoom, youtubeStatus, youtubeLogin, importFile, hardware, setSettings, log, paths: () => paths(config.engine_dir) };
 }

@@ -106,6 +106,7 @@ O **agente local** é o worker rodando no computador do dono e falando com o ser
 | `POST /jobs/claim {wait_ms}` · `POST /jobs/:id/progress` · `POST /jobs/:id/complete` | jobs de processamento (long-poll, até 25 s) |
 | `POST /search/claim` · `POST /search/:id/result` | busca no YouTube feita pelo agente |
 | `POST /exports/claim` · `POST /exports/:id/:pitch/state` | exportação de MP4 |
+| `GET /stats?days=30` | as estatísticas do dono: músicas cantadas, cantores, aplausos, nota média, mais tocadas, quem mais cantou, mais aplaudidas e o movimento por dia (1 a 365 dias) |
 
 As páginas enviam o código da sala em `X-Room`, para a busca, a troca de letra e a exportação de uma sala irem ao agente da sessão dela. O estado da sala traz `owner: {nickname, online}` (e `null` nas salas sem sessão, que continuam no worker clássico por Redis).
 

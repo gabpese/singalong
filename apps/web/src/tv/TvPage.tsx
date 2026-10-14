@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
 import { changeLyricsScale } from '../lib/accessibility.js';
 import { LyricsSize } from '../ui/LyricsSize';
+import { ReactionLayer, useReactionLayer } from '../ui/ReactionLayer';
 import { tRich } from '../i18n/rich';
 import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-media.js';
 import { keySummary } from '../lib/music.js';
@@ -122,6 +123,7 @@ export function TvPage({ code }: { code: string }) {
   const [final, setFinal] = useState<FinalResult | null>(null);
   const [calibrating, setCalibrating] = useState(false);
   const [choosingMics, setChoosingMics] = useState(false);
+  const reactions = useReactionLayer();
 
   const stageRef = useRef<HTMLElement>(null);
   const lyricsRefs = {
@@ -138,7 +140,7 @@ export function TvPage({ code }: { code: string }) {
     // as linhas da letra pertencem ao motor de áudio (ele desenha cada palavra com o seu preenchimento): o React só as entrega
     const controller = createTvController(
       code,
-      { setRoom, notify: setNotice, setUnlock: setUnlockVisible, setHud, setProgress, setFinal },
+      { setRoom, notify: setNotice, setUnlock: setUnlockVisible, setHud, setProgress, setFinal, addReaction: reactions.push },
       {
         prev: lyricsRefs.prev.current!,
         current: lyricsRefs.current.current!,
@@ -264,6 +266,7 @@ export function TvPage({ code }: { code: string }) {
       </section>
 
       <ScoreFinal final={final} room={room} />
+      <ReactionLayer items={reactions.items} />
       {choosingMics && <MicsDialog controller={controllerRef.current} onClose={() => setChoosingMics(false)} />}
       {calibrating && <LatencyDialog controller={controllerRef.current} onClose={() => setCalibrating(false)} />}
 
