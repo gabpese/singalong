@@ -48,6 +48,8 @@ async function make(options = {}) {
   const events = [];
   const controller = createController({
     dataDir,
+    ...(options.workerSource ? { workerSource: options.workerSource } : {}),
+    ...(options.refreshWorkerImpl ? { refreshWorkerImpl: options.refreshWorkerImpl } : {}),
     emit: (name, payload) => name === 'state' && events.push(payload),
     launcher: (root, args, extraEnv) => [process.execPath, [FAKE, ...args], { env: { ...process.env, ...extraEnv, FAKE_MODE: options.mode ?? '' } }],
     assembleImpl: options.assembleImpl ?? (async ({ onProgress }) => { onProgress({ label: 'Baixando python', done: 5, total: 10 }); return { engine: 'cpu', engine_reason: 'sem placa' }; }),
@@ -101,6 +103,26 @@ test('o motor já montado (engine.json completo) é reconhecido ao abrir', async
   const snap = await controller.init();
   assert.equal(snap.engine.status, 'ready');
   assert.equal(snap.engine.kind, 'cu121');
+});
+
+test('ao abrir, o motor já montado recebe o código novo do worker (o app se atualizou) e isso fica no registro', async () => {
+  const calls = [];
+  const { controller, dataDir } = await make({ workerSource: '/recursos/worker', refreshWorkerImpl: async (args) => { calls.push(args); return { updated: true, from: '0.4.0', to: '1.2.5' }; } });
+  await mkdir(join(dataDir, 'engine'), { recursive: true });
+  await writeFile(join(dataDir, 'engine', 'engine.json'), JSON.stringify({ complete: true, engine: 'cpu' }));
+  const snap = await controller.init();
+  assert.deepEqual(calls, [{ root: join(dataDir, 'engine'), workerSource: '/recursos/worker' }]);
+  assert.equal(snap.engine.status, 'ready');
+  assert.ok(snap.logs.some((l) => l.line.includes('0.4.0') && l.line.includes('1.2.5')));
+});
+
+test('se não der para atualizar o código do worker, o motor continua utilizável e o erro vai para o registro', async () => {
+  const { controller, dataDir } = await make({ workerSource: '/recursos/worker', refreshWorkerImpl: async () => { throw new Error('disco cheio'); } });
+  await mkdir(join(dataDir, 'engine'), { recursive: true });
+  await writeFile(join(dataDir, 'engine', 'engine.json'), JSON.stringify({ complete: true, engine: 'cpu' }));
+  const snap = await controller.init();
+  assert.equal(snap.engine.status, 'ready');
+  assert.ok(snap.logs.some((l) => l.level === 'error' && l.line.includes('disco cheio')));
 });
 
 test('falha ao montar o motor: mostra o erro e permite tentar de novo; a verificação reprovada também falha', async () => {
