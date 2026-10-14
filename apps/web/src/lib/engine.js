@@ -1,6 +1,7 @@
 // Motor da TV: toca o instrumental (e, se houver, as vozes de apoio) com troca de tom em tempo real e desenha a letra sincronizada.
 import { t } from '../i18n/index.js';
 import { SoundTouchNode } from '../vendor/soundtouch/SoundTouchNode.js';
+import { heardPosition } from './latency.js';
 import { clampBacking, clampPitch } from './lyrics-sync.js';
 import { createLyricsView } from './lyrics-view.js';
 
@@ -31,6 +32,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
   let graphReady = null;
   let pitchAvailable = true;
   let loadToken = 0;
+  let outputMs = 0; // atraso do som até os ouvidos (caixa, Bluetooth): a letra mostra o que se ouve agora
   // a voz do microfone da TV na saída: microfone -> ganho -> saída (não passa pelo SoundTouch: a troca de tom é da música, não da voz)
   let voiceStream = null;
   let voiceSource = null;
@@ -123,7 +125,7 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
 
   // --- letra: o desenho está em lyrics-view.js; aqui só passa o relógio do áudio ---
   function render() {
-    if (itemId !== null) view.render(audio.currentTime);
+    if (itemId !== null) view.render(heardPosition(audio.currentTime, outputMs));
   }
 
   function loop() {
@@ -258,6 +260,13 @@ export function createEngine({ lyricsEls, onEnded, onError, onLyrics }) {
     get loadedId() { return itemId; },
     get playing() { return !audio.paused; },
     get currentTime() { return audio.currentTime; },
+    /** A posição da música que se ouve agora (a que o motor toca, menos o atraso da saída). */
+    get heardTime() { return heardPosition(audio.currentTime, outputMs); },
+    /** Atraso do som até os ouvidos, em ms: a letra (e a posição que vai aos celulares) acompanham o que se ouve. */
+    setOutputLatency(ms) {
+      outputMs = Math.max(0, Number(ms) || 0);
+      render();
+    },
     get duration() { return audio.duration || 0; },
     get pitchAvailable() { return pitchAvailable; },
     get unlocked() { return ctx?.state === 'running'; },

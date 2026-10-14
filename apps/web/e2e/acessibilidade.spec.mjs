@@ -88,3 +88,11 @@ test('um aviso para leitor de tela anuncia quem está cantando', async ({ page, 
   await page.goto(room.guestUrl);
   await expect(page.locator('p.sr-only[role="status"]')).toContainText('Agora na TV: Bia, Wicked Game');
 });
+
+test('diálogo do atraso do som', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.tvUrl);
+  await page.keyboard.press('l');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});

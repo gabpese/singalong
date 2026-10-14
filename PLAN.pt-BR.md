@@ -537,3 +537,7 @@ O endereço do servidor já é uma configuração do app: para `hml`/`stg` o ins
 5. **Pilha edge:** aceitar uma parada curta e planejada da produção para tirar o Caddy de dentro dela (recomendado), ou manter o Caddy na produção e deixar `hml`/`stg` entrarem na rede dele.
 6. **Nomes:** manter `singalong-hml.duckdns.org` e `singalong-stg.duckdns.org`.
 7. **Transição:** manter a produção seguindo a `main` até o H6 ficar pronto (recomendado), para nada mudar antes de o novo caminho estar provado.
+
+### Status da Fase B (versão 1.1.2)
+- **Compensação de latência (feita):** a TV tem um botão **Atraso** (tecla `L`) com dois controles e uma medição automática (toca estalos pelas caixas e escuta no microfone). O *atraso do som* faz a letra (e a posição enviada aos celulares) acompanhar o que se **ouve**; o *atraso do microfone* faz a pontuação comparar a nota com a melodia do momento em que foi **cantada** (`posição - atraso do som - atraso do microfone`). Guardado por aparelho (`localStorage`). A parte pura está em `lib/latency.js` (testada com gravações sintéticas); a medição usa `ScriptProcessorNode`, então a precisão é de cerca de um bloco (~10 ms).
+- **Falta na B:** volume da voz original (decisão: servir o `vocals.mp3` pelo servidor e pelo servidor local de mídia do dono, **não** pela nuvem), detector de microfonia, mais de um microfone.

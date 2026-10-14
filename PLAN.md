@@ -535,3 +535,7 @@ The server address is already a setting of the app: for `hml`/`stg` the installe
 5. **Edge stack:** accept a short planned production downtime to move Caddy out (recommended), or keep Caddy inside production and let `hml`/`stg` join its network.
 6. **Names:** keep `singalong-hml.duckdns.org` and `singalong-stg.duckdns.org`.
 7. **Transition:** keep production following `main` until H6 is done (recommended), so nothing changes before the new path is proven.
+
+### Phase B status (release 1.1.2)
+- **Latency compensation (done):** the TV has a **Delay** button (key `L`) with two sliders and an automatic measurement (it plays clicks through the speakers and listens to them on the microphone). *Sound delay* makes the lyrics (and the position sent to the phones) follow what is **heard**; *microphone delay* makes the scoring compare the note with the melody at the moment it was **sung** (`position - sound delay - microphone delay`). Stored per device (`localStorage`). The pure part is in `lib/latency.js` (tested with synthetic recordings); the measurement uses `ScriptProcessorNode`, so its precision is about one buffer (~10 ms).
+- **Left in B:** original-voice volume (decision: serve `vocals.mp3` from the server and the owner's local media server, **not** from the cloud), feedback detector, more than one microphone.
