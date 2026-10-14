@@ -6,7 +6,7 @@
 //
 // Estado único por processo (hub em memória). Com várias réplicas da API, o hub passaria a usar Redis pub/sub.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { clampBacking, clampGuide, clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
+import { cleanParts, clampBacking, clampGuide, clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
 import { createBucket, REACTION_KINDS } from './reactions.js';
 import { extractVideoId } from './youtube.js';
 
@@ -291,6 +291,8 @@ export function createRoomService({
           guide: item.guide,
           status: item.status,
           lyric_offset: db.getOffset(item.video_id),
+          // dueto: quem canta cada linha, escolhido pelos cantores (texto com a b * -); nulo = a divisão automática
+          parts: item.guest_status === 'accepted' ? db.getParts(item.video_id) : null,
           song: {
             status: song?.status ?? 'unknown',
             stage: song?.stage ?? null,
@@ -523,6 +525,26 @@ export function createRoomService({
       return mutate(code, actor, (room) => {
         requireHost(room, actor);
         db.setOffset(videoId, clampOffset(offset));
+      });
+    },
+
+    /**
+     * A divisão da letra de um dueto: vale para a música em qualquer sala. Quem muda: o anfitrião ou um dos cantores de uma
+     * música dessas que está na fila (o dono e o convidado). `parts` nulo volta à divisão automática.
+     */
+    setParts(code, videoId, parts, actor) {
+      let clean;
+      try {
+        clean = cleanParts(parts);
+      } catch {
+        throw new HttpError(400, 'invalid_parts', 'Divisão da letra inválida.');
+      }
+      return mutate(code, actor, (room) => {
+        const mine = db
+          .listActive(room.code)
+          .some((i) => i.video_id === videoId && (i.client_id === actor.clientId || (i.guest_status === 'accepted' && i.guest_client_id === actor.clientId)));
+        if (!(hostCheck(room, actor.hostToken) || mine)) throw new HttpError(403, 'not_your_item', 'Você só pode alterar as suas músicas.');
+        db.setParts(videoId, clean);
       });
     },
 

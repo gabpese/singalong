@@ -614,3 +614,13 @@ body.stage { background: #0b0b14; }
 /* guia de melodia: uma faixa de vidro entre a letra e a barra de progresso */
 .tv-stage.has-guide { grid-template-rows: auto minmax(0, 1fr) clamp(110px, 22vh, 240px) auto; }
 .pitch-guide { display: block; width: 100%; height: 100%; border-radius: 18px; background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(8, 10, 22, .62); border: 1px solid rgba(255,255,255,.14); }
+
+/* a divisão da letra do dueto */
+.parts-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+.parts-list li { display: grid; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); }
+.parts-list li.empty-line { opacity: .6; }
+.parts-text { overflow-wrap: anywhere; }
+.parts-choices { display: flex; gap: 6px; flex-wrap: wrap; }
+.part-btn { min-height: 36px; padding: 4px 12px; border: 2px solid var(--part); color: var(--fg); background: transparent; }
+.part-btn::before { content: var(--shape) ' '; color: var(--part); }
+.part-btn.on { background: color-mix(in srgb, var(--part) 30%, var(--bg-2)); color: var(--fg); font-weight: 700; box-shadow: inset 0 0 0 2px var(--part); } /* o escolhido: fundo da cor e borda mais grossa (a forma ao lado também diz qual é) */

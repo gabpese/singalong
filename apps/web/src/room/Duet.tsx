@@ -5,6 +5,7 @@ import { t } from '../i18n/index.js';
 import { tRich } from '../i18n/rich';
 import { api } from '../lib/identity.js';
 import type { ApiError, QueueItem, RoomState } from '../lib/types';
+import { PartsDialog } from './PartsDialog';
 import { useRoom } from './context';
 
 type Person = { pid: string; name: string };
@@ -72,9 +73,25 @@ export function InviteDialog({ people, mePid, onInvite, onClose }: { people: Per
 export function DuetControl({ item }: { item: QueueItem }) {
   const { act, state, toast } = useRoom();
   const [choosing, setChoosing] = useState(false);
+  const [splitting, setSplitting] = useState(false);
   const cancel = () => void act('DELETE', `/queue/${item.id}/invite`).catch(() => {});
 
-  if (item.guest_me) return <p className="duet-note ok">{t('duet.withOk', { name: item.added_by })}</p>;
+  const partsButton = item.guest?.status === 'accepted' && (item.can_edit || item.guest_me) && (
+    <>
+      <button type="button" className="ghost" onClick={() => setSplitting(true)}>
+        {t('parts.button')}
+      </button>
+      {splitting && <PartsDialog item={item} onClose={() => setSplitting(false)} />}
+    </>
+  );
+  if (item.guest_me) {
+    return (
+      <div className="duet-row">
+        <span className="duet-note ok">{t('duet.withOk', { name: item.added_by })}</span>
+        {partsButton}
+      </div>
+    );
+  }
   if (!item.can_edit) {
     return item.guest?.status === 'accepted' ? <p className="duet-note">{t('duet.with', { name: item.guest.name })}</p> : null;
   }
@@ -82,6 +99,7 @@ export function DuetControl({ item }: { item: QueueItem }) {
     <div className="duet-row">
       {item.guest?.status === 'accepted' && <span className="duet-note ok">{t('duet.withOk', { name: item.guest.name })}</span>}
       {item.guest?.status === 'pending' && <span className="duet-note">{t('duet.pending', { name: item.guest.name })}</span>}
+      {partsButton}
       {item.guest ? (
         <button type="button" className="ghost" onClick={cancel}>
           {t(item.guest.status === 'accepted' ? 'duet.remove' : 'duet.cancelInvite')}

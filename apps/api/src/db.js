@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS queue_items (
 CREATE INDEX IF NOT EXISTS idx_items_room ON queue_items (room_code, status, position);
 CREATE TABLE IF NOT EXISTS song_settings (
   video_id     TEXT PRIMARY KEY,
-  lyric_offset REAL NOT NULL DEFAULT 0
+  lyric_offset REAL NOT NULL DEFAULT 0,
+  parts        TEXT                         -- dueto: quem canta cada linha da letra (a b * -), escolhido pelos cantores; nulo = automático
 );
 -- Agente local (o app instalado no computador do dono): dispositivos pareados, códigos de pareamento e sessões.
 CREATE TABLE IF NOT EXISTS devices (
@@ -115,6 +116,9 @@ export function openDb(path = ':memory:') {
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA);
   // bancos criados antes da limpeza do cache não têm last_played_at
+  if (!db.prepare('PRAGMA table_info(song_settings)').all().some((c) => c.name === 'parts')) {
+    db.exec('ALTER TABLE song_settings ADD COLUMN parts TEXT');
+  }
   if (!db.prepare('PRAGMA table_info(song_settings)').all().some((c) => c.name === 'last_played_at')) {
     db.exec('ALTER TABLE song_settings ADD COLUMN last_played_at INTEGER');
   }
@@ -321,6 +325,13 @@ export function openDb(path = ':memory:') {
     /** Músicas em uso (tocando ou na fila de alguma sala): nunca entram na limpeza. */
     activeVideoIds: () => new Set(all("SELECT DISTINCT video_id FROM queue_items WHERE status IN ('queued', 'playing')").map((r) => r.video_id)),
     getOffset: (videoId) => one('SELECT lyric_offset FROM song_settings WHERE video_id = ?', videoId)?.lyric_offset ?? 0,
+    getParts: (videoId) => one('SELECT parts FROM song_settings WHERE video_id = ?', videoId)?.parts ?? null,
+    setParts: (videoId, parts) =>
+      run(
+        `INSERT INTO song_settings (video_id, parts) VALUES (?, ?)
+         ON CONFLICT(video_id) DO UPDATE SET parts = excluded.parts`,
+        videoId, parts,
+      ),
     setOffset: (videoId, offset) =>
       run(
         `INSERT INTO song_settings (video_id, lyric_offset) VALUES (?, ?)

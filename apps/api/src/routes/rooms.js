@@ -147,6 +147,18 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
     },
   }, async (request) => (await rooms.setOffset(request.params.code, request.params.videoId, request.body.offset, actorOf(request))).state);
 
+  // A divisão da letra de um dueto (quem canta cada linha): texto com a (cantor 1), b (cantor 2), * (os dois) e - (ninguém); null = automática.
+  app.put('/rooms/:code/songs/:videoId/parts', {
+    schema: {
+      params: {
+        type: 'object',
+        properties: { code: CODE_PARAM, videoId: { type: 'string', pattern: VIDEO_ID_PATTERN } },
+        required: ['code', 'videoId'],
+      },
+      body: { type: 'object', additionalProperties: false, properties: { parts: { type: ['string', 'null'] } }, required: ['parts'] },
+    },
+  }, async (request) => (await rooms.setParts(request.params.code, request.params.videoId, request.body.parts, actorOf(request))).state);
+
   // Estado em tempo real. A TV (role=tv) também envia "ended" e "position".
   app.get('/rooms/:code/ws', { websocket: true }, (socket, request) => {
     const { role, client, host } = request.query;

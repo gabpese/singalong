@@ -20,6 +20,20 @@ export function clampBacking(value) {
 /** Nível da voz original (guia): o mesmo intervalo das vozes de apoio. */
 export const clampGuide = clampBacking;
 
+/**
+ * A divisão da letra de um dueto: uma letra por linha da letra, `a` (o cantor que adicionou a música), `b` (o convidado),
+ * `*` (os dois juntos) ou `-` (ninguém: linha vazia). Devolve o texto limpo, `null` (volta à divisão automática) ou lança
+ * um erro de texto se não for uma divisão válida.
+ */
+export const PARTS_MAX = 3000;
+export function cleanParts(value) {
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string' || value.length > PARTS_MAX || !/^[ab*-]+$/.test(value)) {
+    throw new Error('invalid_parts');
+  }
+  return value;
+}
+
 /** Ajuste da letra em segundos, limitado a ±10 s e a 2 casas. */
 export function clampOffset(value) {
   const n = Number(value);

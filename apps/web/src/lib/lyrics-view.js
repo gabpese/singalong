@@ -14,6 +14,7 @@ function mark(el, part) {
 export function createLyricsView(els) {
   let cues = [];
   let duet = false; // dueto: cada linha tem um dono (a, b ou os dois) e ganha a cor dele
+  let assigned = null; // a divisão escolhida pelos cantores (texto a b * -); nula = automática
   let parts = [];
   let offset = 0;
   let lastKey = '';
@@ -70,14 +71,23 @@ export function createLyricsView(els) {
     /** Troca a letra (lista de linhas {start, end, text, words?}) e limpa a tela. */
     setCues(next) {
       cues = Array.isArray(next) ? next : [];
-      parts = duet ? splitParts(cues) : [];
+      parts = duet ? splitParts(cues, assigned) : [];
       clear();
     },
 
-    /** Liga o modo dueto (divisão automática das linhas entre os dois cantores) ou volta ao normal. */
-    setDuet(on) {
-      duet = Boolean(on);
-      parts = duet ? splitParts(cues) : [];
+    /**
+     * Liga o modo dueto ou volta ao normal. `chosen` é a divisão escolhida pelos cantores (texto a b * -); sem ela (ou se não
+     * combina com a letra) as linhas se dividem sozinhas entre os dois.
+     * @param {boolean} on
+     * @param {string | null | undefined} [chosen]
+     */
+    setDuet(on, chosen = null) {
+      const next = Boolean(on);
+      const text = next && typeof chosen === 'string' ? chosen : null;
+      if (next === duet && text === assigned) return; // nada mudou: não refaz a divisão a cada estado da sala
+      duet = next;
+      assigned = text;
+      parts = duet ? splitParts(cues, assigned) : [];
       lastKey = '';
     },
 

@@ -43,6 +43,8 @@ export interface QueueItem {
   backing: number;
   /** Nível da voz original, como guia para cantar (0..100 %). */
   guide: number;
+  /** Dueto: quem canta cada linha da letra, escolhido pelos cantores (texto com a b * -); null = divisão automática. */
+  parts?: string | null;
   status: string;
   lyric_offset: number;
   mine: boolean;

@@ -1,7 +1,7 @@
 // Contexto da sala (celular): o código, o estado, as ações e os avisos, compartilhados pelos componentes.
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/identity.js';
-import type { ApiError, ReactionKind, RoomState } from '../lib/types';
+import type { ApiError, LyricCue, QueueItem, ReactionKind, RoomState } from '../lib/types';
 
 export type Tab = 'queue' | 'add' | 'library';
 /** As duas telas da sala: a sala (fila, adicionar, músicas) e a TV (a letra e a fila, só para assistir). */
@@ -19,6 +19,8 @@ export interface RoomContextValue {
   showTab: (tab: Tab) => void;
   /** Manda uma reação (aplauso, fogo...) para a TV. */
   react: (kind: ReactionKind) => void;
+  /** A letra de uma música da fila (do servidor ou, no computador do dono, a que a TV repassou); null se não está ao alcance. */
+  loadCues: (item: QueueItem) => Promise<LyricCue[] | null>;
 }
 
 const RoomContext = createContext<RoomContextValue | null>(null);
