@@ -595,3 +595,17 @@ body.stage { background: #0b0b14; }
 .stage-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .latency-field { margin-top: 10px; } .latency-field input[type=range] { width: 100%; }
 .mic-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; } .mic-list .check { align-items: center; }
+
+/* ---------- reações dos celulares ---------- */
+.reaction-bar { display: flex; justify-content: space-between; gap: 6px; }
+.reaction-bar button { flex: 1; min-height: var(--tap); padding: 4px 0; font-size: 1.5rem; line-height: 1; transition: transform .12s; }
+.reaction-bar button.pop { transform: scale(1.25); }
+.reaction-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
+.reaction { position: absolute; bottom: -8%; display: grid; justify-items: center; gap: 2px; animation: reaction-rise 3.2s ease-out forwards; }
+.reaction-glyph { font-size: clamp(2rem, 5vw, 4rem); filter: drop-shadow(0 4px 10px #000a); }
+.reaction small { max-width: 8em; padding: 1px 8px; border-radius: 999px; background: #000a; color: var(--fg); font-size: clamp(.7rem, 1.2vw, 1rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes reaction-rise {
+  0% { transform: translateY(0) scale(.6); opacity: 0; }
+  12% { opacity: 1; transform: translateY(-8vh) scale(1.1); }
+  100% { transform: translateY(-85vh) scale(1); opacity: 0; }
+}

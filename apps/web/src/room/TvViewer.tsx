@@ -10,6 +10,8 @@ import type { LyricCue, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { LyricsSize } from '../ui/LyricsSize';
 import { QueueBox, titleOf } from '../tv/QueueBox';
+import { ReactionBar } from './ReactionBar';
+import { useRoom } from './context';
 import type { Position } from './useRoomConnection';
 
 interface Props {
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export function TvViewer({ state, position, lyrics }: Props) {
+  const { react } = useRoom();
   const refs = {
     prev: useRef<HTMLParagraphElement>(null),
     current: useRef<HTMLParagraphElement>(null),
@@ -126,6 +129,7 @@ export function TvViewer({ state, position, lyrics }: Props) {
         <p className="line next2" ref={refs.next2} />
       </div>
 
+      <ReactionBar onReact={react} />
       <QueueBox current={current} upcoming={upcoming} />
     </section>
   );

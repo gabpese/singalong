@@ -15,6 +15,7 @@ import { QueueList, Scoreboard } from './QueueList';
 import { PreviewBar, usePreview } from './usePreview';
 import { RoomRail } from './RoomRail';
 import { TabBar, TopBar } from './TopBar';
+import { ReactionLayer, useReactionLayer } from '../ui/ReactionLayer';
 import { TvViewer } from './TvViewer';
 import { useRoomConnection } from './useRoomConnection';
 
@@ -25,7 +26,8 @@ declare global {
 }
 
 export function RoomPage({ code }: { code: string }) {
-  const { state, setState, status, gone, position, lyrics, send } = useRoomConnection(code);
+  const reactions = useReactionLayer();
+  const { state, setState, status, gone, position, lyrics, send } = useRoomConnection(code, reactions.push);
   const { toast, show } = useToast();
   const act = useAct(code, setState, show);
   const [tab, setTab] = useState<Tab>('queue');
@@ -71,8 +73,8 @@ export function RoomPage({ code }: { code: string }) {
 
   const myName = name.trim() || t('room.someone');
   const context: RoomContextValue = useMemo(
-    () => ({ code, state, isHost: Boolean(state?.me?.is_host), act, toast: show, myName, showTab }),
-    [code, state, act, show, myName, showTab],
+    () => ({ code, state, isHost: Boolean(state?.me?.is_host), act, toast: show, myName, showTab, react: (kind) => send({ type: 'reaction', kind }) }),
+    [code, state, act, show, myName, showTab, send],
   );
 
   useEffect(() => {
@@ -148,6 +150,7 @@ export function RoomPage({ code }: { code: string }) {
       {view === 'tv' && (
         <main className="room-page" id="conteudo" tabIndex={-1}>
           <TvViewer state={state} position={position} lyrics={lyrics} />
+          <ReactionLayer items={reactions.items} />
         </main>
       )}
 

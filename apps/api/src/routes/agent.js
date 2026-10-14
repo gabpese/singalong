@@ -126,6 +126,16 @@ export async function agentRoutes(app, { agents, jobs, rooms, config, limiters, 
     };
   });
 
+  // Estatísticas do dono: o que tocou nas salas das sessões deste computador nos últimos `days` dias (1 a 365).
+  app.get('/stats', {
+    ...auth,
+    schema: { querystring: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 365, default: 30 } } } },
+  }, async (request) => {
+    const days = request.query.days ?? 30;
+    const since = Date.now() - days * 24 * 60 * 60 * 1000;
+    return { days, since, ...rooms.statsFor(request.device.id, since) };
+  });
+
   app.delete('/devices/me', auth, async (request, reply) => {
     await agents.revoke(request.device);
     return reply.code(204).send();

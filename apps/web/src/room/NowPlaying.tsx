@@ -9,6 +9,7 @@ import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
 import { BackingControl, GuideControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
+import { ReactionBar } from './ReactionBar';
 import { DuetControl } from './Duet';
 import { VoiceVolume } from './VoiceControl';
 import type { Position } from './useRoomConnection';
@@ -98,7 +99,7 @@ function Progress({ state, current, position }: { state: RoomState; current: Que
 }
 
 export function NowPlaying({ state, position }: { state: RoomState; position: Position }) {
-  const { act, isHost } = useRoom();
+  const { act, isHost, react } = useRoom();
   const { current } = splitQueue(state);
   const run = (method: string, path: string, body?: unknown) => void act(method, path, body).catch(() => {});
 
@@ -129,6 +130,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
               </div>
             </div>
             <Progress state={state} current={current} position={position} />
+            <ReactionBar onReact={react} />
             <NextSinger state={state} />
             <div className="controls-row">
               {isHost && (

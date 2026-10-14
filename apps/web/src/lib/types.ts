@@ -92,8 +92,12 @@ export interface LyricCue {
 }
 
 /** Mensagens que o servidor envia pelo WebSocket da sala. */
+/** As reações que os celulares mandam para a TV (a mesma lista do servidor). */
+export type ReactionKind = 'clap' | 'fire' | 'heart' | 'party' | 'wow';
+
 export type ServerMessage =
   | { type: 'state'; state: RoomState }
+  | { type: 'reaction'; kind: ReactionKind; name?: string }
   | { type: 'position'; item_id: number; ms: number }
   | { type: 'lyrics'; item_id: number; cues: LyricCue[] }
   | { type: 'seek'; item_id: number; seconds?: number; to?: number };

@@ -368,4 +368,11 @@ export default {
   'home.download.buttonVersion': 'Descargar la app para Windows (v{version})',
   'home.download.windowsOnly': 'La app es para ordenadores con Windows. Para cantar no la necesitas: basta con crear o entrar en una sala.',
   'home.download.page': 'Ver la página de descargas',
+
+  'react.group': 'Reacciones',
+  'react.clap': 'Aplaudir',
+  'react.fire': 'Fuego',
+  'react.heart': 'Me encanta',
+  'react.party': 'Fiesta',
+  'react.wow': 'Guau',
 };
