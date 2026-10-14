@@ -492,7 +492,7 @@ A página de entrada (`/`) ganha o mesmo visual da tela de boas-vindas do app do
 
 *Respostas:* (1) o `APP_DOWNLOAD_URL` aponta para o `releases/latest` do repositório; (2) a imagem atual por enquanto; (3) a F vem logo depois da B, como 1.1.3.
 
-**Versões:** a fase A saiu como **1.1.1** e a B como **1.1.2**; a **1.2.0** é a versão que fecha todas as fases (A a F).
+**Versões:** a fase A saiu como **1.1.1**, a B como **1.1.2**, a F como **1.1.3**, a C como **1.1.4** e a D como **1.1.5**. A **1.2.0** fecha este roteiro com as fases A, B, C, D e F. **A fase E (plataforma: modo híbrido, macOS, Linux e GPU AMD/Apple) e os ambientes de homologação e staging (seção 18) ficam para a 1.3.0**; o PLAN guarda o desenho deles para lá.
 
 ### Ordem e dependências
 A antes de tudo (versões seguras e a base de textos e abas) → B (um motor de áudio) → C (retorno rápido) → D (precisa da B) → E (a maior e mais incerta). Cada item vira um marco próprio, com testes, no formato de sempre (seção 16).
@@ -574,3 +574,5 @@ O endereço do servidor já é uma configuração do app: para `hml`/`stg` o ins
 - **Dueto com vozes identificadas, pela letra (feito):** o dono da música e o convidado (ou o anfitrião) abrem **Dividir a letra** e marcam cada linha como **voz 1**, **voz 2** ou **juntos**; ela parte da divisão automática. A escolha é guardada por música (`song_settings.parts`, um texto com `a b * -`, uma letra por linha), vale em qualquer sala e só vai no estado das músicas com dueto aceito. A TV e o palco pintam as linhas com ela; se a letra mudar de tamanho, volta a valer a divisão automática.
 - **Pontuação do dueto por voz (feito):** com a pontuação ligada, um dueto aceito e **dois ou mais microfones** escolhidos na TV, o primeiro microfone é a voz 1 e o segundo é a voz 2; cada um tem o próprio pontuador, que só conta as linhas daquela voz (as linhas "juntos" contam para os dois). O cartão final mostra a nota de cada cantor ("Ana 82 · Bia 74") e a nota da sala é a **média** (uma música tem uma nota só no servidor). Com um microfone só nada muda: a música inteira é pontuada por ele.
 - **Fora de propósito:** a sugestão por IA de quem canta cada linha (diarização de falantes da voz isolada) e a separação real de duas vozes que se sobrepõem; o editor parte da divisão automática. O editor lê a letra do servidor; nas músicas do computador do dono só funciona enquanto a música toca (a TV repassa a letra).
+
+**Fechamento da versão 1.2.0:** as fases A, B, C, D e F estão feitas e publicadas (1.1.1 a 1.1.5). Ficam para a **1.3.0**: a fase E e os ambientes de homologação e staging (seção 18, cujos marcos H1 a H3 não precisam da VM da Oracle e podem abrir o ciclo).

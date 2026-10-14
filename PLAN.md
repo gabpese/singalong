@@ -490,7 +490,7 @@ The entry page (`/`) gets the same look as the owner's app welcome screen: the *
 
 *Answers:* (1) `APP_DOWNLOAD_URL` points to the repository's `releases/latest`; (2) the current picture for now; (3) F goes right after B, as 1.1.3.
 
-**Versions:** phase A is released as **1.1.1**, phase B as **1.1.2**; **1.2.0** is the release that closes all the phases (A to F).
+**Versions:** phase A was released as **1.1.1**, B as **1.1.2**, F as **1.1.3**, C as **1.1.4** and D as **1.1.5**. **1.2.0** closes this roadmap with phases A, B, C, D and F. **Phase E (platform: hybrid mode, macOS, Linux and AMD/Apple GPU) and the homologation/staging environments (section 18) move to 1.3.0**; the PLAN keeps their design for then.
 
 ### Order and dependencies
 A before everything (safe releases and the base for text and tabs) → B (one audio engine) → C (quick return) → D (needs B) → E (largest and most uncertain). Each item gets its own milestone, with tests, in the usual way (section 16).
@@ -572,3 +572,5 @@ The server address is already a setting of the app: for `hml`/`stg` the installe
 - **Duet with identified voices, by lyrics (done):** the owner of the song and the guest (or the host) open **Split the lyrics** and mark each line as **voice 1**, **voice 2** or **together**; it starts from the automatic split. It is stored per song (`song_settings.parts`, a text with `a b * -`, one letter per line), applies in any room, and is sent only for songs with an accepted duet. The TV and the stage paint the lines with it; if the lyrics change size, the automatic split is used again.
 - **Duet scoring per voice (done):** with scoring on, an accepted duet and **two or more microphones** chosen on the TV, the first microphone is voice 1 and the second is voice 2; each one has its own scorer that only counts the lines of that voice (lines marked "together" count for both). The final card shows each singer's score ("Ana 82 · Bia 74") and the room's score is the **average** (a song has a single score on the server). With one microphone nothing changes: the whole song is scored from it.
 - **Left out on purpose:** the AI suggestion of who sings each line (speaker diarization of the isolated voice) and real separation of two overlapping voices; the editor starts from the automatic split instead. The editor reads the lyrics from the server; for songs on the owner's computer it only works while the song plays (the TV relays the lyrics).
+
+**Release 1.2.0 (closing note):** phases A, B, C, D and F are done and released (1.1.1 to 1.1.5). Left for **1.3.0**: phase E and the homologation/staging environments (section 18, whose milestones H1 to H3 do not need the Oracle VM and can start the cycle).
