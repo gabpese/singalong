@@ -9,7 +9,7 @@ import { paths, readState, workerCommand } from '@singalong/engine/src/engine.js
 import { verifyEngine } from '@singalong/engine/src/verify.js';
 import { libraryStats } from './library-stats.js';
 
-export const APP_VERSION = '1.1.3'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
+export const APP_VERSION = '1.1.4'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
 const MAX_LOGS = 300;
 const POLL_MS = 5000;
 
