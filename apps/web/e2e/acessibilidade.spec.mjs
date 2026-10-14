@@ -131,3 +131,17 @@ test('sala com os botões de reação', async ({ page, request }) => {
   await expect(page.getByRole('group', { name: 'Reações' })).toBeVisible();
   expect(await violations(page)).toEqual([]);
 });
+
+test('página inicial no Mac, com a pergunta e o botão do Apple Silicon', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15' });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.getByText('Qual é o seu Mac?')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Apple Silicon (M1 ou mais novo)' }).click();
+  await expect(page.getByRole('link', { name: /Baixar para macOS/ })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Intel' }).click();
+  expect(await violations(page)).toEqual([]);
+  await context.close();
+});

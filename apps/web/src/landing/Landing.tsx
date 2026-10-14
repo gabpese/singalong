@@ -3,7 +3,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { t } from '../i18n/index.js';
 import { api, setHostToken } from '../lib/identity.js';
-import { canInstallApp } from '../lib/platform.js';
+import { detectSystem } from '../lib/platform.js';
 import { Icon } from '../ui/Icon';
 import { LanguageSwitch } from '../ui/LanguageSwitch';
 
@@ -11,30 +11,102 @@ interface ApiError extends Error {
   status?: number;
 }
 
+type System = 'windows' | 'macos' | 'linux';
+
+interface Download {
+  system: System;
+  arch: string;
+  file: string;
+  url: string;
+}
+
 interface HomeConfig {
   app_download_url: string | null;
   app_latest_version: string | null;
+  app_page_url: string | null;
+  app_downloads: Download[];
 }
 
-/** O bloco do app: o botão de baixar (computador Windows) ou a explicação (celular e outros sistemas). Sem endereço, nada. */
+const NO_CONFIG: HomeConfig = { app_download_url: null, app_latest_version: null, app_page_url: null, app_downloads: [] };
+
+const systemName = (system: System) => t(`home.system.${system}`);
+
+/** Um botão de baixar o instalador de um sistema (abre numa aba nova; o arquivo vem do GitHub, não daqui). */
+function DownloadButton({ item, version }: { item: Download; version: string | null }) {
+  const system = systemName(item.system);
+  return (
+    <a className="button" href={item.url} target="_blank" rel="noopener noreferrer">
+      {version ? t('home.download.buttonForVersion', { system, version }) : t('home.download.buttonFor', { system })}
+    </a>
+  );
+}
+
+/**
+ * O Mac não diz se é Intel ou Apple Silicon (o navegador sempre se apresenta como Intel): a pessoa responde. O app só existe para Apple Silicon;
+ * quem tem Mac Intel recebe a explicação em vez de um arquivo que não abre.
+ */
+function MacChoice({ item, version }: { item: Download | undefined; version: string | null }) {
+  const [chip, setChip] = useState<'silicon' | 'intel' | null>(null);
+  return (
+    <div className="mac-choice">
+      <p id="mac-ask" className="hint">
+        {t('home.download.macAsk')}
+      </p>
+      <div className="row" role="group" aria-labelledby="mac-ask">
+        <button type="button" className={chip === 'silicon' ? 'primary' : undefined} aria-pressed={chip === 'silicon'} onClick={() => setChip('silicon')}>
+          {t('home.download.macSilicon')}
+        </button>
+        <button type="button" className={chip === 'intel' ? 'primary' : undefined} aria-pressed={chip === 'intel'} onClick={() => setChip('intel')}>
+          {t('home.download.macIntel')}
+        </button>
+      </div>
+      {chip === 'silicon' && item && (
+        <>
+          <DownloadButton item={item} version={version} />
+          <p className="hint">{t('home.download.macNote')}</p>
+        </>
+      )}
+      {chip === 'intel' && <p className="hint">{t('home.download.macIntelNo')}</p>}
+    </div>
+  );
+}
+
+/**
+ * O bloco do app: o botão do sistema do visitante (no Mac, antes a pergunta "qual é o seu Mac?"), a lista dos outros sistemas, sempre à
+ * vista, e a página com todas as versões. Celular e tablet recebem a explicação. Sem endereço configurado, nada aparece.
+ */
 function DownloadApp({ config }: { config: HomeConfig }) {
-  if (!config.app_download_url) return null;
-  const installable = canInstallApp(navigator.userAgent);
+  if (!config.app_downloads.length) return null;
+  const system = detectSystem(navigator.userAgent);
+  const version = config.app_latest_version;
+  const of = (name: System) => config.app_downloads.find((item) => item.system === name);
+  const detected = system === 'windows' || system === 'macos' || system === 'linux' ? system : null;
+  const others = config.app_downloads.filter((item) => item.system !== detected);
+  const primary = detected && detected !== 'macos' ? of(detected) : undefined;
   return (
     <section className="card download-card" aria-labelledby="download-title">
       <h2 id="download-title">{t('home.download.title')}</h2>
       <p className="hint">{t('home.download.hint')}</p>
-      {installable ? (
-        <a className="button" href={config.app_download_url} target="_blank" rel="noopener noreferrer">
-          {config.app_latest_version ? t('home.download.buttonVersion', { version: config.app_latest_version }) : t('home.download.button')}
+      {primary && <DownloadButton item={primary} version={version} />}
+      {primary?.system === 'linux' && <p className="hint">{t('home.download.linuxNote')}</p>}
+      {detected === 'macos' && <MacChoice item={of('macos')} version={version} />}
+      {!detected && <p className="hint">{t('home.download.computerOnly')}</p>}
+      <h3 className="download-others">{t('home.download.others')}</h3>
+      <ul className="download-list">
+        {others.map((item) => (
+          <li key={item.system}>
+            <a href={item.url} target="_blank" rel="noopener noreferrer">
+              {systemName(item.system)}
+            </a>
+            <span className="muted small"> · {item.file}</span>
+          </li>
+        ))}
+      </ul>
+      {others.some((item) => item.system === 'macos') && <p className="hint small">{t('home.download.macIntelNo')}</p>}
+      {config.app_page_url && (
+        <a className="download-more" href={config.app_page_url} target="_blank" rel="noopener noreferrer">
+          {t('home.download.page')}
         </a>
-      ) : (
-        <>
-          <p className="hint">{t('home.download.windowsOnly')}</p>
-          <a className="download-more" href={config.app_download_url} target="_blank" rel="noopener noreferrer">
-            {t('home.download.page')}
-          </a>
-        </>
       )}
     </section>
   );
@@ -43,11 +115,18 @@ function DownloadApp({ config }: { config: HomeConfig }) {
 export function Landing() {
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
-  const [config, setConfig] = useState<HomeConfig>({ app_download_url: null, app_latest_version: null });
+  const [config, setConfig] = useState<HomeConfig>(NO_CONFIG);
 
   useEffect(() => {
     api('GET', '/api/config')
-      .then((data: HomeConfig) => setConfig({ app_download_url: data.app_download_url ?? null, app_latest_version: data.app_latest_version ?? null }))
+      .then((data: Partial<HomeConfig>) =>
+        setConfig({
+          app_download_url: data.app_download_url ?? null,
+          app_latest_version: data.app_latest_version ?? null,
+          app_page_url: data.app_page_url ?? null,
+          app_downloads: Array.isArray(data.app_downloads) ? data.app_downloads : [],
+        }),
+      )
       .catch(() => undefined); // sem a configuração, a página só não mostra o botão de baixar
   }, []);
 
