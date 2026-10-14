@@ -65,3 +65,15 @@ test('judge: assinado e carimbado passa; sem assinatura, sem carimbo, adulterado
   assert.deepEqual(judge(report({ status: 'NotSigned', signed: false }), { expectUnsigned: true }), []);
   assert.match(judge(report({}), { expectUnsigned: true })[0], /deveria estar sem assinatura/);
 });
+
+test('um arquivo que não dá para ler vira um erro claro (não um "assinado sem carimbo")', async () => {
+  const { readSignature } = await import('../scripts/verify-signature.mjs');
+  const report = parseSignatureReport({ Status: 'UnknownError', Error: true, StatusMessage: 'Cannot find path' });
+  assert.equal(report.failed, true);
+  assert.match(judge(report)[0], /não consegui ler a assinatura: Cannot find path/);
+  assert.match(judge(report, { expectUnsigned: true })[0], /não consegui ler/); // nem como "esperado sem assinatura"
+  if (process.platform === 'win32') {
+    const real = await readSignature('C:/caminho/que/nao/existe.exe'); // o PowerShell de verdade devolve o erro em JSON
+    assert.equal(real.failed, true);
+  }
+});

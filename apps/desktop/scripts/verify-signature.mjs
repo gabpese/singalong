@@ -23,19 +23,51 @@ export function parseSignatureReport(json) {
     subject: cert?.Subject ?? null,
     thumbprint: cert?.Thumbprint ?? null,
     timestamped: Boolean(raw.TimeStamperCertificate),
+    failed: Boolean(raw.Error), // o PowerShell não conseguiu nem ler o arquivo (não existe, sem permissão...)
     message: raw.StatusMessage ?? '',
   };
 }
 
+/** O script do PowerShell, com o caminho já escapado (aspas simples dobradas). Devolve sempre um JSON, mesmo quando algo dá errado. */
+export function signatureScript(file) {
+  const path = String(file).replace(/'/g, "''");
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    'try {',
+    `  $sig = Get-AuthenticodeSignature -LiteralPath '${path}'`,
+    '  $out = [ordered]@{ Status = [string]$sig.Status; StatusMessage = [string]$sig.StatusMessage; SignerCertificate = $null; TimeStamperCertificate = $null }',
+    '  if ($sig.SignerCertificate) { $out.SignerCertificate = @{ Subject = [string]$sig.SignerCertificate.Subject; Thumbprint = [string]$sig.SignerCertificate.Thumbprint } }',
+    '  if ($sig.TimeStamperCertificate) { $out.TimeStamperCertificate = [string]$sig.TimeStamperCertificate.Subject }',
+    '  $out | ConvertTo-Json -Depth 4 -Compress',
+    '} catch {',
+    "  @{ Status = 'UnknownError'; Error = $true; StatusMessage = [string]$_.Exception.Message; SignerCertificate = $null; TimeStamperCertificate = $null } | ConvertTo-Json -Compress",
+    '}',
+  ].join('\n');
+}
+
+/** Lê a assinatura de um arquivo. O script vai codificado (UTF-16 em base64): nenhuma aspas do caminho passa pelo shell. */
 export async function readSignature(file) {
-  const script = `Get-AuthenticodeSignature -LiteralPath $args[0] | Select-Object Status, StatusMessage, @{n='SignerCertificate';e={ if ($_.SignerCertificate) { @{ Subject = $_.SignerCertificate.Subject; Thumbprint = $_.SignerCertificate.Thumbprint } } }}, @{n='TimeStamperCertificate';e={ $_.TimeStamperCertificate.Subject }} | ConvertTo-Json -Depth 4 -Compress`;
-  const { stdout } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `& { ${script} }`, file], { windowsHide: true, timeout: 60_000 });
-  return parseSignatureReport(stdout);
+  const encoded = Buffer.from(signatureScript(file), 'utf16le').toString('base64');
+  let stdout = '';
+  let stderr = '';
+  for (const shell of ['powershell.exe', 'pwsh']) {
+    try {
+      ({ stdout, stderr } = await run(shell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout: 120_000, maxBuffer: 4 * 1024 * 1024 }));
+    } catch (error) {
+      stderr = `${shell}: ${error.stderr || error.message}`;
+      continue; // tenta o outro
+    }
+    if (stdout.trim()) break;
+  }
+  const text = stdout.trim().replace(/^\uFEFF/, '');
+  if (!text) throw new Error(`Não consegui ler a assinatura de ${file}: o PowerShell não devolveu nada.${stderr ? ` Erro: ${stderr.trim()}` : ''}`);
+  return parseSignatureReport(text);
 }
 
 /** Aplica as exigências: devolve a lista de problemas (vazia = tudo certo). */
 export function judge(report, { trusted = false, expectUnsigned = false } = {}) {
   const problems = [];
+  if (report.failed) return [`não consegui ler a assinatura: ${report.message}`];
   if (expectUnsigned) {
     if (report.signed) problems.push('o arquivo está assinado, mas deveria estar sem assinatura');
     return problems;
