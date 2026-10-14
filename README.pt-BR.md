@@ -15,7 +15,7 @@ O app está na [versão mais recente](https://github.com/gabpese/singalong/relea
 | Sistema | Arquivo | Observações |
 |---|---|---|
 | Windows 10/11 (x64) | `singalong_karaoke.exe` | ainda sem assinatura: o SmartScreen pode avisar ("Mais informações" > "Executar assim mesmo") |
-| macOS (Apple Silicon: M1 em diante) | `singalong_karaoke-mac-arm64.dmg` | ainda sem assinatura da Apple: na primeira vez, clique com o botão direito no app > **Abrir** (ou `xattr -dr com.apple.quarantine "/Applications/Singalong Karaoke.app"`); ele não se atualiza sozinho, o "Atualizar agora" abre o download do DMG novo. **Mac Intel não é suportado** |
+| macOS (Apple Silicon: M1 em diante) | `singalong_karaoke-mac-arm64.dmg` | ainda sem assinatura da Apple: na primeira vez, clique com o botão direito no app > **Abrir** (ou `xattr -dr com.apple.quarantine "/Applications/singalong_karaoke.app"`); ele não se atualiza sozinho, o "Atualizar agora" abre o download do DMG novo. **Mac Intel não é suportado** |
 | Linux (x64) | `singalong_karaoke-linux-x86_64.AppImage` | dê `chmod +x` no arquivo e execute (no Ubuntu 22.04 ou mais novo o AppImage precisa do `libfuse2`: `sudo apt install libfuse2`). Ele se atualiza sozinho. No GNOME o ícone da bandeja precisa da extensão AppIndicator |
 
 ## Privacidade

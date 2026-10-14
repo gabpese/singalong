@@ -17,7 +17,7 @@ The app is on the [latest release](https://github.com/gabpese/singalong/releases
 | System | File | Notes |
 |---|---|---|
 | Windows 10/11 (x64) | `singalong_karaoke.exe` | not signed yet: SmartScreen may warn ("More info" > "Run anyway") |
-| macOS (Apple Silicon: M1 and newer) | `singalong_karaoke-mac-arm64.dmg` | no Apple signature yet: the first time, right-click the app > **Open** (or `xattr -dr com.apple.quarantine "/Applications/Singalong Karaoke.app"`); it does not update itself, "Update now" opens the download of the new DMG. **Intel Macs are not supported** |
+| macOS (Apple Silicon: M1 and newer) | `singalong_karaoke-mac-arm64.dmg` | no Apple signature yet: the first time, right-click the app > **Open** (or `xattr -dr com.apple.quarantine "/Applications/singalong_karaoke.app"`); it does not update itself, "Update now" opens the download of the new DMG. **Intel Macs are not supported** |
 | Linux (x64) | `singalong_karaoke-linux-x86_64.AppImage` | `chmod +x` the file and run it (on Ubuntu 22.04 or newer, AppImage needs `libfuse2`: `sudo apt install libfuse2`). It updates itself. On GNOME the tray icon needs the AppIndicator extension |
 
 ## Privacy
