@@ -473,7 +473,22 @@ Ideias escolhidas pelo dono do projeto após uma revisão do que o app tem e do 
 | Modo híbrido (F25) | Por música, escolher se ela também vai para a nuvem (driver S3/R2 já previsto na seção 14). Exige decidir sincronização e custo de armazenamento |
 | macOS, Linux e GPU AMD/Apple (F26) | O motor é montado só para Windows. Primeiro macOS em Apple Silicon (MPS), depois Linux (ROCm para AMD) |
 
-**Versões:** a fase A sai como **1.1.1**; a **1.2.0** é a versão que fecha todas as fases (A a E).
+### Fase F: a página inicial da web
+A página de entrada (`/`) ganha o mesmo visual da tela de boas-vindas do app do dono: a **imagem** (TV, notebook e celular, `apps/desktop/ui/welcome.png`) à **esquerda** e as ações à **direita**.
+| Item | Observações |
+|---|---|
+| Layout | Duas colunas a partir de ~900 px de largura (imagem ~64 %, painel ~36 %, como o `welcome-art`/`welcome-form` do app); no celular a imagem vai em cima (menor) e o painel embaixo. A página mantém o tema escuro, o seletor de idioma e as regras de acessibilidade (axe na suíte) |
+| Painel de ações | **Criar sala e abrir a TV** (principal), **Entrar numa sala** (campo do código) e **Baixar o app** (secundário), mais uma frase curta sobre para que serve o app ("para preparar músicas novas no seu computador") |
+| Botão de download | O endereço vem do servidor (`APP_DOWNLOAD_URL`, já usado no aviso de atualização), exposto em `/api/config` como `app_download_url` (e a versão mais recente, `app_latest_version`, ao lado do botão). Sem endereço configurado, o botão não aparece. No celular ou num computador que não é Windows, o botão explica que o app é para computadores Windows (macOS e Linux são a fase E) em vez de baixar um arquivo inútil |
+| A imagem | Copiada para `apps/web/public/` (o app mantém a própria cópia: a política de segurança dele só aceita arquivos locais). Ela tem o slogan "Karaokê de qualquer vídeo do YouTube" **desenhado dentro**, e as telas dentro dela mostram o menu antigo: a imagem deve ser reexportada **sem o texto** (o título e o slogan viram texto traduzido) e com as telas atuais. Até lá a página usa a imagem atual e corta o texto com CSS se precisar |
+| Testes | Os testes ponta a ponta da entrada são atualizados; novos para o layout de duas colunas e o de celular, o botão de download (aparece, some sem endereço, explica no celular) e o axe na página nova; os três idiomas ganham os textos novos |
+
+**Decisões em aberto da fase F**
+1. **Onde fica hospedado o instalador?** Hoje o `APP_DOWNLOAD_URL` aponta para uma pasta **privada** (veja o `deploy/README.md`). Um botão público precisa de um link que qualquer pessoa abra: as Releases do GitHub deste repositório (o repositório é público) ou o link que você já usa. Sem um link público o botão fica escondido.
+2. **A imagem:** reexportar sem o texto e com as telas atuais (recomendado, precisa da arte nova de você) ou usar a imagem atual por enquanto.
+3. **Ordem:** a F é independente de A a E. Recomendado: logo depois da fase B (versão 1.1.3), por ser pequena e visível; C, D e E seguem depois.
+
+**Versões:** a fase A saiu como **1.1.1** e a B como **1.1.2**; a **1.2.0** é a versão que fecha todas as fases (A a F).
 
 ### Ordem e dependências
 A antes de tudo (versões seguras e a base de textos e abas) → B (um motor de áudio) → C (retorno rápido) → D (precisa da B) → E (a maior e mais incerta). Cada item vira um marco próprio, com testes, no formato de sempre (seção 16).
