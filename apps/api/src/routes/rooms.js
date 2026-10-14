@@ -98,7 +98,7 @@ export async function roomRoutes(app, { rooms, config, limiters }) {
       body: {
         type: 'object',
         additionalProperties: false,
-        properties: { pitch: { type: 'integer' }, backing: { type: 'integer' } }, // tom (semitons) e vozes de apoio (0..100 %)
+        properties: { pitch: { type: 'integer' }, backing: { type: 'integer' }, guide: { type: 'integer' } }, // tom (semitons), vozes de apoio e voz original (0..100 %)
         minProperties: 1,
       },
     },

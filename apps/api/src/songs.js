@@ -13,6 +13,7 @@ const keys = (id) => ({
   meta: `cache/${id}/meta.json`,
   melody: `cache/${id}/melody.json`, // opcional: a melodia da voz original, para a pontuação
   backing: `cache/${id}/backing.mp3`, // opcional: só as vozes de apoio, para o controle de nível delas
+  vocals: `cache/${id}/vocals.mp3`, // opcional: a voz original isolada, como guia para cantar (não sobe para a nuvem)
 });
 
 /** Chave do MP4 exportado: o mesmo nome que o worker usa (karaoke.mp4, karaoke_p+2.mp4, karaoke_p-3.mp4). */
@@ -75,6 +76,7 @@ export function createSongService({ storage, jobs, agents = null }) {
         lyrics: localUrl(lib, k.lyrics),
         melody: files.melody ? localUrl(lib, k.melody) : null,
         backing: files.backing ? localUrl(lib, k.backing) : null,
+        vocals: files.vocals ? localUrl(lib, k.vocals) : null,
         local: true, // os arquivos estão no computador do dono: só o navegador dele (a TV) os alcança
       };
     }
@@ -83,6 +85,7 @@ export function createSongService({ storage, jobs, agents = null }) {
       lyrics: storage.getUrl(k.lyrics),
       melody: (await storage.exists(k.melody)) ? storage.getUrl(k.melody) : null,
       backing: (await storage.exists(k.backing)) ? storage.getUrl(k.backing) : null,
+      vocals: (await storage.exists(k.vocals)) ? storage.getUrl(k.vocals) : null,
       local: false,
     };
   }

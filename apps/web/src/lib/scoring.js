@@ -246,10 +246,10 @@ export function createScorer(melody, { transpose = 0, onBlock = null } = {}) {
 }
 
 /** Abre o microfone. Devolve { read(), stop() }; `read()` = { midi: nota | null, level }. Lança se a pessoa negar o acesso. */
-export async function openMic() {
+export async function openMic(deviceId = '') {
   const stream = await navigator.mediaDevices.getUserMedia({
-    // cancelar o eco evita que o instrumental da própria TV conte como voz
-    audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+    // cancelar o eco evita que o instrumental da própria TV conte como voz; o aparelho escolhido é "ideal" (cai no padrão se saiu)
+    audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, ...(deviceId ? { deviceId: { ideal: deviceId } } : {}) },
   });
   const ctx = new AudioContext();
   await ctx.resume();

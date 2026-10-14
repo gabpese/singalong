@@ -53,7 +53,7 @@ async function room(agent, sess) {
 const entry = (id = SONG, over = {}) => ({
   id,
   meta: { video_id: id, title: 'Tempo Perdido', artist: 'Legião Urbana', duration: 300, lyrics_source: 'lrclib', key: { tonic: 3, mode: 'major' }, ...(over.meta ?? {}) },
-  files: { instrumental: true, lyrics: true, melody: false, backing: false, exports: [], ...(over.files ?? {}) },
+  files: { instrumental: true, lyrics: true, melody: false, backing: false, vocals: false, exports: [], ...(over.files ?? {}) },
 });
 
 const publish = (agent, songs) => call('PUT', '/agent/v1/library', { headers: agent.headers, payload: { songs } });
@@ -102,6 +102,7 @@ test('a música do catálogo do dono aparece pronta na sala, com os endereços d
     lyrics: `${BASE}/cache/${SONG}/lyrics.json`,
     melody: `${BASE}/cache/${SONG}/melody.json`,
     backing: null,
+    vocals: null,
     local: true,
   });
   assert.equal((await state(r)).current_item_id !== null, true); // e já toca
@@ -119,6 +120,10 @@ test('só o instrumental e a letra publicados contam como pronta; vozes de apoio
 
   await publish(agent, [entry(SONG, { files: { backing: true } })]); // a análise das vozes de apoio terminou
   assert.equal((await state(r)).queue[0].song.media.backing, `${BASE}/cache/${SONG}/backing.mp3`);
+
+  assert.equal((await state(r)).queue[0].song.media.vocals, null); // a voz original (guia) só entra se o computador a publicar
+  await publish(agent, [entry(SONG, { files: { backing: true, vocals: true } })]);
+  assert.equal((await state(r)).queue[0].song.media.vocals, `${BASE}/cache/${SONG}/vocals.mp3`);
 });
 
 test('a biblioteca da sala é o catálogo do dono; sem a sala, é a do servidor', async () => {

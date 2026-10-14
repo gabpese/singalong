@@ -88,3 +88,29 @@ test('um aviso para leitor de tela anuncia quem está cantando', async ({ page, 
   await page.goto(room.guestUrl);
   await expect(page.locator('p.sr-only[role="status"]')).toContainText('Agora na TV: Bia, Wicked Game');
 });
+
+test('diálogo do atraso do som', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.tvUrl);
+  await page.keyboard.press('l');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
+test('diálogo dos microfones', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.goto(room.tvUrl);
+  await page.keyboard.press('m');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('checkbox').first()).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});
+
+test('sala com as barras das vozes de apoio e da voz original', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await page.addInitScript((id) => localStorage.setItem('clientId', id), ANA);
+  await page.goto(room.guestUrl);
+  await expect(page.getByRole('slider', { name: /guia para cantar/ })).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+});

@@ -7,7 +7,7 @@ import { formatDuration, nextUp, progressPercent, splitQueue, thumbnailUrl } fro
 import type { QueueItem, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
-import { BackingControl } from './BackingControl';
+import { BackingControl, GuideControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
 import { DuetControl } from './Duet';
 import { VoiceVolume } from './VoiceControl';
@@ -150,6 +150,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
               <PitchControl item={current} />
             </div>
             <BackingControl item={current} />
+            <GuideControl item={current} />
             <VoiceVolume />
             <DuetControl item={current} />
             {isHost && (

@@ -236,7 +236,7 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 **Decisões e aprendizados**
 - **O catálogo é do dispositivo:** quem inicia uma sessão nova já encontra a biblioteca; só o endereço da mídia (e o token) muda a cada execução do agente.
 - **O endereço de mídia é validado no servidor**, porque ele chega ao navegador de todos da sala: um agente comprometido não pode apontá-los para um site qualquer.
-- **O token no caminho** protege contra outra página ou programa do mesmo computador; o CORS (só a origem da página) contra outros sites; a lista fixa de arquivos mantém a voz isolada e o `source.json` dentro do computador.
+- **O token no caminho** protege contra outra página ou programa do mesmo computador; o CORS (só a origem da página) contra outros sites; a lista fixa de arquivos mantém o `source.json` dentro do computador; a voz isolada (`vocals.mp3`) está na lista só para o guia de "voz original" que a TV do dono toca, e nunca sobe para a nuvem.
 - **Docker é só para desenvolvimento:** o servidor de mídia escuta em `0.0.0.0` dentro do container (`AGENT_MEDIA_HOST`), a porta é publicada e o endereço que o navegador usa vem de `AGENT_MEDIA_PUBLIC`.
 - **Limites:** a prévia do instrumental no celular não existe para músicas locais; o MP4 de uma música local só baixa no computador do dono (o celular não alcança o servidor local); Firefox e Safari não foram testados.
 

@@ -34,7 +34,7 @@ test.describe('celular', () => {
     await page.goto(room.guestUrl);
     await expect(slider(page)).toHaveValue('0'); // padrão: desligado
     await slider(page).fill('40');
-    await expect(page.locator('.now .backing-value')).toHaveText('40%');
+    await expect(page.locator('.now .backing-row', { has: slider(page) }).locator('.backing-value')).toHaveText('40%');
     await expect.poll(async () => (await itemOf(request, room, SONGS.alpha)).backing).toBe(40);
     expect(id).toBeTruthy();
     // a barra segue o que a sala diz (mudança vinda de outro lugar)

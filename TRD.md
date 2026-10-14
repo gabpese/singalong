@@ -236,7 +236,7 @@ M1 was split into three parts: **M1a** (local storage: the local media server an
 **Decisions and lessons**
 - **The catalog belongs to the device:** whoever starts a new session already finds the library; only the media address (and the token) changes on each agent run.
 - **The media address is validated on the server**, because it reaches everyone's browser in the room: a compromised agent cannot point them at an arbitrary site.
-- **The token in the path** protects against another page or program on the same computer; CORS (only the page's origin) against other sites; the fixed list of files keeps the isolated voice and `source.json` inside the computer.
+- **The token in the path** protects against another page or program on the same computer; CORS (only the page's origin) against other sites; the fixed list of files keeps `source.json` inside the computer; the isolated voice (`vocals.mp3`) is on the list only for the "original voice" guide that the owner's TV plays, and is never uploaded to the cloud.
 - **Docker is for development only:** the media server listens on `0.0.0.0` inside the container (`AGENT_MEDIA_HOST`), the port is published and the address the browser uses comes from `AGENT_MEDIA_PUBLIC`.
 - **Limits:** the instrumental preview on the phone does not exist for local songs; a local song's MP4 only downloads on the owner's computer (the phone cannot reach the local server); Firefox and Safari were not tested.
 

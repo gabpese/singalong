@@ -5,7 +5,7 @@ import re
 import urllib.parse
 import urllib.request
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 _VERSION_RE = re.compile(r"^v?(\d{1,6})\.(\d{1,6})\.(\d{1,6})(?:[-+][0-9A-Za-z.-]{0,40})?$")
 

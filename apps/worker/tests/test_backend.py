@@ -436,7 +436,7 @@ class HttpCatalogTests(unittest.TestCase):
         self.assertEqual(req["method"], "PUT")
         (entry,) = req["body"]["songs"]
         self.assertEqual((entry["id"], entry["meta"]["title"]), ("abcdefghijk", "T"))
-        self.assertEqual(entry["files"], {"instrumental": True, "lyrics": True, "melody": False, "backing": False, "exports": []})
+        self.assertEqual(entry["files"], {"instrumental": True, "lyrics": True, "melody": False, "backing": False, "vocals": False, "exports": []})
 
     def test_sem_servidor_local_ou_musica_incompleta_nao_publica_nada(self):
         self.song()

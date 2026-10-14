@@ -581,3 +581,5 @@ body.stage { background: #0b0b14; }
   .prev, .next2 { opacity: 1; }
 }
 .stage-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.latency-field { margin-top: 10px; } .latency-field input[type=range] { width: 100%; }
+.mic-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; } .mic-list .check { align-items: center; }

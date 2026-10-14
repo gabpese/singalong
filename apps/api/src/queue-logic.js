@@ -17,6 +17,9 @@ export function clampBacking(value) {
   return Math.min(Math.max(n, 0), 100);
 }
 
+/** Nível da voz original (guia): o mesmo intervalo das vozes de apoio. */
+export const clampGuide = clampBacking;
+
 /** Ajuste da letra em segundos, limitado a ±10 s e a 2 casas. */
 export function clampOffset(value) {
   const n = Number(value);

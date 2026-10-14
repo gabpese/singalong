@@ -7,7 +7,7 @@ import { canRetry, playOrder, songChip, thumbnailUrl } from '../lib/queue-view.j
 import type { ApiError, QueueItem, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
-import { BackingControl } from './BackingControl';
+import { BackingControl, GuideControl } from './BackingControl';
 import { DuetControl } from './Duet';
 import { PitchControl } from './PitchControl';
 
@@ -118,6 +118,7 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
         )}
       </div>
       <BackingControl item={item} />
+      <GuideControl item={item} />
       <DuetControl item={item} />
     </li>
   );
