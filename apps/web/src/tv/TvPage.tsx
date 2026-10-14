@@ -26,7 +26,7 @@ declare global {
   }
 }
 
-/** O QR code da sala sempre à vista (quem chega no meio da festa entra sem pedir o código): fica abaixo da fila enquanto toca. */
+/** O QR code da sala sempre à vista (quem chega no meio da festa entra sem pedir o código): fica ao lado de quem está cantando. */
 function JoinCard({ code }: { code: string }) {
   return (
     <aside className="tv-join" aria-label={t('tvp.joinAria')}>
@@ -188,17 +188,20 @@ export function TvPage({ code }: { code: string }) {
         <InviteNotice state={room} onRespond={(item, accept) => void respondInvite(code, item, accept)} />
       </div>
       <header className="tv-top">
-        <div className="singer is-now" hidden={!current}>
-          {current && (
-            <>
-              <span className="label">{t('tv.singingNow')}</span>
-              <strong className="who">
-                <Icon name="singing" /> {current.singers}
-              </strong>
-              <span className="what">{trackName(current)}</span>
-              <span className="key">{keySummary(current.song.key, current.pitch)}</span>
-            </>
-          )}
+        <div className="tv-now">
+          {current && <JoinCard code={code} />}
+          <div className="singer is-now" hidden={!current}>
+            {current && (
+              <>
+                <span className="label">{t('tv.singingNow')}</span>
+                <strong className="who">
+                  <Icon name="singing" /> {current.singers}
+                </strong>
+                <span className="what">{trackName(current)}</span>
+                <span className="key">{keySummary(current.song.key, current.pitch)}</span>
+              </>
+            )}
+          </div>
         </div>
         <div className="singer is-next" hidden={!next}>
           {next && (
@@ -238,7 +241,6 @@ export function TvPage({ code }: { code: string }) {
         </section>
         <div className="tv-side">
           <QueueBox current={current} upcoming={upcoming} />
-          {current && <JoinCard code={code} />}
         </div>
       </div>
 

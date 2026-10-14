@@ -42,11 +42,15 @@ test('quem aperta sem parar é limitado: a TV não vira uma nuvem de emojis', as
   const bia = await phone(browser, BIA, 'Bia');
   await bia.page.goto(room.guestUrl);
   const button = bia.page.getByRole('button', { name: 'Festa' });
+  const started = Date.now();
   for (let i = 0; i < 30; i++) await button.click({ delay: 0 });
+  const seconds = (Date.now() - started) / 1000;
   await tv.waitForTimeout(500);
   const shown = await tv.locator('.reaction').count();
   expect(shown).toBeGreaterThan(0);
-  expect(shown).toBeLessThanOrEqual(12);
+  // o balde do servidor começa com 6 fichas e enche 3 por segundo: num computador lento os cliques levam mais tempo e passam mais reações
+  expect(shown).toBeLessThanOrEqual(Math.ceil(6 + 3 * (seconds + 0.5)) + 1);
+  expect(shown).toBeLessThan(30);
   await bia.context.close();
 });
 

@@ -307,10 +307,13 @@ body.tv { overflow: hidden; height: 100vh; }
 .tv-stage:not(.has-queue) .tv-body { grid-template-columns: minmax(0, 1fr); }
 .tv-side { align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 14px; min-height: 0; overflow: hidden; }
 .tv-body > * { min-height: 0; }
-.tv-join { display: grid; justify-items: center; gap: 8px; padding: 14px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); text-align: center; flex: 0 0 auto; }
-.tv-join .qr { width: clamp(72px, 16vh, 170px); padding: 6px; }
-.tv-join p { margin: 0; color: var(--dim); font-size: clamp(.8rem, 1.2vw, 1.05rem); }
-.tv-join strong { color: var(--accent); letter-spacing: .12em; }
+/* o QR code da sala fica ao lado de quem está cantando (a coluna da direita é só da fila) */
+.tv-now { display: flex; align-items: center; gap: clamp(12px, 1.6vw, 24px); min-width: 0; }
+.tv-now .singer { flex: 1 1 auto; }
+.tv-join { flex: 0 0 auto; display: grid; justify-items: center; gap: 4px; text-align: center; }
+.tv-join .qr { width: clamp(56px, 9vh, 100px); padding: 4px; }
+.tv-join p { margin: 0; color: var(--dim); font-size: clamp(.75rem, 1.05vw, 1rem); white-space: nowrap; }
+.tv-join strong { color: var(--accent); letter-spacing: .1em; }
 .tv-join[hidden] { display: none; }
 .tv-queue { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); flex: 0 1 auto; min-height: 0; overflow: hidden; padding: 16px 18px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
 .tv-queue[hidden] { display: none; }
@@ -384,7 +387,7 @@ body.tv { overflow: hidden; height: 100vh; }
 
 @media (max-width: 900px) {
   .tv-body, .tv-stage:not(.has-queue) .tv-body { grid-template-columns: minmax(0, 1fr); }
-  .tv-side { display: none; }
+  .tv-side, .tv-join { display: none; }
   .tv-stage.has-queue .idle { right: 0; }
   .tv-top { grid-template-columns: 1fr; gap: 6px; }
   .singer.is-next { padding-left: 0; border-left: 0; }

@@ -106,6 +106,7 @@ for (const size of [{ width: 1100, height: 740 }, { width: 1100, height: 800 }, 
       lyrics: await box(page.locator('.lyrics')),
       queue: await box(page.locator('.tv-queue')),
       qr: await box(page.locator('.tv-join')),
+      singer: await box(page.locator('.singer.is-now')),
       guide: await box(page.locator('canvas.pitch-guide')),
       hud: await box(page.locator('.score-hud')),
       progress: await box(page.locator('.tv-progress')),
@@ -117,6 +118,10 @@ for (const size of [{ width: 1100, height: 740 }, { width: 1100, height: 800 }, 
     expect(cards.hud.right).toBeGreaterThan(size.width - 48); // continua colado na direita
     expect(cards.hud.bottom).toBeLessThanOrEqual(size.height); // e cabe na tela
     expect(cards.qr.bottom).toBeLessThanOrEqual(size.height); // o QR code também cabe na tela
-    expect(cards.queue.bottom).toBeLessThanOrEqual(cards.qr.y + 1); // e a fila termina antes do QR code
+    expect(cards.qr.bottom).toBeLessThanOrEqual(cards.lyrics.y + 1); // o QR code fica no alto, ao lado de quem canta, e não sobre a letra
+    expect(cards.qr.right).toBeLessThanOrEqual(cards.singer.x + 1); // à esquerda do "Cantando agora"
+    expect(cards.queue.x).toBeGreaterThanOrEqual(cards.lyrics.right); // a fila ocupa sozinha a coluna ao lado da letra
+    expect(cards.queue.y).toBeLessThanOrEqual(cards.lyrics.y + 40);
+    expect(cards.queue.bottom).toBeLessThanOrEqual(cards.hud.y + 1); // e termina antes da faixa de baixo
   });
 }
