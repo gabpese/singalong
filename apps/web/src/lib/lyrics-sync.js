@@ -38,14 +38,15 @@ export function lineProgress(cue, t) {
   return Math.min(Math.max((t - cue.start) / span, 0), 1);
 }
 
-export const MIN_GAP_SECONDS = 8; // pausa a partir da qual o cantor recebe o aviso "prepare-se"
+export const MIN_GAP_SECONDS = 3; // pausa a partir da qual o cantor recebe o aviso "prepare-se"
 export const GAP_DASHES = 14; // tamanho do aviso: "--------------"
-export const COUNTDOWN_SECONDS = 8; // os traços somem durante os últimos 8 s antes da próxima linha
+export const COUNTDOWN_SECONDS = 8; // os traços somem durante os últimos 8 s antes da próxima linha (ou ao longo da pausa toda, se ela for mais curta)
 
 /**
- * Se `t` está numa pausa de letra de 8 s ou mais (introdução, solo, ponte), devolve o aviso a mostrar:
+ * Se `t` está numa pausa de letra de 3 s ou mais (introdução, solo, ponte), devolve o aviso a mostrar:
  * { next: índice da próxima linha, remaining: segundos até ela, dashes: quantos traços mostrar }.
- * Os traços ficam completos e, nos últimos 8 s, vão sumindo: o cantor vê QUANDO a linha vai começar.
+ * Os traços ficam completos e, nos últimos 8 s (ou ao longo da pausa toda, se ela tem menos de 8 s), vão sumindo: o cantor
+ * vê QUANDO a linha vai começar.
  * Devolve null fora de pausas longas, após a última linha (não há "próxima") e com letra vazia.
  */
 export function gapDisplay(cues, t) {
@@ -62,7 +63,8 @@ export function gapDisplay(cues, t) {
   const gapEnd = cues[lo].start;
   if (t < gapStart || gapEnd - gapStart < MIN_GAP_SECONDS) return null;
   const remaining = gapEnd - t;
-  const dashes = remaining >= COUNTDOWN_SECONDS ? GAP_DASHES : Math.max(1, Math.ceil((GAP_DASHES * remaining) / COUNTDOWN_SECONDS));
+  const countdown = Math.min(COUNTDOWN_SECONDS, gapEnd - gapStart); // uma pausa de 3 s tem 3 s de contagem, não 8
+  const dashes = remaining >= countdown ? GAP_DASHES : Math.max(1, Math.ceil((GAP_DASHES * remaining) / countdown));
   return { next: lo, remaining, dashes };
 }
 

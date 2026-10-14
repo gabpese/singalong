@@ -101,7 +101,7 @@ test('sungEnd: linha longa demais para o texto é tratada como cantada na estima
   assert.ok(sungEnd({ start: 0, end: 60, text: 'oi' }) < 10); // mínimo de 3 s de estimativa
 });
 
-test('gapDisplay: a introdução (≥ 8 s) mostra os 14 traços completos', () => {
+test('gapDisplay: a introdução (≥ 3 s) mostra os 14 traços completos', () => {
   const g = gapDisplay(song, 2);
   assert.equal(g.next, 0);
   assert.equal(g.dashes, GAP_DASHES);
@@ -123,8 +123,9 @@ test('gapDisplay: nos últimos 8 s os traços vão sumindo até a linha começar
 test('gapDisplay: pausas curtas não mostram aviso', () => {
   assert.equal(gapDisplay(song, 18), null); // dentro da linha 2
   assert.equal(gapDisplay(song, 16.5), null); // entre as linhas 1 e 2: 1 s
-  assert.equal(gapDisplay([{ start: 7.9, end: 10, text: 'a' }], 0), null); // intro de 7,9 s
-  assert.notEqual(gapDisplay([{ start: MIN_GAP_SECONDS, end: 12, text: 'a' }], 0), null); // exatamente 8 s: mostra
+  assert.equal(gapDisplay([{ start: 2.9, end: 10, text: 'a' }], 0), null); // intro de 2,9 s: curta demais
+  assert.notEqual(gapDisplay([{ start: MIN_GAP_SECONDS, end: 12, text: 'a' }], 0), null); // exatamente 3 s: mostra
+  assert.equal(MIN_GAP_SECONDS, 3);
 });
 
 test('gapDisplay: solo no meio da música (a partir do fim da linha anterior)', () => {
@@ -168,4 +169,18 @@ test('clampBacking: nível das vozes de apoio, inteiro de 0 a 100; inválido des
   assert.equal(clampBacking('muito'), 0);
   assert.equal(clampBacking(undefined), 0);
   assert.equal(clampBacking(null), 0);
+});
+
+test('gapDisplay: uma pausa curta (3 s a 8 s) tem os traços cheios no começo e some ao longo dela toda', () => {
+  const cues = [{ start: 0, end: 2, text: 'primeira linha cantada' }, { start: 9, end: 11, text: 'segunda linha' }]; // a pausa vai do fim estimado da 1ª (~5,2 s) até 9 s
+  const gapStart = sungEnd(cues[0]);
+  const length = 9 - gapStart;
+  assert.ok(length >= MIN_GAP_SECONDS && length < COUNTDOWN_SECONDS, `pausa de ${length} s`);
+  assert.equal(gapDisplay(cues, gapStart + 0.01).dashes, 14); // no começo da pausa: cheios (e não já pela metade)
+  const middle = gapDisplay(cues, gapStart + length / 2).dashes;
+  assert.ok(middle > 1 && middle < 14, `no meio: ${middle}`);
+  assert.equal(gapDisplay(cues, 9 - 0.05).dashes, 1);
+  const seen = [];
+  for (let t = gapStart + 0.01; t < 9; t += 0.25) seen.push(gapDisplay(cues, t).dashes);
+  assert.deepEqual(seen, [...seen].sort((a, b) => b - a)); // nunca aumenta
 });

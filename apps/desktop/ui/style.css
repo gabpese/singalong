@@ -142,14 +142,24 @@ details.advanced label { margin-top: 8px; }
 .setup-box .row { justify-content: flex-end; }
 
 /* estatísticas do dono */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 12px 0; }
-.stat { display: grid; gap: 2px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
-.stat strong { font-size: 22px; }
+.stats-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.stats-head h2 { margin: 0; }
+.stats-controls { display: flex; align-items: center; gap: 8px; }
+.stats-controls select { flex: none; width: auto; min-width: 150px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.stat { display: grid; gap: 2px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+.stat strong { font-size: 22px; line-height: 1.1; }
 .stat span { font-size: 12px; }
-.stats-chart { display: flex; align-items: flex-end; gap: 4px; height: 64px; margin: 8px 0 14px; padding: 4px; border-bottom: 1px solid var(--border); }
+.stats-chart-box { margin: 16px 0 6px; }
+.stats-chart-box > .muted { font-size: 12px; margin-bottom: 4px; }
+.stats-chart { display: flex; align-items: flex-end; gap: 4px; height: 64px; padding: 0 2px; border-bottom: 1px solid var(--border); }
 .stats-chart .bar { flex: 1; min-width: 6px; background: var(--accent); border-radius: 3px 3px 0 0; }
-.stats-list { margin: 12px 0; }
+.stats-chart-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.stats-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 4px 28px; margin-top: 14px; }
+.stats-list { margin: 8px 0; min-width: 0; }
 .stats-list h3 { margin: 0 0 6px; font-size: 14px; }
-.stats-list ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
-.stats-list li { display: flex; justify-content: space-between; gap: 12px; }
-.stats-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-list p { margin: 0 0 6px; font-size: 13px; }
+.stats-list ol { margin: 0; padding-left: 20px; display: grid; gap: 5px; font-size: 13px; }
+.stats-list li { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
+.stats-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.stats-list li .muted { flex: none; }
