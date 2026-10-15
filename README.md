@@ -268,6 +268,19 @@ Other ways (`apps/desktop/scripts/signing.mjs`): **Azure Trusted Signing** (`AZU
 
 Honest limits: signing shows **who published** the installer instead of "unknown publisher", but **SmartScreen can keep warning** until the signed file builds reputation. The auto-update checks that the new installer was signed by the **same publisher name** as the installed one (`SINGALONG_PUBLISHER`, or the certificate's common name): when changing certificate keep that name or release one transition version signed by both.
 
+### Measuring lyrics transcription (1.4.0, T1)
+
+`python -m singalong_worker.bench_transcribe` measures how well Whisper **transcribes** the isolated vocals of the songs in your library, using as ground truth the songs that already have human lyrics (LRCLIB or the video subtitles). It reports the word error rate (WER), the error in the start of each line, the speed per model and how confident Whisper is where it errs. Nothing leaves the computer and no lyrics go into the report. With the app's engine (replace the paths):
+
+```powershell
+$engine = "$env:APPDATA\Singalong Karaoke\engine"; $env:PATH = "$engine\bin;$env:PATH"; $env:PYTHONPATH = "C:\projetos\singalong\apps\worker"
+$env:WHISPER_CACHE = "$engine\models\whisper"
+& "$engine\python\python.exe" -m singalong_worker.bench_transcribe --storage-root "$env:APPDATA\Singalong Karaoke\library" --list      # what serves as ground truth
+& "$engine\python\python.exe" -m singalong_worker.bench_transcribe --storage-root "$env:APPDATA\Singalong Karaoke\library" --models base,small,medium,turbo --excerpt 90 --covers covers.txt
+```
+
+`--covers` takes a file with one video ID per line: the report then separates the covers. The models (`medium` and `turbo` are ~1.5 GB each) are downloaded to the engine's cache the first time. `--device cpu` measures the CPU.
+
 ### Worker CLI (no API, for testing)
 
 ```powershell

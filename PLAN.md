@@ -709,3 +709,22 @@ Found while using 1.2.0 on a real TV and microphone:
 - **Time and disk:** the good model is bigger (`medium` ~1.5 GB, `large-v3-turbo` ~1.6 GB) and, on the CPU, transcribing takes a while; the default model comes from the T1 measurements.
 - **Privacy:** nothing changes without the API turned on. With it, **only doubtful passages** of the isolated vocals leave the computer, with the owner's consent.
 - **No AMD/Apple GPU:** Whisper runs on the CPU on those computers (like the rest of the engine).
+
+**T1 status (measure before promising): done.** The `bench_transcribe` script (with tests) was run on the owner's library: **8 songs** with LRCLIB lyrics as ground truth (a 90 s excerpt of each), on an **RTX 3060**, and on the CPU (an i9-12900KS with 16 cores, 3 songs of 60 s). No song was marked as a cover, so **the covers group was not measured yet** (`--covers` separates it).
+
+| Model | WER (words pooled) | Median WER per song | Line start (median) | Speed on the GPU | Speed on the CPU* |
+|---|---|---|---|---|---|
+| `base` | 51% | 45% | 0.39 s | 0.05x the song's length | 0.13x |
+| `small` | 36% | 32% | 0.33 s | 0.05x | 0.13x |
+| `medium` | **25%** | **13%** | 0.42 s | 0.12x | – |
+| `turbo` (large-v3-turbo) | **27%** | **15%** | 0.64 s | **0.075x** | 0.27x |
+
+*A strong CPU (16 cores): a 4-minute song takes ~1 min with `turbo` and ~30 s with `small`; a weaker computer will be slower (not measured yet).
+
+**What the numbers say**
+1. **Default model: `turbo`.** It ties with `medium` on quality (13% to 15% median error) and is much faster; `small` and `base` are far behind (32% and 45%). On the GPU a 4 min song takes ~18 s. On the CPU `turbo` still works on strong computers; on weak CPUs `small` is the limit of acceptable. (T2 chooses by hardware.)
+2. **The worst case is processed voice.** Daft Punk (Stronger), with a vocoder voice, errs 77% to 98% with any model and drags the pooled WER up to 25%; the other 7 songs stay between 8% and 16% with `medium` and between 6% and 27% with `turbo`. The generated lyrics are a **draft**, as the plan says.
+3. **Whisper's timing is only fair:** the line start errs ~0.4 to 0.7 s (median) and only ~60% of the lines are within 1 s (LRCLIB has its own noise too). So **when the catalog has the lyrics, its text with forced alignment is worth more than the transcription**.
+4. **Layer 2 (choosing the catalog lyrics by the audio) works.** The heard excerpt fits the right lyrics (right pair >= 0.40 on `medium` and >= 0.31 on `turbo`) and hardly fits the others (wrong pairs <= 0.08): a wide gap, with a threshold of ~0.24 (`medium`) and ~0.2 (`turbo`); on `small` the gap is smaller (0.18 against 0.09). The same song in two versions does not count as a wrong pair. The sample is small and nearly without covers: the final threshold comes from the test with real covers.
+5. **Layer 3 (the API only where the local one doubts):** the two "doubt" signals Whisper gives (the passage's `avg_logprob` and `mean_word_prob`, the mean word probability) perform alike and **neither is clearly better** (it varies from one run to the next). With `turbo`, flagging passages with `mean_word_prob <= ~0.67` (or `avg_logprob <= ~-0.43`) catches 57% to 62% of the bad passages (65% to 70% of what it flags is really bad) and would send **only ~8% of the words** to the API (18% on the CPU, small sample). The signal is useful, not perfect (measurements vary 1 to 2 points between runs, and a sample of 8 songs is small); **the real gain of the API (how much it fixes) was not measured, it needs the key**: left for T4.
+6. **Still unmeasured:** the covers, the API and the duet voices (T5).

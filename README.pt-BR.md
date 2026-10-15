@@ -273,6 +273,19 @@ Outros caminhos (`apps/desktop/scripts/signing.mjs`): **Azure Trusted Signing** 
 
 Limites honestos: assinar mostra **quem publicou** o instalador em vez de "editor desconhecido", mas o **SmartScreen pode continuar avisando** até o arquivo assinado ganhar reputação. A atualização automática confere que o instalador novo foi assinado pelo **mesmo nome de publicador** do instalado (`SINGALONG_PUBLISHER`, ou o nome comum do certificado): ao trocar de certificado, mantenha esse nome ou publique uma versão de transição assinada pelos dois.
 
+### Medir a transcrição da letra (1.4.0, T1)
+
+`python -m singalong_worker.bench_transcribe` mede o quanto o Whisper acerta ao **transcrever** a voz isolada das músicas da sua biblioteca, usando como gabarito as músicas que já têm letra de gente (LRCLIB ou a legenda do vídeo). Mostra o erro de palavras (WER), o erro do começo de cada linha, a velocidade de cada modelo e quanto o Whisper "duvida" onde erra. Nada sai do computador e nenhuma letra vai para o relatório. Com o motor do app (troque os caminhos):
+
+```powershell
+$engine = "$env:APPDATA\Singalong Karaoke\engine"; $env:PATH = "$engine\bin;$env:PATH"; $env:PYTHONPATH = "C:\projetos\singalong\apps\worker"
+$env:WHISPER_CACHE = "$engine\models\whisper"
+& "$engine\python\python.exe" -m singalong_worker.bench_transcribe --storage-root "$env:APPDATA\Singalong Karaoke\library" --list      # o que serve de gabarito
+& "$engine\python\python.exe" -m singalong_worker.bench_transcribe --storage-root "$env:APPDATA\Singalong Karaoke\library" --models base,small,medium,turbo --excerpt 90 --covers covers.txt
+```
+
+`--covers` recebe um arquivo com um ID de vídeo por linha: o relatório então separa os covers. Os modelos (`medium` e `turbo` têm ~1,5 GB cada) são baixados para o cache do motor na primeira vez. `--device cpu` mede a CPU.
+
 ### CLI do worker (sem API, para testes)
 
 ```powershell

@@ -711,3 +711,22 @@ A **1.3.0 inclui só a F26**. O modo híbrido na nuvem (F25) e os ambientes `hml
 - **Tempo e disco:** o modelo bom é maior (`medium` ~1,5 GB, `large-v3-turbo` ~1,6 GB) e, na CPU, transcrever demora; o modelo padrão sai das medições do T1.
 - **Privacidade:** nada muda sem a API ligada. Com ela, **só trechos duvidosos** da voz isolada saem do computador, com o consentimento do dono.
 - **Sem GPU AMD/Apple:** o Whisper roda na CPU nesses computadores (como o resto do motor).
+
+**Status do T1 (medir antes de prometer): feito.** O script `bench_transcribe` (com testes) foi rodado na biblioteca do dono: **8 músicas** com letra da LRCLIB como gabarito (um trecho de 90 s de cada), numa **RTX 3060**, e na CPU (um i9-12900KS de 16 núcleos, 3 músicas de 60 s). Nenhuma música foi marcada como cover, então **o grupo dos covers ainda não foi medido** (o `--covers` o separa).
+
+| Modelo | WER (palavras juntas) | WER mediano por música | Início de linha (mediano) | Velocidade na GPU | Velocidade na CPU* |
+|---|---|---|---|---|---|
+| `base` | 51% | 45% | 0,39 s | 0,05x o tempo da música | 0,13x |
+| `small` | 36% | 32% | 0,33 s | 0,05x | 0,13x |
+| `medium` | **25%** | **13%** | 0,42 s | 0,12x | – |
+| `turbo` (large-v3-turbo) | **27%** | **15%** | 0,64 s | **0,075x** | 0,27x |
+
+*CPU forte (16 núcleos): uma música de 4 minutos leva ~1 min com o `turbo` e ~30 s com o `small`; num computador mais fraco será mais lento (ainda não medido).
+
+**O que os números dizem**
+1. **Modelo padrão: `turbo`.** Empata em qualidade com o `medium` (13% a 15% de erro mediano) e é bem mais rápido; `small` e `base` ficam muito atrás (32% e 45%). Na GPU uma música de 4 min leva ~18 s. Na CPU o `turbo` ainda serve em computadores fortes; em CPUs fracas o `small` é o limite do aceitável. (T2 escolhe por hardware.)
+2. **O pior caso é voz processada.** Daft Punk (Stronger), com a voz em vocoder, erra 77% a 98% com qualquer modelo e puxa o WER das palavras juntas para 25%; as outras 7 músicas ficam entre 8% e 16% com o `medium` e entre 6% e 27% com o `turbo`. A letra gerada é **rascunho**, como o plano diz.
+3. **O tempo do Whisper é só razoável:** o início de linha erra ~0,4 a 0,7 s (mediano) e só ~60% das linhas ficam a menos de 1 s (a LRCLIB também tem seu ruído). Por isso, **quando o catálogo tem a letra, vale o texto dele com o alinhamento forçado**, e não a transcrição.
+4. **A camada 2 (escolher a letra do catálogo pelo áudio) funciona.** O trecho ouvido cabe na letra certa (par certo >= 0,40 no `medium` e >= 0,31 no `turbo`) e quase não cabe nas outras (pares errados <= 0,08): há uma folga grande, com limiar em ~0,24 (`medium`) e ~0,2 (`turbo`); no `small` a folga é menor (0,18 contra 0,09). A mesma música em duas versões não conta como par errado. A amostra é pequena e quase sem covers: o limiar final sai do teste com covers de verdade.
+5. **A camada 3 (API só onde o local duvida):** os dois sinais de "dúvida" que o Whisper dá (`avg_logprob` do trecho e `mean_word_prob`, a probabilidade média das palavras) rendem parecido e **nenhum é claramente melhor** (varia de uma rodada para outra). Com o `turbo`, marcar os trechos com `mean_word_prob <= ~0,67` (ou `avg_logprob <= ~-0,43`) pega 57% a 62% dos trechos ruins (65% a 70% do que marca é ruim mesmo) e mandaria **só ~8% das palavras** à API (18% na CPU, amostra pequena). O sinal é útil, não perfeito (as medições variam 1 a 2 pontos entre rodadas, e uma amostra de 8 músicas é pequena); **o ganho real da API (quanto ela corrige) não foi medido, precisa da chave**: fica para o T4.
+6. **Ainda sem medir:** os covers, a API e as vozes do dueto (T5).
