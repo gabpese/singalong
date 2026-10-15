@@ -20,10 +20,11 @@ import subprocess
 import sys
 import tempfile
 import time
-import unicodedata
 from pathlib import Path
 
+from . import consensus
 from .storage import LocalStorage
+from .textmatch import align_words, containment, normalize_word, same_lyrics, tokens  # noqa: F401 - reexportados: os testes e o relatório os usam
 
 TRUSTED_SOURCES = ("lrclib", "video", "file")  # letra feita por gente, com tempo de linha: serve de gabarito (align/text são da IA ou do usuário sem tempo)
 DEFAULT_MODELS = ("base", "small", "medium", "turbo")
@@ -32,42 +33,6 @@ SIDE_PAD = 0.35  # folga (s) ao pegar as linhas de gabarito que cabem no trecho:
 
 
 # ---------------------------------------------------------------- texto e erro de palavras
-
-def normalize_word(word: str) -> str:
-    """Minúsculas, sem acento e sem pontuação: "Don't," e "dont" são a mesma palavra para o gabarito."""
-    text = unicodedata.normalize("NFKD", str(word)).lower()
-    return "".join(ch for ch in text if ch.isalnum())
-
-
-def tokens(text: str) -> list[str]:
-    return [n for n in (normalize_word(w) for w in str(text).split()) if n]
-
-
-def align_words(ref: list[str], hyp: list[str]) -> list[tuple[int | None, int | None]]:
-    """O alinhamento de menor custo (Levenshtein) entre a letra (ref) e o que o Whisper ouviu (hyp): pares (índice na ref, índice no hyp);
-    None do lado que não tem par (palavra que faltou ou que sobrou). Trocas contam como um par com palavras diferentes."""
-    n, m = len(ref), len(hyp)
-    cost = [[0] * (m + 1) for _ in range(n + 1)]
-    for i in range(1, n + 1):
-        cost[i][0] = i
-    for j in range(1, m + 1):
-        cost[0][j] = j
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            cost[i][j] = min(cost[i - 1][j - 1] + (ref[i - 1] != hyp[j - 1]), cost[i - 1][j] + 1, cost[i][j - 1] + 1)
-    pairs, i, j = [], n, m
-    while i > 0 or j > 0:
-        if i > 0 and j > 0 and cost[i][j] == cost[i - 1][j - 1] + (ref[i - 1] != hyp[j - 1]):
-            pairs.append((i - 1, j - 1))
-            i, j = i - 1, j - 1
-        elif i > 0 and cost[i][j] == cost[i - 1][j] + 1:
-            pairs.append((i - 1, None))
-            i -= 1
-        else:
-            pairs.append((None, j - 1))
-            j -= 1
-    return pairs[::-1]
-
 
 def word_errors(ref: list[str], hyp: list[str], pairs: list[tuple[int | None, int | None]] | None = None) -> dict:
     """{"ref_words", "hyp_words", "substitutions", "deletions", "insertions", "errors", "wer"} (wer = None sem palavras no gabarito)."""
@@ -120,21 +85,6 @@ def line_start_errors(window: dict, hyp_starts: list[float], pairs: list[tuple[i
 
 
 # ---------------------------------------------------------------- o rascunho contra o catálogo (a camada 2 da busca inteligente)
-
-def containment(hyp: list[str], ref: list[str], n: int = 2) -> float:
-    """Que parte dos pares de palavras seguidas (bigramas) do que o Whisper ouviu aparece na letra candidata. Serve para um TRECHO ouvido
-    contra uma letra INTEIRA (por isso é "contida em", e não uma simetria): 1.0 = o trecho está todo na letra; perto de 0 = é outra música."""
-    grams = [tuple(hyp[i:i + n]) for i in range(len(hyp) - n + 1)]
-    if not grams:
-        return 0.0
-    pool = {tuple(ref[i:i + n]) for i in range(len(ref) - n + 1)}
-    return round(sum(1 for g in grams if g in pool) / len(grams), 3)
-
-
-def same_lyrics(a: list[str], b: list[str], at_least: float = 0.8) -> bool:
-    """As duas letras são praticamente a mesma (o cover e o original, ou duas versões): cada uma está quase toda contida na outra."""
-    return min(containment(a, b), containment(b, a)) >= at_least
-
 
 def catalog_match(heard: dict[str, list[str]], references: dict[str, list[str]]) -> dict | None:
     """Para cada música, o rascunho dela contra a letra dela mesma (par certo) e contra a de todas as outras (pares errados): se um limiar separa
@@ -236,7 +186,7 @@ def transcribe(model, wav: Path) -> dict:
         for w in seg.words or []:
             token = normalize_word(w.word)
             if token:
-                words.append({"token": token, "start": float(w.start), "prob": float(getattr(w, "probability", 0.0) or 0.0)})
+                words.append({"token": token, "text": str(w.word).strip(), "start": float(w.start), "prob": float(getattr(w, "probability", 0.0) or 0.0)})
         probs = [x["prob"] for x in words[first:]]
         segments.append({
             "first": first, "count": len(words) - first,
@@ -297,6 +247,11 @@ def render_table(report: dict) -> str:
             share = '-' if s["line_start_within_1s"] is None else f"{s['line_start_within_1s']:.0%}"
             lines.append(f"{model:<8} {group:<8} {s['songs']:>7} {s['wer_pooled']:>6.1%} {s['wer_median']:>8.1%} "
                          f"{(str(s['line_start_median_s']) + ' s') if s['line_start_median_s'] is not None else '-':>11} {share:>6} {s['realtime_factor']:>12}")
+    for combo, data in report.get("votes", {}).items():
+        v = data["summary"]
+        shift = ", ".join(f"{m} {d:+.1%}" for m, d in v["vs_single"].items())
+        lines.append(f"voto {combo:<22} todas {v['songs']:>3} músicas  WER {v['wer_pooled']:.1%}  mediano {v['wer_median']:.1%}  início med. {v['line_start_median_s']} s"
+                     f"  (contra cada modelo sozinho: {shift}; o voto mexeu em {v['vote_changes']} palavras)")
     rec = report.get("recommendation")
     if rec:
         lines.append(f"\nModelo padrão sugerido: {rec['model']} (WER {rec['wer_pooled']:.1%}, melhor medido {rec['best_wer']:.1%}, {rec['realtime_factor']}x o tempo da música)")
@@ -314,6 +269,29 @@ def render_table(report: dict) -> str:
     return "\n".join(lines)
 
 
+def vote_report(prepared: list[dict], heard_by_model: dict[str, dict[str, dict]], combos: list[list[str]], singles: dict[str, dict]) -> dict:
+    """Mede o voto: para cada combinação de modelos (a primeira é o pivô), junta o que eles ouviram em cada música com `consensus.vote` e
+    compara com a letra de gabarito, igual ao que se faz com um modelo só. `singles` são os resumos dos modelos sozinhos, para comparar."""
+    report = {}
+    for combo in combos:
+        per_song = []
+        for song in prepared:
+            sources = [{"name": m, "words": heard_by_model[m][song["id"]]["words"]} for m in combo if song["id"] in heard_by_model.get(m, {})]
+            if len(sources) < len(combo):
+                continue
+            voted = consensus.vote(sources)
+            heard = {"words": voted["words"], "segments": [], "language": None}
+            scored = score_song(song["window"], heard)
+            per_song.append({**scored, "id": song["id"], "group": song["group"], "seconds": 0.0, "audio_seconds": song["length"], "vote": voted["stats"]})
+        if not per_song:
+            continue
+        summary = summarize(per_song)
+        summary["vote_changes"] = sum(s["vote"]["changed"] + s["vote"]["removed"] + s["vote"]["added"] for s in per_song)
+        summary["vs_single"] = {m: round(summary["wer_pooled"] - singles[m]["wer_pooled"], 3) for m in combo if singles.get(m, {}).get("songs")}
+        report["+".join(combo)] = {"summary": summary, "per_song": [{k: v for k, v in s.items() if k != "segments"} for s in per_song]}
+    return report
+
+
 def best_signal(samples: list[dict]) -> dict:
     """Testa cada sinal de confiança e devolve todos, com o melhor (maior F1) marcado: o que mais separa o trecho ruim do bom."""
     found = {key: suggest_threshold(samples, key) for key in CONFIDENCE_KEYS}
@@ -322,7 +300,7 @@ def best_signal(samples: list[dict]) -> dict:
 
 
 def run(storage_root: str, models: list[str], excerpt: float, covers: set[str], only: set[str] | None, limit: int | None, device: str | None,
-        out: Path | None, log=print) -> dict:
+        out: Path | None, log=print, votes: list[list[str]] | None = None) -> dict:
     import stable_whisper  # import tardio: só quem mede precisa do Whisper
 
     storage = LocalStorage(storage_root)
@@ -345,6 +323,7 @@ def run(storage_root: str, models: list[str], excerpt: float, covers: set[str], 
         prepared.append({**song, "start": start, "length": length, "window": window, "wav": wav, "group": "cover" if song["id"] in covers else "original"})
         report["songs"].append({"id": song["id"], "title": song["title"], "artist": song["artist"], "source": song["source"], "excerpt_start": start,
                                 "ref_words": len(window["words"]), "group": prepared[-1]["group"]})
+    heard_by_model: dict[str, dict[str, dict]] = {}
     for name in models:
         log(f"\nmodelo {name}: carregando…")
         model = stable_whisper.load_model(name, device=device, download_root=os.environ.get("WHISPER_CACHE") or None)  # o mesmo cache do alinhamento
@@ -360,6 +339,7 @@ def run(storage_root: str, models: list[str], excerpt: float, covers: set[str], 
             seconds = time.monotonic() - t0
             scored = score_song(song["window"], heard)
             hypotheses[song["id"]] = [w["token"] for w in heard["words"]]
+            heard_by_model.setdefault(name, {})[song["id"]] = heard
             per_song.append({**scored, "id": song["id"], "group": song["group"], "seconds": round(seconds, 1), "audio_seconds": song["length"]})
             log(f"  {song['id']}: WER {scored['wer']:.1%} em {seconds:.1f} s")
         groups = {"todas": summarize(per_song), "original": summarize([s for s in per_song if s["group"] == "original"]),
@@ -370,6 +350,8 @@ def run(storage_root: str, models: list[str], excerpt: float, covers: set[str], 
         report.setdefault("per_song", {})[name] = per_song  # com os trechos (só números, sem texto) para reanalisar sem rodar tudo de novo
         del model
     report["recommendation"] = recommend({name: groups["todas"] for name, groups in report["models"].items()})
+    if votes:
+        report["votes"] = vote_report(prepared, heard_by_model, votes, {name: groups["todas"] for name, groups in report["models"].items()})
     log("\n" + render_table(report))
     if out:
         out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -387,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, help="no máximo N músicas")
     p.add_argument("--device", choices=["cpu", "cuda"], help="padrão: automático")
     p.add_argument("--out", type=Path, default=Path("bench-transcribe.json"), help="onde gravar o relatório (padrão: %(default)s)")
+    p.add_argument("--vote", help="combinações de modelos para votar, separadas por vírgula; em cada uma os modelos se separam por + e o primeiro é o pivô "
+                   "(ex.: medium+turbo+small,medium+turbo). Os modelos precisam estar em --models")
     p.add_argument("--list", action="store_true", help="só lista as músicas que servem de gabarito")
     args = p.parse_args(sys.argv[1:] if argv is None else argv)
     only = set(args.only.split(",")) if args.only else None
@@ -395,7 +379,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{song['id']}  {song['source']:<10} {len([c for c in song['cues'] if c.get('text')]):>3} linhas  {song['artist'] or ''} - {song['title']}")
         return 0
     covers = {line.strip() for line in args.covers.read_text(encoding="utf-8").splitlines() if line.strip()} if args.covers else set()
-    run(args.storage_root, [m.strip() for m in args.models.split(",") if m.strip()], args.excerpt, covers, only, args.limit, args.device, args.out)
+    models = [m.strip() for m in args.models.split(",") if m.strip()]
+    votes = [[m.strip() for m in combo.split("+") if m.strip()] for combo in args.vote.split(",")] if args.vote else None
+    for combo in votes or []:
+        if not set(combo) <= set(models):
+            raise SystemExit(f"--vote usa modelos que não estão em --models: {', '.join(sorted(set(combo) - set(models)))}")
+    run(args.storage_root, models, args.excerpt, covers, only, args.limit, args.device, args.out, votes=votes)
     return 0
 
 

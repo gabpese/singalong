@@ -168,6 +168,34 @@ class CatalogMatchTests(unittest.TestCase):
         self.assertIsNone(bench.catalog_match({"a": ["x", "y"]}, {"a": ["x", "y"]}))  # sem nenhum par errado para comparar
 
 
+class VoteReportTests(unittest.TestCase):
+    def heard(self, text, probs=0.9):
+        return {"words": [{"token": t, "text": t, "start": float(i), "prob": probs} for i, t in enumerate(text.split())], "segments": [], "language": None}
+
+    def test_the_vote_is_scored_like_a_single_model_and_compared_with_each_one(self):
+        window = {"words": "my old friend i have come".split(), "line_of": [0, 0, 0, 1, 1, 1], "line_starts": [0.0, 3.0], "lines": 2}
+        prepared = [{"id": "s1", "window": window, "group": "original", "length": 90.0}]
+        heard = {
+            "medium": {"s1": self.heard("my old fiend i have come")},  # um erro
+            "turbo": {"s1": self.heard("my old friend i have come")},
+            "small": {"s1": self.heard("my old friend i have comb")},  # outro erro, em outro lugar
+        }
+        singles = {m: bench.summarize([{**bench.score_song(window, h["s1"]), "seconds": 1.0, "audio_seconds": 90.0}]) for m, h in heard.items()}
+        out = bench.vote_report(prepared, heard, [["medium", "turbo", "small"]], singles)
+        summary = out["medium+turbo+small"]["summary"]
+        self.assertEqual(summary["wer_pooled"], 0.0)  # cada erro estava só em um modelo: o voto os corrige
+        self.assertEqual(summary["vote_changes"], 1)  # o voto conta o que mudou em relação ao pivô: só o "fiend" do medium; o erro do small nem entrou
+        self.assertEqual(summary["vs_single"]["medium"], -round(1 / 6, 3))  # melhor que o medium sozinho
+        self.assertEqual(summary["vs_single"]["turbo"], 0.0)  # e igual ao melhor
+        self.assertEqual(out["medium+turbo+small"]["per_song"][0]["vote"]["changed"], 1)
+
+    def test_a_combination_with_a_missing_model_is_skipped(self):
+        window = {"words": ["a", "b"], "line_of": [0, 0], "line_starts": [0.0], "lines": 1}
+        prepared = [{"id": "s1", "window": window, "group": "original", "length": 90.0}]
+        heard = {"medium": {"s1": self.heard("a b")}}
+        self.assertEqual(bench.vote_report(prepared, heard, [["medium", "turbo"]], {}), {})
+
+
 class BestSignalTests(unittest.TestCase):
     def test_picks_the_signal_that_separates_best(self):
         samples = [
