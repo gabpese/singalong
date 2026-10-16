@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; font-src 'self'">
   <title>Singalong Karaoke</title>
   <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="theme-bridge.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="chrome">
     <header>
       <img src="icon.png" alt="" class="brand-icon">
-      <h1>Singalong Karaoke</h1>
+      <h1 class="wordmark">Singalong Karaoke</h1>
       <span id="version" class="muted" data-testid="version"></span>
       <button id="gear" type="button" class="gear" hidden title="Configurações" aria-label="Configurações" data-testid="gear"><span class="gear-icon"></span></button>
     </header>
@@ -72,7 +74,7 @@
 
     <!-- 3) início: imagem de apresentação, o login do YouTube e o apelido para começar a sessão -->
     <section id="screen-welcome" class="welcome" hidden data-testid="screen-welcome">
-      <div class="welcome-art"><img src="welcome.png" alt="Singalong: karaokê com a TV, o computador e o celular"></div>
+      <div class="welcome-art"><div class="welcome-sheet"><img src="mark.svg" alt="Singalong: um vinil com um microfone"><p class="welcome-tag">Passa o microfone.</p></div></div>
       <div class="welcome-form">
         <h2>Vamos cantar?</h2>
 
@@ -114,8 +116,8 @@
       </div>
 
       <div class="card" id="card-songs">
-        <h2>Músicas</h2>
-        <p class="muted">Importe um arquivo de áudio seu (mp3, flac, wav, m4a, ogg, opus). Ele fica neste computador.</p>
+        <h2>Jukebox</h2>
+        <p class="muted">Importe um arquivo de áudio seu (mp3, flac, wav, m4a, ogg, opus). Ele entra no Jukebox e fica neste computador.</p>
         <button id="import-pick" type="button" data-testid="import-pick">Importar arquivo…</button>
         <div id="import-form" hidden data-testid="import-form">
           <div id="import-file" class="muted" data-testid="import-file"></div>

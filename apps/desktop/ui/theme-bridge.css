@@ -1,0 +1,121 @@
+/*
+ * Singalong — tokens de design (tema "casa de karaokê à noite").
+ *
+ * Um só lugar para as decisões visuais. As referências do projeto, e o que cada uma pediu:
+ *   - taste-skill (devDependency, skill "redesign-existing-projects"): UMA cor de destaque, sem gradiente roxo/azul de "cara de IA", sem
+ *     brilho neon, sombras tingidas, fundo escuro tingido (nunca preto puro), fonte com personalidade, cartões só quando a elevação
+ *     explica a hierarquia, rótulos em frase (nada de caixa-alta em todo lugar) e botões sem pílula.
+ *   - awesome-design-md (devDependency): a atmosfera de Spotify e Warp, escuros quentes com uma única cor de marca, funcional.
+ *   - cult-ui: só o que serve de cada padrão (superfícies em camadas), em CSS puro. Tailwind ficou de fora de propósito: não é ele
+ *     que tira a "cara de IA" (os kits de componentes dele são hoje a marca mais comum dela) e migrar 700 linhas de CSS só traria risco.
+ *
+ * O app instalável (apps/desktop/ui) usa uma cópia deste arquivo; mudou um, mude o outro (um teste confere).
+ */
+
+:root {
+  /* ---------- neutros: a noite de uma sala e o papel de um cartaz (uma só família, quente) ---------- */
+  --ds-bg: #16110f;
+  --ds-bg-raised: #1d1713;
+  --ds-surface: #251d18;
+  --ds-surface-2: #30261f;
+  --ds-line: rgba(240, 228, 205, 0.1);
+  --ds-line-strong: rgba(240, 228, 205, 0.2);
+  --ds-text: #f0e4cd;
+  --ds-text-dim: #b3a794; /* 7:1 sobre a noite */
+  --ds-paper: #f0e4cd;
+  --ds-paper-ink: #16110f; /* texto sobre o papel */
+  --ds-paper-dim: #5b4b3c; /* texto secundário sobre o papel (6:1) */
+
+  /* ---------- a tinta de destaque (vermelho de letreiro): ação e estado ativo. Duas intensidades do mesmo vermelho, por
+     contraste: o profundo (#d62828) para preencher (botões, abas ativas), com texto claro por cima; o aceso (#ff6b6b) para
+     texto e traço sobre o fundo escuro; e o escuro (#b91c1c) quando o fundo é o papel ---------- */
+  --ds-accent-rgb: 214, 40, 40;
+  --ds-accent: rgb(var(--ds-accent-rgb));
+  --ds-accent-hi: #e53935;
+  --ds-accent-text: #ff6b6b; /* 6,7:1 sobre a noite, 4,9:1 sobre os cartões mais claros */
+  --ds-accent-ink: #fff8ee; /* texto sobre o vermelho (4,7:1) */
+  --ds-accent-on-paper: #b91c1c; /* o vermelho sobre o papel (5:1) */
+  --ds-mustard: #e8a933; /* tinta de apoio: logotipo, cartazes, fitas. Nunca botão nem estado */
+
+  /* ---------- semânticas (só para dizer o que é, nunca decoração) ---------- */
+  --ds-gold: #e8c35a; /* "os dois" no dueto */
+  --ds-ok: #6fcf9f;
+  --ds-warn: #e5a63c;
+  --ds-bad: #ff7d8c;
+  --ds-busy: #8fb0f0;
+
+  /* nomes antigos, apontando para o mesmo lugar (o CSS do site ainda os usa) */
+  --ds-pink: var(--ds-accent);
+  --ds-pink-hi: var(--ds-accent-hi);
+  --ds-pink-ink: var(--ds-accent-ink);
+  --ds-cyan: var(--ds-accent);
+  --ds-cyan-ink: var(--ds-accent-ink);
+  --ds-glass: var(--ds-surface);
+  --ds-glass-strong: var(--ds-surface);
+  --ds-glass-soft: rgba(255, 236, 220, 0.05);
+  --ds-edge: var(--ds-line);
+  --ds-edge-hi: var(--ds-line-strong);
+
+  /* ---------- espaçamento (a única escala permitida) ---------- */
+  --ds-s1: 4px;
+  --ds-s2: 8px;
+  --ds-s3: 12px;
+  --ds-s4: 16px;
+  --ds-s5: 24px;
+  --ds-s6: 32px;
+  --ds-s7: 48px;
+  --ds-s8: 64px;
+
+  /* ---------- cantos: 12 a 20, mais fechados por dentro e mais suaves nos contêineres ---------- */
+  --ds-r-sm: 12px;
+  --ds-r-md: 16px;
+  --ds-r-lg: 20px;
+  --ds-r-pill: 12px; /* botões e rótulos não são pílulas */
+
+  /* ---------- profundidade: sombras tingidas do tom do fundo, luz de cima ---------- */
+  --ds-shadow-1: 0 1px 0 rgba(255, 236, 220, 0.04) inset, 0 6px 18px -8px rgba(12, 6, 3, 0.7);
+  --ds-shadow-2: 0 1px 0 rgba(255, 236, 220, 0.06) inset, 0 2px 4px rgba(12, 6, 3, 0.4), 0 22px 44px -16px rgba(12, 6, 3, 0.8);
+  --ds-glow-pink: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 10px 22px -10px rgba(var(--ds-accent-rgb), 0.7);
+  --ds-glow-cyan: 0 0 0 1px rgba(var(--ds-accent-rgb), 0.55);
+  --ds-blur: none;
+
+  /* ---------- tipografia: duas famílias, hospedadas no próprio app ---------- */
+  --ds-font-display: 'Bricolage Grotesque Variable', 'Segoe UI Variable Display', system-ui, sans-serif;
+  --ds-font-ui: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* ---------- movimento ---------- */
+  --ds-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ds-fast: 0.16s;
+}
+
+/* grão fixo por cima de tudo: quebra a planura digital do fundo (não captura cliques) */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 .95  0 0 0 0 .9  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.display {
+  font-family: var(--ds-font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* indicador "ao vivo" */
+.live-dot {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: var(--ds-ok);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after {
+    opacity: 0.05;
+  }
+}

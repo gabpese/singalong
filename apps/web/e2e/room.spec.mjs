@@ -39,16 +39,16 @@ test('a TV abrindo muda o estado para "TV conectada"', async ({ page, context, r
 test('a biblioteca lista as músicas prontas, filtra por artista e nome e adiciona na fila', async ({ page, request }) => {
   const room = await createRoom(request);
   await page.goto(room.guestUrl);
-  await tab(page, 'Músicas').click();
+  await tab(page, 'Jukebox').click();
   const library = page.locator('.library li');
   await expect(library).toHaveCount(4);
-  await expect(page.getByRole('heading', { name: /Músicas já processadas/ })).toContainText('(4)');
+  await expect(page.getByRole('heading', { name: /Jukebox/ })).toContainText('(4)');
 
-  const filter = page.getByLabel('Filtrar as músicas já processadas');
+  const filter = page.getByLabel('Filtrar o Jukebox');
   await filter.fill('faouzia');
   await expect(library).toHaveCount(2);
   await expect(library.first()).toContainText('Unethical');
-  await expect(page.getByRole('heading', { name: /Músicas já processadas/ })).toContainText('(2 de 4)');
+  await expect(page.getByRole('heading', { name: /Jukebox/ })).toContainText('(2 de 4)');
 
   await filter.fill('nada disso existe');
   await expect(page.getByText('Nenhuma música encontrada para “nada disso existe”.')).toBeVisible();
@@ -130,8 +130,8 @@ test('os botões de tom e a prévia usam ícones de mais e menos', async ({ page
   await addToQueue(request, room.code, SONGS.alpha, { name: 'Ana' });
   await page.goto(room.hostUrl);
   const pitch = page.locator('.now .pitch');
-  await expect(pitch.getByRole('button', { name: 'Tom mais grave' }).locator('.icon.i-minus')).toBeVisible();
-  await expect(pitch.getByRole('button', { name: 'Tom mais agudo' }).locator('.icon.i-plus')).toBeVisible();
+  await expect(pitch.getByRole('button', { name: 'Mais grave' }).locator('.icon.i-minus')).toBeVisible();
+  await expect(pitch.getByRole('button', { name: 'Mais agudo' }).locator('.icon.i-plus')).toBeVisible();
 });
 
 test('anfitrião: ajuste da letra, tom, mover e remover na fila', async ({ page, request }) => {
@@ -150,8 +150,10 @@ test('anfitrião: ajuste da letra, tom, mover e remover na fila', async ({ page,
   await expect(page.getByText('0,4 s', { exact: true })).toBeVisible();
 
   // tom da música que está tocando
-  await page.locator('.now .pitch').getByRole('button', { name: 'Tom mais agudo' }).click();
-  await expect(page.locator('.now .pitch-value')).toHaveText('Tom +1');
+  await expect(page.locator('.now .pitch-value')).toContainText('Tom original');
+  await page.locator('.now .pitch').getByRole('button', { name: 'Mais agudo' }).click();
+  await expect(page.locator('.now .pitch')).toHaveAttribute('data-pitch', '1');
+  await expect(page.locator('.now .pitch-caption')).toHaveText('Mais agudo');
 
   // ordem: Unethical, Rolling in the Deep; subir a segunda
   const items = page.locator('.queue-item');
@@ -208,7 +210,7 @@ test('quem não é anfitrião só mexe nas próprias músicas e pode ceder a vez
   const others = queueItem(page, 'Rolling in the Deep');
   await expect(mine.getByRole('button', { name: 'Remover da fila' })).toBeVisible();
   await expect(others.getByRole('button', { name: 'Remover da fila' })).toBeHidden();
-  await expect(others.getByRole('button', { name: 'Tom mais agudo' })).toBeHidden();
+  await expect(others.getByRole('button', { name: 'Mais agudo' })).toBeHidden();
   await mine.getByRole('button', { name: 'Ceder a vez' }).click();
   await expect(toast(page)).toContainText('Você cedeu a vez');
   await expect(page.locator('.queue-item').nth(0)).toContainText('Rolling in the Deep');
@@ -291,9 +293,9 @@ test('música ainda preparando e música que pede letra aparecem com o aviso cer
     data: { url: 'https://youtu.be/dQw4w9WgXcQ', name: 'Ana', artist: 'Rick', title: 'Never', lyrics: { source: 'none' } },
   });
   await page.goto(room.guestUrl);
-  await expect(page.getByText('Preparando a próxima música')).toBeVisible();
+  await expect(page.getByText('Afinando o próximo show')).toBeVisible();
   await expect(page.getByRole('heading', { name: /Na fila/ })).toContainText('(1)');
-  await expect(page.locator('.queue-item .chip')).toContainText(/Na fila|Preparando|Aguardando|Baixando/i);
+  await expect(page.locator('.queue-item .chip')).toContainText(/Esperando a vez|Montando o palco|Aguardando|Chamando a banda|Isolando a banda|Procurando o refrão|Afinando/i);
 });
 
 test('prévia: toca o instrumental com tom e o tom vale para a sua música na fila', async ({ page, request }) => {
@@ -308,11 +310,11 @@ test('prévia: toca o instrumental com tom e o tom vale para a sua música na fi
   await expect(bar).toBeVisible();
   await expect(bar).toContainText('Unethical');
   await expect(bar.getByText('Mudar o tom aqui muda o tom da sua música na fila.')).toBeVisible();
-  await expect(bar.getByText('Tom 0')).toBeVisible();
-  await bar.getByRole('button', { name: 'Tom mais agudo' }).click();
-  await expect(bar.getByText('Tom +1')).toBeVisible();
+  await expect(bar.getByText('Tom original')).toBeVisible();
+  await bar.getByRole('button', { name: 'Mais agudo' }).click();
+  await expect(bar.locator('.pitch')).toHaveAttribute('data-pitch', '1');
   await expect.poll(async () => (await roomState(request, room.code)).queue.find((i) => i.video_id === SONGS.bravo.id).pitch).toBe(1);
-  await expect(mine.locator('.pitch-value')).toHaveText('Tom +1');
+  await expect(mine.locator('.pitch')).toHaveAttribute('data-pitch', '1');
   await bar.getByRole('button', { name: 'Fechar a prévia' }).click();
   await expect(bar).toBeHidden();
 });
@@ -326,8 +328,8 @@ test('prévia de música de outra pessoa não muda o tom dela', async ({ page, r
   await queueItem(page, 'Unethical').getByRole('button', { name: 'Prévia' }).click();
   const bar = page.getByRole('complementary', { name: 'Prévia da música' });
   await expect(bar.getByText('Esta música é de outra pessoa')).toBeVisible();
-  await bar.getByRole('button', { name: 'Tom mais grave' }).click();
-  await expect(bar.getByText('Tom -1').or(bar.getByText('Tom −1'))).toBeVisible();
+  await bar.getByRole('button', { name: 'Mais grave' }).click();
+  await expect(bar.locator('.pitch')).toHaveAttribute('data-pitch', '-1');
   expect((await roomState(request, room.code)).queue.find((i) => i.video_id === SONGS.bravo.id).pitch).toBe(0);
 });
 
@@ -341,7 +343,7 @@ test('exportar MP4: pede o vídeo no tom escolhido e baixa com o nome da música
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await page.goto(room.guestUrl);
-  await tab(page, 'Músicas').click();
+  await tab(page, 'Jukebox').click();
   const song = page.locator('.library li', { hasText: 'Unethical' }).first();
   await song.getByLabel('Tom do vídeo MP4').selectOption('2');
   const download = page.waitForEvent('download');
@@ -374,8 +376,8 @@ test('as abas trocam a seção e a mudança de rodízio do anfitrião aparece pa
   await tab(page, 'Adicionar').click();
   await expect(page.getByRole('heading', { name: 'Adicionar música' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Tocando agora' })).toBeHidden();
-  await tab(page, 'Músicas').click();
-  await expect(page.getByRole('heading', { name: /Músicas já processadas/ })).toBeVisible();
+  await tab(page, 'Jukebox').click();
+  await expect(page.getByRole('heading', { name: /Jukebox/ })).toBeVisible();
   await tab(page, 'Fila').click();
   await expect(page.getByRole('heading', { name: 'Tocando agora' })).toBeVisible();
   await hostPatch(request, room, { scoring: true });
@@ -497,8 +499,8 @@ test('adicionar música: acha a versão também pelo título original do vídeo 
 test('a biblioteca também filtra pelo título original do vídeo', async ({ page, request }) => {
   const room = await createRoom(request);
   await page.goto(room.guestUrl);
-  await tab(page, 'Músicas').click();
-  await page.getByLabel('Filtrar as músicas já processadas').fill('maphra');
+  await tab(page, 'Jukebox').click();
+  await page.getByLabel('Filtrar o Jukebox').fill('maphra');
   await expect(page.locator('.library li')).toHaveCount(1);
   await expect(page.locator('.library li')).toContainText('Unethical (Acoustic)');
 });

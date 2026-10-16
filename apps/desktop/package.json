@@ -1,7 +1,7 @@
 {
   "name": "@singalong/desktop",
   "private": true,
-  "version": "1.3.1",
+  "version": "1.4.0",
   "productName": "Singalong Karaoke",
   "description": "Singalong Karaoke: a interface do computador do dono (pareia, monta o motor, inicia a sessão e o agente)",
   "type": "module",

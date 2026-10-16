@@ -71,8 +71,8 @@ test('describeLyricsSource: nada de jargão na tela', () => {
   assert.equal(describeLyricsSource('none'), 'sem letra (só o instrumental)');
   assert.equal(describeLyricsSource('lrclib'), 'buscada na internet');
   assert.equal(describeLyricsSource('video'), 'legenda do vídeo');
-  assert.equal(describeLyricsSource('align'), 'seu texto, sincronizado com a voz por IA');
-  assert.equal(describeLyricsSource('lrclib+align'), 'buscada na internet, sincronizada com a voz por IA');
+  assert.equal(describeLyricsSource('align'), 'seu texto, no ritmo da voz');
+  assert.equal(describeLyricsSource('lrclib+align'), 'buscada na internet, no ritmo da voz');
   assert.equal(describeLyricsSource('text+lrclib'), 'seu texto, com os tempos da busca na internet');
   assert.equal(describeLyricsSource('text+video'), 'seu texto, com os tempos da legenda do vídeo');
   assert.equal(describeLyricsSource(undefined), 'desconhecida');

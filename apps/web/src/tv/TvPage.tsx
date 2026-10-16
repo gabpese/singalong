@@ -9,13 +9,14 @@ import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-med
 import { keySummary } from '../lib/music.js';
 import { nextUp, playOrder, splitQueue } from '../lib/queue-view.js';
 import type { QueueItem, RoomState } from '../lib/types';
-import { Icon } from '../ui/Icon';
+import { SingerBlobs } from '../ui/SingerBlobs';
 import { InviteNotice, respondInvite } from '../room/Duet';
 import { createTvController, type FinalResult, type HudState, type TvController } from './controller';
 import { LatencyDialog } from './LatencyDialog';
 import { MicsDialog } from './MicsDialog';
 import { PitchGuide } from './PitchGuide';
 import { BetaTag } from '../ui/BetaTag';
+import { Lobby } from './Lobby';
 import { QrCode } from './QrCode';
 import { QueueBox, titleOf } from './QueueBox';
 
@@ -200,7 +201,8 @@ export function TvPage({ code }: { code: string }) {
               <>
                 <span className="label">{t('tv.singingNow')}</span>
                 <strong className="who">
-                  <Icon name="singing" /> {current.singers}
+                  <SingerBlobs item={current} animate />
+                  <span className="who-name">{current.singers}</span>
                 </strong>
                 <span className="what">{trackName(current)}</span>
                 <span className="key">{keySummary(current.song.key, current.pitch)}</span>
@@ -213,7 +215,8 @@ export function TvPage({ code }: { code: string }) {
             <>
               <span className="label">{t('tv.next')}</span>
               <strong className="who">
-                <Icon name="singing" /> {next.item.singers}
+                <SingerBlobs item={next.item} />
+                <span className="who-name">{next.item.singers}</span>
               </strong>
               <span className="what">{nextLabel}</span>
             </>
@@ -274,17 +277,7 @@ export function TvPage({ code }: { code: string }) {
       </footer>
 
       <section className="idle" hidden={Boolean(current)}>
-        <h1>
-          <Icon name="singing" />
-          Singalong
-        </h1>
-        <p className="idle-lead">
-          {tRich('tvp.idleLead', { code })}
-        </p>
-        <QrCode code={code} />
-        <p className="idle-msg">
-          {next ? t('tvp.idleNext', { who: next.item.singers, title: nextLabel }) : t('tvp.idleAdd')}
-        </p>
+        <Lobby code={code} people={room?.people ?? []} status={next ? t('tvp.idleNext', { who: next.item.singers, title: nextLabel }) : t('tvp.idleAdd')} />
       </section>
 
       <ScoreFinal final={final} room={room} />

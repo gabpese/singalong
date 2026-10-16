@@ -6,6 +6,7 @@ import { keySummary } from '../lib/music.js';
 import { formatDuration, nextUp, progressPercent, splitQueue, thumbnailUrl } from '../lib/queue-view.js';
 import type { QueueItem, RoomState } from '../lib/types';
 import { Icon } from '../ui/Icon';
+import { SingerBlobs } from '../ui/SingerBlobs';
 import { useRoom } from './context';
 import { BackingControl, GuideControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
@@ -122,7 +123,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
                 <strong>{current.title ?? current.video_id}</strong>
                 {current.artist && <span className="muted">{current.artist}</span>}
                 <span className="now-singer">
-                  <Icon name="singing" />
+                  <SingerBlobs item={current} />
                   {` ${t(current.guest?.status === 'accepted' ? 'now.singing.many' : 'now.singing.one', { who: current.singers })}`}
                 </span>
                 {current.song.key && <span className="muted small">{keySummary(current.song.key, current.pitch)}</span>}

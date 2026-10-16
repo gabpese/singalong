@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Singalong">
+  <rect width="512" height="512" rx="112" fill="#f0e4cd"/>
+  <circle cx="226" cy="236" r="164" fill="#16110f"/>
+  <circle cx="226" cy="236" r="150" fill="none" stroke="#f0e4cd" stroke-opacity=".16" stroke-width="2"/>
+  <circle cx="226" cy="236" r="136" fill="none" stroke="#f0e4cd" stroke-opacity=".10" stroke-width="3"/><circle cx="226" cy="236" r="118" fill="none" stroke="#f0e4cd" stroke-opacity=".10" stroke-width="3"/><circle cx="226" cy="236" r="100" fill="none" stroke="#f0e4cd" stroke-opacity=".10" stroke-width="3"/><circle cx="226" cy="236" r="84" fill="none" stroke="#f0e4cd" stroke-opacity=".10" stroke-width="3"/>
+  <path d="M226 236 L330 120 A156 156 0 0 1 382 236 Z" fill="#f0e4cd" fill-opacity=".07"/>
+  <path d="M226 236 L122 352 A156 156 0 0 1 70 236 Z" fill="#f0e4cd" fill-opacity=".07"/>
+  <circle cx="226" cy="236" r="62" fill="#d62828"/>
+  <circle cx="226" cy="236" r="50" fill="none" stroke="#f0e4cd" stroke-opacity=".55" stroke-width="2.5"/>
+  <circle cx="226" cy="236" r="9" fill="#f0e4cd"/>
+  <g transform="translate(378 384) rotate(-42)">
+    <g fill="#f0e4cd" stroke="#f0e4cd" stroke-width="30" stroke-linejoin="round"><ellipse cx="0" cy="-84" rx="50" ry="58"/><path d="M-20 -20 L20 -20 L14 128 Q0 142 -14 128 Z"/></g>
+    <path d="M-20 -20 L20 -20 L14 128 Q0 142 -14 128 Z" fill="#16110f"/>
+    <path d="M-9 -4 L-5 118" stroke="#f0e4cd" stroke-opacity=".25" stroke-width="5" stroke-linecap="round"/>
+    <rect x="-24" y="14" width="48" height="20" rx="4" fill="#e8a933"/>
+    <clipPath id="h"><ellipse cx="0" cy="-84" rx="50" ry="58"/></clipPath>
+    <ellipse cx="0" cy="-84" rx="50" ry="58" fill="#d62828"/>
+    <g clip-path="url(#h)" transform="translate(0 -4)" stroke="#16110f" stroke-opacity=".6" stroke-width="4" fill="none"><path d="M-60 -130 L60 -130" /><path d="M-60 -112 L60 -112" /><path d="M-60 -94 L60 -94" /><path d="M-60 -76 L60 -76" /><path d="M-60 -58 L60 -58" /><path d="M-60 -40 L60 -40" /><path d="M-60 -22 L60 -22" /><path d="M-48 -140 L-48 -20" /><path d="M-24 -140 L-24 -20" /><path d="M0 -140 L0 -20" /><path d="M24 -140 L24 -20" /><path d="M48 -140 L48 -20" /></g>
+    <path d="M-34 -118 Q-22 -136 -4 -138" stroke="#f0e4cd" stroke-opacity=".6" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <rect x="-34" y="-30" width="68" height="16" rx="5" fill="#16110f"/>
+  </g>
+</svg>

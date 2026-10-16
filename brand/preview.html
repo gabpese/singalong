@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><title>Singalong — logotipo e cartaz (rascunho 3, paleta B)</title>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <filter id="rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".02 .04" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.6"/></filter>
+  <filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="3" seed="2"/><feColorMatrix values="0 0 0 0 .1  0 0 0 0 .07  0 0 0 0 .05  0 0 0 .5 0"/></filter>
+</defs></svg>
+<style>
+@font-face{font-family:B;src:url('../apps/web/node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2');font-weight:200 800}
+:root{--ink:#16110f;--ink2:#2c221d;--paper:#f0e4cd;--red:#d62828;--alt:#e8a933}
+body{margin:0;background:#100e0d;color:var(--paper);font-family:B;padding:40px;display:grid;gap:48px;justify-items:start}
+h2{margin:0 0 12px;font-size:18px;font-weight:600;opacity:.7}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:center}
+.lock{position:relative;display:inline-block;font-weight:800;letter-spacing:-.045em;line-height:1;white-space:nowrap;padding-right:1.02em}
+.lock .w{display:inline-block;position:relative;color:var(--paper);filter:url(#rough);text-shadow:.028em .022em 0 var(--red)}
+.lock.on-paper .w{color:var(--ink)}
+.sign{position:absolute;right:0;top:.05em;transform:rotate(5deg);font-weight:800;font-size:.17em;letter-spacing:.14em;line-height:1;color:var(--red);background-color:var(--ink);padding:.55em .8em .5em;border:.22em solid var(--red);border-radius:.5em;box-shadow:0 0 0 .18em var(--ink),0 0 0 .3em #d6282866;white-space:nowrap;animation:blink 3.4s steps(1) infinite;background-image:repeating-linear-gradient(103deg,transparent 0 .9em,#f0e4cd14 .9em .93em),radial-gradient(#f0e4cd18 8%,transparent 9%);background-size:auto,.55em .55em}
+.sign::before,.sign::after{content:'';position:absolute;top:50%;width:.45em;height:.45em;margin-top:-.22em;border-radius:50%;background:#f0e4cd55}
+.sign::before{left:-.95em} .sign::after{right:-.95em}
+.sign .v{opacity:.5;animation:flick 5.1s steps(1) infinite}
+.on-paper .sign{background-color:var(--paper)}
+@keyframes blink{0%,62%{opacity:1;filter:drop-shadow(0 0 .35em #d62828aa)}63%,68%{opacity:.45;filter:none}69%,92%{opacity:1;filter:drop-shadow(0 0 .35em #d62828aa)}93%,100%{opacity:.5;filter:none}}
+@keyframes flick{0%,40%{opacity:.95}41%,44%{opacity:.2}45%,100%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){.sign,.sign .v{animation:none}}
+.poster{position:relative;width:760px;padding:44px 48px 40px;background:var(--paper);color:var(--ink);transform:rotate(-1.2deg);clip-path:polygon(0 1%,3% 0,12% .8%,24% 0,40% .7%,58% 0,73% .6%,88% 0,100% .9%,99.4% 22%,100% 48%,99.3% 73%,100% 99%,90% 100%,76% 99.3%,55% 100%,38% 99.2%,20% 100%,7% 99.4%,0 100%,.6% 74%,0 50%,.7% 26%)}
+.poster::before{content:'';position:absolute;inset:0;filter:url(#paper);opacity:.55;pointer-events:none}
+.poster .dots{position:absolute;right:-40px;bottom:-40px;width:260px;height:260px;border-radius:50%;background:radial-gradient(var(--red) 38%,transparent 40%) 0 0/16px 16px;opacity:.9;-webkit-mask:radial-gradient(circle at 30% 30%,transparent 18%,#000 70%);mask:radial-gradient(circle at 30% 30%,transparent 18%,#000 70%)}
+.poster .tape{position:absolute;width:120px;height:34px;background:#e8a933cc;transform:rotate(-8deg);top:-12px;left:30px}
+.poster .tape.r{left:auto;right:30px;transform:rotate(6deg)}
+.poster .kicker{font-weight:700;font-size:20px;letter-spacing:-.01em;color:var(--red)}
+.poster h3{margin:6px 0 18px;font-size:112px;line-height:.86;font-weight:800;letter-spacing:-.05em;text-wrap:balance;position:relative;text-shadow:.02em .02em 0 #d6282855}
+.poster h3 span{color:var(--red);text-shadow:none}
+.poster .line{display:flex;gap:28px;align-items:end;justify-content:space-between;position:relative}
+.poster .code{font-size:22px;font-weight:600;line-height:1.25}
+.poster .code b{display:block;font-size:64px;letter-spacing:.14em;line-height:1;margin-top:4px}
+.poster .qr{width:120px;height:120px;background:var(--ink);padding:10px;box-sizing:border-box;border-radius:6px}
+.poster .qr i{display:block;width:100%;height:100%;background:conic-gradient(var(--paper) 25%,transparent 0 50%,var(--paper) 0 75%,transparent 0) 0 0/20px 20px}
+.who{display:flex;gap:14px;margin-top:22px;position:relative}
+.who span{display:grid;place-items:center;width:52px;height:52px;border-radius:32%;font-weight:800;font-size:24px;color:var(--ink)}
+</style>
+<div><h2>Logotipo (a placa pisca)</h2><div class="row">
+  <div class="lock" style="font-size:132px"><span class="w">singalong</span><span class="sign">AO <span class="v">V</span>IVO</span></div>
+</div></div>
+<div><h2>Sobre papel, e ícones</h2><div class="row">
+  <div style="background:var(--paper);padding:30px 34px;border-radius:14px"><div class="lock on-paper" style="font-size:84px"><span class="w">singalong</span><span class="sign">AO <span class="v">V</span>IVO</span></div></div>
+  <img src="mark.svg" width="200"><img src="mark.svg" width="72"><img src="mark.svg" width="32"><img src="mark-dark.svg" width="120">
+</div></div>
+<div><h2>Aplicação: a espera da TV como cartaz</h2>
+<div class="poster">
+  <i class="tape"></i><i class="tape r"></i><i class="dots"></i>
+  <div class="kicker">Hoje tem karaokê</div>
+  <h3>Passa o <span>microfone.</span></h3>
+  <div class="line"><div class="code">Entre na sala pelo celular<b>K7QM</b></div><div class="qr"><i></i></div></div>
+  <div class="who"><span style="background:#e9b48a">M</span><span style="background:#a9c3a4">R</span><span style="background:#e8a933">D</span><span style="background:transparent;border:2px dashed #16110f66"></span></div>
+</div></div>

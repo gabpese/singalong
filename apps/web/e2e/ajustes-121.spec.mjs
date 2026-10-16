@@ -21,13 +21,17 @@ test('a letra se ajusta ao cartão: nenhuma linha passa por cima da outra, mesmo
   expect(await page.locator('.lyrics').evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true); // tudo cabe no cartão
 });
 
-test('a letra que já passou não fica à mostra', async ({ page, request }) => {
+test('a letra que já passou fica apagada (baixa opacidade) e a que vem fica num branco sutil', async ({ page, request }) => {
   const room = await createRoom(request);
   await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
   await page.goto(room.tvUrl);
   await expect.poll(() => tvPlaying(page)).toBe(true);
   await expect(page.locator('.line.current')).toContainText('Segunda linha cantada agora');
-  await expect(page.locator('.line.prev')).toBeHidden();
+  const opacity = (selector) => page.locator(selector).evaluate((el) => Number(getComputedStyle(el).opacity));
+  expect(await opacity('.line.prev')).toBeLessThan(0.5); // a linha que passou perde a força
+  expect(await opacity('.line.next')).toBe(1); // a que vem não perde opacidade: a cor é um branco translúcido
+  const color = await page.locator('.line.next').evaluate((el) => getComputedStyle(el).color);
+  expect(color).toMatch(/^rgba\(255, 255, 255, 0\.\d+\)$/);
 });
 
 test('a pontuação fica na extrema direita e não cobre o guia de melodia', async ({ page, request }) => {

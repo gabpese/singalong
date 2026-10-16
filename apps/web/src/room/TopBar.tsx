@@ -36,7 +36,7 @@ export function TopBar({ state, status, view, onView }: { state: RoomState | nul
     <header className="topbar" ref={header}>
       <div className="topbar-main">
         <h1>
-          <Icon name="singing" />
+          <img className="topbar-mark" src="/brand/mark.svg" alt="" />
           {t('room.word')} <span>{code}</span>
         </h1>
         <p className={`tv-status${status === 'connected' && state?.tv_connected ? ' on' : ''}`}>{tvStatusText(state, status)}</p>

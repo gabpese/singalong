@@ -1,0 +1,3 @@
+/* as duas fontes do tema, hospedadas no próprio app (a CSP só aceita arquivos locais) */
+@font-face { font-family: 'Geist Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('fonts/geist-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Bricolage Grotesque Variable'; font-style: normal; font-display: swap; font-weight: 200 800; src: url('fonts/bricolage-grotesque-latin-wght-normal.woff2') format('woff2-variations'); }

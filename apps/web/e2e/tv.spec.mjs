@@ -4,6 +4,23 @@ import { addToQueue, ANA, BIA, createRoom, hostPatch, roomState, SONGS } from '.
 const hostPost = (request, room, path, data) =>
   request.post(`/api/rooms/${room.code}${path}`, { headers: { 'x-client-id': ANA, 'x-host-token': room.host }, data });
 // tocando de verdade: o áudio já carregou (duração conhecida) e o relógio andou; só `playing` vale assim que o play() é chamado
+/** Bichinhos cortados: para cada um, os elementos acima dele que cortam o que transborda precisam conter o desenho inteiro. */
+const clippedBlobs = (page) =>
+  page.evaluate(() => {
+    const out = [];
+    for (const blob of document.querySelectorAll('.singer-blobs .blob')) {
+      // o bicho que respira (SVG em linha) passa do próprio quadro: o SVG não pode cortar o que transborda
+      if (blob.tagName.toLowerCase() === 'svg' && getComputedStyle(blob).overflow !== 'visible') out.push('svg.blob');
+      const box = blob.getBoundingClientRect();
+      for (let el = blob.parentElement; el && el !== document.body; el = el.parentElement) {
+        const style = getComputedStyle(el);
+        if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+        const clip = el.getBoundingClientRect();
+        if (box.top < clip.top - 1 || box.bottom > clip.bottom + 1 || box.left < clip.left - 1 || box.right > clip.right + 1) out.push(el.className);
+      }
+    }
+    return out;
+  });
 const playing = (page) => page.evaluate(() => window.tv.engine.playing && window.tv.engine.duration > 0 && window.tv.engine.currentTime > 0);
 
 test('sem sala na URL a TV avisa', async ({ page }) => {
@@ -192,4 +209,91 @@ test('pontuação e guia de melodia estão marcados como beta (interruptores, gu
   await expect(tv.locator('.score-hud .beta-tag')).toBeVisible();
   await expect(tv.locator('.guide-card .beta-tag')).toBeVisible();
   await expect(tv.locator('.guide-card .beta-tag')).toHaveAttribute('title', /ainda não é totalmente fiel/);
+});
+
+test('sala de espera: "Aguardando cantores" com o QR code no centro e os celulares que entram aparecem em tempo real', async ({ browser, page, request }) => {
+  const room = await createRoom(request);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(room.tvUrl);
+  await expect(page.getByRole('heading', { name: 'Aguardando cantores…' })).toBeVisible();
+  await expect(page.getByText('Ninguém conectado ainda')).toBeVisible();
+  await expect(page.locator('.slot.free')).toHaveCount(4); // vagas livres enquanto ninguém entra
+
+  // o QR code fica no centro do painel de vidro, e o painel no centro da tela
+  const qr = await page.locator('.lobby-qr').boundingBox();
+  const lobby = await page.locator('.lobby').boundingBox();
+  expect(Math.abs(qr.x + qr.width / 2 - (lobby.x + lobby.width / 2))).toBeLessThanOrEqual(2);
+  expect(Math.abs(lobby.x + lobby.width / 2 - 1280 / 2)).toBeLessThanOrEqual(2);
+
+  // um celular entra pelo código: o avatar com o nome aparece na TV sem recarregar
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    localStorage.setItem('clientId', 'client-lobby-0001');
+    localStorage.setItem('userName', 'Marina');
+  });
+  const phone = await context.newPage();
+  await phone.goto(room.guestUrl);
+  await expect(page.locator('.slot.filled')).toContainText('Marina');
+  await expect(page.locator('.slot.filled svg.blob')).toBeVisible(); // o bichinho (blobatar) feito a partir do nome
+  await expect(page.getByText('1 cantor conectado')).toBeVisible();
+
+  // e sai quando o celular fecha
+  await context.close();
+  await expect(page.locator('.slot.filled')).toHaveCount(0);
+  await expect(page.getByText('Ninguém conectado ainda')).toBeVisible();
+});
+
+test('sala de espera: não há limite de cantores; passando de 7, o último lugar mostra quantos faltam', async ({ page, request }) => {
+  const room = await createRoom(request);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(room.tvUrl);
+  // dez celulares conectados (o mesmo WebSocket da sala que o celular abre)
+  await page.evaluate((code) => {
+    window.phones = Array.from({ length: 10 }, (_, i) =>
+      new WebSocket(`ws://${location.host}/api/rooms/${code}/ws?role=controller&client=lobby-phone-${i}&name=Pessoa${i}`));
+  }, room.code);
+  await expect(page.getByText('10 cantores conectados')).toBeVisible();
+  await expect(page.locator('.slot.filled')).toHaveCount(6);
+  await expect(page.locator('.slot.more')).toContainText('+4');
+  await expect(page.locator('.slot.free')).toHaveCount(0);
+  // a fileira cabe no cartaz e o cartaz cabe na tela
+  const sheet = await page.locator('.lobby-sheet').boundingBox();
+  const slots = await page.locator('.lobby-slots').boundingBox();
+  expect(slots.x).toBeGreaterThanOrEqual(sheet.x);
+  expect(slots.x + slots.width).toBeLessThanOrEqual(sheet.x + sheet.width);
+  expect(sheet.y + sheet.height).toBeLessThanOrEqual(720);
+});
+
+test('o bichinho de quem canta aparece ao lado do nome; num dueto aceito aparecem os dois', async ({ browser, page, request }) => {
+  const room = await createRoom(request);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  // a Bia está na sala (um celular conectado), para poder ser convidada
+  await page.goto(room.tvUrl);
+  await page.evaluate((code) => {
+    window.bia = new WebSocket(`ws://${location.host}/api/rooms/${code}/ws?role=controller&client=client-bia-0001&name=Bia`);
+  }, room.code);
+  await expect.poll(async () => (await roomState(request, room.code)).people.length).toBe(1);
+  const itemId = await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
+  await expect(page.locator('.singer.is-now .who')).toContainText('Ana');
+  await expect(page.locator('.singer.is-now .singer-blobs .blob')).toHaveCount(1);
+  await expect(page.locator('.tv-queue .is-current .singer-blobs .blob')).toHaveCount(1);
+
+  const { pid } = (await roomState(request, room.code)).people[0];
+  await request.post(`/api/rooms/${room.code}/queue/${itemId}/invite`, { headers: { 'x-client-id': ANA }, data: { pid } });
+  await request.post(`/api/rooms/${room.code}/queue/${itemId}/invite/respond`, { headers: { 'x-client-id': BIA }, data: { accept: true } });
+  await expect(page.locator('.singer.is-now .who')).toContainText('Ana & Bia');
+  await expect(page.locator('.singer.is-now .singer-blobs.duo .blob')).toHaveCount(2);
+  await expect(page.locator('.tv-queue .is-current .singer-blobs .blob')).toHaveCount(2);
+  expect(await clippedBlobs(page)).toEqual([]); // nenhum bichinho cortado pela altura da linha do nome
+  // o nome do dueto aparece inteiro (quebra em duas linhas se precisar, em vez de virar "…")
+  expect(await page.locator('.singer.is-now .who-name').evaluate((el) => el.scrollHeight - el.clientHeight < parseFloat(getComputedStyle(el).lineHeight) / 2 && el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+
+  // no celular, a música tocando e a fila também mostram os dois
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await phone.addInitScript(() => { localStorage.setItem('clientId', 'client-caio-0001'); localStorage.setItem('userName', 'Caio'); });
+  const caio = await phone.newPage();
+  await caio.goto(room.guestUrl);
+  await expect(caio.locator('.now-singer .singer-blobs.duo img.blob')).toHaveCount(2);
+  expect(await clippedBlobs(caio)).toEqual([]);
+  await phone.close();
 });
