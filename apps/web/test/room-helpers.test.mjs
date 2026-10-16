@@ -26,11 +26,11 @@ test('parseHostHash', () => {
 
 test('songChip: o que a pessoa lê para cada estado da música', () => {
   assert.deepEqual(songChip({ status: 'ready', ready: true }), { label: 'Pronta', kind: 'ok' });
-  assert.deepEqual(songChip({ status: 'pending' }), { label: 'Na fila de processamento', kind: 'busy' });
-  assert.deepEqual(songChip({ status: 'processing', stage: 'separating' }), { label: 'Separando a voz…', kind: 'busy' });
-  assert.deepEqual(songChip({ status: 'processing', stage: 'aligning' }), { label: 'Sincronizando a letra…', kind: 'busy' });
-  assert.deepEqual(songChip({ status: 'processing' }), { label: 'Processando…', kind: 'busy' });
-  assert.deepEqual(songChip({ status: 'needs_lyrics' }), { label: 'Precisa de letra', kind: 'warn' });
+  assert.deepEqual(songChip({ status: 'pending' }), { label: 'Esperando a vez no palco', kind: 'busy' });
+  assert.deepEqual(songChip({ status: 'processing', stage: 'separating' }), { label: 'Isolando a banda…', kind: 'busy' });
+  assert.deepEqual(songChip({ status: 'processing', stage: 'aligning' }), { label: 'Afinando os microfones…', kind: 'busy' });
+  assert.deepEqual(songChip({ status: 'processing' }), { label: 'Montando o palco…', kind: 'busy' });
+  assert.deepEqual(songChip({ status: 'needs_lyrics' }), { label: 'Falta a letra', kind: 'warn' });
   assert.deepEqual(songChip({ status: 'failed' }), { label: 'Falhou', kind: 'error' });
   assert.equal(songChip(undefined).kind, 'busy');
   // pronta mas com um job de nova letra rodando: o estado do job é o que importa
@@ -106,7 +106,7 @@ test('canRetry: só oferece "Tentar de novo" quando vale a pena', () => {
   assert.equal(canRetry({ status: 'failed', retry: null }), true);
   assert.equal(canRetry({ status: 'failed', retry: 'never' }), false); // privado, bloqueado, longo demais...
   assert.equal(canRetry({ status: 'ready' }), false);
-  assert.equal(songChip({ status: 'processing', stage: 'retrying' }).label, 'Tentando de novo…');
+  assert.equal(songChip({ status: 'processing', stage: 'retrying' }).label, 'Passando o som de novo…');
 });
 
 test('wordFills: usa os tempos reais de cada palavra e cai na estimativa quando não há', async () => {

@@ -26,7 +26,7 @@ test('sala: abas, fila e adicionar', async ({ page, request }) => {
   expect(await violations(page)).toEqual([]);
   await page.getByRole('button', { name: /Adicionar/ }).last().click();
   expect(await violations(page)).toEqual([]);
-  await page.getByRole('button', { name: /Músicas/ }).click();
+  await page.getByRole('button', { name: /Jukebox/ }).click();
   expect(await violations(page)).toEqual([]);
 });
 

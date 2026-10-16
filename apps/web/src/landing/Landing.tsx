@@ -4,8 +4,8 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { t } from '../i18n/index.js';
 import { api, setHostToken } from '../lib/identity.js';
 import { detectSystem } from '../lib/platform.js';
-import { Icon } from '../ui/Icon';
 import { LanguageSwitch } from '../ui/LanguageSwitch';
+import { Logo } from '../ui/Logo';
 
 interface ApiError extends Error {
   status?: number;
@@ -79,7 +79,7 @@ function DownloadApp({ config }: { config: HomeConfig }) {
   const primary = config.app_downloads.find((item) => item.system === detected);
   const others = config.app_downloads.filter((item) => item.system !== detected);
   return (
-    <section className="card download-card" aria-labelledby="download-title">
+    <section className="mode-card mode-download download-card" aria-labelledby="download-title">
       <h2 id="download-title">{t('home.download.title')}</h2>
       <p className="hint">{t('home.download.hint')}</p>
       {primary && <DownloadButton item={primary} />}
@@ -143,49 +143,62 @@ export function Landing() {
 
   return (
     <div className="home">
-      <div className="home-art">
-        <img src="/welcome.png" alt={t('home.artAlt')} />
-      </div>
-      <main className="home-panel">
+      <header className="home-top">
         <LanguageSwitch />
-        <h1>
-          <Icon name="singing" />
-          Singalong
-        </h1>
-        <p className="lead">{t('landing.lead')}</p>
+      </header>
 
-        <section className="card">
-          <h2>{t('landing.create.title')}</h2>
+      <div className="home-hero">
+        <div>
+          <h1 className="home-logo">
+            <Logo />
+          </h1>
+          <p className="lead">{t('landing.lead')}</p>
+        </div>
+        <div className="home-art">
+          <img src="/brand/mark.svg" alt={t('home.artAlt')} />
+        </div>
+      </div>
+
+      <main className="home-modes">
+        <section className="mode-card mode-host" aria-labelledby="mode-host-title">
+          <h2 id="mode-host-title">{t('landing.create.title')}</h2>
           <p className="hint">{t('landing.create.hint')}</p>
-          <button type="button" className="primary big" onClick={createRoom}>
-            {t('landing.create.button')}
-          </button>
+          <p className="poster-tag" aria-hidden="true">
+            {t('brand.tagline')}
+          </p>
+          <div className="mode-action">
+            <button type="button" className="primary big" onClick={createRoom}>
+              {t('landing.create.button')}
+            </button>
+          </div>
         </section>
 
-        <section className="card">
-          <h2>{t('landing.join.title')}</h2>
-          <form className="row" autoComplete="off" onSubmit={join}>
-            <input
-              className="join-code"
-              type="text"
-              inputMode="text"
-              maxLength={8}
-              placeholder={t('landing.join.placeholder')}
-              aria-label={t('landing.join.aria')}
-              required
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-            />
-            <button type="submit">{t('landing.join.button')}</button>
-          </form>
+        <section className="mode-card mode-join" aria-labelledby="mode-join-title">
+          <h2 id="mode-join-title">{t('landing.join.title')}</h2>
+          <p className="hint">{t('landing.join.hint')}</p>
+          <div className="mode-action">
+            <form className="join-form" autoComplete="off" onSubmit={join}>
+              <input
+                className="join-code"
+                type="text"
+                inputMode="text"
+                maxLength={8}
+                placeholder={t('landing.join.placeholder')}
+                aria-label={t('landing.join.aria')}
+                required
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+              />
+              <button type="submit">{t('landing.join.button')}</button>
+            </form>
+          </div>
         </section>
-
         <DownloadApp config={config} />
-
-        <p className={`hint${message ? ' error' : ''}`} role="status">
-          {message}
-        </p>
       </main>
+
+      <p className={`hint${message ? ' error' : ''}`} role="status">
+        {message}
+      </p>
     </div>
   );
 }

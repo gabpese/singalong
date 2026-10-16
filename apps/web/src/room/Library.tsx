@@ -3,8 +3,8 @@ import { useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
 import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from '../lib/export-mp4.js';
 import { api } from '../lib/identity.js';
-import { keySummary } from '../lib/music.js';
-import { filterSongs, formatDuration, formatPitch, sortSongs, thumbnailUrl } from '../lib/queue-view.js';
+import { keySummary, pitchLabel } from '../lib/music.js';
+import { filterSongs, formatDuration, sortSongs, thumbnailUrl } from '../lib/queue-view.js';
 import type { ApiError, LibrarySong } from '../lib/types';
 import { useRoom } from './context';
 
@@ -56,7 +56,7 @@ function LibraryRow({ song }: { song: LibrarySong }) {
           <select aria-label={t('library.exportPitch')} value={pitch} onChange={(event) => setPitch(Number(event.target.value))}>
             {EXPORT_PITCHES.map((value: number) => (
               <option key={value} value={value}>
-                {t('pitch.label', { n: formatPitch(value) })}
+                {pitchLabel(value)}
               </option>
             ))}
           </select>

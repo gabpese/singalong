@@ -49,3 +49,14 @@ export function keySummary(key, pitch = 0) {
   if (!pitch) return original;
   return t('key.shifted', { original, notes: keyOptions(transposeKey(key, pitch)), shift: `${pitch > 0 ? '+' : ''}${pitch}` });
 }
+
+/** A nota que a pessoa canta com a música no tom `pitch`: "Si (B)" ou, quando a estimativa é incerta, "Fá (F) ou Ré (D)". */
+export function noteSummary(key, pitch = 0) {
+  return key ? keyOptions(transposeKey(key, pitch)) : '';
+}
+
+/** O ajuste de tom em palavras, sem número solto: "Tom original", "Mais agudo (+2)", "Mais grave (−1)". */
+export function pitchLabel(pitch) {
+  if (!pitch) return t('pitch.original');
+  return `${t(pitch > 0 ? 'pitch.higher' : 'pitch.lower')} (${pitch > 0 ? '+' : '−'}${Math.abs(pitch)})`;
+}

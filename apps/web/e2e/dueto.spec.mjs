@@ -157,11 +157,11 @@ test('convite com a música JÁ TOCANDO: aparece em qualquer tela do convidado e
   const notice = bia.page.getByRole('alert', { name: 'Convites para cantar junto' });
   await expect(notice).toContainText('Ana convidou você para cantar');
   await expect(notice).toContainText('ela já está tocando');
-  for (const tab of ['Adicionar', 'Músicas', 'Fila']) {
+  for (const tab of ['Adicionar', 'Jukebox', 'Fila']) {
     await bia.page.getByRole('navigation', { name: 'Seções' }).getByRole('button', { name: tab }).click();
     await expect(notice).toBeVisible();
   }
-  await bia.page.getByRole('navigation', { name: 'Seções' }).getByRole('button', { name: 'Músicas' }).click();
+  await bia.page.getByRole('navigation', { name: 'Seções' }).getByRole('button', { name: 'Jukebox' }).click();
   await notice.getByRole('button', { name: 'Aceitar' }).click(); // aceita estando na Jukebox
 
   // a Bia vai para o palco, a Ana vê a dupla e a TV passa a pintar a letra com as duas cores, no meio da música

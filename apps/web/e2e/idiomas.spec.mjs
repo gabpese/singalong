@@ -4,9 +4,10 @@ import { addToQueue, createRoom, SONGS } from './helpers.mjs';
 
 test('trocar o idioma na entrada traduz a página e a escolha continua na sala', async ({ page, request }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Criar uma sala' })).toBeVisible();
-  await page.getByLabel('Idioma').selectOption('en');
-  await expect(page.getByRole('heading', { name: 'Create a room' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Criar uma festa' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Idioma' }).getByRole('button', { name: 'Português' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('group', { name: 'Idioma' }).getByRole('button', { name: 'English' }).click();
+  await expect(page.getByRole('heading', { name: 'Start a party' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
   const room = await createRoom(request);
@@ -15,7 +16,7 @@ test('trocar o idioma na entrada traduz a página e a escolha continua na sala',
   await expect(page.getByRole('tab', { name: 'TV' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Queue/ })).toBeVisible();
-  await page.getByLabel('Language').selectOption('es');
+  await page.getByRole('group', { name: 'Language' }).getByRole('button', { name: 'Español' }).click();
   await expect(page.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
 });
 
@@ -25,4 +26,16 @@ test('sem escolha salva o navegador decide: inglês no navegador em inglês', as
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Join a room' })).toBeVisible();
   await context.close();
+});
+
+test('o idioma se escolhe por bandeiras (Brasil, Estados Unidos e Espanha), sem o nome escrito na tela', async ({ page }) => {
+  await page.goto('/');
+  const group = page.getByRole('group', { name: 'Idioma' });
+  await expect(group.getByRole('button')).toHaveCount(3);
+  for (const name of ['Português', 'English', 'Español']) {
+    const flag = group.getByRole('button', { name });
+    await expect(flag.locator('svg')).toBeVisible();
+    await expect(flag).toHaveAttribute('title', name); // o nome aparece ao passar o mouse
+  }
+  await expect(group).not.toContainText('English'); // nada escrito, só as bandeiras
 });

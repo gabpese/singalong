@@ -1,5 +1,5 @@
-// Gera o ícone do app (ui/icon.png e build/icon.ico) a partir de build/singing.svg: o desenho preto sobre um quadrado
-// arredondado amarelo (a cor da marca), para aparecer bem na barra de tarefas escura e na clara.
+// Gera o ícone do app (ui/icon.png e build/icon.ico) a partir da marca (brand/mark.svg, na raiz do repositório): o vinil com o
+// microfone num quadrado de papel creme, que aparece bem na barra de tarefas escura e na clara.
 // build/icon.png sai em 1024 px: o macOS (.icns) e o Linux (AppImage) exigem pelo menos 512 px.
 //   node_modules\electron\dist\electron.exe scripts\make-icon.cjs      (sem ELECTRON_RUN_AS_NODE)
 const { app, BrowserWindow, nativeImage } = require('electron');
@@ -8,12 +8,12 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 
 const root = join(__dirname, '..');
-const svg = readFileSync(join(root, 'build', 'singing.svg'), 'utf8').replace(/<\?xml[^>]*\?>|<!DOCTYPE[^>]*>/g, '');
-const SIZES = [256, 64, 48, 32, 16];
+const svg = readFileSync(join(root, '..', '..', 'brand', 'mark.svg'), 'utf8').replace(/<\?xml[^>]*\?>|<!DOCTYPE[^>]*>/g, '');
+const SIZES = [256, 128, 64, 48, 32, 24, 16];
 
 async function render(size) {
   const win = new BrowserWindow({ show: false, width: size, height: size, useContentSize: true, transparent: true, frame: false, webPreferences: { offscreen: true } });
-  const html = `<!doctype html><body style="margin:0;background:transparent"><div style="width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.22)}px;background:#ffc83d;display:flex;align-items:center;justify-content:center"><div style="width:${Math.round(size * 0.72)}px;height:${Math.round(size * 0.72)}px">${svg.replace('<svg ', '<svg style="width:100%;height:100%" ')}</div></div>`;
+  const html = `<!doctype html><body style="margin:0;background:transparent"><div style="width:${size}px;height:${size}px">${svg.replace('<svg ', '<svg style="width:100%;height:100%" ')}</div>`;
   const file = join(tmpdir(), `singalong-icon-${size}.html`);
   writeFileSync(file, html);
   await win.loadFile(file);

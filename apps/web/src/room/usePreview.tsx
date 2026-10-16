@@ -3,10 +3,9 @@ import { t } from '../i18n/index.js';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { keySummary } from '../lib/music.js';
 import { createPreviewPlayer } from '../lib/preview.js';
-import { formatPitch } from '../lib/queue-view.js';
 import type { QueueItem, RoomState, SongKey } from '../lib/types';
 import { Icon } from '../ui/Icon';
-import { clampPitch } from './PitchControl';
+import { clampPitch, PitchPicker } from './PitchControl';
 
 interface PreviewItem {
   id: number;
@@ -161,15 +160,7 @@ export function PreviewBar({ preview }: { preview: PreviewControls }) {
             player.seek(Number(event.target.value) / 1000);
           }}
         />
-        <span className="pitch">
-          <button type="button" className="icon-btn" aria-label={t('pitch.lower')} onClick={() => stepPitch(-1)}>
-            <Icon name="minus" />
-          </button>
-          <span className="pitch-value">{t('pitch.label', { n: formatPitch(pitch) })}</span>
-          <button type="button" className="icon-btn" aria-label={t('pitch.higher')} onClick={() => stepPitch(1)}>
-            <Icon name="plus" />
-          </button>
-        </span>
+        <PitchPicker pitch={pitch} songKey={item?.key ?? null} onChange={(value) => stepPitch(value - pitch)} />
         <button type="button" aria-label={t('preview.close')} onClick={close}>
           ✕
         </button>

@@ -7,7 +7,7 @@ import { keySummary } from '../lib/music.js';
 import { createLyricsView } from '../lib/lyrics-view.js';
 import { nextUp, playOrder, splitQueue } from '../lib/queue-view.js';
 import type { LyricCue, RoomState } from '../lib/types';
-import { Icon } from '../ui/Icon';
+import { SingerBlobs } from '../ui/SingerBlobs';
 import { LyricsSize } from '../ui/LyricsSize';
 import { QueueBox, titleOf } from '../tv/QueueBox';
 import { ReactionBar } from './ReactionBar';
@@ -103,7 +103,8 @@ export function TvViewer({ state, position, lyrics }: Props) {
           <div className="singer is-now">
             <span className="label">{t('tv.singingNow')}</span>
             <strong className="who">
-              <Icon name="singing" /> {current.singers}
+              <SingerBlobs item={current} />
+              <span className="who-name">{current.singers}</span>
             </strong>
             <span className="what">{[titleOf(current), current.artist].filter(Boolean).join(' — ')}</span>
             <span className="key">{keySummary(current.song.key, current.pitch)}</span>
@@ -115,7 +116,8 @@ export function TvViewer({ state, position, lyrics }: Props) {
           <div className="singer is-next">
             <span className="label">{t('tv.next')}</span>
             <strong className="who">
-              <Icon name="singing" /> {next.item.singers}
+              <SingerBlobs item={next.item} />
+              <span className="who-name">{next.item.singers}</span>
             </strong>
             <span className="what">{titleOf(next.item)}</span>
           </div>

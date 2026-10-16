@@ -6,7 +6,7 @@ import { keySummary } from '../lib/music.js';
 import { canRetry, playOrder, songChip, thumbnailUrl } from '../lib/queue-view.js';
 import type { ApiError, QueueItem, RoomState } from '../lib/types';
 import { BetaTag } from '../ui/BetaTag';
-import { Icon } from '../ui/Icon';
+import { SingerBlobs } from '../ui/SingerBlobs';
 import { useRoom } from './context';
 import { BackingControl, GuideControl } from './BackingControl';
 import { DuetControl } from './Duet';
@@ -46,7 +46,7 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
         <strong>{item.title ?? item.video_id}</strong>
         <span className="muted">
           {item.artist ? `${item.artist} · ` : null}
-          <Icon name="singing" />
+          <SingerBlobs item={item} />
           {` ${item.singers}`}
         </span>
         {item.song.key && <span className="muted small">{keySummary(item.song.key, item.pitch)}</span>}

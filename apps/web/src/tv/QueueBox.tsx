@@ -2,6 +2,7 @@
 import { t } from '../i18n/index.js';
 import { songChip } from '../lib/queue-view.js';
 import type { QueueItem } from '../lib/types';
+import { SingerBlobs } from '../ui/SingerBlobs';
 
 const UPCOMING_SHOWN = 5;
 export const titleOf = (item: QueueItem) => item.title ?? item.video_id;
@@ -10,6 +11,7 @@ function QueueRow({ item, badge, isCurrent = false }: { item: QueueItem; badge: 
   return (
     <li className={isCurrent ? 'is-current' : ''}>
       <span className="mark">{badge}</span>
+      <SingerBlobs item={item} />
       <span className="text">
         <strong>{item.singers}</strong>
         <small>

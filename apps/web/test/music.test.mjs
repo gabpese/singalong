@@ -54,12 +54,12 @@ test('isUncertain: margem pequena E notas diferentes entre a 1ª e a 2ª tonalid
 
 test('keySummary: a nota original e a nota cantada quando há transposição', () => {
   assert.equal(keySummary(a, 0), 'Tom: Lá (A)');
-  assert.equal(keySummary(a, 2), 'Tom: Lá (A) → Si (B) com +2');
-  assert.equal(keySummary(a, -3), 'Tom: Lá (A) → Fá♯ / Sol♭ (F#/Gb) com -3');
+  assert.equal(keySummary(a, 2), 'Tom: Lá (A) → agora em Si (B)');
+  assert.equal(keySummary(a, -3), 'Tom: Lá (A) → agora em Fá♯ / Sol♭ (F#/Gb)');
   assert.equal(keySummary({ tonic: 0, mode: 'major', margin: 0.01 }, 0), 'Tom provável: Dó (C)'); // sem alternativa
   const ambiguous = { tonic: 5, mode: 'major', margin: 0.04, alt: { tonic: 2, mode: 'minor' } };
   assert.equal(keySummary(ambiguous, 0), 'Tom provável: Fá (F) ou Ré (D)');
-  assert.equal(keySummary(ambiguous, 2), 'Tom provável: Fá (F) ou Ré (D) → Sol (G) ou Mi (E) com +2');
+  assert.equal(keySummary(ambiguous, 2), 'Tom provável: Fá (F) ou Ré (D) → agora em Sol (G) ou Mi (E)');
   const sameNote = { tonic: 0, mode: 'major', margin: 0.01, alt: { tonic: 0, mode: 'minor' } };
   assert.equal(keySummary(sameNote, 0), 'Tom: Dó (C)'); // a nota é certa
   assert.equal(keySummary(null, 2), '');
