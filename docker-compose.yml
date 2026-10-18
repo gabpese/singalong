@@ -32,6 +32,9 @@ services:
       APP_LATEST_VERSION: ${APP_LATEST_VERSION:-}
       APP_MIN_VERSION: ${APP_MIN_VERSION:-}
       APP_NOTES: ${APP_NOTES:-}
+      # intervalo entre músicas (segundos): os aplausos depois de cada música e a subida ao palco do próximo cantor (0 desliga a fase)
+      INTERMISSION_APPLAUSE_SECONDS: ${INTERMISSION_APPLAUSE_SECONDS:-15}
+      INTERMISSION_STAGE_SECONDS: ${INTERMISSION_STAGE_SECONDS:-15}
       APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}
       PAIR_ALLOWED_EMAILS: ${PAIR_ALLOWED_EMAILS:-}
       ENABLED_TO_SEND_TO_CLOUD: ${ENABLED_TO_SEND_TO_CLOUD:-}

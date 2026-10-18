@@ -58,7 +58,25 @@ if (!process.env.E2E_STORAGE) await seed(root);
 const jobs = createMemoryJobStore();
 const BIG = { max: 1e6, windowMs: 60_000 };
 // adminToken liga o pareamento do agente local (/agent/v1): os testes de agente.spec.mjs fazem o papel do app do dono
-const app = buildApp({ config: { publicDir, publicUrl: '', adminPath: 'e2e-painel-secreto-0123456789', appDownloadUrl: 'https://example.test/releases/latest', appLatestVersion: '1.2.3', adminToken: 'e2e-admin', rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG } }, storage: new LocalStorage(root), jobs });
+// intervalo entre músicas: as salas dos testes nascem com ele desligado (os testes antigos esperam a próxima música na hora); os
+// testes do intervalo o ligam e ele dura E2E_INTERMISSION_MS em cada fase (3 s, ou mais para ver as cenas inteiras)
+const INTERMISSION_MS = Number(process.env.E2E_INTERMISSION_MS ?? 3000);
+const app = buildApp({
+  config: {
+    publicDir,
+    publicUrl: '',
+    adminPath: 'e2e-painel-secreto-0123456789',
+    appDownloadUrl: 'https://example.test/releases/latest',
+    appLatestVersion: '1.2.3',
+    adminToken: 'e2e-admin',
+    rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG },
+    intermissionApplauseMs: INTERMISSION_MS,
+    intermissionStageMs: INTERMISSION_MS,
+    intermissionByDefault: false,
+  },
+  storage: new LocalStorage(root),
+  jobs,
+});
 
 app.post('/__test/search-results', async (request) => {
   jobs.searchResults = request.body;

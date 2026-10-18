@@ -47,7 +47,7 @@ export async function roomRoutes(app, { rooms, config, limiters, release }) {
       body: {
         type: 'object',
         additionalProperties: false,
-        properties: { fair: { type: 'boolean' }, scoring: { type: 'boolean' }, voice: { type: 'boolean' }, voice_volume: { type: 'integer', minimum: 0, maximum: 100 }, melody_bars: { type: 'boolean' } },
+        properties: { fair: { type: 'boolean' }, scoring: { type: 'boolean' }, voice: { type: 'boolean' }, voice_volume: { type: 'integer', minimum: 0, maximum: 100 }, melody_bars: { type: 'boolean' }, intermission: { type: 'boolean' } },
         minProperties: 1,
       },
     },
@@ -117,12 +117,15 @@ export async function roomRoutes(app, { rooms, config, limiters, release }) {
 
   app.post('/rooms/:code/player/:action', {
     schema: {
-      params: { type: 'object', properties: { code: CODE_PARAM, action: { enum: ['pause', 'resume', 'skip'] } }, required: ['code', 'action'] },
+      params: { type: 'object', properties: { code: CODE_PARAM, action: { enum: ['pause', 'resume', 'skip', 'start'] } }, required: ['code', 'action'] },
     },
   }, async (request) => {
     const { code, action } = request.params;
     const actor = actorOf(request);
-    const result = action === 'skip' ? await rooms.skip(code, actor) : await rooms.setPlayback(code, action === 'resume', actor);
+    // start: pula o intervalo entre músicas (os aplausos e a subida ao palco) e a próxima música começa já
+    const result = action === 'skip' ? await rooms.skip(code, actor)
+      : action === 'start' ? await rooms.startNow(code, actor)
+      : await rooms.setPlayback(code, action === 'resume', actor);
     return result.state;
   });
 

@@ -9,6 +9,7 @@ import { myPart, partName } from '../lib/duet.js';
 import { connectRoom } from '../lib/identity.js';
 import { createLyricsView } from '../lib/lyrics-view.js';
 import { splitQueue } from '../lib/queue-view.js';
+import { useInterlude } from '../ui/useInterlude';
 import { InviteDialog, InviteNotice, respondInvite } from '../room/Duet';
 import { api } from '../lib/identity.js';
 import { dismissStage, STAGE_END_SECONDS, stageItemFor } from '../lib/stage.js';
@@ -19,6 +20,18 @@ const roomUrl = (code: string) => `/room.html?room=${code}`;
 interface Ended {
   title: string;
   score: number | null;
+}
+
+/** A subida ao palco no celular de quem vai cantar: o chamado e quanto falta para a música começar. */
+function StageCall({ state }: { state: RoomState }) {
+  const clock = useInterlude(state.interlude);
+  if (!clock) return null;
+  return (
+    <div className="stage-call" role="status">
+      <strong>{t('interlude.yourTurn')}</strong>
+      <span>{t('interlude.startsIn.long', { n: clock.seconds })}</span>
+    </div>
+  );
 }
 
 export function StagePage({ code }: { code: string }) {
@@ -187,6 +200,8 @@ export function StagePage({ code }: { code: string }) {
           }}
         />
       )}
+
+      {state?.interlude?.phase === 'stage' && state.interlude.item_id === item?.id && <StageCall state={state} />}
 
       <section className="lyrics stage-lyrics" aria-live="off">
         <p className="line prev" ref={lyricsRefs.prev} />

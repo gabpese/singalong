@@ -59,7 +59,26 @@ export interface ScoreRow {
   score: number;
 }
 
-export type Playback = 'idle' | 'playing' | 'paused';
+/** `intro`: a música da vez já foi escolhida, mas o cantor ainda está subindo ao palco (o som espera o intervalo acabar). */
+export type Playback = 'idle' | 'intro' | 'playing' | 'paused';
+
+/**
+ * Intervalo entre músicas em andamento: os aplausos para quem acabou de cantar (`applause`) ou a subida ao palco de quem vem (`stage`).
+ * `left_ms` é o que faltava quando o servidor mandou o estado: cada aparelho conta o resto sozinho.
+ */
+export interface Interlude {
+  phase: 'applause' | 'stage';
+  total_ms: number;
+  left_ms: number;
+  item_id: number;
+  title: string | null;
+  artist: string | null;
+  added_by: string;
+  guest: { name: string; status: 'pending' | 'accepted' } | null;
+  singers: string;
+  /** A nota de quem acabou de cantar (só nos aplausos e com a pontuação ligada). */
+  score: number | null;
+}
 
 export interface RoomState {
   code: string;
@@ -70,6 +89,9 @@ export interface RoomState {
   voice_volume: number;
   /** Guia de melodia na TV: as notas da voz original como barras, com a afinação de quem canta por cima. */
   melody_bars: boolean;
+  /** Intervalo entre músicas (o anfitrião liga): aplausos depois de cada música e a subida ao palco do próximo cantor. */
+  intermission: boolean;
+  interlude: Interlude | null;
   scoreboard: ScoreRow[];
   play_order: number[];
   playback: Playback;

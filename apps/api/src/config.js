@@ -38,5 +38,8 @@ export function loadConfig(env = process.env) {
     appMinVersion: env.APP_MIN_VERSION ?? '',
     appNotes: (env.APP_NOTES ?? '').slice(0, 500),
     appDownloadUrl: env.APP_DOWNLOAD_URL ?? '',
+    // intervalo entre músicas (segundos): os aplausos depois de cada música e a subida ao palco do próximo cantor; 0 desliga a fase
+    intermissionApplauseMs: Math.max(0, Number(env.INTERMISSION_APPLAUSE_SECONDS ?? 15)) * 1000,
+    intermissionStageMs: Math.max(0, Number(env.INTERMISSION_STAGE_SECONDS ?? 15)) * 1000,
   };
 }

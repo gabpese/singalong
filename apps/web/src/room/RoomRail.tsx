@@ -32,7 +32,7 @@ function RailSwitch({ icon, label, tip, checked, onToggle, beta = false }: { ico
 }
 
 /** Ajuste do anfitrião que vai no PATCH da sala. */
-function useHostField(field: 'fair' | 'scoring' | 'voice' | 'melody_bars', checked: boolean, names: [string, string]) {
+function useHostField(field: 'fair' | 'scoring' | 'voice' | 'melody_bars' | 'intermission', checked: boolean, names: [string, string]) {
   const { act, toast } = useRoom();
   const [pending, setPending] = useState<boolean | null>(null);
   const set = (value: boolean) => {
@@ -55,6 +55,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
   const voice = useHostField('voice', Boolean(state?.voice), [t('rail.voiceOn'), t('rail.voiceOff')]);
   const melody = useHostField('melody_bars', Boolean(state?.melody_bars), [t('rail.melodyOn'), t('rail.melodyOff')]);
   const fair = useHostField('fair', Boolean(state?.fair), [t('rail.fairOn'), t('rail.fairOff')]);
+  const intermission = useHostField('intermission', Boolean(state?.intermission), [t('rail.intermissionOn'), t('rail.intermissionOff')]);
   const [asking, setAsking] = useState(false);
 
   async function copyText(text: string, okMessage: string) {
@@ -130,6 +131,9 @@ export function RoomRail({ state }: { state: RoomState | null }) {
           </Item>
           <Item>
             <RailSwitch icon="shuffle" label={t('rail.fair')} tip={t('rail.fairTip')} checked={fair.value} onToggle={fair.set} />
+          </Item>
+          <Item>
+            <RailSwitch icon="stage" label={t('rail.intermission')} tip={t('rail.intermissionTip')} checked={intermission.value} onToggle={intermission.set} />
           </Item>
         </>
       )}

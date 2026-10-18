@@ -16,6 +16,7 @@ import { LatencyDialog } from './LatencyDialog';
 import { MicsDialog } from './MicsDialog';
 import { PitchGuide } from './PitchGuide';
 import { BetaTag } from '../ui/BetaTag';
+import { Interlude } from './Interlude';
 import { Lobby } from './Lobby';
 import { QrCode } from './QrCode';
 import { QueueBox, titleOf } from './QueueBox';
@@ -280,7 +281,11 @@ export function TvPage({ code }: { code: string }) {
         <Lobby code={code} people={room?.people ?? []} status={next ? t('tvp.idleNext', { who: next.item.singers, title: nextLabel }) : t('tvp.idleAdd')} />
       </section>
 
-      <ScoreFinal final={final} room={room} />
+      {/* o intervalo entre músicas cobre tudo (a espera também): aplausos para quem cantou, depois a subida ao palco de quem vem */}
+      <Interlude room={room} />
+
+      {/* nos aplausos a nota já aparece no meio da tela: o quadro da nota final não se repete */}
+      <ScoreFinal final={room?.interlude ? null : final} room={room} />
       <ReactionLayer items={reactions.items} />
       {choosingMics && <MicsDialog controller={controllerRef.current} onClose={() => setChoosingMics(false)} />}
       {calibrating && <LatencyDialog controller={controllerRef.current} onClose={() => setCalibrating(false)} />}
