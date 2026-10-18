@@ -10,6 +10,7 @@ import type { LyricCue, RoomState } from '../lib/types';
 import { SingerBlobs } from '../ui/SingerBlobs';
 import { LyricsSize } from '../ui/LyricsSize';
 import { QueueBox, titleOf } from '../tv/QueueBox';
+import { InterludeBanner } from './InterludeBanner';
 import { ReactionBar } from './ReactionBar';
 import { useRoom } from './context';
 import type { Position } from './useRoomConnection';
@@ -98,6 +99,7 @@ export function TvViewer({ state, position, lyrics }: Props) {
     <section className="tv-viewer" aria-label={t('tvview.aria')}>
       {!state?.tv_connected && <p className="hint tv-viewer-note">{t('tvview.noTv')}</p>}
       <LyricsSize />
+      {state && <InterludeBanner state={state} controls={false} />}
       <header className="tv-viewer-top">
         {current ? (
           <div className="singer is-now">

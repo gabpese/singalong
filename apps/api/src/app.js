@@ -28,7 +28,14 @@ export function buildApp({ config, storage, jobs, logger = false, mailer = creat
   );
   const agents = createAgentService({ db, jobs, cloudEmails: config.cloudUploadEmails ?? [] });
   const songs = createSongService({ storage, jobs, agents });
-  const rooms = createRoomService({ db, songs, hub: createHub(), agents });
+  const rooms = createRoomService({
+    db,
+    songs,
+    hub: createHub(),
+    agents,
+    // sem durações na configuração (os testes da API) não há intervalo: a próxima música começa na hora, como antes
+    intermission: { applauseMs: config.intermissionApplauseMs ?? 0, stageMs: config.intermissionStageMs ?? 0, byDefault: config.intermissionByDefault ?? true },
+  });
   app.decorate('rooms', rooms);
   app.decorate('agents', agents);
   app.decorate('db', db);

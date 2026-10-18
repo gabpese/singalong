@@ -54,6 +54,9 @@ services:
       APP_MIN_VERSION: "${APP_MIN_VERSION:-}"
       APP_NOTES: "${APP_NOTES:-}"
       APP_DOWNLOAD_URL: "${APP_DOWNLOAD_URL:-}"
+      # intervalo entre músicas (segundos): os aplausos depois de cada música e a subida ao palco do próximo cantor (0 desliga a fase)
+      INTERMISSION_APPLAUSE_SECONDS: "${INTERMISSION_APPLAUSE_SECONDS:-15}"
+      INTERMISSION_STAGE_SECONDS: "${INTERMISSION_STAGE_SECONDS:-15}"
       # o endereço SECRETO da página do administrador (sem ele a página não existe); gere com: openssl rand -hex 16
       ADMIN_PATH: "${ADMIN_PATH:-}"
       # código de pareamento por e-mail (opcional): quem estiver em PAIR_ALLOWED_EMAILS pede o código no app e recebe por e-mail

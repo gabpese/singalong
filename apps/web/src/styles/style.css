@@ -794,3 +794,111 @@ body.stage { background: var(--bg); }
 .singer .who .singer-blobs.duo .blob + .blob { margin-left: -.36em; }
 .tv-queue .singer-blobs { font-size: clamp(1rem, 1.6vw, 1.5rem); margin: -.3em -.25em; }
 .tv-queue .singer-blobs .blob { filter: drop-shadow(2px 2px 0 rgba(22, 17, 15, .8)); }
+
+/* ---------- intervalo entre músicas na TV: aplausos e subida ao palco (cenas de cartaz com os bichinhos da sala) ---------- */
+/* --dur é a duração da fase e --late o quanto dela já tinha passado quando a cena apareceu (as animações começam dali) */
+.interlude { position: absolute; inset: 0; z-index: 4; overflow: hidden; display: grid; background: var(--bg); color: var(--ds-paper); animation: interlude-in .5s ease-out both; }
+@keyframes interlude-in { from { opacity: 0; } }
+.interlude-kicker { margin: 0; font-family: var(--ds-font-display); font-weight: 800; font-size: clamp(1.2rem, 2.6vw, 2.4rem); letter-spacing: -.02em; color: var(--ds-accent-on-paper); }
+.interlude-who { margin: 0; display: flex; align-items: center; justify-content: center; gap: .18em; font-size: clamp(2.6rem, 7vw, 6.5rem); line-height: 1; font-weight: 800; letter-spacing: -.04em; text-align: center; text-wrap: balance; text-shadow: .03em .03em 0 rgba(var(--ds-accent-rgb), .45); }
+.interlude-who .singer-blobs { margin: 0; }
+.interlude-who .singer-blobs .blob { width: 1.2em; height: 1.2em; filter: drop-shadow(3px 3px 0 rgba(22, 17, 15, .85)); }
+.interlude-song { margin: 0; font-size: clamp(1rem, 2vw, 1.8rem); color: var(--ds-paper-dim); }
+.interlude-hint { margin: 0; text-align: center; color: var(--dim); font-size: clamp(1rem, 1.8vw, 1.6rem); }
+
+/* aplausos: focos de luz balançando, confete, o cartaz de quem cantou (com a nota carimbada) e a plateia pulando */
+.interlude.applause { place-items: center; }
+.beams { position: absolute; inset: -20% -20% 0; transform-origin: 50% 100%; background: conic-gradient(from 200deg at 50% 100%, transparent 0 10deg, rgba(var(--ds-accent-rgb), .2) 10deg 22deg, transparent 22deg 40deg, rgba(232, 169, 51, .16) 40deg 50deg, transparent 50deg 70deg, rgba(240, 228, 205, .1) 70deg 80deg, transparent 80deg); animation: beams-sway 5s ease-in-out infinite alternate; }
+@keyframes beams-sway { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+.interlude-sheet { position: relative; z-index: 2; display: grid; justify-items: center; gap: 1.2vh; max-width: 86vw; margin-bottom: 16vh; padding: 5vh 5vw 4.5vh; background: var(--ds-paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .12  0 0 0 0 .08  0 0 0 0 .05  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); color: var(--ds-paper-ink); clip-path: polygon(0 1%,3% 0,12% .8%,24% 0,40% .7%,58% 0,73% .6%,88% 0,100% .9%,99.4% 22%,100% 48%,99.3% 73%,100% 99%,90% 100%,76% 99.3%,55% 100%,38% 99.2%,20% 100%,7% 99.4%,0 100%,.6% 74%,0 50%,.7% 26%); transform: rotate(-1.2deg); animation: sheet-drop .7s var(--ds-ease) both; }
+.interlude-sheet .tape { position: absolute; top: 1.2vh; left: 50%; width: 9vw; height: 3.2vh; background: rgba(232, 169, 51, .88); transform: translateX(-50%) rotate(-3deg); }
+@keyframes sheet-drop { from { transform: translateY(-30vh) rotate(-6deg); opacity: 0; } }
+.score-stamp { display: grid; justify-items: center; margin-top: 1vh; padding: 1.2vh 3vw 1.6vh; border: .45vw solid var(--ds-accent-on-paper); border-radius: 14px; color: var(--ds-accent-on-paper); transform: rotate(-4deg); animation: stamp-in .45s .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+.score-stamp strong { font-family: var(--ds-font-display); font-size: clamp(4rem, 15vh, 11rem); line-height: .9; font-weight: 800; letter-spacing: -.04em; }
+.score-stamp span { font-weight: 800; font-size: clamp(1rem, 2vw, 1.8rem); }
+.score-stamp small { color: var(--ds-paper-ink); font-size: clamp(.9rem, 1.6vw, 1.4rem); }
+@keyframes stamp-in { from { transform: scale(2.4) rotate(-12deg); opacity: 0; } }
+.crowd { position: absolute; left: 0; right: 0; bottom: -2vh; z-index: 3; display: flex; justify-content: center; align-items: flex-end; }
+.crowd-one { display: block; margin: 0 -1.1vw; animation: crowd-jump var(--jump) ease-in-out var(--wait) infinite alternate; }
+.crowd-blob { display: block; width: calc(14vh * var(--size)); height: calc(14vh * var(--size)); overflow: visible; filter: drop-shadow(1.5px 0 0 var(--ds-paper)) drop-shadow(-1.5px 0 0 var(--ds-paper)) drop-shadow(0 1.5px 0 var(--ds-paper)) drop-shadow(0 -1.5px 0 var(--ds-paper)); }
+@keyframes crowd-jump { to { transform: translateY(-4.5vh); } }
+.confetti { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.confetti .bit { position: absolute; top: -6vh; left: var(--x); width: 1vw; height: 1.8vw; border-radius: 2px; animation: confetti-fall var(--fall) linear var(--wait) infinite; }
+.confetti .c0 { background: var(--ds-accent); }
+.confetti .c1 { background: var(--ds-mustard); }
+.confetti .c2 { background: var(--ds-paper); }
+@keyframes confetti-fall { to { transform: translateY(116vh) rotate(var(--spin)); } }
+
+/* subida ao palco: quem vem e a contagem no alto; embaixo, o bichinho sai do camarim, sobe a escada e chega ao microfone */
+.interlude.stage-up { grid-template-rows: auto minmax(0, 1fr) auto; gap: 1.5vh; padding: 3vh 4vw; }
+.stage-up-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 3vw; }
+.stage-up .interlude-kicker { color: var(--accent-text); }
+.stage-up .interlude-who { justify-content: flex-start; text-align: left; text-shadow: .035em .03em 0 rgba(var(--ds-accent-rgb), .6); }
+.stage-up .interlude-song { color: var(--dim); }
+.countdown { margin: 0; flex: 0 0 auto; display: grid; justify-items: center; min-width: 15vh; padding: 1.4vh 2.2vh; border-radius: 14px; background: var(--ds-paper); color: var(--ds-paper-ink); transform: rotate(3deg); box-shadow: 0 14px 24px -10px rgba(8, 4, 2, .7); }
+.countdown small { font-weight: 700; font-size: clamp(.8rem, 1.4vw, 1.2rem); color: var(--ds-paper-dim); }
+.countdown strong { font-family: var(--ds-font-display); font-weight: 800; font-size: clamp(3rem, 10vh, 6.5rem); line-height: 1; color: var(--ds-accent-on-paper); }
+.scene { position: relative; justify-self: center; align-self: center; width: min(100%, 118vh); aspect-ratio: 16 / 9; max-height: 100%; container-type: size; }
+.scene .valance { position: absolute; z-index: 3; left: 0; right: 0; top: 0; height: 9%; background: radial-gradient(circle at 50% 0, #9b2020 68%, transparent 70%) 0 0 / 8cqw 100%; }
+.scene .spot { position: absolute; z-index: 1; left: 64%; top: 0; width: 34%; height: 54%; background: linear-gradient(rgba(255, 240, 200, 0), rgba(255, 240, 200, .32)); clip-path: polygon(45% 0, 55% 0, 100% 100%, 0 100%); opacity: 0; animation: spot-on var(--dur) linear var(--late) both; }
+@keyframes spot-on { 0%, 74% { opacity: 0; } 80%, 100% { opacity: 1; } }
+.scene .door { position: absolute; left: 5%; bottom: 22%; width: 14%; height: 44%; background: #0c0908; border: 1.2cqh solid var(--ds-paper); border-bottom: 0; border-radius: 1cqh 1cqh 0 0; }
+.door-sign { position: absolute; left: 50%; top: -11cqh; transform: translateX(-50%) rotate(-3deg); padding: .8cqh 1.8cqh; border-radius: .6cqh; background: var(--ds-mustard); color: var(--ds-paper-ink); font-weight: 800; font-size: 3.4cqh; white-space: nowrap; }
+.door-leaf { position: absolute; inset: 0; background: #6b2a1d; transform-origin: 0 50%; animation: door-open var(--dur) linear var(--late) both; }
+@keyframes door-open { 0% { transform: scaleX(1); } 6%, 100% { transform: scaleX(.12); } }
+.scene .floor { position: absolute; left: 0; bottom: 0; width: 36%; height: 22%; background: #2a211c; border-top: .5cqh solid rgba(240, 228, 205, .18); }
+/* cinco degraus do chão (22% da cena) até o palco (46%) */
+.scene .stairs { position: absolute; left: 36%; bottom: 0; width: 22%; height: 46%; background: linear-gradient(#4a3a31, #33271f); clip-path: polygon(0 100%, 0 41.74%, 20% 41.74%, 20% 31.3%, 40% 31.3%, 40% 20.87%, 60% 20.87%, 60% 10.43%, 80% 10.43%, 80% 0, 100% 0, 100% 100%); }
+.scene .platform { position: absolute; left: 58%; right: 0; bottom: 0; height: 46%; background: repeating-linear-gradient(90deg, #8f1d1d 0 3cqw, #771616 3cqw 6cqw); border-top: 1.2cqh solid var(--ds-paper); }
+.scene .mic-stand { position: absolute; z-index: 2; left: 80%; bottom: 46%; width: .7cqw; height: 22%; background: #cfc3ad; }
+.scene .mic-stand::before { content: ''; position: absolute; left: 50%; top: -4cqh; width: 3.4cqw; height: 6cqh; border-radius: 50%; background: var(--ds-accent); transform: translateX(-50%) rotate(-20deg); box-shadow: inset 0 0 0 .4cqw rgba(22, 17, 15, .35); }
+.scene .mic-stand::after { content: ''; position: absolute; left: 50%; bottom: -.4cqh; width: 7cqw; height: 1.4cqh; border-radius: 1cqh; background: #cfc3ad; transform: translateX(-50%); }
+.walker { position: absolute; z-index: 2; left: 6.5%; bottom: 22%; animation: walk-path var(--dur) linear var(--late) both; }
+.walker.w1 { z-index: 1; animation-name: walk-path-2; }
+.walker-bob { display: block; animation: walk-bob .42s ease-in-out infinite alternate; }
+.walker .singer-blobs { display: block; margin: 0; }
+.walker .singer-blobs .blob { width: 14cqw; height: 14cqw; margin-bottom: -3.2cqw; } /* o bicho fica no miolo do desenho: a margem de baixo some, e ele pisa no chão */
+@keyframes walk-bob { to { transform: translateY(-1.8cqh); } }
+@keyframes walk-path {
+  0%, 5% { left: 6.5%; bottom: 22%; opacity: 0; }
+  9% { left: 6.5%; bottom: 22%; opacity: 1; }
+  32% { left: 29%; bottom: 22%; }
+  36% { left: 31%; bottom: 26.8%; }
+  41% { left: 35.4%; bottom: 31.6%; }
+  46% { left: 39.8%; bottom: 36.4%; }
+  51% { left: 44.2%; bottom: 41.2%; }
+  56% { left: 48.6%; bottom: 46%; }
+  78%, 100% { left: 66%; bottom: 46%; opacity: 1; }
+}
+@keyframes walk-path-2 {
+  0%, 12% { left: 6.5%; bottom: 22%; opacity: 0; }
+  16% { left: 6.5%; bottom: 22%; opacity: 1; }
+  38% { left: 25%; bottom: 22%; }
+  42% { left: 27%; bottom: 26.8%; }
+  47% { left: 31.4%; bottom: 31.6%; }
+  52% { left: 35.8%; bottom: 36.4%; }
+  57% { left: 40.2%; bottom: 41.2%; }
+  62% { left: 44.6%; bottom: 46%; }
+  80%, 100% { left: 56%; bottom: 46%; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* sem passeio: a cena já mostra quem vem no palco, com a luz acesa */
+  .walker { animation: none; left: 66%; bottom: 46%; }
+  .walker.w1 { left: 56%; }
+  .scene .spot { animation: none; opacity: 1; }
+  .door-leaf { animation: none; transform: scaleX(.12); }
+  .confetti, .beams { display: none; }
+}
+
+/* ---------- intervalo entre músicas no celular: o aviso na música tocando e o chamado no palco do cantor ---------- */
+.interlude-banner { display: flex; align-items: center; gap: var(--ds-s3); margin: 0 0 var(--ds-s3); padding: var(--ds-s3); border-radius: var(--ds-r-sm); background: var(--ds-paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .12  0 0 0 0 .08  0 0 0 0 .05  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); color: var(--ds-paper-ink); }
+.interlude-banner .singer-blobs { font-size: 1.4rem; margin: -.3em -.1em -.3em -.2em; }
+.interlude-banner .singer-blobs .blob { filter: drop-shadow(2px 2px 0 rgba(22, 17, 15, .8)); }
+.interlude-banner-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.interlude-banner .muted { color: var(--ds-paper-dim); }
+.interlude-start { flex: 0 0 auto; background: var(--ds-paper-ink); color: var(--ds-paper); border-color: transparent; font-weight: 700; }
+.interlude-start:hover:not(:disabled) { border-color: var(--ds-accent); }
+.stage-call { display: grid; justify-items: center; gap: 4px; padding: var(--ds-s4); border-radius: var(--ds-r-md); background: var(--ds-paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .12  0 0 0 0 .08  0 0 0 0 .05  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); color: var(--ds-paper-ink); text-align: center; }
+.stage-call strong { font-family: var(--ds-font-display); font-size: 1.9rem; line-height: 1.05; color: var(--ds-accent-on-paper); }
+.stage-call span { color: var(--ds-paper-dim); font-weight: 600; }
+.i-stage { --icon: url('/icons/stage.svg'); }

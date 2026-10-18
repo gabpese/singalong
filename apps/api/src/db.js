@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   voice_volume    INTEGER NOT NULL DEFAULT 40,      -- volume dessa voz, de 0 a 100
   melody_bars     INTEGER NOT NULL DEFAULT 0,       -- guia de melodia na TV: as notas da voz original como barras (decidido pelo anfitrião)
   current_item_id INTEGER,
-  playback        TEXT NOT NULL DEFAULT 'idle',   -- idle | playing | paused
+  playback        TEXT NOT NULL DEFAULT 'idle',   -- idle | intro (o cantor sobe ao palco; a música espera) | playing | paused
   last_client_id  TEXT,                           -- quem cantou por último (rodízio justo)
   created_at      INTEGER NOT NULL,
   last_active_at  INTEGER NOT NULL
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS agent_songs (
 );
 `;
 
-const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'melody_bars', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
+const ROOM_FIELDS = new Set(['fair', 'scoring', 'voice', 'voice_volume', 'melody_bars', 'intermission', 'applause_item_id', 'applause_until', 'stage_until', 'current_item_id', 'playback', 'last_client_id', 'last_active_at']);
 const ITEM_FIELDS = new Set(['pitch', 'backing', 'guide', 'position', 'status', 'played_at', 'score', 'title', 'artist', 'guest_client_id', 'guest_name', 'guest_status']);
 
 export function openDb(path = ':memory:') {
@@ -138,6 +138,11 @@ export function openDb(path = ':memory:') {
   if (!hasColumn('rooms', 'voice')) db.exec('ALTER TABLE rooms ADD COLUMN voice INTEGER NOT NULL DEFAULT 0');
   if (!hasColumn('rooms', 'voice_volume')) db.exec('ALTER TABLE rooms ADD COLUMN voice_volume INTEGER NOT NULL DEFAULT 40');
   if (!hasColumn('rooms', 'melody_bars')) db.exec('ALTER TABLE rooms ADD COLUMN melody_bars INTEGER NOT NULL DEFAULT 0');
+  // intervalo entre músicas: os aplausos para quem acabou de cantar e a subida ao palco de quem vem (o anfitrião desliga)
+  if (!hasColumn('rooms', 'intermission')) db.exec('ALTER TABLE rooms ADD COLUMN intermission INTEGER NOT NULL DEFAULT 1');
+  if (!hasColumn('rooms', 'applause_item_id')) db.exec('ALTER TABLE rooms ADD COLUMN applause_item_id INTEGER');
+  if (!hasColumn('rooms', 'applause_until')) db.exec('ALTER TABLE rooms ADD COLUMN applause_until INTEGER');
+  if (!hasColumn('rooms', 'stage_until')) db.exec('ALTER TABLE rooms ADD COLUMN stage_until INTEGER');
   if (!hasColumn('queue_items', 'score')) db.exec('ALTER TABLE queue_items ADD COLUMN score INTEGER');
   if (!hasColumn('queue_items', 'guest_client_id')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_client_id TEXT');
   if (!hasColumn('queue_items', 'guest_name')) db.exec('ALTER TABLE queue_items ADD COLUMN guest_name TEXT');
@@ -184,8 +189,8 @@ export function openDb(path = ':memory:') {
     close: () => db.close(),
 
     // --- salas ---
-    createRoom: (code, hostToken, now, sessionId = null) =>
-      run('INSERT INTO rooms (code, host_token, created_at, last_active_at, session_id) VALUES (?, ?, ?, ?, ?)', code, hostToken, now, now, sessionId),
+    createRoom: (code, hostToken, now, sessionId = null, intermission = true) =>
+      run('INSERT INTO rooms (code, host_token, created_at, last_active_at, session_id, intermission) VALUES (?, ?, ?, ?, ?, ?)', code, hostToken, now, now, sessionId, intermission ? 1 : 0),
     getRoom: (code) => one('SELECT * FROM rooms WHERE code = ?', code),
     listRoomCodes: () => all('SELECT code FROM rooms').map((r) => r.code),
     updateRoom: (code, fields) => update('rooms', ROOM_FIELDS, 'code', code, fields),

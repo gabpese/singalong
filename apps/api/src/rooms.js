@@ -117,6 +117,8 @@ export function createRoomService({
   songs,
   hub,
   agents = null, // o serviço do agente local: dá o apelido e o estado (online) do dono da sessão de uma sala
+  // intervalo entre músicas: duração dos aplausos e da subida ao palco (0 desliga a fase) e se a sala nasce com ele ligado
+  intermission = { applauseMs: 0, stageMs: 0, byDefault: true },
   now = Date.now,
   newCode = generateCode,
   newToken = () => randomBytes(16).toString('hex'),
@@ -127,6 +129,7 @@ export function createRoomService({
   const touched = new Map(); // code -> última vez que gravamos last_active_at
   const locks = new Map(); // code -> cauda da fila de operações da sala
   let timers = [];
+  const wakes = new Set(); // despertadores do intervalo entre músicas (um por fim de fase)
 
   /** Serializa as operações de uma sala: evita duas "avançar a fila" ao mesmo tempo. */
   function withLock(code, fn) {
@@ -184,23 +187,91 @@ export function createRoomService({
     return new Set(ids.filter((_, i) => flags[i]));
   }
 
-  /** Se nada está tocando, põe para tocar o próximo item PRONTO (itens ainda em processamento mantêm a posição). */
-  async function tryAdvance(code) {
+  /**
+   * O intervalo entre músicas vale agora nesta sala? Precisa estar ligado pelo anfitrião, ter duração e uma TV para mostrá-lo
+   * (sem TV nada toca: esperar não ajudaria ninguém).
+   */
+  const intermissionOn = (room, ms) => ms > 0 && Boolean(room.intermission) && hub.count(room.code, 'tv') > 0;
+
+  /** Acorda a sala quando uma fase do intervalo termina (o passo periódico também cuida disso; o despertador só é mais pontual). */
+  function wakeAt(code, ms) {
+    const timer = setTimeout(() => {
+      wakes.delete(timer);
+      withLock(code, async () => {
+        const staged = endStage(code);
+        const advanced = await tryAdvance(code);
+        if (staged || advanced) await publish(code);
+      }).catch(() => {});
+    }, ms + 30);
+    timer.unref?.();
+    wakes.add(timer);
+  }
+
+  /** Fim da subida ao palco: a música da vez começa. */
+  function endStage(code) {
+    const room = db.getRoom(code);
+    if (!room || room.playback !== 'intro' || (room.stage_until ?? 0) > now()) return false;
+    db.updateRoom(code, { playback: 'playing', stage_until: null });
+    return true;
+  }
+
+  /**
+   * Se nada está tocando, põe o próximo item PRONTO na vez (itens ainda em processamento mantêm a posição). Durante os aplausos
+   * a fila espera; com o intervalo ligado, a música da vez entra em "intro" (o cantor sobe ao palco) antes de tocar.
+   */
+  async function tryAdvance(code, { skipStage = false } = {}) {
     const room = db.getRoom(code);
     if (!room || (room.current_item_id && room.playback !== 'idle')) return false;
+    if ((room.applause_until ?? 0) > now()) return false;
     const queued = db.listActive(code).filter((i) => i.status === 'queued');
     const pick = nextPlayable(queued, await readySet(queued, room), { fair: Boolean(room.fair), lastClientId: room.last_client_id });
     if (!pick) {
-      if (room.current_item_id || room.playback !== 'idle') db.updateRoom(code, { current_item_id: null, playback: 'idle' });
+      if (room.current_item_id || room.playback !== 'idle') db.updateRoom(code, { current_item_id: null, playback: 'idle', stage_until: null });
       return false;
     }
+    const stageMs = !skipStage && intermissionOn(room, intermission.stageMs) ? intermission.stageMs : 0;
     db.transaction(() => {
       db.updateItem(pick.id, { status: 'playing', played_at: now() });
       db.touchPlayed(pick.video_id, now()); // base da limpeza do cache por uso (LRU)
-      db.updateRoom(code, { current_item_id: pick.id, playback: 'playing', last_client_id: pick.client_id });
+      db.updateRoom(code, {
+        current_item_id: pick.id,
+        playback: stageMs ? 'intro' : 'playing',
+        stage_until: stageMs ? now() + stageMs : null,
+        applause_item_id: null,
+        applause_until: null,
+        last_client_id: pick.client_id,
+      });
     });
+    if (stageMs) wakeAt(code, stageMs);
     positions.delete(code);
     return true;
+  }
+
+  /** Os dados de uma música que o intervalo mostra (quem cantou ou vai cantar, o título e a nota, se houve pontuação). */
+  function interludeItem(item) {
+    return {
+      item_id: item.id,
+      title: item.title,
+      artist: item.artist,
+      added_by: item.added_by,
+      guest: item.guest_status ? { name: item.guest_name, status: item.guest_status } : null,
+      singers: item.guest_status === 'accepted' ? `${item.added_by} & ${item.guest_name}` : item.added_by,
+      score: Number.isInteger(item.score) ? item.score : null,
+    };
+  }
+
+  /** A fase do intervalo em andamento (aplausos ou subida ao palco), com quanto tempo falta; null fora do intervalo. */
+  function interludeOf(room) {
+    const t = now();
+    if (room.playback === 'intro' && room.current_item_id) {
+      const item = db.getItem(room.current_item_id);
+      if (item) return { phase: 'stage', total_ms: intermission.stageMs, left_ms: Math.max(0, (room.stage_until ?? t) - t), ...interludeItem(item) };
+    }
+    if (!room.current_item_id && (room.applause_until ?? 0) > t && room.applause_item_id) {
+      const item = db.getItem(room.applause_item_id);
+      if (item) return { phase: 'applause', total_ms: intermission.applauseMs, left_ms: room.applause_until - t, ...interludeItem(item) };
+    }
+    return null;
   }
 
   /** Uma linha no histórico do dono da sessão (salas sem dono, do worker clássico, não têm estatísticas de dono). */
@@ -260,6 +331,9 @@ export function createRoomService({
       voice: Boolean(room.voice),
       voice_volume: room.voice_volume ?? 40,
       melody_bars: Boolean(room.melody_bars),
+      // intervalo entre músicas: o ajuste do anfitrião e a fase em andamento (aplausos ou subida ao palco)
+      intermission: Boolean(room.intermission),
+      interlude: interludeOf(room),
       scoreboard: db.listScored(room.code).map((r) => ({ id: r.id, name: r.guest_status === 'accepted' ? `${r.added_by} & ${r.guest_name}` : r.added_by, title: r.title, score: r.score })),
       // quem está na sala agora (para convidar para um dueto): só o nome e uma identificação que não revela o client_id
       people: hub.people(room.code).map((p) => ({ pid: pidOf(p.clientId), name: p.name })),
@@ -310,7 +384,8 @@ export function createRoomService({
     };
   }
 
-  const stateKey = (base) => JSON.stringify({ ...base, position_ms: 0 });
+  // o tempo que falta do intervalo muda a cada passo: não conta como mudança de estado (os aparelhos contam o tempo sozinhos)
+  const stateKey = (base) => JSON.stringify({ ...base, position_ms: 0, interlude: base.interlude && { ...base.interlude, left_ms: 0 } });
 
   function publishBase(code, base) {
     lastKeys.set(code, stateKey(base));
@@ -346,7 +421,7 @@ export function createRoomService({
         const code = newCode();
         if (db.getRoom(code)) continue;
         const hostToken = newToken();
-        db.createRoom(code, hostToken, now(), sessionId);
+        db.createRoom(code, hostToken, now(), sessionId, intermission.byDefault !== false);
         return { code, host_token: hostToken };
       }
       throw new HttpError(503, 'no_room_code', 'Não consegui criar uma sala agora. Tente de novo.');
@@ -474,6 +549,19 @@ export function createRoomService({
       });
     },
 
+    /** Pula o intervalo entre músicas (só o anfitrião): acaba com os aplausos e com a subida ao palco, e a música da vez toca já. */
+    startNow(code, actor) {
+      return mutate(code, actor, async (room) => {
+        requireHost(room, actor);
+        if (room.playback === 'intro') {
+          db.updateRoom(room.code, { playback: 'playing', stage_until: null });
+        } else if ((room.applause_until ?? 0) > now()) {
+          db.updateRoom(room.code, { applause_item_id: null, applause_until: null });
+          await tryAdvance(room.code, { skipStage: true });
+        }
+      });
+    },
+
     /**
      * Muda a posição da música que está tocando (só o anfitrião): `{ to }` = vai para esse ponto (segundos, a barra de
      * progresso arrastada); `{ seconds }` = avança ou volta esse tanto. Quem executa é a TV, dona da posição.
@@ -507,6 +595,14 @@ export function createRoomService({
         if (typeof settings.voice === 'boolean') fields.voice = settings.voice ? 1 : 0;
         if (typeof settings.melody_bars === 'boolean') fields.melody_bars = settings.melody_bars ? 1 : 0;
         if (Number.isInteger(settings.voice_volume)) fields.voice_volume = Math.min(100, Math.max(0, settings.voice_volume));
+        if (typeof settings.intermission === 'boolean') {
+          fields.intermission = settings.intermission ? 1 : 0;
+          // desligado no meio do intervalo: os aplausos acabam e a música da vez começa
+          if (!settings.intermission) {
+            Object.assign(fields, { applause_item_id: null, applause_until: null, stage_until: null });
+            if (room.playback === 'intro') fields.playback = 'playing';
+          }
+        }
         db.updateRoom(room.code, fields);
       });
     },
@@ -555,6 +651,11 @@ export function createRoomService({
         const room = db.getRoom(normalized);
         if (!room || room.current_item_id !== itemId) return;
         finishCurrent(normalized, 'done');
+        // fim natural: aplausos para quem cantou antes de a próxima subir ao palco
+        if (intermissionOn(room, intermission.applauseMs)) {
+          db.updateRoom(normalized, { applause_item_id: itemId, applause_until: now() + intermission.applauseMs });
+          wakeAt(normalized, intermission.applauseMs);
+        }
         await tryAdvance(normalized);
         await publish(normalized);
       });
@@ -648,9 +749,10 @@ export function createRoomService({
       for (const code of hub.codes()) {
         await withLock(code, async () => {
           try {
+            const staged = endStage(code);
             const advanced = await tryAdvance(code);
             const base = await snapshot(code);
-            if (advanced || stateKey(base) !== lastKeys.get(code)) publishBase(code, base);
+            if (staged || advanced || stateKey(base) !== lastKeys.get(code)) publishBase(code, base);
           } catch {
             // sala removida ou storage indisponível: tenta de novo no próximo passo
           }
@@ -673,6 +775,8 @@ export function createRoomService({
     stop() {
       for (const timer of timers) clearInterval(timer);
       timers = [];
+      for (const timer of wakes) clearTimeout(timer);
+      wakes.clear();
     },
   };
 }

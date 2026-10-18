@@ -12,6 +12,7 @@ import { BackingControl, GuideControl } from './BackingControl';
 import { PitchControl } from './PitchControl';
 import { ReactionBar } from './ReactionBar';
 import { DuetControl } from './Duet';
+import { InterludeBanner } from './InterludeBanner';
 import { VoiceVolume } from './VoiceControl';
 import type { Position } from './useRoomConnection';
 
@@ -107,12 +108,15 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
   return (
     <article className="card now">
       <h2>{t('now.title')}</h2>
+      <InterludeBanner state={state} />
       <div>
         {!current ? (
           <div className="now-content">
-            <p className="hint">
-              {state.queue.length ? t('now.preparing') : t('now.nothing')}
-            </p>
+            {!state.interlude && (
+              <p className="hint">
+                {state.queue.length ? t('now.preparing') : t('now.nothing')}
+              </p>
+            )}
             <NextSinger state={state} />
           </div>
         ) : (
