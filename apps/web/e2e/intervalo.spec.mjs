@@ -6,6 +6,8 @@ import { addToQueue, ANA, BIA, createRoom, hostPatch, roomState, SONGS } from '.
 
 const violations = async (page) =>
   (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations.map((v) => `${v.id}: ${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}`);
+// o intervalo só acontece com a TV conectada: os testes esperam a TV entrar na sala antes de pôr a primeira música na fila
+const tvConnected = (request, room) => expect.poll(async () => (await roomState(request, room.code)).tv_connected).toBe(true);
 const playing = (page) => page.evaluate(() => window.tv.engine.playing && window.tv.engine.currentTime > 0);
 const finishSong = (page) => page.evaluate(() => window.tv.engine.seek(window.tv.engine.duration - 0.3));
 
@@ -14,6 +16,7 @@ test('a TV mostra a subida ao palco com a contagem (o som espera), depois toca; 
   await hostPatch(request, room, { intermission: true });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(room.tvUrl);
+  await tvConnected(request, room);
   await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
   await addToQueue(request, room.code, SONGS.bravo, { client: BIA, name: 'Bia' });
 
@@ -55,6 +58,7 @@ test('o celular mostra o intervalo; o anfitrião pula com "Começar agora" e o p
   };
   const host = await phone('client-host-0001', 'Gabi', room.hostUrl);
   const ana = await phone(ANA, 'Ana', room.guestUrl);
+  await tvConnected(request, room);
   await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });
 
   // quem vai cantar é levado ao palco, e lá está o chamado com a contagem
