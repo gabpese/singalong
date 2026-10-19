@@ -4,7 +4,14 @@
 
 Karaokê próprio e colaborativo: pesquise uma música no YouTube e o Singalong gera a versão karaokê (instrumental, letra sincronizada palavra a palavra, troca de tom, vozes de apoio, pontuação pelo microfone e exportação em MP4), com fila compartilhada pelo celular e a TV como player.
 
-Documentação: [PRD](PRD.pt-BR.md) (requisitos do produto), [TRD](TRD.pt-BR.md) (requisitos técnicos e a proposta do instalador/agente) e [PLAN](PLAN.pt-BR.md) (decisões e histórico). Cada um tem também a versão em inglês.
+| | |
+|---|---|
+| **Experimente** | [singalong.duckdns.org](https://singalong.duckdns.org): crie uma festa no computador ligado à TV; os convidados entram lendo o QR code. As músicas que já estão no Jukebox tocam na hora; preparar músicas novas pede o app instalável. |
+| **Instale o app** | A [versão mais recente](https://github.com/gabpese/singalong/releases/latest), para Windows, macOS (Apple Silicon) e Linux. Ele prepara as músicas novas no seu próprio computador. |
+| **Rode o seu servidor** | [Como rodar](#como-rodar) (Docker em casa) e o [guia de infraestrutura](docs/infrastructure.pt-BR.md) (VM na nuvem). |
+| **Como é construído** | [Arquitetura](docs/architecture.pt-BR.md) · [Decisões (ADRs)](docs/README.pt-BR.md#decisões-de-arquitetura-adrs) · [Roadmap](docs/ROADMAP.pt-BR.md) · [Glossário](docs/GLOSSARY.pt-BR.md) · [todos os documentos](docs/README.pt-BR.md) |
+
+Todo documento tem a versão em inglês (sem o `.pt-BR`), que é a de referência. Requisitos do produto e histórico: [PRD](docs/PRD.pt-BR.md), [TRD](docs/TRD.pt-BR.md), [PLAN](docs/PLAN.pt-BR.md).
 
 > **Beta.** A pontuação pelo microfone e o guia de melodia estão em fase beta: seguem a voz original por aproximação e ainda não são totalmente fiéis, então valem como diversão. Aparecem marcados como "beta" no app.
 
@@ -17,6 +24,13 @@ O app está na [versão mais recente](https://github.com/gabpese/singalong/relea
 | Windows 10/11 (x64) | `singalong_karaoke.exe` | ainda sem assinatura: o SmartScreen pode avisar ("Mais informações" > "Executar assim mesmo") |
 | macOS (Apple Silicon: M1 em diante) | `singalong_karaoke-mac-arm64.dmg` | ainda sem assinatura da Apple: na primeira vez, clique com o botão direito no app > **Abrir** (ou `xattr -dr com.apple.quarantine "/Applications/singalong_karaoke.app"`); ele não se atualiza sozinho, o "Atualizar agora" abre o download do DMG novo. **Mac Intel não é suportado** |
 | Linux (x64) | `singalong_karaoke-linux-x86_64.AppImage` | dê `chmod +x` no arquivo e execute (no Ubuntu 22.04 ou mais novo o AppImage precisa do `libfuse2`: `sudo apt install libfuse2`). Ele se atualiza sozinho. No GNOME o ícone da bandeja precisa da extensão AppIndicator |
+
+## Como foi construído
+
+O Singalong é desenhado e mantido por Gabriel Pesegoginski e desenvolvido com o [Claude Code](https://claude.com/claude-code), o agente de programação da Anthropic. As decisões de produto e de arquitetura são do dono; o agente escreve o código a partir delas, e toda mudança passa por testes automáticos (unitários, da API e de ponta a ponta) e pela revisão do dono antes de entrar.
+
+- O [`AGENTS.md`](AGENTS.pt-BR.md) é o briefing que todo agente de programação lê primeiro: o mapa, as convenções e os passos da release.
+- Os [ADRs](docs/README.pt-BR.md#decisões-de-arquitetura-adrs) registram por que o projeto tem esta forma. Foram rascunhados com IA a partir das respostas do dono numa sessão de entrevista e revisados por ele.
 
 ## Privacidade
 
@@ -112,7 +126,7 @@ O contrato entre a API e o worker (Redis Streams) está documentado em [apps/api
 
 ### Agente local (marco M0: lado do servidor e transporte do worker)
 
-O **agente local** é o worker rodando no computador do dono e falando com o servidor só por **HTTP de saída** (`/agent/v1`), sem acesso ao Redis. O dono inicia uma **sessão** (com um apelido que os convidados veem), cria as salas dela, e todo pedido de música feito pelo celular de um convidado nessas salas vai para o **agente desse dono** (nunca para o de outra sessão). Desenho e plano: [TRD](TRD.pt-BR.md).
+O **agente local** é o worker rodando no computador do dono e falando com o servidor só por **HTTP de saída** (`/agent/v1`), sem acesso ao Redis. O dono inicia uma **sessão** (com um apelido que os convidados veem), cria as salas dela, e todo pedido de música feito pelo celular de um convidado nessas salas vai para o **agente desse dono** (nunca para o de outra sessão). Desenho e plano: [TRD](docs/TRD.pt-BR.md).
 
 | Rota (`/agent/v1`, `Authorization: Bearer <token do dispositivo>`) | Função |
 |---|---|

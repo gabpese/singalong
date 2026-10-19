@@ -8,6 +8,8 @@ status: direção, paleta B e logotipo aprovados pelo dono em 2026-10-16; aplica
 
 # Singalong — conceito de marca
 
+[English](BRAND.md) · **Português (Brasil)**
+
 Escrito para: o dono do produto, para decidir a direção antes de qualquer nova rodada de interface.
 
 ## 1. Veredito em um parágrafo
