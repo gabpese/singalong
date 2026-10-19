@@ -4,7 +4,14 @@
 
 A self-hosted, collaborative karaoke system: search for a song on YouTube and Singalong builds the karaoke version (instrumental, word-by-word synced lyrics, key change, backing vocals, microphone pitch scoring and MP4 export), with a shared queue on everyone's phone and a TV as the player.
 
-Documentation: [PRD](PRD.md) (product requirements), [TRD](TRD.md) (technical requirements and the installer/agent proposal) and [PLAN](PLAN.md) (design decisions and history). Each one also has a Portuguese version (`*.pt-BR.md`).
+| | |
+|---|---|
+| **Try it** | [singalong.duckdns.org](https://singalong.duckdns.org): start a party on the computer connected to the TV; guests join by scanning the QR code. Songs already in the Jukebox play right away; preparing new songs needs the installable app. |
+| **Install the app** | The [latest release](https://github.com/gabpese/singalong/releases/latest), for Windows, macOS (Apple Silicon) and Linux. It prepares new songs on your own computer. |
+| **Run your own server** | [Running it](#running-it) (Docker at home) and the [infrastructure guide](docs/infrastructure.md) (cloud VM). |
+| **How it is built** | [Architecture](docs/architecture.md) · [Decisions (ADRs)](docs/README.md#architecture-decisions-adrs) · [Roadmap](docs/ROADMAP.md) · [Glossary](docs/GLOSSARY.md) · [all docs](docs/README.md) |
+
+Every document has a Portuguese version (`*.pt-BR.md`). Product requirements and history: [PRD](docs/PRD.md), [TRD](docs/TRD.md), [PLAN](docs/PLAN.md).
 
 > The app's interface is in Brazilian Portuguese. Where this README quotes a button or label, the Portuguese text follows in parentheses.
 
@@ -19,6 +26,13 @@ The app is on the [latest release](https://github.com/gabpese/singalong/releases
 | Windows 10/11 (x64) | `singalong_karaoke.exe` | not signed yet: SmartScreen may warn ("More info" > "Run anyway") |
 | macOS (Apple Silicon: M1 and newer) | `singalong_karaoke-mac-arm64.dmg` | no Apple signature yet: the first time, right-click the app > **Open** (or `xattr -dr com.apple.quarantine "/Applications/singalong_karaoke.app"`); it does not update itself, "Update now" opens the download of the new DMG. **Intel Macs are not supported** |
 | Linux (x64) | `singalong_karaoke-linux-x86_64.AppImage` | `chmod +x` the file and run it (on Ubuntu 22.04 or newer, AppImage needs `libfuse2`: `sudo apt install libfuse2`). It updates itself. On GNOME the tray icon needs the AppIndicator extension |
+
+## How it was built
+
+Singalong is designed and maintained by Gabriel Pesegoginski and developed with [Claude Code](https://claude.com/claude-code), Anthropic's coding agent. The product and architecture decisions are the owner's; the agent writes code from them, and every change goes through automated tests (unit, API and end-to-end) and the owner's review before it is merged.
+
+- [`AGENTS.md`](AGENTS.md) is the brief every coding agent reads first: the map, the conventions and the release steps.
+- The [ADRs](docs/README.md#architecture-decisions-adrs) record why the project is shaped this way. They were drafted with AI from the owner's answers in an interview session and reviewed by the owner.
 
 ## Privacy
 
@@ -107,7 +121,7 @@ The contract between the API and the worker (Redis Streams) is documented in [ap
 
 ### Local agent (milestone M0: server side and worker transport)
 
-A **local agent** is the worker running on the owner's computer and talking to the server over **outbound HTTP only** (`/agent/v1`), with no Redis access. The owner starts a **session** (with a nickname the guests see), creates the rooms of that session, and every song request made from a guest's phone in those rooms is routed to **that owner's agent** (never to another session's). Design and plan: [TRD](TRD.md).
+A **local agent** is the worker running on the owner's computer and talking to the server over **outbound HTTP only** (`/agent/v1`), with no Redis access. The owner starts a **session** (with a nickname the guests see), creates the rooms of that session, and every song request made from a guest's phone in those rooms is routed to **that owner's agent** (never to another session's). Design and plan: [TRD](docs/TRD.md).
 
 | Route (`/agent/v1`, `Authorization: Bearer <device token>`) | Purpose |
 |---|---|
