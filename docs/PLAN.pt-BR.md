@@ -696,3 +696,10 @@ A **1.3.0 inclui só a F26**. O modo híbrido na nuvem (F25) e os ambientes `hml
 - **Como funciona:** o servidor guarda as duas fases (a sala ganha o estado `intro`, em que a música da vez já foi escolhida mas o som espera), e cada aparelho conta o tempo que falta sozinho. Cada fase dura 15 s (`INTERMISSION_APPLAUSE_SECONDS` e `INTERMISSION_STAGE_SECONDS`; 0 desliga a fase). Sem TV conectada não há intervalo.
 - **Controle do anfitrião:** um interruptor novo, "Intervalo entre músicas" (ligado por padrão), e o botão "Começar agora", que pula o intervalo.
 - **Animações em código, não vídeo:** são cenas de cartaz feitas com os bichinhos da sala, então mostram as pessoas de verdade, não pesam e funcionam sem internet. Quem pede menos movimento vê as cenas paradas.
+
+### Novidades da 1.4.2 (o pareamento no cofre do sistema)
+- **Por quê:** depois do pareamento, o app instalável guardava o token do aparelho em texto puro no `config.json`. Um backup, uma cópia sincronizada da pasta de dados ou um disco lido por outra conta o expunha, e quem o tinha agia como aquele computador até o dono revogá-lo.
+- **O token no cofre do sistema:** agora ele fica guardado só cifrado (`token_enc`), pelo `safeStorage` do Electron: DPAPI no Windows, o Keychain no macOS, o Secret Service no Linux. A primeira abertura depois da atualização cifra o token em texto puro e regrava o arquivo. Um token que o computador não consegue decifrar (um perfil copiado, um chaveiro trocado) leva o app de volta ao pareamento; o aparelho antigo continua na lista do servidor, para ser revogado.
+- **Linux sem chaveiro:** o Electron usa então uma chave fixa, e a tela inicial mostra um aviso permanente de que o pareamento está sem proteção naquela conta.
+- **macOS:** o app ainda não tem assinatura de código, então o Keychain pode pedir permissão depois de uma atualização; negar significa parear de novo.
+- **Por trás:** o `lib` e os catálogos de idioma do site passaram para TypeScript, com comentários em inglês (passo 1 do [ROADMAP](ROADMAP.pt-BR.md)), e o [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md) registra o plano da API: NestJS com MikroORM.

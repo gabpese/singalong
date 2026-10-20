@@ -694,3 +694,10 @@ Found while using 1.2.0 on a real TV and microphone:
 - **How it works:** the server keeps both phases (rooms get the `intro` state, where the song is already chosen but the sound waits), and each device counts the remaining time on its own. Each phase lasts 15 s (`INTERMISSION_APPLAUSE_SECONDS` and `INTERMISSION_STAGE_SECONDS`; 0 turns the phase off). Without a connected TV there is no break.
 - **Host control:** a new "Break between songs" switch (on by default) and a "Start now" button that skips the break.
 - **Animations in code, not video:** poster scenes built with the room's creatures, so they show the real people, weigh nothing and work offline. People who ask for reduced motion see still scenes.
+
+### What is new in 1.4.2 (the pairing in the system vault)
+- **Why:** after pairing, the installable app kept its device token as plain text in `config.json`. A backup, a synced copy of the data folder or a disk read from another account exposed it, and whoever held it acted as that computer until the owner revoked it.
+- **The token in the system vault:** it is now stored only encrypted (`token_enc`), through Electron's `safeStorage`: DPAPI on Windows, the Keychain on macOS, the Secret Service on Linux. The first run after the update encrypts the plain token and rewrites the file. A token the computer cannot decrypt (a copied profile, a replaced keychain) sends the app back to pairing; the old device stays in the server's list, to be revoked.
+- **Linux without a keychain:** Electron then falls back to a fixed key, so the start screen shows a lasting notice that the pairing is unprotected on that account.
+- **macOS:** the app is not code-signed yet, so the Keychain may ask for permission after an update; denying it means pairing again.
+- **Behind the scenes:** the web's `lib` and i18n catalogs moved to TypeScript, with comments in English (step 1 of the [ROADMAP](ROADMAP.md)), and [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.md) records the plan for the API: NestJS with MikroORM.
