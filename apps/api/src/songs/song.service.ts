@@ -8,22 +8,12 @@
 // Which one applies depends on the context `{ sessionId }`: if the Session has a `media_base`, its catalog; otherwise, the server.
 import type { AgentService } from '../agents/agent.service.ts';
 import type { JobStore } from '../app.ts';
+import type { ExportState, SongMedia } from '../protocol.ts';
 import type { LocalStorage } from '../storage.js';
 
 /** Where a request comes from: a Room's Session (its owner's agent answers it) or none (the classic worker). */
 export interface SongContext {
   sessionId?: string | null;
-}
-
-/** The files of a ready song (null where an optional file does not exist). */
-export interface SongMedia {
-  instrumental: string;
-  lyrics: string;
-  melody: string | null;
-  backing: string | null;
-  vocals: string | null;
-  /** The files are on the owner's computer: only their browser (the TV) reaches them. */
-  local: boolean;
 }
 
 export interface SongState {
@@ -35,13 +25,6 @@ export interface SongState {
   retry: string | null;
   meta: Record<string, unknown> | null;
   media: SongMedia | null;
-}
-
-export interface ExportState {
-  status: string;
-  url: string | null;
-  error: string | null;
-  local?: boolean;
 }
 
 export interface LyricsChoice {

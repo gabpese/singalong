@@ -3,13 +3,14 @@ import { type MikroORM, UniqueConstraintViolationException } from '@mikro-orm/co
 import type { AgentService } from '../agents/agent.service.ts';
 import { PlayLog, QueueItem, Room, Session, SongSettings } from '../database/entities.ts';
 import { HttpError } from '../http-error.ts';
+import type { AddedSong, CreatedRoom, Guest, Interlude, LyricCue, Playback, SongKey } from '../protocol.ts';
 import { createSerializer } from '../serial.ts';
 import type { LyricsChoice, SongService } from '../songs/song.service.ts';
 import { extractVideoId } from '../youtube.js';
 import { type Connection, Hub, type RoomSocket } from './hub.ts';
 import { clampBacking, clampGuide, clampOffset, clampPitch, cleanParts, nextPlayable, playOrder, swapTarget } from './queue-logic.ts';
 import { createBucket, REACTION_KINDS } from './reactions.ts';
-import { type Actor, cleanName, generateCode, type LyricCue, MAX_PER_CLIENT, MAX_QUEUE, normalizeCode, personalize, pidOf, sanitizeCues } from './rooms.ts';
+import { type Actor, type BaseRoomState, cleanName, generateCode, MAX_PER_CLIENT, MAX_QUEUE, normalizeCode, personalize, pidOf, sanitizeCues } from './rooms.ts';
 
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const PLAY_LOG_TTL_MS = 400 * 24 * 60 * 60 * 1000; // the play history stays for over a year
@@ -58,6 +59,9 @@ export interface RoomSettings {
 }
 
 type QueueStatus = 'queued' | 'playing' | 'done' | 'skipped';
+
+/** Duet: the guest and whether they accepted, as the pages see them; null without one. */
+const guestOf = (item: QueueItem): Guest | null => (item.guestStatus ? { name: item.guestName ?? '', status: item.guestStatus as Guest['status'] } : null);
 
 /**
  * The Rooms and their Queue, on MikroORM. Every command that reads and then changes a Room runs alone, in the order it arrived
@@ -242,17 +246,17 @@ export class RoomService {
   private interludeItem(item: QueueItem) {
     return {
       item_id: item.id,
-      title: item.title,
-      artist: item.artist,
+      title: item.title ?? null,
+      artist: item.artist ?? null,
       added_by: item.addedBy,
-      guest: item.guestStatus ? { name: item.guestName, status: item.guestStatus } : null,
+      guest: guestOf(item),
       singers: item.guestStatus === 'accepted' ? `${item.addedBy} & ${item.guestName}` : item.addedBy,
-      score: Number.isInteger(item.score) ? item.score : null,
+      score: Number.isInteger(item.score) ? item.score! : null,
     };
   }
 
   /** The Intermission phase under way (applause or the walk to the stage), with the time left; null outside the Intermission. */
-  private async interludeOf(room: Room) {
+  private async interludeOf(room: Room): Promise<Interlude | null> {
     const t = this.now();
     if (room.playback === 'intro' && room.currentItemId) {
       const item = await this.em().findOne(QueueItem, { id: room.currentItemId });
@@ -302,7 +306,7 @@ export class RoomService {
   }
 
   /** The Room's base state (with each item's client_id: run it through `personalize` before sending it to anyone). */
-  private async snapshot(code: string) {
+  private async snapshot(code: string): Promise<BaseRoomState> {
     const room = await this.requireRoom(code);
     const em = this.em();
     // the song playing comes first (with the Fair rotation it can have a higher position than those waiting)
@@ -329,11 +333,11 @@ export class RoomService {
       // the Intermission: the Host's setting and the phase under way (applause or the walk to the stage)
       intermission: room.intermission,
       interlude: await this.interludeOf(room),
-      scoreboard: scored.map((row) => ({ id: row.id, name: row.guestStatus === 'accepted' ? `${row.addedBy} & ${row.guestName}` : row.addedBy, title: row.title, score: row.score })),
+      scoreboard: scored.map((row) => ({ id: row.id, name: row.guestStatus === 'accepted' ? `${row.addedBy} & ${row.guestName}` : row.addedBy, title: row.title ?? null, score: row.score! })),
       // who is in the Room now (to invite to a Duet): only the name and an id that does not reveal the client_id
       people: this.hub.people(room.code).map((person) => ({ pid: pidOf(person.clientId), name: person.name })),
       play_order: playOrder(waiting, order).map((item) => item.id),
-      playback: room.playback,
+      playback: room.playback as Playback,
       current_item_id: room.currentItemId ?? null,
       next_item_id: upNext?.id ?? null,
       position_ms: position && position.item_id === room.currentItemId ? position.ms : 0,
@@ -344,23 +348,23 @@ export class RoomService {
       local_media: Boolean(sessionId && (await this.agents?.libraryOfSession(sessionId))),
       queue: items.map((item) => {
         const song = described.get(item.videoId);
-        const meta = song?.meta as { title?: string; artist?: string; duration?: number; lyrics_source?: string; key?: unknown } | null | undefined;
+        const meta = song?.meta as { title?: string; artist?: string; duration?: number; lyrics_source?: string; key?: SongKey } | null | undefined;
         return {
           id: item.id,
           video_id: item.videoId,
-          title: meta?.title ?? item.title,
-          artist: meta?.artist ?? item.artist,
+          title: meta?.title ?? item.title ?? null,
+          artist: meta?.artist ?? item.artist ?? null,
           added_by: item.addedBy,
           // Duet: who sings along and whether they accepted; `singers` is what the TV and the scoreboard show ("Ana & Bia")
-          guest: item.guestStatus ? { name: item.guestName, status: item.guestStatus } : null,
-          guest_client_id: item.guestStatus ? item.guestClientId : null,
+          guest: guestOf(item),
+          guest_client_id: item.guestStatus ? (item.guestClientId ?? null) : null,
           singers: item.guestStatus === 'accepted' ? `${item.addedBy} & ${item.guestName}` : item.addedBy,
           client_id: item.clientId,
           pitch: item.pitch,
           backing: item.backing,
           guide: item.guide,
-          status: item.status,
-          lyric_offset: settings.get(item.videoId)?.lyricOffset ?? 0,
+          status: item.status as 'queued' | 'playing',
+          lyric_offset: Number(settings.get(item.videoId)?.lyricOffset ?? 0),
           // Duet: who sings each line, chosen by the singers (text of a b * -); null = the automatic split
           parts: item.guestStatus === 'accepted' ? (settings.get(item.videoId)?.parts ?? null) : null,
           song: {
@@ -381,11 +385,11 @@ export class RoomService {
   }
 
   // the Intermission's time left changes at each step: it does not count as a change of state (devices count it down themselves)
-  private stateKey(base: Awaited<ReturnType<RoomService['snapshot']>>) {
+  private stateKey(base: BaseRoomState) {
     return JSON.stringify({ ...base, position_ms: 0, interlude: base.interlude && { ...base.interlude, left_ms: 0 } });
   }
 
-  private publishBase(code: string, base: Awaited<ReturnType<RoomService['snapshot']>>) {
+  private publishBase(code: string, base: BaseRoomState) {
     this.lastKeys.set(code, this.stateKey(base));
     this.hub.broadcast(code, (conn) => ({ type: 'state', state: personalize(base, conn) }));
   }
@@ -413,7 +417,7 @@ export class RoomService {
   }
 
   /** Creates the Room. With `sessionId`, its song requests go to the agent that owns that Session. */
-  async createRoom({ sessionId = null }: { sessionId?: string | null } = {}): Promise<{ code: string; host_token: string }> {
+  async createRoom({ sessionId = null }: { sessionId?: string | null } = {}): Promise<CreatedRoom> {
     for (let attempt = 0; attempt < 20; attempt++) {
       const code = this.newCode();
       const hostToken = this.newToken();
@@ -438,7 +442,7 @@ export class RoomService {
     return this.stateFor(normalizeCode(code), actor);
   }
 
-  add(code: string, params: AddParams, actor: Actor) {
+  add(code: string, params: AddParams, actor: Actor): Promise<AddedSong> {
     return this.mutate(code, actor, async (room) => {
       const videoId = params.video_id ?? extractVideoId(params.url);
       if (!videoId) throw new HttpError(400, 'invalid_url', 'Link do YouTube inválido.');

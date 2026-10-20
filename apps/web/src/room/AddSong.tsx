@@ -9,20 +9,12 @@ import { t } from '../i18n/index.ts';
 import { api } from '../lib/identity.ts';
 import { findJukeboxMatches, formatDuration, thumbnailUrl } from '../lib/queue-view.ts';
 import { buildSearchQuery, embedUrl, extractVideoId, guessArtistTitle, watchUrl } from '../lib/youtube.ts';
-import type { ApiError, LibrarySong } from '../lib/types.ts';
+import type { ApiError, LibrarySong, SearchResult } from '../lib/types.ts';
 import { Icon } from '../ui/Icon';
 import { JukeboxDialog } from './JukeboxDialog';
 
 // opções em que a pessoa cola um texto
 const TEXT_SOURCES = ['file', 'align'];
-
-interface SearchResult {
-  video_id: string;
-  title: string;
-  channel?: string | null;
-  duration?: number | null;
-  thumbnail?: string | null;
-}
 
 interface NewSong {
   url: string;
@@ -167,7 +159,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
     setSearching(true);
     setStatus(t('add.s.searching', { query }));
     try {
-      const found: SearchResult[] = await api('GET', `/api/search?q=${encodeURIComponent(query)}`, undefined, room);
+      const found = await api<SearchResult[]>('GET', `/api/search?q=${encodeURIComponent(query)}`, undefined, room);
       if (!found.length) {
         clearResults();
         return setStatus(t('add.s.nothing'), true);

@@ -1,16 +1,11 @@
 // Export the song as a karaoke MP4 (instrumental + lyrics) to use offline.
 
 import { t } from '../i18n/index.ts';
+import type { ExportState } from './types.ts';
 
 export const EXPORT_PITCHES = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6];
 
-interface ExportInfo {
-  status: string;
-  url?: string;
-  error?: string;
-}
-
-type Api = (method: string, path: string, body?: unknown) => Promise<ExportInfo>;
+type Api = (method: string, path: string, body?: unknown) => Promise<ExportState>;
 
 /** The downloaded file's name: "Artist - Title (+2).mp4", without characters that file systems refuse. */
 export function exportFileName(song: { artist?: string | null; title?: string | null; video_id: string }, pitch = 0): string {

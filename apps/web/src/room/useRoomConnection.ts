@@ -1,7 +1,7 @@
 // Estado da sala em tempo real (WebSocket com reconexão) e a posição da música que a TV informa.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { connectRoom } from '../lib/identity.ts';
-import type { LyricCue, ReactionKind, RoomState, ServerMessage } from '../lib/types.ts';
+import type { ClientMessage, LyricCue, ReactionKind, RoomState, ServerMessage } from '../lib/types.ts';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
 
@@ -19,11 +19,11 @@ export function useRoomConnection(code: string, onReaction?: (kind: ReactionKind
   const [position, setPosition] = useState<Position>({ ms: 0, at: performance.now(), itemId: null });
   /** A letra da música atual, repassada pela TV (a aba TV da sala desenha com ela). */
   const [lyrics, setLyrics] = useState<{ itemId: number; cues: LyricCue[] } | null>(null);
-  const connectionRef = useRef<{ send(payload: unknown): void } | null>(null);
+  const connectionRef = useRef<{ send(message: ClientMessage): void } | null>(null);
   const reactionRef = useRef(onReaction); // sempre a versão mais recente, sem reabrir o WebSocket
   reactionRef.current = onReaction;
   /** Manda uma mensagem à sala pelo WebSocket (ex.: o nome da pessoa). */
-  const send = useCallback((payload: unknown) => connectionRef.current?.send(payload), []);
+  const send = useCallback((message: ClientMessage) => connectionRef.current?.send(message), []);
 
   useEffect(() => {
     const connection = connectRoom(code, 'controller', {

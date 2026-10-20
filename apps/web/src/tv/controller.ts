@@ -10,7 +10,7 @@ import { type MelodyNote, melodyNotes, pushTrail } from '../lib/melody-guide.ts'
 import { partAtTime, singsAt, splitParts } from '../lib/duet.ts';
 import { createScorer, noteName, openMic } from '../lib/scoring.ts';
 import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.ts';
-import type { QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types.ts';
+import type { ClientMessage, LyricCue, QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types.ts';
 
 export interface HudState {
   visible: boolean;
@@ -57,7 +57,7 @@ export interface GuideFrame {
   partAt: ((t: number) => 'a' | 'b' | 'both' | null) | null;
 }
 
-type Connection = { send(payload: unknown): void; close(): void };
+type Connection = { send(message: ClientMessage): void; close(): void };
 
 const FINAL_SECONDS = 9;
 
@@ -104,7 +104,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       connection.send({ type: 'ended', item_id: itemId });
     },
     // a letra também vai para o palco dos cantores (no celular): com as músicas no computador do dono, só a TV a alcança
-    onLyrics(itemId: number, cues: unknown[]) {
+    onLyrics(itemId: number, cues: LyricCue[]) {
       connection.send({ type: 'lyrics', item_id: itemId, cues });
     },
     // o apito (microfonia) apareceu: o motor já cortou o volume da voz; a TV avisa por alguns segundos

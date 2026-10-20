@@ -1,8 +1,9 @@
 // The phones' Reactions (applause, fire...) that float on the TV: only the ones on the list, with a limit per connection so nobody
 // floods the screen.
 
-export const REACTION_KINDS = ['clap', 'fire', 'heart', 'party', 'wow'] as const;
-export type ReactionKind = (typeof REACTION_KINDS)[number];
+import type { ReactionKind } from '../protocol.ts';
+
+export const REACTION_KINDS: readonly ReactionKind[] = ['clap', 'fire', 'heart', 'party', 'wow'];
 
 export interface Bucket {
   /** Spends one token at `nowMs`; false when there is none left. */
