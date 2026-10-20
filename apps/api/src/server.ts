@@ -1,9 +1,9 @@
 import { Redis } from 'ioredis';
 import { type App, buildApp } from './app.ts';
-import { loadConfig } from './config.js';
-import { createRedisJobStore } from './jobs.js';
-import { buildLoggerOptions } from './logging.js';
-import { LocalStorage } from './storage.js';
+import { loadConfig } from './config.ts';
+import { createRedisJobStore } from './jobs.ts';
+import { buildLoggerOptions } from './logging.ts';
+import { LocalStorage } from './storage.ts';
 
 const config = loadConfig();
 const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: 2 });

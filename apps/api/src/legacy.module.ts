@@ -3,11 +3,11 @@ import { type DynamicModule, Global, Module } from '@nestjs/common';
 import { AgentService } from './agents/agent.service.ts';
 import type { AppConfig, JobStore } from './app.ts';
 import type { openDb } from './db.js';
-import type { createMailer } from './mailer.js';
-import type { createRateLimiter } from './rate-limit.js';
+import type { createMailer } from './mailer.ts';
+import type { createRateLimiter } from './rate-limit.ts';
 import { RoomService } from './rooms/room.service.ts';
 import { SongService } from './songs/song.service.ts';
-import type { LocalStorage } from './storage.js';
+import type { LocalStorage } from './storage.ts';
 import { CONFIG, DB, JOBS, LIMITERS, MAILER, STORAGE } from './tokens.ts';
 
 /** The services built before Nest, as app.ts hands them over. */

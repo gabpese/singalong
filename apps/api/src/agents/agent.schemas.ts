@@ -1,5 +1,5 @@
 import { Type } from '@sinclair/typebox';
-import { MAX_WAIT_MS } from '../jobs.js';
+import { MAX_WAIT_MS } from '../jobs.ts';
 import { OneOf } from '../validation.ts';
 import { MAX_LIBRARY_BATCH, MAX_NAME, VIDEO_ID_PATTERN } from './agents.ts';
 

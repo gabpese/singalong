@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
 import { RateLimitError } from './http-error.filter.ts';
 import type { LegacyServices } from './legacy.module.ts';
-import { keyOf } from './rate-limit.js';
+import { keyOf } from './rate-limit.ts';
 import { LIMITERS } from './tokens.ts';
 
 const RATE_LIMIT = 'rateLimit';
@@ -17,10 +17,7 @@ interface RateLimitOptions {
   by: 'client' | 'ip';
 }
 
-/**
- * Limits a route per person (the browser's id, or the IP), as the Fastify routes' rateLimited() does: over the limit, a 429
- * with Retry-After.
- */
+/** Limits a route per person (the browser's id, or the IP): over the limit, a 429 with Retry-After. */
 export const RateLimit = (limiter: string, message?: string, by: RateLimitOptions['by'] = 'client') =>
   applyDecorators(SetMetadata(RATE_LIMIT, { limiter, message, by } satisfies RateLimitOptions), UseGuards(RateLimitGuard));
 

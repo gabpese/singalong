@@ -1,8 +1,9 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, type Stats } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname } from 'node:path';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
-const TYPES = {
+const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
@@ -14,13 +15,13 @@ const TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-/** Interpreta o header Range (um único intervalo). null = sem Range; 'invalid' = não satisfazível. */
-export function parseRange(header, size) {
+/** Reads the Range header (a single range). null = no Range; 'invalid' = it cannot be satisfied. */
+export function parseRange(header: string | undefined, size: number): { start: number; end: number } | 'invalid' | null {
   if (!header) return null;
   const m = /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
   if (!m || (m[1] === '' && m[2] === '')) return 'invalid';
-  let start;
-  let end;
+  let start: number;
+  let end: number;
   if (m[1] === '') {
     start = Math.max(size - Number(m[2]), 0);
     end = size - 1;
@@ -31,9 +32,9 @@ export function parseRange(header, size) {
   return start > end || start >= size ? 'invalid' : { start, end };
 }
 
-/** Envia um arquivo com suporte a Range (necessário para o <audio> fazer seek). */
-export async function sendFile(request, reply, file, { cache = 'no-cache' } = {}) {
-  let info;
+/** Sends a file, with Range support (the <audio> element needs it to seek). */
+export async function sendFile(request: FastifyRequest, reply: FastifyReply, file: string, { cache = 'no-cache' } = {}) {
+  let info: Stats;
   try {
     info = await stat(file);
     if (!info.isFile()) throw new Error('not a file');

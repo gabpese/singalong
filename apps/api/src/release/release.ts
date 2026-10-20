@@ -1,6 +1,6 @@
 // The published app version: what the server tells the installed apps (the update notice) and the home page (the download
 // button). A version published on the admin page wins; otherwise the APP_* variables from the .env apply.
-import { compareVersions, parseVersion } from '../version.js';
+import { compareVersions, parseVersion } from '../version.ts';
 
 const NOTES_MAX = 500;
 const URL_MAX = 500;

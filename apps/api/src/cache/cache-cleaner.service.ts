@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
 import type { JobStore } from '../app.ts';
-import type { LocalStorage } from '../storage.js';
+import type { LocalStorage } from '../storage.ts';
 import { JOBS, STORAGE } from '../tokens.ts';
 import { cleanCache, GB, ormCacheUsage } from './cache-cleaner.ts';
 

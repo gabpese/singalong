@@ -1,6 +1,6 @@
 """Busca de vídeos no YouTube (yt-dlp), atendida por uma thread do worker.
 
-O transporte (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.js.
+O transporte (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.ts.
 """
 import logging
 import tempfile

@@ -103,7 +103,7 @@ curl -fsSL https://raw.githubusercontent.com/gabpese/singalong/main/deploy/deplo
 
 ## Ajustes
 
-A API lê variáveis de ambiente ([`apps/api/src/config.js`](../apps/api/src/config.js)):
+A API lê variáveis de ambiente ([`apps/api/src/config.ts`](../apps/api/src/config.ts)):
 
 | Variável | Padrão | O que faz |
 |---|---|---|

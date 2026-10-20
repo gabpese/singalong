@@ -5,9 +5,9 @@ import { AgentService } from '../agents/agent.service.ts';
 import { CloudBlocked, Device, EmailRule } from '../database/entities.ts';
 import { ReleaseService } from '../release/release.service.ts';
 import { HttpError } from '../http-error.ts';
-import type { LocalStorage } from '../storage.js';
+import type { LocalStorage } from '../storage.ts';
 import { CONFIG, STORAGE } from '../tokens.ts';
-import { updateInfo } from '../version.js';
+import { updateInfo } from '../version.ts';
 
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 const READY_FILES = ['instrumental.mp3', 'lyrics.json', 'meta.json'];

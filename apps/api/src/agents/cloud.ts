@@ -3,7 +3,7 @@ import { type Static, Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Device } from '../database/entities.ts';
 import { HttpError } from '../http-error.ts';
-import type { LocalStorage } from '../storage.js';
+import type { LocalStorage } from '../storage.ts';
 import { OneOf } from '../validation.ts';
 import { deviceOf } from './agent-auth.guard.ts';
 import type { AgentService } from './agent.service.ts';

@@ -8,7 +8,7 @@ import { RateLimit } from '../rate-limit.guard.ts';
 import { RoomService } from '../rooms/room.service.ts';
 import { JOBS } from '../tokens.ts';
 import { TypeBoxPipe } from '../validation.ts';
-import { extractVideoId } from '../youtube.js';
+import { extractVideoId } from '../youtube.ts';
 import { ExportBody, ExportQuery, LyricsBody, missingLyricsText, SearchQuery, SongBody, SongIdParams } from './song.schemas.ts';
 import { SongService } from './song.service.ts';
 

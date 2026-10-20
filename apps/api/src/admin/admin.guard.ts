@@ -4,7 +4,7 @@ import { safeEqual } from '../agents/agents.ts';
 import type { AppConfig } from '../app.ts';
 import { RateLimitError } from '../http-error.filter.ts';
 import type { LegacyServices } from '../legacy.module.ts';
-import { keyOf } from '../rate-limit.js';
+import { keyOf } from '../rate-limit.ts';
 import { HttpError } from '../http-error.ts';
 import { CONFIG, LIMITERS } from '../tokens.ts';
 

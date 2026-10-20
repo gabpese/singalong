@@ -18,7 +18,7 @@ Fazer o Singalong funcionar em duas partes: um **servidor** central (hoje, a VM 
                                     Redis ◄── worker Python (puxa): yt-dlp • Demucs • Whisper • UVR • ffmpeg
 ```
 
-- **API**: salas, fila, WebSocket, `/media`, busca e jobs via Redis (contrato em `apps/api/src/jobs.js`). Nunca chama o worker; o worker sempre **puxa** (funciona atrás de NAT).
+- **API**: salas, fila, WebSocket, `/media`, busca e jobs via Redis (contrato em `apps/api/src/jobs.ts`). Nunca chama o worker; o worker sempre **puxa** (funciona atrás de NAT).
 - **Worker**: consome o stream `jobs` (consumer group), atende `search:req` e `export:req` em threads próprias e a análise de vozes de apoio em outra. A lógica de um job (`runner.py`) não depende do cliente Redis (recebe um objeto com `hset/hincrby/expire/xack`).
 - **Armazenamento**: driver `local` (pasta `storage/`), chaves lógicas `cache/<id>/{instrumental.mp3, vocals.mp3, lyrics.json, meta.json, melody.json, backing.mp3, source.json}`.
 - **Hoje**: o worker roda em Docker no PC do dono (perfil `gpu` ou `cpu`); a nuvem só toca a biblioteca copiada por `deploy/sync-library.sh`, porque o YouTube bloqueia o IP da Oracle (medido: 0 de 8 downloads sem cookie).

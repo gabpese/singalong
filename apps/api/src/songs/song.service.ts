@@ -9,7 +9,7 @@
 import type { AgentService } from '../agents/agent.service.ts';
 import type { JobStore } from '../app.ts';
 import type { ExportState, SongMedia } from '../protocol.ts';
-import type { LocalStorage } from '../storage.js';
+import type { LocalStorage } from '../storage.ts';
 
 /** Where a request comes from: a Room's Session (its owner's agent answers it) or none (the classic worker). */
 export interface SongContext {
@@ -136,16 +136,16 @@ export class SongService {
     // only the "ready" record is left in Redis but the files were deleted (cache cleaning): as if it never existed
     if (!ready && job?.status === 'ready') return null;
     // a job under way (e.g. changing the lyrics) wins over the earlier "ready"
-    const jobActive = Boolean(job && ACTIVE_JOB.includes(job.status));
-    const status = jobActive ? job.status : ready ? 'ready' : job.status;
+    const active = job && ACTIVE_JOB.includes(job.status) ? job : null;
+    const status = active ? active.status : ready ? 'ready' : job!.status;
     const local = ready ? await this.readyLocally(await this.localOf(ctx), id) : null;
     return {
       video_id: id,
       status,
-      stage: jobActive ? job.stage : null,
-      error: jobActive ? job.error : null,
-      error_code: jobActive ? job.error_code ?? null : null,
-      retry: jobActive ? job.retry ?? null : null,
+      stage: active?.stage ?? null,
+      error: active?.error ?? null,
+      error_code: active?.error_code ?? null,
+      retry: active?.retry ?? null,
       meta: ready ? (local ? local.meta : await this.readMeta(id)) : null,
       media: ready ? await this.mediaOf(id, ctx) : null,
     };

@@ -5,8 +5,8 @@
 // stays and what was sung once months ago goes (and is prepared again if someone asks for it).
 import type { MikroORM } from '@mikro-orm/core';
 import { QueueItem, SongSettings } from '../database/entities.ts';
-import type { createMemoryJobStore } from '../jobs.js';
-import type { LocalStorage } from '../storage.js';
+import type { JobStore } from '../jobs.ts';
+import type { LocalStorage } from '../storage.ts';
 
 export const GB = 1024 ** 3;
 
@@ -54,7 +54,7 @@ export async function cleanCache({
 }: {
   storage: Pick<LocalStorage, 'listDetailed' | 'delete'>;
   usage: CacheUsage;
-  jobs: Pick<ReturnType<typeof createMemoryJobStore>, 'get'>;
+  jobs: Pick<JobStore, 'get'>;
   maxBytes: number;
   targetRatio?: number;
   log?: Log;

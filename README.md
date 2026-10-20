@@ -117,7 +117,7 @@ Rooms and the queue live in a SQLite database in the Docker volume `api-data`.
 | `GET /healthz`, `GET /readyz` | liveness / readiness (checks Redis) |
 
 Requests carry `X-Client-Id` (the browser's id) and, for the host, `X-Host-Token`.
-The contract between the API and the worker (Redis Streams) is documented in [apps/api/src/jobs.js](apps/api/src/jobs.js).
+The contract between the API and the worker (Redis Streams) is documented in [apps/api/src/jobs.ts](apps/api/src/jobs.ts).
 
 ### Local agent (milestone M0: server side and worker transport)
 

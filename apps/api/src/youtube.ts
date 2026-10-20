@@ -1,18 +1,18 @@
 const ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const YT_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com']);
 
-/** Extrai o ID de 11 caracteres de links do YouTube; aceita também o ID puro. null se inválido. */
-export function extractVideoId(input) {
+/** The 11-character id of a YouTube link; a bare id is taken too. null when invalid. */
+export function extractVideoId(input: unknown): string | null {
   const text = String(input ?? '').trim();
   if (ID_RE.test(text)) return text;
-  let url;
+  let url: URL;
   try {
     url = new URL(text);
   } catch {
     return null;
   }
   const host = url.hostname.toLowerCase();
-  let candidate = null;
+  let candidate: string | null = null;
   if (host === 'youtu.be') {
     candidate = url.pathname.replace(/^\/+/, '').split('/')[0];
   } else if (YT_HOSTS.has(host)) {
