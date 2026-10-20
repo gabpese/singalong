@@ -82,6 +82,7 @@ O Singalong não usa framework completo: ele compõe estas peças ([ADR 0016](ad
 | Palco | `apps/web/src/stage/StagePage.tsx` |
 | Desenho da letra, Tom, Pontuação | `apps/web/src/lib/` (`lyrics-view.ts`, `engine.ts`, `scoring.ts`) |
 | Preparo das músicas | `apps/worker/singalong_worker/pipeline.py` e `runner.py` |
+| O que as páginas e a API trocam | `apps/api/src/protocol.ts` (o site o lê pelo `apps/web/src/lib/types.ts`) |
 | API do agente, Pareamento, Sessão | `apps/api/src/agents/` (`agent.service.ts`, `pairing.controller.ts`, `agent.controller.ts`, `cloud.ts`) |
 | Montagem do Motor | `apps/engine/src/assemble.js` (a partir de `apps/engine/manifest.json`) |
 | Mídia local | `apps/worker/singalong_worker/media_server.py` |

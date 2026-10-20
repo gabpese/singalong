@@ -4,28 +4,13 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { api, setHostToken } from '../lib/identity.ts';
 import { detectSystem } from '../lib/platform.ts';
+import type { ApiError, CreatedRoom, Download, PublicConfig } from '../lib/types.ts';
 import { LanguageSwitch } from '../ui/LanguageSwitch';
 import { Logo } from '../ui/Logo';
 
-interface ApiError extends Error {
-  status?: number;
-}
+type System = Download['system'];
 
-type System = 'windows' | 'macos' | 'linux';
-
-interface Download {
-  system: System;
-  arch: string;
-  file: string;
-  url: string;
-}
-
-interface HomeConfig {
-  app_download_url: string | null;
-  app_latest_version: string | null;
-  app_page_url: string | null;
-  app_downloads: Download[];
-}
+type HomeConfig = Pick<PublicConfig, 'app_download_url' | 'app_latest_version' | 'app_page_url' | 'app_downloads'>;
 
 const NO_CONFIG: HomeConfig = { app_download_url: null, app_latest_version: null, app_page_url: null, app_downloads: [] };
 
@@ -105,8 +90,8 @@ export function Landing() {
   const [config, setConfig] = useState<HomeConfig>(NO_CONFIG);
 
   useEffect(() => {
-    api('GET', '/api/config')
-      .then((data: Partial<HomeConfig>) =>
+    api<Partial<PublicConfig>>('GET', '/api/config')
+      .then((data) =>
         setConfig({
           app_download_url: data.app_download_url ?? null,
           app_latest_version: data.app_latest_version ?? null,
@@ -119,7 +104,7 @@ export function Landing() {
 
   async function createRoom() {
     try {
-      const { code: roomCode, host_token: token } = await api('POST', '/api/rooms');
+      const { code: roomCode, host_token: token } = await api<CreatedRoom>('POST', '/api/rooms');
       setHostToken(roomCode, token);
       // aberta dentro do clique para o navegador não bloquear a aba da TV; na sala há um botão "Abrir TV" se bloquear
       window.open(`tv.html?room=${roomCode}`, '_blank');

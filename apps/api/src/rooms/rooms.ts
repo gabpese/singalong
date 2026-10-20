@@ -4,6 +4,7 @@
 // Host (who created the Room: skips, pauses, reorders and removes anyone's songs). Everyone else adds songs and removes or
 // adjusts their own. Commands come over HTTP; the WebSocket only pushes the state and takes in the TV's events.
 import { createHash, randomBytes } from 'node:crypto';
+import type { LyricCue, QueueItem, RoomState } from '../protocol.ts';
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L: easy to read out and type
 export const MAX_QUEUE = 100;
@@ -15,14 +16,6 @@ export const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
 export interface Actor {
   clientId: string;
   hostToken: string;
-}
-
-/** A line of lyrics as the TV hands it to the Stage. */
-export interface LyricCue {
-  start: number;
-  end: number;
-  text: string;
-  words?: [number, number][];
 }
 
 /** A person IN THE ROOM, for invitations: a digest of the client_id (which never leaves the server) that cannot be reversed. */
@@ -52,15 +45,14 @@ export function sanitizeCues(cues: unknown): LyricCue[] | null {
   return JSON.stringify(clean).length <= 400_000 ? clean : null;
 }
 
-/** What `personalize` needs of each Queue item in the base state. */
-interface OwnedItem {
-  client_id: string;
-  guest_client_id?: string | null;
-  guest: { status: string } | null;
-}
+/** A Queue item before `personalize`: with its owner's and its guest's client_id, which never leave the server. */
+export type BaseQueueItem = Omit<QueueItem, 'mine' | 'can_edit' | 'guest_me' | 'invite_for_me'> & { client_id: string; guest_client_id: string | null };
+
+/** The Room's state before `personalize`, the same for everyone. */
+export type BaseRoomState = Omit<RoomState, 'queue' | 'me'> & { queue: BaseQueueItem[] };
 
 /** The state sent to ONE connection: nobody's client_id, with `mine` and `can_edit` on each item. */
-export function personalize<Item extends OwnedItem, State extends { queue: Item[] }>(base: State, { clientId, isHost }: { clientId: string; isHost: boolean }) {
+export function personalize(base: BaseRoomState, { clientId, isHost }: { clientId: string; isHost: boolean }): RoomState {
   return {
     ...base,
     me: { is_host: Boolean(isHost), pid: clientId ? pidOf(clientId) : null },

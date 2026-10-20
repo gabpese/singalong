@@ -1,6 +1,6 @@
 // The browser's identity, the Host token and API calls (shared by the landing page, the phone and the TV).
 import { hasText, t } from '../i18n/index.ts';
-import type { ApiError, ServerMessage } from './types.ts';
+import type { ApiError, ClientMessage, ServerMessage } from './types.ts';
 
 export type SocketRole = 'tv' | 'controller';
 
@@ -98,7 +98,7 @@ export function connectRoom(
   code: string,
   role: SocketRole,
   { onMessage, onStatus, onGone }: { onMessage: (message: ServerMessage) => void; onStatus?: (status: 'connected' | 'reconnecting') => void; onGone?: () => void },
-): { send(payload: unknown): void; close(): void } {
+): { send(message: ClientMessage): void; close(): void } {
   let socket: WebSocket | undefined;
   let attempt = 0;
   let closed = false;
@@ -124,8 +124,8 @@ export function connectRoom(
   };
   open();
   return {
-    send: (payload) => {
-      if (socket?.readyState === 1) socket.send(JSON.stringify(payload));
+    send: (message) => {
+      if (socket?.readyState === 1) socket.send(JSON.stringify(message));
     },
     close() {
       closed = true;

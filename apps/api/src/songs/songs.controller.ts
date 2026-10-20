@@ -3,6 +3,7 @@ import type { Static } from '@sinclair/typebox';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { JobStore } from '../app.ts';
 import { AgentService } from '../agents/agent.service.ts';
+import type { SearchResult } from '../protocol.ts';
 import { RateLimit } from '../rate-limit.guard.ts';
 import { RoomService } from '../rooms/room.service.ts';
 import { JOBS } from '../tokens.ts';
@@ -49,8 +50,8 @@ export class SongsController {
       return { error: 'owner_offline', message: 'O dono da sessão está desconectado. Cole o link do vídeo ou tente mais tarde.' };
     }
     try {
-      const results: { video_id: string }[] = await this.jobs.search(q, { sessionId });
-      return results.map((result) => ({ ...result, thumbnail: `https://i.ytimg.com/vi/${result.video_id}/mqdefault.jpg` }));
+      const results: Omit<SearchResult, 'thumbnail'>[] = await this.jobs.search(q, { sessionId });
+      return results.map((result): SearchResult => ({ ...result, thumbnail: `https://i.ytimg.com/vi/${result.video_id}/mqdefault.jpg` }));
     } catch (err) {
       request.log.warn({ err: (err as Error).message }, 'search failed');
       reply.code(503);

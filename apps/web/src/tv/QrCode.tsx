@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { api } from '../lib/identity.ts';
+import type { PublicConfig } from '../lib/types.ts';
 import qrcode from '../vendor/qrcode/qrcode.mjs';
 
 /** `compact`: o cartão pequeno que fica na TV enquanto toca (sem o endereço escrito). */
@@ -14,7 +15,7 @@ export function QrCode({ code, compact = false }: { code: string; compact?: bool
       let base = location.origin;
       let configured = false;
       try {
-        const config = await api('GET', '/api/config');
+        const config = await api<PublicConfig>('GET', '/api/config');
         if (config.public_url) {
           base = config.public_url;
           configured = true;

@@ -27,6 +27,7 @@ Singalong is a self-hosted collaborative karaoke: phones queue songs in a Room, 
 
 - **The UI**: read [docs/BRAND.md](docs/BRAND.md) first. Colors and fonts come from the tokens in `apps/web/src/styles/theme-bridge.css` (the desktop app keeps a copy; a test compares them). The ready-songs library is called the **Jukebox**. Copy never mentions price.
 - **An architectural decision**: read [docs/adr/](docs/adr/). Changing one means a new ADR that supersedes the old. The ordered architecture work is in the [ROADMAP](docs/ROADMAP.md).
+- **What the API sends or takes** (the Room's state, a WebSocket message, an HTTP answer the pages read): change its type in `apps/api/src/protocol.ts`. The web imports it as a type through `apps/web/src/lib/types.ts`, so its compiler shows every page the change reaches.
 - **A tool or dependency**: the repository keeps one version per language: TypeScript 7, Node 24, Python 3.11. TypeScript 7 ships no compiler API, so pick tools that run through `tsc` or Node itself; the Nest CLI, ts-node and ts-morph would need TypeScript 6 beside it ([ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.md)).
 - **The app version**: it lives in `apps/desktop/package.json` (and its lock), `apps/desktop/src/controller.js` (`APP_VERSION`) and `apps/worker/singalong_worker/version.py`. Bump the three together; a test checks.
 - **Anything that costs money** (a paid API, a paid service): ask the owner first. The project runs at zero cost ([ADR 0001](docs/adr/0001-zero-cost-while-non-profit.md)).

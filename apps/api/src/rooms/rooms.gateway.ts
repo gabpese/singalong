@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http';
 import { ConnectedSocket, MessageBody, type OnGatewayConnection, type OnGatewayDisconnect, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import type { ClientMessage } from '../protocol.ts';
 import type { Connection, RoomSocket } from './hub.ts';
 import { RoomService } from './room.service.ts';
 import { CLIENT_ID } from './rooms.ts';
@@ -11,7 +12,7 @@ type RoomClient = RoomSocket & {
   joined?: Promise<Awaited<ReturnType<RoomService['connect']>> | null>;
 };
 
-/** A TV message about an item of the Queue. */
+/** A TV message about a Queue item, as it arrives: any field may be missing or of another type (see ClientMessage). */
 interface TvMessage {
   item_id?: unknown;
   score?: unknown;
@@ -74,37 +75,37 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /** The phone says the person's name (for the list of who is in the Room). */
-  @SubscribeMessage('hello')
+  @SubscribeMessage('hello' satisfies ClientMessage['type'])
   async hello(@ConnectedSocket() socket: RoomClient, @MessageBody() message: { name?: unknown }) {
     const conn = await this.connOf(socket);
     if (conn) this.rooms.rename(conn, message.name);
   }
 
-  @SubscribeMessage('reaction')
+  @SubscribeMessage('reaction' satisfies ClientMessage['type'])
   async reaction(@ConnectedSocket() socket: RoomClient, @MessageBody() message: { kind?: unknown }) {
     const conn = await this.connOf(socket);
     if (conn) await this.rooms.react(conn, message.kind).catch(() => {});
   }
 
-  @SubscribeMessage('ended')
+  @SubscribeMessage('ended' satisfies ClientMessage['type'])
   async ended(@ConnectedSocket() socket: RoomClient, @MessageBody() message: TvMessage) {
     const tv = await this.tvOf(socket, message);
     if (tv) await this.rooms.tvEnded(tv.code, message.item_id as number).catch(() => {});
   }
 
-  @SubscribeMessage('score')
+  @SubscribeMessage('score' satisfies ClientMessage['type'])
   async score(@ConnectedSocket() socket: RoomClient, @MessageBody() message: TvMessage) {
     const tv = await this.tvOf(socket, message);
     if (tv) await this.rooms.tvScore(tv.code, message.item_id as number, message.score as number).catch(() => {});
   }
 
-  @SubscribeMessage('position')
+  @SubscribeMessage('position' satisfies ClientMessage['type'])
   async position(@ConnectedSocket() socket: RoomClient, @MessageBody() message: TvMessage) {
     const tv = await this.tvOf(socket, message);
     if (tv && Number.isFinite(message.ms)) this.rooms.tvPosition(tv.code, message.item_id as number, message.ms as number);
   }
 
-  @SubscribeMessage('lyrics')
+  @SubscribeMessage('lyrics' satisfies ClientMessage['type'])
   async lyrics(@ConnectedSocket() socket: RoomClient, @MessageBody() message: TvMessage) {
     const tv = await this.tvOf(socket, message);
     if (tv) await this.rooms.tvLyrics(tv.code, message.item_id as number, message.cues).catch(() => {});
