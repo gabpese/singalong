@@ -188,7 +188,7 @@ O agente só faz pedidos de saída, então funciona atrás de qualquer roteador 
 
 ```
 apps/
-  api/        API em Node (NestJS sobre o Fastify, MikroORM): src/app.ts, src/database/, áreas no Nest em src/{admin,release,cache}/,
+  api/        API em Node (NestJS sobre o Fastify, MikroORM): src/app.ts, src/database/, áreas no Nest em src/{admin,release,cache,songs}/,
               as que ainda estão no Fastify em src/rooms.js, src/agents.js, src/routes/
   web/        React + Vite: src/{landing,room,tv,stage,ui,lib,i18n,styles}, e2e/ (Playwright)
   worker/     Python: singalong_worker/ (pipeline, runner, align, lyrics...), tests/

@@ -188,7 +188,7 @@ The agent only makes outbound requests, so it works behind any home router witho
 
 ```
 apps/
-  api/        Node API (NestJS on Fastify, MikroORM): src/app.ts, src/database/, Nest areas in src/{admin,release,cache}/,
+  api/        Node API (NestJS on Fastify, MikroORM): src/app.ts, src/database/, Nest areas in src/{admin,release,cache,songs}/,
               the areas still on Fastify in src/rooms.js, src/agents.js, src/routes/
   web/        React + Vite: src/{landing,room,tv,stage,ui,lib,i18n,styles}, e2e/ (Playwright)
   worker/     Python: singalong_worker/ (pipeline, runner, align, lyrics...), tests/

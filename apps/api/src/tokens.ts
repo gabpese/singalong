@@ -6,3 +6,4 @@ export const JOBS = Symbol('jobs');
 export const STORAGE = Symbol('storage');
 export const AGENTS = Symbol('agents');
 export const LIMITERS = Symbol('limiters');
+export const ROOMS = Symbol('rooms');

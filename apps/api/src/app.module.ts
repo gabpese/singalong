@@ -9,6 +9,7 @@ import { HealthController } from './health.controller.ts';
 import { HttpErrorFilter } from './http-error.filter.ts';
 import { LegacyModule, type LegacyServices } from './legacy.module.ts';
 import { ReleaseModule } from './release/release.module.ts';
+import { SongsModule } from './songs/songs.module.ts';
 
 /**
  * The API's root module. The areas move here one by one (ROADMAP, step 3); until then their routes stay Fastify plugins
@@ -26,6 +27,7 @@ export class AppModule {
         MikroOrmModule.forRoot({ ...ormOptions(services.db.connection), registerRequestContext: false }),
         ReleaseModule,
         CacheModule,
+        SongsModule,
         ...(adminPath ? [AdminModule, RouterModule.register([{ path: adminPath, module: AdminModule }])] : []),
       ],
       controllers: [HealthController],

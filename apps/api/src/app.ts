@@ -18,8 +18,7 @@ import { ReleaseService } from './release/release.service.ts';
 import { createHub, createRoomService, HttpError } from './rooms.js';
 import { agentRoutes } from './routes/agent.js';
 import { roomRoutes } from './routes/rooms.js';
-import { songRoutes } from './routes/songs.js';
-import { createSongService } from './songs.js';
+import { SongService } from './songs/song.service.ts';
 import { type LocalStorage, safeJoin } from './storage.js';
 
 /** The settings from loadConfig(); the tests pass only the ones they need, plus their own rate limits. */
@@ -72,7 +71,7 @@ export async function buildApp({
     Object.entries({ ...DEFAULT_LIMITS, ...(config.rateLimits ?? {}) }).map(([name, options]) => [name, createRateLimiter(options)]),
   );
   const agents = createAgentService({ db, jobs, cloudEmails: config.cloudUploadEmails ?? [] });
-  const songs = createSongService({ storage, jobs, agents });
+  const songs = new SongService(storage, jobs, agents);
   const rooms = createRoomService({
     db,
     songs,
@@ -84,7 +83,7 @@ export async function buildApp({
 
   // Nest takes the root: /healthz, /readyz and the areas that moved (ROADMAP, step 3). The Fastify routes below use its services.
   const nest = await NestFactory.create<NestFastifyApplication>(
-    AppModule.forRoot({ config, db, jobs, storage, agents, limiters }),
+    AppModule.forRoot({ config, db, jobs, storage, agents, limiters, songs, rooms }),
     new FastifyAdapter(app as never),
     {
       logger: false,
@@ -107,7 +106,6 @@ export async function buildApp({
     });
 
     legacy.register(websocket);
-    legacy.register(songRoutes, { prefix: '/api', songs, jobs, limiters, rooms, agents });
     legacy.register(roomRoutes, { prefix: '/api', rooms, config, limiters, release });
     legacy.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters, mailer, storage, release });
     legacy.register(adminPage, { config });

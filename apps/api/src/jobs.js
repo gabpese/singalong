@@ -161,7 +161,7 @@ export function createRedisJobStore(redis, { staleMs = STALE_MS } = {}) {
     async get(id) {
       return toJob(await redis.hgetall(jobKey(id)));
     },
-    async enqueue(id, payload, { replace = false, sessionId = null } = {}) {
+    async enqueue(id, payload, { replace = false, sessionId = /** @type {string | null} */ (null) } = {}) {
       const created = await redis.enqueueJob(
         jobKey(id), sessionId ? sessionStream(sessionId) : STREAM, replace ? '1' : '0', String(Date.now()), payload.lyrics_source ?? 'auto',
         JSON.stringify(payload), id, sessionId ?? '',
@@ -169,7 +169,7 @@ export function createRedisJobStore(redis, { staleMs = STALE_MS } = {}) {
       if (created === 1 && sessionId) await ensureGroup(sessionStream(sessionId));
       return { created: created === 1, job: toJob(await redis.hgetall(jobKey(id))) };
     },
-    async requestExport(id, pitch, { sessionId = null } = {}) {
+    async requestExport(id, pitch, { sessionId = /** @type {string | null} */ (null) } = {}) {
       await redis.requestExport(
         exportKey(id, pitch), sessionId ? sessionExport(sessionId) : 'export:req', String(Date.now()), JSON.stringify({ video_id: id, pitch }), sessionId ?? '',
       );
@@ -178,7 +178,7 @@ export function createRedisJobStore(redis, { staleMs = STALE_MS } = {}) {
     async exportState(id, pitch) {
       return toExport(await redis.hgetall(exportKey(id, pitch)));
     },
-    async search(query, { timeoutSec = 20, sessionId = null } = {}) {
+    async search(query, { timeoutSec = 20, sessionId = /** @type {string | null} */ (null) } = {}) {
       const q = query.trim();
       const cacheKey = `search:cache:${createHash('sha1').update(q.toLowerCase()).digest('hex')}`;
       const cached = await redis.get(cacheKey);
@@ -362,7 +362,7 @@ export function createMemoryJobStore({ now = Date.now, staleMs = STALE_MS } = {}
     searchQueries: [],
     /** Os jobs ainda não terminados da sessão (para os testes). */
     sessionJobs: (sid) => [...(sessions.get(sid)?.jobs ?? [])],
-    async search(query, { sessionId = null, timeoutMs = 20_000 } = {}) {
+    async search(query, { sessionId = /** @type {string | null} */ (null), timeoutMs = 20_000 } = {}) {
       this.searchQueries.push(query.trim());
       if (!sessionId) {
         if (this.searchResults instanceof Error) throw this.searchResults;
@@ -385,7 +385,7 @@ export function createMemoryJobStore({ now = Date.now, staleMs = STALE_MS } = {}
       // campos vazios viram null, como no Redis (o agente grava "" para limpar)
       return job ? { ...job, stage: job.stage || null, error: job.error || null, error_code: job.error_code || null, retry: job.retry || null } : null;
     },
-    async enqueue(id, payload, { replace = false, sessionId = null } = {}) {
+    async enqueue(id, payload, { replace = false, sessionId = /** @type {string | null} */ (null) } = {}) {
       const current = jobs.get(id);
       if (busy(current) || (current?.status === 'needs_lyrics' && !replace)) return { created: false, job: { ...current } };
       const job = {
@@ -402,7 +402,7 @@ export function createMemoryJobStore({ now = Date.now, staleMs = STALE_MS } = {}
       }
       return { created: true, job: { ...job } };
     },
-    async requestExport(id, pitch, { sessionId = null } = {}) {
+    async requestExport(id, pitch, { sessionId = /** @type {string | null} */ (null) } = {}) {
       const key = exportKey(id, pitch);
       if (!['pending', 'processing'].includes(exports.get(key)?.status)) {
         exports.set(key, { status: 'pending', error: null, session_id: sessionId });
