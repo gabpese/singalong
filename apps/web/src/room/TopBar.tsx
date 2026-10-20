@@ -1,7 +1,7 @@
 // Topo da sala (código e estado da TV) e a barra de abas. Os atalhos e ajustes ficam na barra lateral (RoomRail).
 import { useEffect, useRef } from 'react';
-import type { RoomState } from '../lib/types';
-import { t } from '../i18n/index.js';
+import type { RoomState } from '../lib/types.ts';
+import { t } from '../i18n/index.ts';
 import { Icon } from '../ui/Icon';
 import { LanguageSwitch } from '../ui/LanguageSwitch';
 import { type Tab, useRoom, type View } from './context';

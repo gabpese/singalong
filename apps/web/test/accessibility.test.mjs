@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LYRICS_SCALES, stepScale } from '../src/lib/accessibility.js';
+import { LYRICS_SCALES, stepScale } from '../src/lib/accessibility.ts';
 
 test('stepScale: anda pela lista e para nos extremos', () => {
   assert.equal(stepScale(1, 1), 1.25);
@@ -11,7 +11,7 @@ test('stepScale: anda pela lista e para nos extremos', () => {
 });
 
 test('detectSystem e canInstallApp: Windows, macOS e Linux têm instalador; celular, tablet e o resto não', async () => {
-  const { canInstallApp, detectSystem } = await import('../src/lib/platform.js');
+  const { canInstallApp, detectSystem } = await import('../src/lib/platform.ts');
   const windows = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
   const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15'; // um Mac M1 também diz "Intel"
   const linux = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36';

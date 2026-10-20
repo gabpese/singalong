@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
-import { t } from '../i18n/index.js';
-import { parseRoomCode } from '../lib/identity.js';
+import { t } from '../i18n/index.ts';
+import { parseRoomCode } from '../lib/identity.ts';
 import '../styles/style.css';
 import { TvPage } from './TvPage';
 

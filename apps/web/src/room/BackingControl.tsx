@@ -1,8 +1,8 @@
 // Nível das vozes de apoio (backing vocals) e da voz original (guia para cantar) de uma música da fila, de 0 a 100 %. Só aparece
 // nas músicas que têm o arquivo; quem escolheu a música (ou o anfitrião) arrasta, os demais só veem o valor.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import type { QueueItem } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import type { QueueItem } from '../lib/types.ts';
 import { useRoom } from './context';
 
 const PENDING_MS = 1500;

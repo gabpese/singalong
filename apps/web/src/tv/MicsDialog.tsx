@@ -1,7 +1,7 @@
 // Microfones da TV: quais entram nas caixas junto com a música (um por cantor). O primeiro marcado também faz a pontuação.
 import { useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { listMicrophones, MAX_MICS } from '../lib/voice.js';
+import { t } from '../i18n/index.ts';
+import { listMicrophones, MAX_MICS } from '../lib/voice.ts';
 import type { TvController } from './controller';
 
 type Mic = { id: string; label: string };

@@ -1,8 +1,8 @@
 // Tom da música: dois botões ("Mais grave" e "Mais agudo") e, no meio, a nota em que a pessoa vai cantar, em destaque. Quem não pode
 // editar só vê a nota. O mesmo seletor serve à fila, à música tocando e à prévia.
-import { t } from '../i18n/index.js';
-import { noteSummary } from '../lib/music.js';
-import type { QueueItem, SongKey } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { noteSummary } from '../lib/music.ts';
+import type { QueueItem, SongKey } from '../lib/types.ts';
 import { Icon } from '../ui/Icon';
 import { useRoom } from './context';
 

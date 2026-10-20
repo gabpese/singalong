@@ -78,12 +78,12 @@ Singalong uses no full-stack framework: it composes these pieces ([ADR 0016](adr
 | TV | `apps/web/src/tv/` (`TvPage.tsx`, `controller.ts` for sound and scoring, `Interlude.tsx`, `Lobby.tsx`) |
 | Phone (Room page) | `apps/web/src/room/` |
 | Stage | `apps/web/src/stage/StagePage.tsx` |
-| Lyrics drawing, Key, Score | `apps/web/src/lib/` (`lyrics-view.js`, `engine.js`, `scoring.js`) |
+| Lyrics drawing, Key, Score | `apps/web/src/lib/` (`lyrics-view.ts`, `engine.ts`, `scoring.ts`) |
 | Song preparation | `apps/worker/singalong_worker/pipeline.py` and `runner.py` |
 | Agent API, Pairing, Session | `apps/api/src/agents.js`, `apps/api/src/routes/agent.js` |
 | Engine assembly | `apps/engine/src/assemble.js` (from `apps/engine/manifest.json`) |
 | Local media | `apps/worker/singalong_worker/media_server.py` |
-| UI texts | `apps/web/src/i18n/{pt,en,es}.js` |
+| UI texts | `apps/web/src/i18n/{pt,en,es}.ts` |
 | Brand tokens | `apps/web/src/styles/theme-bridge.css` |
 
 ## A song request, from the phone to the TV

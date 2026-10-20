@@ -1,4 +1,6 @@
-// Español.
+// Spanish.
+import type { Catalog } from './pt.ts';
+
 export default {
   'lang.label': 'Idioma',
 
@@ -439,4 +441,4 @@ export default {
 
   'mics.filter': 'Reducir ruido y eco de la voz',
   'mics.filterHint': 'un filtro de graves y una puerta de ruido: el micrófono baja cuando nadie canta. Desactívalo si se corta la voz.',
-};
+} satisfies Catalog;

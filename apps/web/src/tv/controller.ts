@@ -1,16 +1,16 @@
 // Controlador da TV: liga a sala (WebSocket) ao motor de áudio e à pontuação. Não desenha nada: avisa a tela pelo `ui`.
 // A TV toca o que a sala manda (a fila é do servidor), avisa quando a música termina e a posição para os celulares.
-import { t } from '../i18n/index.js';
-import { createEngine } from '../lib/engine.js';
-import { clampLatency, loadLatency, saveLatency, sungPosition } from '../lib/latency.js';
-import { loadMics, loadVoiceFilter, micsKey, openVoice, saveMics, saveVoiceFilter, voiceGain } from '../lib/voice.js';
-import { connectRoom } from '../lib/identity.js';
-import { splitQueue } from '../lib/queue-view.js';
-import { type MelodyNote, melodyNotes, pushTrail } from '../lib/melody-guide.js';
-import { partAtTime, singsAt, splitParts } from '../lib/duet.js';
-import { createScorer, noteName, openMic } from '../lib/scoring.js';
-import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.js';
-import type { QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { createEngine } from '../lib/engine.ts';
+import { clampLatency, loadLatency, saveLatency, sungPosition } from '../lib/latency.ts';
+import { loadMics, loadVoiceFilter, micsKey, openVoice, saveMics, saveVoiceFilter, voiceGain } from '../lib/voice.ts';
+import { connectRoom } from '../lib/identity.ts';
+import { splitQueue } from '../lib/queue-view.ts';
+import { type MelodyNote, melodyNotes, pushTrail } from '../lib/melody-guide.ts';
+import { partAtTime, singsAt, splitParts } from '../lib/duet.ts';
+import { createScorer, noteName, openMic } from '../lib/scoring.ts';
+import { finalMessage, MIN_SCORED_FRAMES } from '../lib/score-view.ts';
+import type { QueueItem, ReactionKind, RoomState, ServerMessage } from '../lib/types.ts';
 
 export interface HudState {
   visible: boolean;
@@ -63,7 +63,7 @@ const FINAL_SECONDS = 9;
 
 export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HTMLElement; current: HTMLElement; next: HTMLElement; next2: HTMLElement }) {
   let latest: RoomState | null = null; // último estado da sala
-  let latency = loadLatency(); // atraso do som e do microfone deste aparelho (veja lib/latency.js)
+  let latency = loadLatency(); // atraso do som e do microfone deste aparelho (veja lib/latency.ts)
   let micsChosen = loadMics(); // microfones escolhidos nesta TV (vazio = o padrão); o primeiro também serve à pontuação
   let applying = false;
   let endedFor: number | null = null; // evita avisar duas vezes que a mesma música terminou

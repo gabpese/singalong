@@ -1,40 +1,40 @@
-// Tamanho da letra (para quem lê de longe ou enxerga pouco): um fator que multiplica o tamanho de todas as linhas da letra,
-// guardado neste navegador. A TV, o palco e a aba TV da sala usam o mesmo valor.
+// Lyrics size (for whoever reads from afar or sees little): a factor that multiplies the size of every lyrics line, kept in
+// this browser. The TV, the Stage and the Room's TV tab use the same value.
 
 export const LYRICS_SCALES = [0.8, 1, 1.25, 1.5, 1.8];
 const KEY = 'lyricsScale';
 
-/** O fator seguinte (`direction` = 1) ou anterior (-1) da lista; nos extremos, fica onde está. */
-export function stepScale(current, direction) {
+/** The next (`direction` = 1) or previous (-1) factor in the list; at either end, it stays where it is. */
+export function stepScale(current: number, direction: number): number {
   const index = LYRICS_SCALES.reduce((best, value, i) => (Math.abs(value - current) < Math.abs(LYRICS_SCALES[best] - current) ? i : best), 0);
   return LYRICS_SCALES[Math.min(Math.max(index + direction, 0), LYRICS_SCALES.length - 1)];
 }
 
-export function getLyricsScale() {
+export function getLyricsScale(): number {
   try {
     const saved = Number(localStorage.getItem(KEY));
     return LYRICS_SCALES.includes(saved) ? saved : 1;
   } catch {
-    return 1; // sem armazenamento (ou fora do navegador)
+    return 1; // no storage (or outside a browser)
   }
 }
 
-/** Aplica o fator à página (variável CSS `--lyrics-scale`) e o guarda. */
-export function setLyricsScale(value) {
+/** Applies the factor to the page (CSS variable `--lyrics-scale`) and keeps it. */
+export function setLyricsScale(value: number): void {
   if (typeof document !== 'undefined') document.documentElement.style.setProperty('--lyrics-scale', String(value));
   try {
     localStorage.setItem(KEY, String(value));
   } catch {
-    // sem armazenamento: vale só até recarregar
+    // no storage: it only lasts until a reload
   }
 }
 
-/** Aumenta (+1) ou diminui (-1) a letra e devolve o novo fator. */
-export function changeLyricsScale(direction) {
+/** Makes the lyrics bigger (+1) or smaller (-1) and returns the new factor. */
+export function changeLyricsScale(direction: number): number {
   const next = stepScale(getLyricsScale(), direction);
   setLyricsScale(next);
   return next;
 }
 
-// ao carregar a página, aplica o que a pessoa escolheu antes
+// when the page loads, apply what the person chose before
 if (typeof document !== 'undefined') document.documentElement.style.setProperty('--lyrics-scale', String(getLyricsScale()));

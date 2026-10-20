@@ -1,14 +1,14 @@
 // TV: toca o que a sala manda, mostra a letra sincronizada, quem canta, a fila e a pontuação.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { changeLyricsScale } from '../lib/accessibility.js';
+import { t } from '../i18n/index.ts';
+import { changeLyricsScale } from '../lib/accessibility.ts';
 import { LyricsSize } from '../ui/LyricsSize';
 import { ReactionLayer, useReactionLayer } from '../ui/ReactionLayer';
 import { tRich } from '../i18n/rich';
-import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-media.js';
-import { keySummary } from '../lib/music.js';
-import { nextUp, playOrder, splitQueue } from '../lib/queue-view.js';
-import type { QueueItem, RoomState } from '../lib/types';
+import { accessMessage, localMediaBase, probeLocalMedia } from '../lib/local-media.ts';
+import { keySummary } from '../lib/music.ts';
+import { nextUp, playOrder, splitQueue } from '../lib/queue-view.ts';
+import type { QueueItem, RoomState } from '../lib/types.ts';
 import { SingerBlobs } from '../ui/SingerBlobs';
 import { InviteNotice, respondInvite } from '../room/Duet';
 import { createTvController, type FinalResult, type HudState, type TvController } from './controller';

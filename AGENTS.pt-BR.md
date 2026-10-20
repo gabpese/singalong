@@ -11,7 +11,7 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 | Caminho | O que é | Tecnologia |
 |---|---|---|
 | `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, Fastify (migrando para NestJS e MikroORM, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)), SQLite, Redis |
-| `apps/web` | Página inicial, Sala (celular), TV, Palco | React + Vite, TypeScript (`src/lib` ainda tem JavaScript, em migração) |
+| `apps/web` | Página inicial, Sala (celular), TV, Palco | React + Vite, TypeScript |
 | `apps/worker` | Download, separação da voz, alinhamento da letra, exportação em MP4 | Python 3.11, PyTorch |
 | `apps/desktop` | O app instalável do dono (bandeja, páginas da TV e do anfitrião embutidas) | Electron |
 | `apps/engine` | Monta o ambiente do worker no computador do usuário | Node |
@@ -23,7 +23,7 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 - Escreva tudo no repositório em inglês: nomes, comentários, nomes de testes, documentos, mensagens de commit, títulos e descrições de PR.
 - O português vive em dois lugares só: a tradução `*.pt-BR.md` ao lado de cada documento e os catálogos da interface em `apps/web/src/i18n/`. Mantenha o documento e a tradução juntos na mesma mudança.
 - Arquivos antigos ainda têm comentários em português. Traduza os comentários de um arquivo na mesma passada em que ele migra para TypeScript ([ROADMAP](docs/ROADMAP.pt-BR.md)).
-- O produto fala português: pt-BR é o idioma padrão da interface, e todo texto de tela passa pelos catálogos de idioma (`pt.js`, `en.js` e `es.js` têm as mesmas chaves; um teste confere).
+- O produto fala português: pt-BR é o idioma padrão da interface, e todo texto de tela passa pelos catálogos de idioma (o `pt.ts` define as chaves; o `en.ts` e o `es.ts` precisam ter as mesmas, e o compilador confere).
 
 ## Antes de mudar
 
@@ -39,7 +39,7 @@ Os comandos são os `scripts` de cada `package.json`. O que eles não contam:
 
 | App | Rodar | Pegadinha |
 |---|---|---|
-| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | O servidor dos testes de ponta a ponta serve o `dist/`: faça o build antes. As salas dele nascem com o intervalo desligado; os testes que precisam dele o ligam. |
+| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | O servidor dos testes de ponta a ponta serve o `dist/`: faça o build antes. As salas dele nascem com o intervalo desligado; os testes que precisam dele o ligam. Os testes unitários rodam o `src/lib` e o `src/i18n` direto no Node, então os imports ali nomeiam o arquivo `.ts`. |
 | `apps/worker` | `python -I -m unittest discover -s tests -t .` | Precisa só de `numpy langdetect websockets yt-dlp` (sem PyTorch). |
 | `apps/api`, `apps/desktop`, `apps/engine` | `npm test` | |
 

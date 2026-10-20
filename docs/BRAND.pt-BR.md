@@ -23,7 +23,7 @@ A interface ficou com "cara de IA" por um motivo anterior a qualquer fonte ou co
   - **Proposta:** trocar a metáfora por uma que nasça do uso real (seção 4). `[< 1 day]` para decidir, o resto vem depois.
   - **Tradeoff:** perde o apelo "gamer" que o briefing pediu; ganha coerência e algo que ninguém mais tem.
 - **[HIGH] Não existe nenhum elemento que seja só do Singalong.**
-  - **Evidência:** `style.css` hoje é fonte display + um coral + cartões escuros; trocando o nome, serve para qualquer app. O único traço realmente próprio do produto é o preenchimento palavra a palavra da letra (`.current .w`, `lyrics-view.js`), e ele está tratado como detalhe.
+  - **Evidência:** `style.css` hoje é fonte display + um coral + cartões escuros; trocando o nome, serve para qualquer app. O único traço realmente próprio do produto é o preenchimento palavra a palavra da letra (`.current .w`, `lyrics-view.ts`), e ele está tratado como detalhe.
   - **Proposta:** construir a marca em volta de duas coisas que só o produto faz: **a letra que se acende palavra a palavra** e **"agora é a sua vez"**.
   - **Tradeoff:** a marca fica mais específica (e menos "segura"); em troca, é reconhecível em uma captura de tela.
 - **[MEDIUM] O ícone e o logo contam outra história.**
@@ -32,7 +32,7 @@ A interface ficou com "cara de IA" por um motivo anterior a qualquer fonte ou co
 - **[MEDIUM] `welcome.png` ainda carrega a paleta antiga** (azul, roxo e amarelo) e aparece na Home e no app.
   - **Proposta:** refazer depois que a paleta for decidida; não antes. `[< 1 day]`
 - **[MEDIUM] A voz dos textos oscila.** "Você é o anfitrião: escolhe a ordem" (didático), "Isolando a banda…" (lúdico) e "Aplausos para você" (genérico) não parecem da mesma pessoa. Proposta: seção 5.
-- **[LOW] As reações são emojis do sistema** (`lib/reactions.js`), fora da marca. Proposta: um conjunto próprio de cinco, desenhado junto com o logotipo.
+- **[LOW] As reações são emojis do sistema** (`lib/reactions.ts`), fora da marca. Proposta: um conjunto próprio de cinco, desenhado junto com o logotipo.
 - **[GOOD]** O dueto usa cor **e** forma (círculo, quadrado, losango) e passou no axe. Isso é decisão de marca (acessível sem alarde) e deve virar princípio. Os tokens estão num só arquivo (`theme-bridge.css`), então trocar a identidade custa dias, não semanas.
 
 ## 3. O que a interface deve transmitir (em ordem de importância)

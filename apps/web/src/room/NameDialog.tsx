@@ -1,7 +1,7 @@
 // A primeira coisa ao entrar na sala: quem é você? O nome aparece na fila, nos convites de dueto e na pontuação, então o
 // modal não fecha sem ele (depois a pessoa ainda pode trocá-lo na aba "Adicionar").
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 
 export function NameDialog({ code, onName }: { code: string; onName: (name: string) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);

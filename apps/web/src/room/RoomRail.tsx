@@ -1,9 +1,9 @@
 // A barra lateral da sala: os atalhos e os ajustes do anfitrião sempre à vista, só com ícones (o texto fica no tooltip e no
 // nome acessível). Em telas largas é uma coluna à esquerda; no celular vira uma faixa logo abaixo do topo.
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 import { type ReactNode, useState } from 'react';
-import { hostToken } from '../lib/identity.js';
-import type { RoomState } from '../lib/types';
+import { hostToken } from '../lib/identity.ts';
+import type { RoomState } from '../lib/types.ts';
 import { Icon, type IconName } from '../ui/Icon';
 import { useRoom } from './context';
 import { VoiceDialog, VoiceVolume } from './VoiceControl';

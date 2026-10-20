@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   clampPitch, describeLyricsSource, lineProgress, locate, wordProgress, wordSpans,
-} from '../src/lib/lyrics-sync.js';
+} from '../src/lib/lyrics-sync.ts';
 
 const cues = [
   { start: 10, end: 12, text: 'a' },
@@ -79,7 +79,7 @@ test('describeLyricsSource: nada de jargão na tela', () => {
 });
 
 // ---------- pausas longas: aviso "--------------" ----------
-import { COUNTDOWN_SECONDS, GAP_DASHES, MIN_GAP_SECONDS, gapDisplay, sungEnd } from '../src/lib/lyrics-sync.js';
+import { COUNTDOWN_SECONDS, GAP_DASHES, MIN_GAP_SECONDS, gapDisplay, sungEnd } from '../src/lib/lyrics-sync.ts';
 
 const song = [
   { start: 12, end: 16, text: 'primeira linha da música' }, // intro de 12 s
@@ -160,7 +160,7 @@ test('lineProgress usa o fim cantado: o preenchimento não se arrasta durante um
 });
 
 test('clampBacking: nível das vozes de apoio, inteiro de 0 a 100; inválido desliga', async () => {
-  const { clampBacking } = await import('../src/lib/lyrics-sync.js');
+  const { clampBacking } = await import('../src/lib/lyrics-sync.ts');
   assert.equal(clampBacking(40), 40);
   assert.equal(clampBacking(40.6), 41);
   assert.equal(clampBacking(-10), 0);

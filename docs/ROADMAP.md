@@ -8,9 +8,9 @@ What is planned next, without dates. What already happened is in the [PLAN](PLAN
 
 [ADR 0011](adr/0011-migrate-javascript-to-typescript.md) moves every JavaScript file outside the worker to TypeScript, and [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.md) moves the API to NestJS with MikroORM. The repository keeps one version of each language: TypeScript 7, Node 24 and Python 3.11.
 
-Each step is one pull request (step 3 is several), merged with a merge commit. Only step 2 makes a release. A step adds `tsc --noEmit` to the CI job of the app it migrates, and translates the comments and test names of every file it touches ([ADR 0015](adr/0015-english-first-repository.md)).
+Each step is one pull request (step 3 is several), merged with a merge commit. Only step 2 makes a release. A step adds `tsc --noEmit` to the CI job of the app it migrates, and translates the comments and test names of every file it migrates ([ADR 0015](adr/0015-english-first-repository.md)).
 
-### 1. The web's `lib` and i18n catalogs in TypeScript
+### 1. The web's `lib` and i18n catalogs in TypeScript (done)
 
 - Every file in `apps/web/src/lib` and `apps/web/src/i18n` becomes `.ts`. `src/vendor` (SoundTouch, qrcode) is third-party code and stays JavaScript, with a `.d.ts` where needed.
 - Imports name the `.ts` file (`allowImportingTsExtensions`), and `erasableSyntaxOnly` keeps the code runnable by Node, which runs the unit tests without a build. The tests' imports point to `.ts` in the same pull request.

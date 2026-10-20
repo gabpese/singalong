@@ -1,12 +1,12 @@
 // Aba TV da sala: quem está no celular acompanha a letra, quem canta e a fila. Só assiste: o som e o microfone são do aparelho
 // que abriu a TV como player (tv.html), então dois aparelhos nunca tocam a mesma música.
 import { useEffect, useRef } from 'react';
-import { t } from '../i18n/index.js';
-import { createSyncClock } from '../lib/clock.js';
-import { keySummary } from '../lib/music.js';
-import { createLyricsView } from '../lib/lyrics-view.js';
-import { nextUp, playOrder, splitQueue } from '../lib/queue-view.js';
-import type { LyricCue, RoomState } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { createSyncClock } from '../lib/clock.ts';
+import { keySummary } from '../lib/music.ts';
+import { createLyricsView } from '../lib/lyrics-view.ts';
+import { nextUp, playOrder, splitQueue } from '../lib/queue-view.ts';
+import type { LyricCue, RoomState } from '../lib/types.ts';
 import { SingerBlobs } from '../ui/SingerBlobs';
 import { LyricsSize } from '../ui/LyricsSize';
 import { QueueBox, titleOf } from '../tv/QueueBox';

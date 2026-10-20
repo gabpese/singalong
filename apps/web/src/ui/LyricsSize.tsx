@@ -1,7 +1,7 @@
 // Botões A− e A+ para o tamanho da letra (TV, palco e aba TV da sala).
 import { useState } from 'react';
-import { t } from '../i18n/index.js';
-import { changeLyricsScale, getLyricsScale, LYRICS_SCALES } from '../lib/accessibility.js';
+import { t } from '../i18n/index.ts';
+import { changeLyricsScale, getLyricsScale, LYRICS_SCALES } from '../lib/accessibility.ts';
 
 export function LyricsSize() {
   const [scale, setScale] = useState(getLyricsScale);

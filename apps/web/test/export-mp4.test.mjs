@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { exportFileName, requestExport } from '../src/lib/export-mp4.js';
+import { exportFileName, requestExport } from '../src/lib/export-mp4.ts';
 
 test('exportFileName: "Artista - Título (tom).mp4" sem caracteres inválidos', () => {
   assert.equal(exportFileName({ artist: 'Stone Sour', title: 'Wicked Game', video_id: 'x' }), 'Stone Sour - Wicked Game.mp4');
@@ -31,7 +31,7 @@ test('requestExport: pede, espera o worker e devolve a URL; erros viram mensagem
 });
 
 test('downloadTarget: da mesma origem usa o atributo download; de outra (servidor local de mídia) pede o nome por ?download=', async () => {
-  const { downloadTarget } = await import('../src/lib/export-mp4.js');
+  const { downloadTarget } = await import('../src/lib/export-mp4.ts');
   assert.deepEqual(downloadTarget('/media/cache/x/karaoke.mp4', 'A - B.mp4', 'https://singalong.example'), { href: '/media/cache/x/karaoke.mp4', useDownloadAttribute: true });
   const local = downloadTarget('http://127.0.0.1:8765/tok/cache/abcdefghijk/karaoke_p+2.mp4', 'Legião - Tempo Perdido (+2).mp4', 'https://singalong.example');
   assert.equal(local.useDownloadAttribute, false);

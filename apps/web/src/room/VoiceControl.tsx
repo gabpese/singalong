@@ -1,6 +1,6 @@
 // A voz do microfone da TV nas caixas de som: o anfitrião liga (com um aviso sobre microfones direcionais) e ajusta o volume.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 import { tRich } from '../i18n/rich';
 import { useRoom } from './context';
 

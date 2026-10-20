@@ -5,11 +5,11 @@
 // Não sabe nada de salas: quem usa passa as funções que enviam o pedido (submitNew) e que trocam a letra de um item
 // que a pede (submitLyrics).
 import { forwardRef, type FormEvent, useImperativeHandle, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { api } from '../lib/identity.js';
-import { findJukeboxMatches, formatDuration, thumbnailUrl } from '../lib/queue-view.js';
-import { buildSearchQuery, embedUrl, extractVideoId, guessArtistTitle, watchUrl } from '../lib/youtube.js';
-import type { ApiError, LibrarySong } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { api } from '../lib/identity.ts';
+import { findJukeboxMatches, formatDuration, thumbnailUrl } from '../lib/queue-view.ts';
+import { buildSearchQuery, embedUrl, extractVideoId, guessArtistTitle, watchUrl } from '../lib/youtube.ts';
+import type { ApiError, LibrarySong } from '../lib/types.ts';
 import { Icon } from '../ui/Icon';
 import { JukeboxDialog } from './JukeboxDialog';
 

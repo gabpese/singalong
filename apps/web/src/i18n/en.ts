@@ -1,4 +1,6 @@
 // English.
+import type { Catalog } from './pt.ts';
+
 export default {
   'lang.label': 'Language',
 
@@ -439,4 +441,4 @@ export default {
 
   'mics.filter': 'Reduce voice noise and echo',
   'mics.filterHint': 'a low-cut filter and a noise gate: the microphone goes down when nobody sings. Turn it off if your voice is being cut.',
-};
+} satisfies Catalog;

@@ -1,25 +1,49 @@
-// Desenho da letra sincronizada (anterior, atual com palavras preenchidas, próximas e o aviso de pausa longa). Não sabe de onde vem
-// o relógio: a TV passa o tempo do áudio; o palco do celular, o de um relógio sincronizado com a TV.
-import { t as translate } from '../i18n/index.js';
-import { splitParts } from './duet.js';
-import { gapDisplay, lineProgress, locate, wordFills, wordProgress, wordSpans } from './lyrics-sync.js';
+// Drawing the synced lyrics (previous line, current line with filled words, next lines and the long-pause notice). It does not
+// know where the clock comes from: the TV passes the audio's time; the phone's Stage, that of a clock synced with the TV.
+import { t as translate } from '../i18n/index.ts';
+import { splitParts, type Part } from './duet.ts';
+import { gapDisplay, lineProgress, locate, wordFills, wordProgress, wordSpans, type WordSpan } from './lyrics-sync.ts';
+import type { LyricCue } from './types.ts';
 
-/** Põe (ou tira) o dono da linha: sem dono o atributo SOME (vazio ainda casaria com o CSS do dueto). */
-function mark(el, part) {
+/** The elements where the lyrics are drawn. */
+export interface LyricsElements {
+  prev: HTMLElement;
+  current: HTMLElement;
+  next: HTMLElement;
+  next2: HTMLElement;
+}
+
+export interface LyricsView {
+  /** Replaces the lyrics and clears the screen. */
+  setCues(next: readonly LyricCue[] | null | undefined): void;
+  /**
+   * Turns Duet mode on or back to normal. `chosen` is the split chosen by the singers (text of a b * -); without it (or if it
+   * does not match the lyrics) the lines split between the two by themselves.
+   */
+  setDuet(on: boolean, chosen?: string | null): void;
+  setOffset(seconds: number): void;
+  clear(): void;
+  /** Draws what holds at instant `time` (seconds) of the song. */
+  render(time: number): void;
+  readonly cues: readonly LyricCue[];
+  readonly offset: number;
+}
+
+/** Sets (or removes) the line's owner: without an owner the attribute GOES (an empty one would still match the Duet's CSS). */
+function mark(el: HTMLElement, part: Part | '') {
   if (part) el.dataset.part = part;
   else el.removeAttribute('data-part');
 }
 
-/** @param els elementos { prev, current, next, next2 } onde a letra é desenhada */
-export function createLyricsView(els) {
-  let cues = [];
-  let duet = false; // dueto: cada linha tem um dono (a, b ou os dois) e ganha a cor dele
-  let assigned = null; // a divisão escolhida pelos cantores (texto a b * -); nula = automática
-  let parts = [];
+export function createLyricsView(els: LyricsElements): LyricsView {
+  let cues: readonly LyricCue[] = [];
+  let duet = false; // Duet: each line has an owner (a, b or both) and takes their color
+  let assigned: string | null = null; // the split chosen by the singers (text of a b * -); null = automatic
+  let parts: (Part | null)[] = [];
   let offset = 0;
   let lastKey = '';
-  let words = []; // [{el, span, p}] da linha atual
-  let gapEl = null; // o aviso de pausa longa, quando está na tela
+  let words: { el: HTMLSpanElement; span: WordSpan; p: number }[] = []; // the current line's words
+  let gapEl: HTMLSpanElement | null = null; // the long-pause notice, while it is on screen
   let lastDashes = -1;
 
   function clear() {
@@ -28,8 +52,8 @@ export function createLyricsView(els) {
     lastKey = '';
   }
 
-  /** Monta a linha atual com um <span> por palavra (cada um com seu preenchimento: a quebra de linha não importa). */
-  function buildCurrentLine(text) {
+  /** Builds the current line with one <span> per word (each with its own fill: the line break does not matter). */
+  function buildCurrentLine(text: string) {
     els.current.textContent = '';
     words = wordSpans(text).map((span, i) => {
       const el = document.createElement('span');
@@ -41,7 +65,7 @@ export function createLyricsView(els) {
     });
   }
 
-  function paintCurrentLine(lineP, fills) {
+  function paintCurrentLine(lineP: number, fills: number[] | null) {
     words.forEach((w, i) => {
       const p = Math.round((fills ? fills[i] : wordProgress(w.span, lineP)) * 1000) / 10;
       if (p !== w.p) {
@@ -51,7 +75,7 @@ export function createLyricsView(els) {
     });
   }
 
-  /** Pausa longa na letra: no lugar da linha atual, "--------------" que some nos últimos 8 s (prepare-se!). */
+  /** A long pause in the lyrics: in place of the current line, "--------------" that vanishes in the last 8 s (get ready!). */
   function buildGapLine() {
     els.current.textContent = '';
     gapEl = document.createElement('span');
@@ -62,8 +86,8 @@ export function createLyricsView(els) {
   }
 
   /**
-   * Encaixa a letra no cartão: se as linhas não cabem na altura (uma frase que quebra em três linhas, uma tela pequena), reduz
-   * o tamanho das fontes aos poucos (`--fit`) em vez de deixar uma linha passar por cima da outra.
+   * Fits the lyrics in the card: if the lines do not fit the height (a phrase that wraps onto three lines, a small screen), it
+   * shrinks the fonts step by step (`--fit`) instead of letting one line run over another.
    */
   function fit() {
     const box = els.current.parentElement;
@@ -76,30 +100,23 @@ export function createLyricsView(els) {
     }
   }
 
-  function paintGap(dashes) {
-    if (dashes === lastDashes) return;
+  function paintGap(dashes: number) {
+    if (dashes === lastDashes || !gapEl) return;
     lastDashes = dashes;
     gapEl.textContent = '-'.repeat(dashes);
   }
 
   return {
-    /** Troca a letra (lista de linhas {start, end, text, words?}) e limpa a tela. */
     setCues(next) {
       cues = Array.isArray(next) ? next : [];
       parts = duet ? splitParts(cues, assigned) : [];
       clear();
     },
 
-    /**
-     * Liga o modo dueto ou volta ao normal. `chosen` é a divisão escolhida pelos cantores (texto a b * -); sem ela (ou se não
-     * combina com a letra) as linhas se dividem sozinhas entre os dois.
-     * @param {boolean} on
-     * @param {string | null | undefined} [chosen]
-     */
     setDuet(on, chosen = null) {
       const next = Boolean(on);
       const text = next && typeof chosen === 'string' ? chosen : null;
-      if (next === duet && text === assigned) return; // nada mudou: não refaz a divisão a cada estado da sala
+      if (next === duet && text === assigned) return; // nothing changed: do not redo the split on every Room state
       duet = next;
       assigned = text;
       parts = duet ? splitParts(cues, assigned) : [];
@@ -115,16 +132,15 @@ export function createLyricsView(els) {
       clear();
     },
 
-    /** Desenha o que vale no instante `time` (segundos) da música. */
     render(time) {
       const t = time + offset;
       const gap = gapDisplay(cues, t);
       let { current, next } = locate(cues, t);
       if (gap) {
-        current = -1; // dentro de uma pausa longa nenhuma linha está sendo cantada, mesmo que o `end` da anterior diga o contrário
+        current = -1; // inside a long pause no line is being sung, even if the previous line's `end` says otherwise
         next = gap.next;
       }
-      const text = (i) => cues[i]?.text ?? '';
+      const text = (i: number) => cues[i]?.text ?? '';
       const anchor = current >= 0 ? current : next;
       const key = `${current}|${anchor}|${gap ? 'gap' : ''}`;
       if (key !== lastKey) {
@@ -134,8 +150,8 @@ export function createLyricsView(els) {
         else buildCurrentLine(current >= 0 ? text(current) : cues.length ? '' : translate('lyrics.none'));
         els.next.textContent = text(current >= 0 ? current + 1 : next);
         els.next2.textContent = text(current >= 0 ? current + 2 : next + 1);
-        // dueto: quem canta cada linha (o CSS pinta de verde, vermelho ou amarelo); fora do dueto o atributo some
-        const part = (i) => (duet && cues[i] ? parts[i] ?? '' : '');
+        // Duet: who sings each line (the CSS paints it green, red or yellow); outside a Duet the attribute goes
+        const part = (i: number): Part | '' => (duet && cues[i] ? parts[i] ?? '' : '');
         mark(els.prev, part(anchor - 1));
         mark(els.current, gap ? '' : part(current));
         mark(els.next, part(current >= 0 ? current + 1 : next));

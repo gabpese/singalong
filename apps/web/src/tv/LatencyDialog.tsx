@@ -1,9 +1,9 @@
 // Calibração do atraso da TV: o som demora a chegar aos ouvidos (caixa, Bluetooth, HDMI) e o microfone demora a entregar o que
 // captou. Dá para medir sozinho (estalos nas caixas, escutados pelo microfone) ou ajustar à mão.
 import { useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { clampLatency, MAX_LATENCY_MS, splitRoundTrip } from '../lib/latency.js';
-import { measureRoundTrip } from '../lib/latency-measure.js';
+import { t } from '../i18n/index.ts';
+import { clampLatency, MAX_LATENCY_MS, splitRoundTrip } from '../lib/latency.ts';
+import { measureRoundTrip } from '../lib/latency-measure.ts';
 import type { TvController } from './controller';
 
 type Status = { kind: 'idle' | 'measuring' | 'ok' | 'fail' | 'error'; text?: string };

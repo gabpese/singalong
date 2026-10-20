@@ -1,5 +1,5 @@
 // Marca "beta" ao lado dos recursos que ainda não são totalmente fiéis (pontuação e guia de melodia).
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 
 export function BetaTag() {
   return (

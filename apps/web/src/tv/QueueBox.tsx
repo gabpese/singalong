@@ -1,7 +1,7 @@
 // Lista de cantores da TV (a música atual e as próximas), compartilhada pela TV que toca e pela aba TV da sala.
-import { t } from '../i18n/index.js';
-import { songChip } from '../lib/queue-view.js';
-import type { QueueItem } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { songChip } from '../lib/queue-view.ts';
+import type { QueueItem } from '../lib/types.ts';
 import { SingerBlobs } from '../ui/SingerBlobs';
 
 const UPCOMING_SHOWN = 5;

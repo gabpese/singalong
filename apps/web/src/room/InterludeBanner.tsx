@@ -1,7 +1,7 @@
 // O intervalo entre músicas no celular: quem está sendo aplaudido (com a nota, se houve pontuação) ou quem está subindo ao palco,
 // com a contagem regressiva. O anfitrião pode pular o intervalo ("Começar agora").
-import { t } from '../i18n/index.js';
-import type { RoomState } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import type { RoomState } from '../lib/types.ts';
 import { SingerBlobs } from '../ui/SingerBlobs';
 import { useInterlude } from '../ui/useInterlude';
 import { useRoom } from './context';

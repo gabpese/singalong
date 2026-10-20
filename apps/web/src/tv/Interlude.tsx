@@ -8,9 +8,9 @@ import { Blobatar } from '@blobatar/react';
 import { happy, love, surprised, wink } from 'blobatar/expression';
 import 'blobatar/motion.css';
 import { type CSSProperties, useEffect, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { finalMessage } from '../lib/score-view.js';
-import type { Interlude as InterludeState, RoomState } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { finalMessage } from '../lib/score-view.ts';
+import type { Interlude as InterludeState, RoomState } from '../lib/types.ts';
 import { SingerBlobs } from '../ui/SingerBlobs';
 import { useInterlude } from '../ui/useInterlude';
 import { playApplause } from './applause-sound';
@@ -83,7 +83,7 @@ function ApplauseScene({ phase, elapsedMs, people, scoring }: { phase: Interlude
           <div className="score-stamp" role="status">
             <strong>{phase.score}</strong>
             <span>{t('interlude.points')}</span>
-            <small>{finalMessage(phase.score)}</small>
+            <small>{finalMessage(phase.score ?? 0)}</small>
           </div>
         )}
       </div>

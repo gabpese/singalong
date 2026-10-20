@@ -1,7 +1,7 @@
 // QR code para entrar na sala: usa PUBLIC_URL (o endereço que os celulares alcançam) ou o da própria página.
 import { useEffect, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { api } from '../lib/identity.js';
+import { t } from '../i18n/index.ts';
+import { api } from '../lib/identity.ts';
 import qrcode from '../vendor/qrcode/qrcode.mjs';
 
 /** `compact`: o cartão pequeno que fica na TV enquanto toca (sem o endereço escrito). */

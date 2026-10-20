@@ -1,10 +1,10 @@
 // "Na fila": quem espera, na ordem em que vai tocar, com as ações de cada item.
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 import { tRich } from '../i18n/rich';
-import { api } from '../lib/identity.js';
-import { keySummary } from '../lib/music.js';
-import { canRetry, playOrder, songChip, thumbnailUrl } from '../lib/queue-view.js';
-import type { ApiError, QueueItem, RoomState } from '../lib/types';
+import { api } from '../lib/identity.ts';
+import { keySummary } from '../lib/music.ts';
+import { canRetry, playOrder, songChip, thumbnailUrl } from '../lib/queue-view.ts';
+import type { ApiError, QueueItem, RoomState } from '../lib/types.ts';
 import { BetaTag } from '../ui/BetaTag';
 import { SingerBlobs } from '../ui/SingerBlobs';
 import { useRoom } from './context';

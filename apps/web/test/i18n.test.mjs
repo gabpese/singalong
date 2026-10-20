@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import en from '../src/i18n/en.js';
-import es from '../src/i18n/es.js';
-import { pickLanguage, translate } from '../src/i18n/index.js';
-import pt from '../src/i18n/pt.js';
+import en from '../src/i18n/en.ts';
+import es from '../src/i18n/es.ts';
+import { pickLanguage, translate } from '../src/i18n/index.ts';
+import pt from '../src/i18n/pt.ts';
 
 const placeholders = (text) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
 
