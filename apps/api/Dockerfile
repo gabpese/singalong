@@ -9,13 +9,23 @@ COPY apps/web/public ./public
 COPY apps/web/src ./src
 RUN npx vite build
 
+# The API compiled with TypeScript 7's tsc (ADR 0017): plain JavaScript, the same for any architecture, built where the build runs.
+FROM --platform=$BUILDPLATFORM node:24-slim AS api
+WORKDIR /api
+COPY apps/api/package.json apps/api/package-lock.json ./
+RUN npm ci
+COPY apps/api/tsconfig.json ./
+COPY apps/api/scripts ./scripts
+COPY apps/api/src ./src
+RUN npm run build
+
 FROM node:24-slim
 
 WORKDIR /app
 COPY apps/api/package.json apps/api/package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY apps/api/src ./src
+COPY --from=api /api/dist ./dist
 COPY --from=web /web/dist ./public
 
 ENV NODE_ENV=production \
@@ -28,4 +38,4 @@ RUN mkdir -p /data && chown node:node /data
 
 USER node
 EXPOSE 3000
-CMD ["node", "src/server.js"]
+CMD ["node", "dist/server.js"]

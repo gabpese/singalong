@@ -6,11 +6,11 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { openDb } from '../src/db.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { createHub, createRoomService, MAX_PER_CLIENT } from '../src/rooms.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { openDb } from '../dist/db.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { createHub, createRoomService, MAX_PER_CLIENT } from '../dist/rooms.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const NO_LIMITS = { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG };
@@ -32,7 +32,7 @@ async function seed(id) {
 before(async () => {
   root = await mkdtemp(join(tmpdir(), 'singalong-concurrency-'));
   for (const id of READY) await seed(id);
-  app = buildApp({ config: { publicDir: root, adminToken: 'admin-secret', rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs: createMemoryJobStore() });
+  app = await buildApp({ config: { publicDir: root, adminToken: 'admin-secret', rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs: createMemoryJobStore() });
   await app.ready();
 });
 

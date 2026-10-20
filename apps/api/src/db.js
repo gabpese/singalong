@@ -1,6 +1,9 @@
 // Persistência (SQLite embutido do Node): salas, fila e ajustes por música.
 import { DatabaseSync } from 'node:sqlite';
 
+// Frozen (ADR 0017): the schema below and the column checks in openDb() no longer change. They still create a new database
+// and bring an old one up to date, and the MikroORM entities (src/database/entities.ts) describe exactly what they build, as
+// a test checks. Any new table or column is a MikroORM migration in src/database/migrations/.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS rooms (
   code            TEXT PRIMARY KEY,
@@ -172,20 +175,26 @@ export function openDb(path = ':memory:') {
     run(`UPDATE ${table} SET ${sets} WHERE ${keyColumn} = ?`, ...entries.map(([, value]) => value), key);
   }
 
+  // MikroORM shares this connection while the API moves to it (ADR 0017): when one of its transactions is open, this one
+  // nests as a savepoint instead of failing on a second BEGIN.
+  let savepoints = 0;
   function transaction(fn) {
-    db.exec('BEGIN');
+    const savepoint = db.isTransaction ? `sp${++savepoints}` : null;
+    db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
     try {
       const result = fn();
-      db.exec('COMMIT');
+      db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT');
       return result;
     } catch (err) {
-      db.exec('ROLLBACK');
+      db.exec(savepoint ? `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}` : 'ROLLBACK');
       throw err;
     }
   }
 
   return {
     transaction,
+    /** The open connection, for MikroORM to share (src/database/orm.ts). */
+    connection: db,
     close: () => db.close(),
 
     // --- salas ---

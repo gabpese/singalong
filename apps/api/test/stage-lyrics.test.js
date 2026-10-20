@@ -4,10 +4,10 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { sanitizeCues } from '../src/rooms.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { sanitizeCues } from '../dist/rooms.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const SONG = 'songAlpha01';
 const ANA = 'client-ana-0001';
@@ -21,7 +21,7 @@ before(async () => {
   await writeFile(join(dir, 'instrumental.mp3'), Buffer.from('ID3x'));
   await writeFile(join(dir, 'lyrics.json'), JSON.stringify(CUES));
   await writeFile(join(dir, 'meta.json'), JSON.stringify({ video_id: SONG, title: 'T', artist: 'A' }));
-  app = buildApp({
+  app = await buildApp({
     config: { publicDir: root, rateLimits: { createRoom: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 } } },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),

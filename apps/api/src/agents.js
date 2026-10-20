@@ -76,7 +76,7 @@ export function createAgentService({
   newId = randomUUID,
   newToken = () => `sga_${randomBytes(32).toString('base64url')}`,
   newPairCode = () => generateCode(PAIR_CODE_LENGTH),
-  cloudEmails = [], // e-mails (minúsculos) cujos computadores enviam as músicas para a nuvem automaticamente
+  cloudEmails = /** @type {string[]} */ ([]), // e-mails (minúsculos) cujos computadores enviam as músicas para a nuvem automaticamente
 }) {
   /** Código digitado: ignora maiúsculas e espaços. */
   const normalizeCode = (code) => String(code ?? '').replace(/\s+/g, '').toUpperCase();

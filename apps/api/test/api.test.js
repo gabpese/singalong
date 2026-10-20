@@ -3,10 +3,10 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
-import { extractVideoId } from '../src/youtube.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
+import { extractVideoId } from '../dist/youtube.js';
 
 const NO_LIMITS = { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } };
 const VID = 'dQw4w9WgXcQ';
@@ -32,7 +32,7 @@ before(async () => {
   await seed(READY);
   await seed('parcial0000', { complete: false });
   jobs = createMemoryJobStore();
-  app = buildApp({ config: { publicDir, rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs });
+  app = await buildApp({ config: { publicDir, rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs });
   await app.ready();
 });
 

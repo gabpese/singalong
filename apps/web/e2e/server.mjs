@@ -7,9 +7,9 @@ import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildApp } from '../../api/src/app.js';
-import { createMemoryJobStore } from '../../api/src/jobs.js';
-import { LocalStorage } from '../../api/src/storage.js';
+import { buildApp } from '../../api/dist/app.js';
+import { createMemoryJobStore } from '../../api/dist/jobs.js';
+import { LocalStorage } from '../../api/dist/storage.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.E2E_PORT ?? 3100);
@@ -61,7 +61,7 @@ const BIG = { max: 1e6, windowMs: 60_000 };
 // intervalo entre músicas: as salas dos testes nascem com ele desligado (os testes antigos esperam a próxima música na hora); os
 // testes do intervalo o ligam e ele dura E2E_INTERMISSION_MS em cada fase (3 s, ou mais para ver as cenas inteiras)
 const INTERMISSION_MS = Number(process.env.E2E_INTERMISSION_MS ?? 3000);
-const app = buildApp({
+const app = await buildApp({
   config: {
     publicDir,
     publicUrl: '',

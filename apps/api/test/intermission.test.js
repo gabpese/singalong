@@ -4,9 +4,9 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const NO_LIMITS = { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } };
 const READY_A = 'readySongA1';
@@ -35,7 +35,7 @@ before(async () => {
   await mkdir(publicDir);
   await writeFile(join(publicDir, 'index.html'), 'ok');
   for (const id of [READY_A, READY_B]) await seed(id);
-  app = buildApp({
+  app = await buildApp({
     config: { publicDir, rateLimits: NO_LIMITS, intermissionApplauseMs: APPLAUSE_MS, intermissionStageMs: STAGE_MS },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),

@@ -4,10 +4,10 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
-import { compareVersions, parseVersion, updateInfo } from '../src/version.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
+import { compareVersions, parseVersion, updateInfo } from '../dist/version.js';
 
 test('parseVersion aceita MAIOR.MENOR.CORREÇÃO e recusa o resto', () => {
   assert.deepEqual(parseVersion('1.2.3'), [1, 2, 3]);
@@ -36,7 +36,7 @@ test('updateInfo: em dia, atualização disponível, obrigatória e desconhecida
 
 async function build(extra) {
   const root = await mkdtemp(join(tmpdir(), 'singalong-ver-'));
-  const app = buildApp({
+  const app = await buildApp({
     config: { publicDir: root, adminToken: 'adm', rateLimits: { pair: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 }, search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 } }, ...extra },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),

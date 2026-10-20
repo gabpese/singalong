@@ -53,9 +53,12 @@ jobs:
           cache-dependency-path: |
             apps/web/package-lock.json
             apps/api/package-lock.json
-      # os testes de ponta a ponta sobem a API de verdade (apps/web/e2e/server.mjs importa apps/api/src)
+      # the end-to-end tests run the real API (apps/web/e2e/server.mjs imports the compiled apps/api/dist)
       - name: Instalar dependências da API
         run: npm ci
+        working-directory: apps/api
+      - name: Build the API
+        run: npm run build
         working-directory: apps/api
       - name: Instalar dependências do front-end
         run: npm ci
@@ -194,6 +197,10 @@ jobs:
       - name: Dependências da API
         if: runner.os == 'Windows'
         run: npm ci
+        working-directory: apps/api
+      - name: Build the API
+        if: runner.os == 'Windows'
+        run: npm run build
         working-directory: apps/api
       - uses: actions/setup-python@v5
         if: runner.os == 'Windows'

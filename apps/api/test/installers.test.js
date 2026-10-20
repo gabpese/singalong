@@ -1,7 +1,7 @@
 // Os links de download por sistema (a página inicial) e a concordância dos nomes com os do app e do electron-builder.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { downloadBase, downloadPage, downloadsFor, INSTALLERS } from '../src/installers.js';
+import { downloadBase, downloadPage, downloadsFor, INSTALLERS } from '../dist/installers.js';
 
 test('downloadBase: a pasta de arquivos; a página da release do GitHub é corrigida; o que não é http(s) é recusado', () => {
   assert.equal(downloadBase('https://github.com/dono/repo/releases/latest/download/'), 'https://github.com/dono/repo/releases/latest/download/');

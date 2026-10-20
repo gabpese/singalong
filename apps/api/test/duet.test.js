@@ -4,10 +4,10 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { pidOf } from '../src/rooms.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { pidOf } from '../dist/rooms.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const ANA = 'client-ana-0001';
 const BIA = 'client-bia-0001';
@@ -25,7 +25,7 @@ before(async () => {
     await writeFile(join(dir, 'meta.json'), JSON.stringify({ video_id: id, title: `Música ${id}`, artist: 'A' }));
   }
   const loose = { max: 1e6, windowMs: 60_000 };
-  app = buildApp({ config: { publicDir: root, rateLimits: { createRoom: loose, addToQueue: loose } }, storage: new LocalStorage(root), jobs: createMemoryJobStore() });
+  app = await buildApp({ config: { publicDir: root, rateLimits: { createRoom: loose, addToQueue: loose } }, storage: new LocalStorage(root), jobs: createMemoryJobStore() });
   await app.ready();
 });
 

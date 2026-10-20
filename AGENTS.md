@@ -8,7 +8,7 @@ Singalong is a self-hosted collaborative karaoke: phones queue songs in a Room, 
 
 | Path | What it is | Runtime |
 |---|---|---|
-| `apps/api` | Rooms, queue, WebSocket state, media files, the agent API | Node 24, Fastify (moving to NestJS and MikroORM, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.md)), SQLite, Redis |
+| `apps/api` | Rooms, queue, WebSocket state, media files, the agent API | Node 24, NestJS on Fastify and MikroORM over SQLite (areas moving in, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.md)), Redis; compiled by `tsc` into `dist/` |
 | `apps/web` | Landing page, Room (phone), TV, Stage | React + Vite, TypeScript |
 | `apps/worker` | Download, vocal separation, lyrics alignment, MP4 export | Python 3.11, PyTorch |
 | `apps/desktop` | The owner's installable app (tray, embedded TV and host pages) | Electron |
@@ -37,9 +37,10 @@ The commands are the `scripts` in each `package.json`. What they do not tell you
 
 | App | Run | Gotcha |
 |---|---|---|
-| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | The e2e server serves `dist/`: build before e2e. Its rooms start with the intermission off; tests that need it turn it on. The unit tests run `src/lib` and `src/i18n` straight in Node, so imports there name the `.ts` file. |
+| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | The e2e server serves `dist/`: build before e2e. It runs the compiled API, so `npm run build` in `apps/api` first. Its rooms start with the intermission off; tests that need it turn it on. The unit tests run `src/lib` and `src/i18n` straight in Node, so imports there name the `.ts` file. |
 | `apps/worker` | `python -I -m unittest discover -s tests -t .` | Needs only `numpy langdetect websockets yt-dlp` (no PyTorch). |
-| `apps/api`, `apps/desktop`, `apps/engine` | `npm test` | |
+| `apps/api` | `npm test` | It builds `dist/` first: the tests, and the web and desktop e2e, import the compiled API. A schema change is a MikroORM migration in `src/database/migrations/`; `db.js`'s schema is frozen. |
+| `apps/desktop`, `apps/engine` | `npm test` | The desktop e2e runs the compiled API too. |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of them on `main`. The API image is published only after CI passes.
 
@@ -57,4 +58,4 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of them on 
 4. Build the Windows installer locally (`npm run dist:win` in `apps/desktop`) and upload `singalong_karaoke.exe`, `singalong_karaoke.exe.blockmap` and `latest.yml`.
 5. Run the "Instaladores de Linux e macOS" workflow (`release-installers.yml`) with the tag; it attaches the AppImage, `latest-linux.yml` and the DMG.
 6. Publish the draft as Latest once all six files are attached.
-7. The owner runs `./deploy.sh` on the VM (automatic deploy is off) and sets the new version in the admin page.
+7. The owner runs `./deploy.sh` on the VM (automatic deploy is off) and sets the new version in the admin page. The VM keeps its own copies of `deploy.sh`, `docker-compose.prod.yml` and `Caddyfile`: when a change touches one, download it again first ([infrastructure](docs/infrastructure.md#the-files-on-the-vm)).

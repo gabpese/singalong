@@ -36,10 +36,10 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
    - Testes de concorrência (`apps/api/test/concurrency.test.js`) para as regras que leem e depois gravam: músicas adicionadas ao mesmo tempo no limite por pessoa, "a TV terminou" e "o Anfitrião pulou" chegando juntos, uma nota enviada quando a música termina, movimentos ao mesmo tempo, um código de pareamento usado duas vezes, dois inícios de sessão, duas Salas com o mesmo código.
    - A fila por Sala, na ordem de chegada (`src/serial.js`), já cobria as rotas HTTP, o "terminou" e os timers do Intervalo; a nota da TV e as difusões de quem entra e sai da sala agora também passam por ela. O "pular" nomeia a música da tela do Anfitrião, então nunca pula a do próximo cantor; as mudanças de sessão fazem fila por computador; uma reação, um código de Sala e um código de pareamento se resolvem cada um numa única instrução SQL. A reserva de trabalhos dos agentes fica no Redis ou na memória, não no SQLite, então o ORM não chega nela.
    - O `deploy.sh` copia o arquivo do SQLite com `VACUUM INTO` antes de cada deploy e guarda as cinco últimas cópias.
-2. **NestJS e MikroORM no lugar.**
-   - O Nest sobe sobre a instância atual do Fastify; as rotas antigas continuam registradas como plugins do Fastify.
-   - O MikroORM 7 sobre o `node:sqlite` (`NodeSqliteDialect`), com entidades em `defineEntity`, e a migração base.
-   - O `tsc` do TypeScript 7 gera o `dist/`; o Dockerfile ganha uma etapa de build; o CI compila a API antes dos testes dela e antes dos testes de ponta a ponta do site e do app. O `buildApp()` continua devolvendo a instância do Fastify.
+2. **NestJS e MikroORM no lugar (feito).**
+   - O Nest sobe sobre a instância atual do Fastify e atende o `/healthz` e o `/readyz`. As outras rotas continuam plugins do Fastify, num contexto próprio que mantém o tratador de erros delas.
+   - O MikroORM 7 compartilha a conexão `node:sqlite` do `db.js` (`src/database/sqlite-dialect.ts`), com entidades em `defineEntity` que um teste compara com o schema congelado, e uma migração base que não muda nada.
+   - O `tsc` do TypeScript 7 gera o `dist/`; o Dockerfile ganha uma etapa de build; o CI compila a API antes dos testes dela e antes dos testes de ponta a ponta do site e do app. O `buildApp()` agora é assíncrono e continua devolvendo a instância do Fastify.
 3. **Um pull request por área,** da menos para a mais concorrida: `release`, `cache-cleaner` e `admin`; `songs`; `agents`; `rooms`. Cada um passa os seus arquivos para TypeScript e para um módulo do Nest, escreve os JSON Schemas com TypeBox e torna as chamadas ao banco assíncronas pelo MikroORM, com um EntityManager derivado por requisição, mensagem do WebSocket, timer e volta do long poll. O pull request de `rooms` define os tipos do protocolo (`state`, `position`, as respostas HTTP) na API, e o site os importa com `import type`.
 
 ### 4. O motor

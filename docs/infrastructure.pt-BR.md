@@ -91,6 +91,16 @@ docker compose -f docker-compose.prod.yml --env-file .env run --rm --no-deps api
 IMAGE_TAG=<sha> ./deploy.sh                                                              # ou ./deploy.sh para a imagem mais nova
 ```
 
+### Os arquivos da VM
+
+O `setup-vm.sh` baixa o `deploy.sh`, o `docker-compose.prod.yml` e o `Caddyfile` para `/opt/singalong` uma vez só, quando a VM é preparada. Um deploy baixa uma imagem nova da API, não esses arquivos: quando uma mudança mexe num deles, baixe-o de novo antes do `./deploy.sh`.
+
+```sh
+cd /opt/singalong
+curl -fsSL https://raw.githubusercontent.com/gabpese/singalong/main/deploy/deploy.sh -o deploy.sh && chmod +x deploy.sh
+# o mesmo para o docker-compose.prod.yml e o Caddyfile, sem o chmod
+```
+
 ## Ajustes
 
 A API lê variáveis de ambiente ([`apps/api/src/config.js`](../apps/api/src/config.js)):

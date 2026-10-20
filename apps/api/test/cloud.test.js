@@ -5,9 +5,9 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const LOOSE = { max: 1e6, windowMs: 60_000 };
 const SONG = 'abcdefghijk';
@@ -22,7 +22,7 @@ let root;
 before(async () => {
   root = await mkdtemp(join(tmpdir(), 'singalong-cloud-'));
   jobs = createMemoryJobStore();
-  app = buildApp({
+  app = await buildApp({
     config: {
       publicDir: root,
       adminToken: 'adm',

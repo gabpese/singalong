@@ -11,9 +11,9 @@ import { createServer as createHttp } from 'node:http';
 import { createServer as createNet } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { buildApp } from '../../api/src/app.js';
-import { createMemoryJobStore } from '../../api/src/jobs.js';
-import { LocalStorage } from '../../api/src/storage.js';
+import { buildApp } from '../../api/dist/app.js';
+import { createMemoryJobStore } from '../../api/dist/jobs.js';
+import { LocalStorage } from '../../api/dist/storage.js';
 import { chromium } from 'playwright-core';
 
 const [exe, updateDir, userData] = process.argv.slice(2).map((p) => resolve(p));
@@ -37,7 +37,7 @@ const feed = `http://127.0.0.1:${files.address().port}/`;
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const root = await mkdtemp(join(tmpdir(), 'sg-upd-api-'));
-const api = buildApp({
+const api = await buildApp({
   config: { publicDir: root, adminToken: 'adm', rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG }, appLatestVersion: newVersion, appMinVersion: '0.0.1', appNotes: 'Teste de atualização', appDownloadUrl: feed },
   storage: new LocalStorage(root),
   jobs: createMemoryJobStore(),

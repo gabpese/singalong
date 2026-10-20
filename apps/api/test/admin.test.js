@@ -4,9 +4,9 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const LOOSE = { max: 1e6, windowMs: 60_000 };
 const ADMIN = { 'x-admin-token': 'segredo-do-admin' };
@@ -18,7 +18,7 @@ const meta = Buffer.from(JSON.stringify({ video_id: SONG, title: 'Tempo Perdido'
 async function build({ config = {}, rateLimits = {} } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'singalong-admin-'));
   const sent = [];
-  const app = buildApp({
+  const app = await buildApp({
     config: { publicDir: root, adminToken: 'segredo-do-admin', adminPath: PATH, pairAllowedEmails: [], cloudUploadEmails: [], brevoApiKey: 'k', mailFrom: 'a@b.com', rateLimits: { pair: LOOSE, pairRequest: LOOSE, pairEmail: LOOSE, admin: LOOSE, adminFail: LOOSE, ...rateLimits }, ...config },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),
@@ -79,7 +79,7 @@ test('sem ADMIN_TOKEN, sem ADMIN_PATH ou com um ADMIN_PATH curto/inválido a adm
 });
 
 test('o ADMIN_PATH do ambiente só vale com 16 a 64 letras, números, _ ou -', async () => {
-  const { loadConfig } = await import('../src/config.js');
+  const { loadConfig } = await import('../dist/config.js');
   assert.equal(loadConfig({ ADMIN_PATH: 'gestao-secreta-9f3k2x7q1m4z8p5a' }).adminPath, 'gestao-secreta-9f3k2x7q1m4z8p5a');
   for (const bad of ['', 'admin', 'a'.repeat(15), 'a'.repeat(65), 'com/barra/barra/barra', '../../etc/passwd-passwd', 'com espaço no meio....']) assert.equal(loadConfig({ ADMIN_PATH: bad }).adminPath, '', bad);
   assert.equal(loadConfig({}).adminPath, '');

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampOffset, clampPitch, fairOrder, nextPlayable, swapTarget } from '../src/queue-logic.js';
+import { clampOffset, clampPitch, fairOrder, nextPlayable, swapTarget } from '../dist/queue-logic.js';
 
 const item = (id, video_id, client_id) => ({ id, video_id, client_id });
 

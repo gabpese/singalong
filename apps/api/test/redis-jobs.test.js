@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, test } from 'node:test';
 import { Redis } from 'ioredis';
-import { createRedisJobStore } from '../src/jobs.js';
+import { createRedisJobStore } from '../dist/jobs.js';
 
 const URL = process.env.REDIS_TEST_URL;
 const skip = URL ? false : 'defina REDIS_TEST_URL para rodar os testes com Redis';
