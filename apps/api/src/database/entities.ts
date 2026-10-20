@@ -1,9 +1,8 @@
-// The database as MikroORM sees it: one entity per table, describing exactly what db.js's frozen schema builds (a test
-// compares them). Entities hold data and explicit relations only; the rules stay in the services (ADR 0017). Times are
-// milliseconds since the epoch, kept as integers like the rest of the API.
+// The database as MikroORM sees it: one entity per table, describing exactly what db.js's frozen schema builds and the
+// migrations then change (a test compares them). Entities hold data and explicit relations only; the rules stay in the
+// services (ADR 0017). Times are milliseconds since the epoch, kept as integers like the rest of the API.
 //
 // A few details mirror that schema rather than MikroORM's defaults, so that no table has to be rebuilt:
-// - primary keys are `.nullable()`: the old tables declare `TEXT PRIMARY KEY` without `NOT NULL`, which SQLite then allows;
 // - flags are booleans stored as INTEGER with `.defaultRaw('0')` or `('1')`, where MikroORM would write `false` or `true`;
 // - relations get `.index(false)`: the old schema has its own composite indexes, not one per foreign key;
 // - foreign keys keep the old rules: `cascade` where the schema says so, otherwise `no action`.
@@ -13,7 +12,7 @@ export const Device = defineEntity({
   name: 'Device',
   tableName: 'devices',
   properties: (p) => ({
-    id: p.string().primary().nullable(),
+    id: p.string().primary(),
     name: p.string(),
     /** Only the token's SHA-256: the token itself is never stored. The table's own UNIQUE keeps it unique. */
     tokenHash: p.string().name('token_hash'),
@@ -30,7 +29,7 @@ export const Session = defineEntity({
   name: 'Session',
   tableName: 'sessions',
   properties: (p) => ({
-    id: p.string().primary().nullable(),
+    id: p.string().primary(),
     device: p.manyToOne(Device).name('device_id').deleteRule('cascade').index(false),
     /** The nickname guests see (never the YouTube account). */
     displayName: p.string().name('display_name'),
@@ -47,7 +46,7 @@ export const Room = defineEntity({
   name: 'Room',
   tableName: 'rooms',
   properties: (p) => ({
-    code: p.string().primary().nullable(),
+    code: p.string().primary(),
     hostToken: p.string().name('host_token'),
     fair: p.boolean().defaultRaw('0'),
     scoring: p.boolean().defaultRaw('0'),
@@ -74,7 +73,7 @@ export const QueueItem = defineEntity({
   name: 'QueueItem',
   tableName: 'queue_items',
   properties: (p) => ({
-    id: p.integer().primary().autoincrement().nullable(),
+    id: p.integer().primary().autoincrement(),
     room: p.manyToOne(Room).name('room_code').deleteRule('cascade').index(false),
     videoId: p.string().name('video_id'),
     title: p.string().nullable(),
@@ -108,7 +107,7 @@ export const SongSettings = defineEntity({
   name: 'SongSettings',
   tableName: 'song_settings',
   properties: (p) => ({
-    videoId: p.string().name('video_id').primary().nullable(),
+    videoId: p.string().name('video_id').primary(),
     lyricOffset: p.double().name('lyric_offset').columnType('real').default(0),
     /** Duet: who sings each lyrics line (a b * -), chosen by the singers; null = automatic. */
     parts: p.string().nullable(),
@@ -121,7 +120,7 @@ export const AppRelease = defineEntity({
   name: 'AppRelease',
   tableName: 'app_release',
   properties: (p) => ({
-    id: p.integer().primary().autoincrement(false).nullable(),
+    id: p.integer().primary().autoincrement(false),
     latest: p.string().default(''),
     minimum: p.string().default(''),
     notes: p.string().default(''),
@@ -134,7 +133,7 @@ export const PairCode = defineEntity({
   name: 'PairCode',
   tableName: 'pair_codes',
   properties: (p) => ({
-    codeHash: p.string().name('code_hash').primary().nullable(),
+    codeHash: p.string().name('code_hash').primary(),
     expiresAt: p.integer().name('expires_at'),
     email: p.string().nullable(),
   }),
@@ -145,7 +144,7 @@ export const PlayLog = defineEntity({
   name: 'PlayLog',
   tableName: 'play_log',
   properties: (p) => ({
-    id: p.integer().primary().autoincrement().nullable(),
+    id: p.integer().primary().autoincrement(),
     device: p.manyToOne(Device).name('device_id').deleteRule('cascade').index(false),
     sessionId: p.string().name('session_id'),
     videoId: p.string().name('video_id'),
@@ -170,7 +169,7 @@ export const EmailRule = defineEntity({
   name: 'EmailRule',
   tableName: 'email_rules',
   properties: (p) => ({
-    email: p.string().primary().nullable(),
+    email: p.string().primary(),
     canPair: p.boolean().name('can_pair').defaultRaw('0'),
     canCloud: p.boolean().name('can_cloud').defaultRaw('0'),
     createdAt: p.integer().name('created_at'),
@@ -182,7 +181,7 @@ export const CloudBlocked = defineEntity({
   name: 'CloudBlocked',
   tableName: 'cloud_blocked',
   properties: (p) => ({
-    videoId: p.string().name('video_id').primary().nullable(),
+    videoId: p.string().name('video_id').primary(),
     blockedAt: p.integer().name('blocked_at'),
   }),
 });

@@ -2,8 +2,8 @@
 import { DatabaseSync } from 'node:sqlite';
 
 // Frozen (ADR 0017): the schema below and the column checks in openDb() no longer change. They still create a new database
-// and bring an old one up to date, and the MikroORM entities (src/database/entities.ts) describe exactly what they build, as
-// a test checks. Any new table or column is a MikroORM migration in src/database/migrations/.
+// and bring an old one up to date, and the MikroORM migrations in src/database/migrations/ then run on what they build (the
+// entities in src/database/entities.ts describe the result, as a test checks). Any change to the schema is a migration.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS rooms (
   code            TEXT PRIMARY KEY,

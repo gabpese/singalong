@@ -30,7 +30,7 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
 
 ### 3. A API em NestJS e MikroORM
 
-[ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md). A API vai para a VM depois de cada pull request aceito. Até o passo 3 terminar, as migrações só criam tabelas e colunas, então a imagem anterior continua rodando sobre um banco já migrado.
+[ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md). A API vai para a VM depois de cada pull request aceito. Até o passo 3 terminar, uma migração mantém toda tabela e coluna que a imagem anterior usa (ela cria tabelas e colunas, ou aperta uma restrição que os dados já cumprem), então a imagem anterior continua rodando sobre um banco já migrado.
 
 1. **Ainda em JavaScript (feito).**
    - Testes de concorrência (`apps/api/test/concurrency.test.js`) para as regras que leem e depois gravam: músicas adicionadas ao mesmo tempo no limite por pessoa, "a TV terminou" e "o Anfitrião pulou" chegando juntos, uma nota enviada quando a música termina, movimentos ao mesmo tempo, um código de pareamento usado duas vezes, dois inícios de sessão, duas Salas com o mesmo código.
@@ -43,6 +43,7 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
 3. **Um pull request por área,** da menos para a mais concorrida: `release`, `cache-cleaner` e `admin`; `songs`; `agents`; `rooms`. Cada um passa os seus arquivos para TypeScript e para um módulo do Nest, escreve os JSON Schemas com TypeBox e torna as chamadas ao banco assíncronas pelo MikroORM, com um EntityManager derivado por requisição, mensagem do WebSocket, timer e volta do long poll. O pull request de `rooms` define os tipos do protocolo (`state`, `position`, as respostas HTTP) na API, e o site os importa com `import type`.
    - **`release`, `cache-cleaner` e `admin`: feito.** Cada chamada ganha o seu EntityManager derivado. A versão publicada do app é lida uma vez ao subir e fica em memória, então as rotas dos agentes continuam lendo-a de forma síncrona. Os arquivos estáticos da página do administrador continuam uma rota do Fastify (o endereço precisa terminar em "/"); a API dela é um módulo do Nest no endereço secreto, com um guard para o token e os limites, TypeBox por meio de um pipe e um filtro que responde um `HttpError` como antes.
    - **`songs`: feito.** Sem trabalho de banco: TypeScript, um controller do Nest, schemas TypeBox e um guard `@RateLimit()` reutilizável. O `SongService` continua sendo criado pelo `app.ts`, porque as Salas também o usam. O pipe valida os schemas TypeBox com o próprio Ajv do Fastify e as mesmas opções, então a conversão de tipos e as propriedades descartadas são idênticas às das rotas do Fastify.
+   - **Chaves primárias `NOT NULL`: feito.** O schema do `db.js` declarava `TEXT PRIMARY KEY` sem `NOT NULL`, o que deixa o SQLite guardar um nulo, então as entidades tipavam toda chave como anulável. A primeira migração que muda o schema reconstrói as dez tabelas como o SQLite documenta, com as chaves estrangeiras desligadas fora da transação: ligadas, apagar `rooms` ou `devices` apaga em cascata a Fila, as Sessões e o histórico. Ela mantém as linhas, as restrições `UNIQUE` e `CHECK`, os índices e os contadores do `AUTOINCREMENT`. As migrações agora rodam uma a uma, cada uma na sua transação.
 
 ### 4. O motor
 
