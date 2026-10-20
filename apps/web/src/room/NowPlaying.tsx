@@ -149,7 +149,7 @@ export function NowPlaying({ state, position }: { state: RoomState; position: Po
                   >
                     <Icon name={state.playback === 'paused' ? 'resume' : 'pause'} />
                   </button>
-                  <button type="button" className="icon-btn" aria-label={t('player.skip')} title={t('player.skipTitle')} onClick={() => run('POST', '/player/skip')}>
+                  <button type="button" className="icon-btn" aria-label={t('player.skip')} title={t('player.skipTitle')} onClick={() => run('POST', '/player/skip', { item_id: current.id })}>
                     <Icon name="next-song" />
                   </button>
                 </>

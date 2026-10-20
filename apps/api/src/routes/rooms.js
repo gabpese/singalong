@@ -123,7 +123,8 @@ export async function roomRoutes(app, { rooms, config, limiters, release }) {
     const { code, action } = request.params;
     const actor = actorOf(request);
     // start: pula o intervalo entre músicas (os aplausos e a subida ao palco) e a próxima música começa já
-    const result = action === 'skip' ? await rooms.skip(code, actor)
+    // skip may name the song on the Host's screen ({ item_id }): one that already ended is not skipped again
+    const result = action === 'skip' ? await rooms.skip(code, actor, Number.isInteger(request.body?.item_id) ? request.body.item_id : null)
       : action === 'start' ? await rooms.startNow(code, actor)
       : await rooms.setPlayback(code, action === 'resume', actor);
     return result.state;

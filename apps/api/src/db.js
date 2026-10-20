@@ -189,8 +189,12 @@ export function openDb(path = ':memory:') {
     close: () => db.close(),
 
     // --- salas ---
+    /** Creates the Room; false when the code is already taken (the insert itself checks, so no other request can slip in between). */
     createRoom: (code, hostToken, now, sessionId = null, intermission = true) =>
-      run('INSERT INTO rooms (code, host_token, created_at, last_active_at, session_id, intermission) VALUES (?, ?, ?, ?, ?, ?)', code, hostToken, now, now, sessionId, intermission ? 1 : 0),
+      run(
+        'INSERT INTO rooms (code, host_token, created_at, last_active_at, session_id, intermission) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(code) DO NOTHING',
+        code, hostToken, now, now, sessionId, intermission ? 1 : 0,
+      ).changes === 1,
     getRoom: (code) => one('SELECT * FROM rooms WHERE code = ?', code),
     listRoomCodes: () => all('SELECT code FROM rooms').map((r) => r.code),
     updateRoom: (code, fields) => update('rooms', ROOM_FIELDS, 'code', code, fields),
@@ -254,6 +258,9 @@ export function openDb(path = ':memory:') {
     countQueued: (roomCode) => one("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = ? AND status = 'queued'", roomCode).n,
     updateItem: (id, fields) => update('queue_items', ITEM_FIELDS, 'id', id, fields),
     addCheers: (id, n = 1) => run('UPDATE queue_items SET cheers = cheers + ? WHERE id = ?', n, id),
+    /** Cheers for the song playing in the Room, in one statement (nothing can change the song between reading and writing). */
+    addCheersToCurrent: (roomCode, n = 1) =>
+      run('UPDATE queue_items SET cheers = cheers + ? WHERE id = (SELECT current_item_id FROM rooms WHERE code = ?)', n, roomCode),
     deleteItem: (id) => run('DELETE FROM queue_items WHERE id = ?', id),
     swapPositions: (idA, idB) =>
       transaction(() => {
@@ -277,12 +284,11 @@ export function openDb(path = ':memory:') {
         run('INSERT OR REPLACE INTO pair_codes (code_hash, expires_at, email) VALUES (?, ?, ?)', codeHash, expiresAt, email);
       }),
     /** Gasta o código (uso único): { email } (o e-mail a que foi enviado, se houve) só se existia e não tinha vencido; senão null. */
-    consumePairCode: (codeHash, now) =>
-      transaction(() => {
-        const row = one('SELECT expires_at, email FROM pair_codes WHERE code_hash = ?', codeHash);
-        run('DELETE FROM pair_codes WHERE code_hash = ?', codeHash);
-        return row && row.expires_at > now ? { email: row.email ?? null } : null;
-      }),
+    consumePairCode: (codeHash, now) => {
+      // one statement deletes and reads the code: two requests with the same code can never both get it
+      const row = one('DELETE FROM pair_codes WHERE code_hash = ? RETURNING expires_at, email', codeHash);
+      return row && row.expires_at > now ? { email: row.email ?? null } : null;
+    },
 
     createSession: ({ id, deviceId, displayName, now }) =>
       run('INSERT INTO sessions (id, device_id, display_name, created_at, last_seen) VALUES (?, ?, ?, ?, ?)', id, deviceId, displayName, now, now),

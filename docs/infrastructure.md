@@ -82,6 +82,15 @@ The release steps are in [AGENTS.md → Release](../AGENTS.md#release).
 
 Every API image is published twice: as `latest` and as the short SHA of its commit. On the VM, `IMAGE_TAG=<sha> ./deploy.sh` pulls and starts that earlier image; the variable from the shell wins over the `.env`. The database stays as the newer version left it, so a migration must keep the earlier image working on it ([ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.md)).
 
+When the data itself has to go back, restore one of the copies `deploy.sh` keeps (see [Backups and data](#backups-and-data)), with the API stopped:
+
+```sh
+docker compose -f docker-compose.prod.yml --env-file .env exec api ls /data/backups     # the copies, newest last
+docker compose -f docker-compose.prod.yml --env-file .env stop api
+docker compose -f docker-compose.prod.yml --env-file .env run --rm --no-deps api sh -c 'cp /data/backups/<copy>.db /data/singalong.db'
+IMAGE_TAG=<sha> ./deploy.sh                                                              # or ./deploy.sh for the latest image
+```
+
 ## Settings
 
 The API reads environment variables ([`apps/api/src/config.js`](../apps/api/src/config.js)):
@@ -106,6 +115,6 @@ The self-hosted worker reads `YTDLP_COOKIES` and `YTDLP_COOKIES_POLICY` (`when-a
 
 ## Backups and data
 
-- **Rooms and queue**: the SQLite file in the `api-data` volume; Rooms idle for 24 hours are deleted. Nothing copies it automatically yet: step 3 of the [ROADMAP](ROADMAP.md) makes `deploy.sh` keep the last five copies.
+- **Rooms and queue**: the SQLite file in the `api-data` volume; Rooms idle for 24 hours are deleted. Before each deploy, `deploy.sh` has the running API copy it (`VACUUM INTO`) to `/data/backups` in the same volume and keeps the last five copies; if the copy fails, nothing is deployed.
 - **Songs**: `storage/cache/<video_id>/`, never in the repository or in an image (the repository is public). [`deploy/sync-library.sh`](../deploy/sync-library.sh) copies prepared songs to the VM when needed.
 - **Secrets**: `secrets/` and the VM's `.env`, both outside git.

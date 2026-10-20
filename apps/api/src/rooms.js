@@ -8,6 +8,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { cleanParts, clampBacking, clampGuide, clampOffset, clampPitch, nextPlayable, playOrder, swapTarget } from './queue-logic.js';
 import { createBucket, REACTION_KINDS } from './reactions.js';
+import { createSerializer } from './serial.js';
 import { extractVideoId } from './youtube.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sem 0/O/1/I/L: fácil de ditar e digitar
@@ -127,16 +128,14 @@ export function createRoomService({
   const lyricsCache = new Map(); // code -> {item_id, cues}: a letra da música que está tocando, enviada pela TV ao palco dos cantores
   const lastKeys = new Map(); // code -> último estado difundido (sem a posição)
   const touched = new Map(); // code -> última vez que gravamos last_active_at
-  const locks = new Map(); // code -> cauda da fila de operações da sala
   let timers = [];
   const wakes = new Set(); // despertadores do intervalo entre músicas (um por fim de fase)
 
-  /** Serializa as operações de uma sala: evita duas "avançar a fila" ao mesmo tempo. */
-  function withLock(code, fn) {
-    const run = (locks.get(code) ?? Promise.resolve()).then(fn, fn);
-    locks.set(code, run.catch(() => {}));
-    return run;
-  }
+  /** Serializes a Room's operations: every command that reads and then changes a Room runs alone, in the order it arrived. */
+  const withLock = createSerializer();
+
+  /** Broadcasts the Room's state after the commands queued before it, so a newer state is never followed by an older one. */
+  const republish = (code) => withLock(code, () => publish(code)).catch(() => {});
 
   function requireRoom(code) {
     const room = db.getRoom(normalizeCode(code));
@@ -419,9 +418,9 @@ export function createRoomService({
     createRoom({ sessionId = null } = {}) {
       for (let attempt = 0; attempt < 20; attempt++) {
         const code = newCode();
-        if (db.getRoom(code)) continue;
         const hostToken = newToken();
-        db.createRoom(code, hostToken, now(), sessionId, intermission.byDefault !== false);
+        // the insert itself refuses a code already taken, so two rooms created at once never share one
+        if (!db.createRoom(code, hostToken, now(), sessionId, intermission.byDefault !== false)) continue;
         return { code, host_token: hostToken };
       }
       throw new HttpError(503, 'no_room_code', 'Não consegui criar uma sala agora. Tente de novo.');
@@ -542,9 +541,14 @@ export function createRoomService({
       });
     },
 
-    skip(code, actor) {
+    /**
+     * Skips the song playing (Host only). With `itemId` (the song on the Host's screen), a song that already ended is not
+     * skipped again: otherwise a skip arriving right after the TV's "ended" would skip the next singer's song.
+     */
+    skip(code, actor, itemId = null) {
       return mutate(code, actor, (room) => {
         requireHost(room, actor);
+        if (itemId !== null && room.current_item_id !== itemId) return;
         finishCurrent(room.code, 'skipped');
       });
     },
@@ -609,12 +613,15 @@ export function createRoomService({
 
     /** Pontuação final enviada pela TV ao fim da música (só vale com a pontuação ligada e para o item que está tocando). */
     tvScore(code, itemId, score) {
-      const room = db.getRoom(normalizeCode(code));
-      const item = db.getItem(itemId);
-      if (!room?.scoring || !item || item.room_code !== room.code || item.status !== 'playing') return;
-      if (!Number.isInteger(score) || score < 0 || score > 100) return;
-      db.updateItem(item.id, { score });
-      this.tick().catch(() => {});
+      const normalized = normalizeCode(code);
+      return withLock(normalized, async () => {
+        const room = db.getRoom(normalized);
+        const item = db.getItem(itemId);
+        if (!room?.scoring || !item || item.room_code !== room.code || item.status !== 'playing') return;
+        if (!Number.isInteger(score) || score < 0 || score > 100) return;
+        db.updateItem(item.id, { score });
+        await publish(normalized);
+      });
     },
 
     setOffset(code, videoId, offset, actor) {
@@ -697,12 +704,12 @@ export function createRoomService({
       if (conn.role === 'controller' && cached && cached.item_id === room.current_item_id && socket.readyState === 1) {
         socket.send(JSON.stringify({ type: 'lyrics', item_id: cached.item_id, cues: cached.cues }));
       }
-      publish(room.code).catch(() => {});
+      republish(room.code);
       return {
         conn,
         leave() {
           remove();
-          publish(room.code).catch(() => {});
+          republish(room.code);
         },
       };
     },
@@ -723,22 +730,21 @@ export function createRoomService({
         const name = cleanName(message.name);
         if (name !== conn.name) {
           conn.name = name;
-          publish(code).catch(() => {});
+          republish(code);
         }
         return;
       }
       // uma reação (aplauso, fogo...): vai para a TV e para quem está olhando a TV ou o palco; conta para a música que toca
       if (conn.role === 'controller' && message?.type === 'reaction') {
         if (!REACTION_KINDS.includes(message.kind) || !conn.reactions.take(now())) return;
-        const room = db.getRoom(code);
-        if (!room) return;
-        if (room.current_item_id) db.addCheers(room.current_item_id, 1);
+        if (!db.getRoom(code)) return;
+        db.addCheersToCurrent(code, 1); // one statement: the cheer goes to the song playing when it arrives, never to the next one
         hub.broadcast(code, () => ({ type: 'reaction', kind: message.kind, name: conn.name }));
         return;
       }
       if (conn.role !== 'tv') return;
       if (!Number.isInteger(message?.item_id)) return;
-      if (message.type === 'score') this.tvScore(code, message.item_id, message.score);
+      if (message.type === 'score') this.tvScore(code, message.item_id, message.score).catch(() => {});
       else if (message.type === 'ended') this.tvEnded(code, message.item_id).catch(() => {});
       else if (message.type === 'position' && Number.isFinite(message.ms)) this.tvPosition(code, message.item_id, message.ms);
       else if (message.type === 'lyrics') this.tvLyrics(code, message.item_id, message.cues);

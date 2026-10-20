@@ -5,6 +5,7 @@
 // A nuvem sabe só um apelido de exibição e se o dono está online: nunca cookies, e-mail ou a conta do YouTube.
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { HttpError, generateCode } from './rooms.js';
+import { createSerializer } from './serial.js';
 import { parseVersion } from './version.js';
 
 export const PAIR_CODE_LENGTH = 8;
@@ -82,6 +83,9 @@ export function createAgentService({
 
   const online = (session) => Boolean(session) && !session.ended_at && now() - session.last_seen <= ONLINE_MS;
 
+  /** One device's session changes run one at a time: two "start session" at once must not leave two active sessions. */
+  const perDevice = createSerializer();
+
   return {
     /** Gera um código de pareamento de uso único (quem chama já provou ser o administrador do servidor). */
     startPairing(email = null) {
@@ -131,10 +135,12 @@ export function createAgentService({
     },
 
     /** Revoga o dispositivo e encerra a sessão dele. */
-    async revoke(device) {
-      const session = db.activeSessionOf(device.id);
-      if (session) await this.endSession(session);
-      db.revokeDevice(device.id, now());
+    revoke(device) {
+      return perDevice(device.id, async () => {
+        const session = db.activeSessionOf(device.id);
+        if (session) await this.endSession(session);
+        db.revokeDevice(device.id, now());
+      });
     },
 
     /**
@@ -145,18 +151,20 @@ export function createAgentService({
       const name = clean(displayName, MAX_NAME);
       if (!name) throw new HttpError(400, 'display_name_required', 'Escolha um apelido para a sessão.');
       const media = normalizeMediaBase(mediaBase); // valida antes de mexer em qualquer sessão
-      const current = db.activeSessionOf(device.id);
-      if (current && resumeId && current.id === resumeId) {
-        db.renameSession(current.id, name);
-        db.touchSession(current.id, now());
-        if (mediaBase !== undefined) db.setSessionMedia(current.id, media);
-        return db.getSession(current.id);
-      }
-      if (current) await this.endSession(current);
-      const id = newId();
-      db.createSession({ id, deviceId: device.id, displayName: name, now: now() });
-      db.setSessionMedia(id, media);
-      return db.getSession(id);
+      return perDevice(device.id, async () => {
+        const current = db.activeSessionOf(device.id);
+        if (current && resumeId && current.id === resumeId) {
+          db.renameSession(current.id, name);
+          db.touchSession(current.id, now());
+          if (mediaBase !== undefined) db.setSessionMedia(current.id, media);
+          return db.getSession(current.id);
+        }
+        if (current) await this.endSession(current);
+        const id = newId();
+        db.createSession({ id, deviceId: device.id, displayName: name, now: now() });
+        db.setSessionMedia(id, media);
+        return db.getSession(id);
+      });
     },
 
     /** O agente mudou de endereço de mídia (reiniciou o servidor local): a sessão passa a apontar para o novo. */
