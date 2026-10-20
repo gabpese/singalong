@@ -18,7 +18,7 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
 - Types live next to their module. The shapes the server sends stay in `lib/types.ts` until step 3.
 - `engines` becomes `>=24` in every app.
 
-### 2. The device token in the system vault, then release 1.4.2
+### 2. The device token in the system vault, then release 1.4.2 (done)
 
 **Security.** After pairing, the installable app keeps its device token as plain text in `config.json`, in the user's data folder (`apps/desktop/src/controller.js`), while the [TRD](TRD.md) planned the system vault. A backup, a synced copy of that folder or a disk read from another account exposes the token, and whoever holds it acts as that computer until the owner revokes it.
 

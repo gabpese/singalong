@@ -18,7 +18,7 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
 - Os tipos ficam ao lado do seu módulo. As formas que o servidor envia continuam em `lib/types.ts` até o passo 3.
 - O `engines` passa a `>=24` em todos os apps.
 
-### 2. O token do aparelho no cofre do sistema, e depois a versão 1.4.2
+### 2. O token do aparelho no cofre do sistema, e depois a versão 1.4.2 (feito)
 
 **Segurança.** Depois do pareamento, o app instalável guarda o token do aparelho em texto puro no `config.json`, na pasta de dados do usuário (`apps/desktop/src/controller.js`), enquanto o [TRD](TRD.pt-BR.md) previa o cofre do sistema. Um backup, uma cópia sincronizada dessa pasta ou um disco lido por outra conta expõe o token, e quem o tem age como aquele computador até o dono revogá-lo.
 
