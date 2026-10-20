@@ -82,6 +82,15 @@ Os passos da release estão no [AGENTS.pt-BR.md → Release](../AGENTS.pt-BR.md#
 
 Toda imagem da API é publicada duas vezes: como `latest` e com o SHA curto do seu commit. Na VM, `IMAGE_TAG=<sha> ./deploy.sh` baixa e sobe aquela imagem anterior; a variável do shell vence a do `.env`. O banco fica como a versão mais nova o deixou, então uma migração precisa manter a imagem anterior funcionando sobre ele ([ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)).
 
+Quando os próprios dados precisam voltar, restaure uma das cópias que o `deploy.sh` guarda (veja [Cópias e dados](#cópias-e-dados)), com a API parada:
+
+```sh
+docker compose -f docker-compose.prod.yml --env-file .env exec api ls /data/backups     # as cópias, a mais nova por último
+docker compose -f docker-compose.prod.yml --env-file .env stop api
+docker compose -f docker-compose.prod.yml --env-file .env run --rm --no-deps api sh -c 'cp /data/backups/<cópia>.db /data/singalong.db'
+IMAGE_TAG=<sha> ./deploy.sh                                                              # ou ./deploy.sh para a imagem mais nova
+```
+
 ## Ajustes
 
 A API lê variáveis de ambiente ([`apps/api/src/config.js`](../apps/api/src/config.js)):
@@ -106,6 +115,6 @@ O worker hospedado em casa lê `YTDLP_COOKIES` e `YTDLP_COOKIES_POLICY` (`when-a
 
 ## Cópias e dados
 
-- **Salas e fila**: o arquivo do SQLite no volume `api-data`; Salas paradas há 24 horas são apagadas. Nada o copia sozinho ainda: o passo 3 do [ROADMAP](ROADMAP.pt-BR.md) faz o `deploy.sh` guardar as cinco últimas cópias.
+- **Salas e fila**: o arquivo do SQLite no volume `api-data`; Salas paradas há 24 horas são apagadas. Antes de cada deploy, o `deploy.sh` pede à API em execução uma cópia dele (`VACUUM INTO`) em `/data/backups`, no mesmo volume, e guarda as cinco últimas; se a cópia falhar, nada é publicado.
 - **Músicas**: `storage/cache/<video_id>/`, nunca no repositório nem numa imagem (o repositório é público). O [`deploy/sync-library.sh`](../deploy/sync-library.sh) copia músicas preparadas para a VM quando preciso.
 - **Segredos**: `secrets/` e o `.env` da VM, os dois fora do git.

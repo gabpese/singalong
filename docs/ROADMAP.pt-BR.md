@@ -32,10 +32,9 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
 
 [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md). A API vai para a VM depois de cada pull request aceito. Até o passo 3 terminar, as migrações só criam tabelas e colunas, então a imagem anterior continua rodando sobre um banco já migrado.
 
-1. **Ainda em JavaScript.**
-   - Testes de concorrência para as regras que leem e depois gravam: duas músicas adicionadas ao mesmo tempo no limite da fila, um avanço duplo quando "a TV terminou" e "o Anfitrião pulou" chegam juntos, um código de pareamento ou um trabalho reservado duas vezes. Eles passam hoje e precisam continuar passando.
-   - Uma fila de comandos por Sala, na ordem de chegada, para as rotas HTTP, as mensagens do WebSocket e os timers do Intervalo.
-   - `UPDATE`s condicionais para os códigos de pareamento e a reserva de trabalhos.
+1. **Ainda em JavaScript (feito).**
+   - Testes de concorrência (`apps/api/test/concurrency.test.js`) para as regras que leem e depois gravam: músicas adicionadas ao mesmo tempo no limite por pessoa, "a TV terminou" e "o Anfitrião pulou" chegando juntos, uma nota enviada quando a música termina, movimentos ao mesmo tempo, um código de pareamento usado duas vezes, dois inícios de sessão, duas Salas com o mesmo código.
+   - A fila por Sala, na ordem de chegada (`src/serial.js`), já cobria as rotas HTTP, o "terminou" e os timers do Intervalo; a nota da TV e as difusões de quem entra e sai da sala agora também passam por ela. O "pular" nomeia a música da tela do Anfitrião, então nunca pula a do próximo cantor; as mudanças de sessão fazem fila por computador; uma reação, um código de Sala e um código de pareamento se resolvem cada um numa única instrução SQL. A reserva de trabalhos dos agentes fica no Redis ou na memória, não no SQLite, então o ORM não chega nela.
    - O `deploy.sh` copia o arquivo do SQLite com `VACUUM INTO` antes de cada deploy e guarda as cinco últimas cópias.
 2. **NestJS e MikroORM no lugar.**
    - O Nest sobe sobre a instância atual do Fastify; as rotas antigas continuam registradas como plugins do Fastify.

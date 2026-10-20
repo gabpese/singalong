@@ -32,10 +32,9 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
 
 [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.md). The API goes to the VM after each merged pull request. Until step 3 ends, migrations only add tables and columns, so the previous image keeps running on a migrated database.
 
-1. **Still in JavaScript.**
-   - Concurrency tests for the rules that read and then write: two songs added at once at the queue limit, a double advance when "the TV ended" and "the Host skipped" arrive together, a pairing code or a job claimed twice. They pass today and must keep passing.
-   - A first-in-first-out queue of commands per Room, for HTTP routes, WebSocket messages and Intermission timers.
-   - Conditional `UPDATE`s for pairing codes and job claims.
+1. **Still in JavaScript (done).**
+   - Concurrency tests (`apps/api/test/concurrency.test.js`) for the rules that read and then write: songs added at once at the per-person limit, "the TV ended" and "the Host skipped" arriving together, a score sent as the song ends, moves at once, a pairing code used twice, two session starts, two Rooms with the same code.
+   - The first-in-first-out queue per Room (`src/serial.js`) already covered the HTTP routes, "ended" and the Intermission timers; the TV's score and the publishes of people joining and leaving now go through it too. A skip names the song on the Host's screen, so it never skips the next singer's song; session changes queue per computer; a cheer, a Room code and a pairing code are each settled by one SQL statement. The agents' job claims live in Redis or in memory, not in SQLite, so the ORM does not reach them.
    - `deploy.sh` copies the SQLite file with `VACUUM INTO` before each deploy and keeps the last five copies.
 2. **NestJS and MikroORM in place.**
    - Nest boots on the existing Fastify instance; the old routes stay registered as Fastify plugins.
