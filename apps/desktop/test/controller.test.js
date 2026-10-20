@@ -55,6 +55,7 @@ async function make(options = {}) {
     assembleImpl: options.assembleImpl ?? (async ({ onProgress }) => { onProgress({ label: 'Baixando python', done: 5, total: 10 }); return { engine: 'cpu', engine_reason: 'sem placa' }; }),
     verifyImpl: options.verifyImpl ?? (async () => ({ ok: true, checks: [] })),
     detectBrowser: async () => options.browser ?? 'edge',
+    ...(options.openVault ? { openVault: options.openVault } : {}),
     pollMs: 40,
     restartMs: 20,
   });
@@ -318,9 +319,85 @@ test('desparear para o agente, revoga no servidor e apaga o token', async () => 
   const snap = await controller.unpair();
   assert.equal(snap.paired, false);
   assert.equal(snap.agent.status, 'stopped');
-  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).token, '');
+  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).token, undefined);
   assert.ok(calls.some((c) => c.method === 'DELETE' && c.url === '/agent/v1/devices/me'));
   sessionOpen = false;
+});
+
+/**
+ * A stand-in for the system vault: it "encrypts" by tagging and reversing the text with a key version, enough to show that the
+ * plain token never reaches the disk and that a rotated key re-encrypts it.
+ */
+function fakeVault({ protects = true, failDecrypt = false, keyVersion = 'k1' } = {}) {
+  return async () => ({
+    available: true,
+    protects,
+    encrypt: async (text) => Buffer.from(`${keyVersion}:${[...text].reverse().join('')}`).toString('base64'),
+    decrypt: async (sealed) => {
+      if (failDecrypt) throw new Error('cannot decrypt here');
+      const [version, reversed] = Buffer.from(sealed, 'base64').toString().split(':');
+      return { text: [...reversed].reverse().join(''), reEncrypt: version !== keyVersion };
+    },
+  });
+}
+
+/** A data folder as an older or another run left it: config.json plus a ready engine. */
+async function seed(config) {
+  const dataDir = await mkdtemp(join(tmpdir(), 'singalong-desk-'));
+  await writeFile(join(dataDir, 'config.json'), JSON.stringify(config));
+  await mkdir(join(dataDir, 'engine'), { recursive: true });
+  await writeFile(join(dataDir, 'engine', 'engine.json'), JSON.stringify({ complete: true, engine: 'cpu' }));
+  return dataDir;
+}
+
+const sealedWith = async (keyVersion, token) => (await fakeVault({ keyVersion })()).encrypt(token);
+
+test('the token reaches the disk only encrypted, and a restart decrypts it', async () => {
+  const { controller, dataDir } = await ready({ openVault: fakeVault() });
+  const file = await readFile(join(dataDir, 'config.json'), 'utf8');
+  assert.equal(file.includes('tok-1'), false);
+  assert.equal(JSON.parse(file).token, undefined);
+  assert.ok(JSON.parse(file).token_enc);
+  assert.equal(controller.snapshot().tokenProtected, true);
+
+  const again = createController({ dataDir, openVault: fakeVault(), detectBrowser: async () => 'edge' });
+  assert.equal((await again.init()).paired, true);
+  const { server } = await again.stats({ days: 7 }); // the server answers only to `Bearer tok-1`
+  assert.equal(server.days, 7);
+});
+
+test('a plain token left by an older version is encrypted on the first run', async () => {
+  const dataDir = await seed({ server: base, token: 'tok-1', device_name: 'PC' });
+  const controller = createController({ dataDir, openVault: fakeVault(), detectBrowser: async () => 'edge' });
+  assert.equal((await controller.init()).paired, true);
+  const saved = JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8'));
+  assert.equal(saved.token, undefined);
+  assert.equal(saved.token_enc, await sealedWith('k1', 'tok-1'));
+});
+
+test('a token encrypted under an older system key is stored again under the new one', async () => {
+  const dataDir = await seed({ server: base, token_enc: await sealedWith('k1', 'tok-1'), device_name: 'PC' });
+  const controller = createController({ dataDir, openVault: fakeVault({ keyVersion: 'k2' }), detectBrowser: async () => 'edge' });
+  assert.equal((await controller.init()).paired, true);
+  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).token_enc, await sealedWith('k2', 'tok-1'));
+});
+
+test('a token this computer cannot decrypt sends it back to pairing', async () => {
+  const dataDir = await seed({ server: base, token_enc: await sealedWith('k1', 'tok-1'), device_name: 'PC' });
+  const controller = createController({ dataDir, openVault: fakeVault({ failDecrypt: true }), detectBrowser: async () => 'edge' });
+  const snap = await controller.init();
+  assert.equal(snap.paired, false);
+  assert.equal(snap.phase, 'pair');
+  assert.equal(JSON.parse(await readFile(join(dataDir, 'config.json'), 'utf8')).token_enc, undefined);
+  assert.ok(snap.logs.some((entry) => entry.level === 'error' && /Pareie de novo/.test(entry.line)));
+});
+
+test('without a vault that protects it, the window is told the token is unprotected', async () => {
+  const fixedKey = await ready({ openVault: fakeVault({ protects: false }) });
+  assert.equal(fixedKey.controller.snapshot().tokenProtected, false);
+  const none = await ready();
+  assert.equal(none.controller.snapshot().tokenProtected, false);
+  assert.equal(JSON.parse(await readFile(join(none.dataDir, 'config.json'), 'utf8')).token, 'tok-1'); // no vault at all: plain text, as before
 });
 
 test('os registros são limitados e o texto do worker nunca é interpretado', async () => {

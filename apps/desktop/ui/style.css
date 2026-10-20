@@ -88,6 +88,7 @@ section.center #engine-progress { width: min(420px, 100%); display: flex; flex-d
 .step-head { display: flex; align-items: center; gap: 10px; }
 .welcome-foot { display: flex; flex-direction: column; gap: 4px; font-size: 12px; margin-top: 4px; }
 .welcome-foot .folder span { color: var(--text); word-break: break-all; }
+.welcome-foot .token-note { color: var(--warn); margin: 0; }
 @media (max-width: 820px) { .welcome { flex-direction: column; height: auto; } .welcome-art { flex: none; height: 200px; } .welcome-form { max-width: none; } }
 
 /* espera */

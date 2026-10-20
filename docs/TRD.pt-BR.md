@@ -62,7 +62,7 @@ Prefixo `/agent/v1`, autenticada por **token de dispositivo** (`Authorization: B
 | Rota | Função |
 |---|---|
 | `POST /sessions` · `DELETE /sessions/:id` | Inicia/encerra a sessão do agente (só apelido de exibição, sem dados da conta) |
-| `POST /pair/start` · `POST /pair/complete` | Pareamento: a página web mostra um **código de 8 caracteres (10 min)**; o agente o envia e recebe o token (guardado no cofre do sistema: Credential Manager no Windows) |
+| `POST /pair/start` · `POST /pair/complete` | Pareamento: a página web mostra um **código de 8 caracteres (10 min)**; o agente o envia e recebe o token (cifrado pelo cofre do sistema: DPAPI no Windows, o Keychain no macOS, o Secret Service no Linux) |
 | `POST /jobs/claim` (long-poll, 25 s) | Entrega o próximo job `{video_id, lyrics_source, lyrics_text?, artist?, title?}`, com reivindicação com expiração (visibility timeout), como o `XAUTOCLAIM` de hoje |
 | `POST /jobs/:id/progress` | `{status, stage, error?, error_code?, retry?}` (mesmo conteúdo do hash `job:<id>`) |
 | `POST /jobs/:id/complete` | Marca `ready` ou `needs_lyrics` |
@@ -316,7 +316,7 @@ O M1 foi dividido em três partes: **M1a** (armazenamento local: servidor local 
 - `ELECTRON_RUN_AS_NODE=1` (exportado pelo VS Code) faz o Electron rodar como Node puro; o teste remove isso. O modo "electron" do próprio Playwright não lida com `main` em ESM, então o teste da janela inicia o Electron direto e o controla pelo protocolo de depuração.
 
 **Decisões e o que falta**
-- O token fica no `config.json` da pasta do perfil do usuário (privada à conta do Windows); protegê-lo com a criptografia do sistema (`safeStorage`) pode vir com o instalador.
+- O token fica no `config.json` da pasta do perfil do usuário, cifrado pelo cofre do sistema por meio do `safeStorage` do Electron (`token_enc`, desde a 1.4.2). Um token que o computador não consegue decifrar (um perfil copiado, um chaveiro trocado) o leva de volta ao pareamento. Onde o sistema não oferece cofre (Linux sem Secret Service), o token fica legível e a tela inicial avisa.
 - A pasta da biblioteca é fixa (`<dados>/library`) por enquanto; escolher outra pasta fica para depois.
 - O código de pareamento ainda é gerado pelo administrador do servidor (`ADMIN_TOKEN`); um jeito mais amigável de parear sem pedir código fica para a v2.
 - Não testado numa máquina limpa: isso é do M4.

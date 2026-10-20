@@ -105,6 +105,7 @@ function render(s) {
   if (document.activeElement !== $('welcome-nickname') && !$('welcome-nickname').value) $('welcome-nickname').value = s.nickname ?? '';
   if (!$('pair-server').value) $('pair-server').value = s.defaultServer ?? '';
   $('welcome-server').textContent = s.server ? s.server.replace(/^https?:\/\//, '') : '';
+  $('token-note').hidden = s.tokenProtected !== false;
   $('welcome-error').hidden = s.agent.status !== 'auth_error';
   $('welcome-error').textContent = s.agent.status === 'auth_error' ? s.agent.error ?? '' : '';
 

@@ -3,7 +3,7 @@
 // Na CI roda sob xvfb (Linux) ou direto (Windows).
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -137,6 +137,14 @@ test('o app: parear, iniciar a sessão, criar sala, importar com erro legível e
   assert.equal(await id('screen-home').isHidden(), true); // as outras opções só aparecem com a sessão
   await shot('1b-inicio');
   assert.equal(await id('error').isHidden(), true);
+
+  // the device token reaches the disk only through the system vault (DPAPI on Windows, where CI runs this test)
+  if (process.platform === 'win32') {
+    const saved = JSON.parse(await readFile(join(userData, 'config.json'), 'utf8'));
+    assert.equal(saved.token, undefined);
+    assert.ok(saved.token_enc);
+    assert.equal(await id('token-note').isHidden(), true);
+  }
 
   // o aviso de atualização do servidor aparece
   await id('update-banner').waitFor();
