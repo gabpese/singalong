@@ -115,7 +115,7 @@ Salas e fila ficam num SQLite no volume `api-data` do Docker.
 | `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair, scoring, voice, voice_volume, melody_bars}` | controle e ajustes da sala (anfitrião) |
 | `PUT /api/rooms/:code/songs/:id/parts {parts}` | quem canta cada linha da letra num dueto (`a b * -`; os cantores ou o anfitrião) |
 | `PUT /api/rooms/:code/songs/:id/offset {offset}` | ajuste da letra, em segundos (anfitrião) |
-| `WS /api/rooms/:code/ws?role=tv\|controller` | estado em tempo real; a TV envia `ended` e `position` |
+| `WS /api/rooms/ws?code=…&role=tv\|controller` | estado em tempo real; a TV envia `ended` e `position` |
 | `GET /api/search?q=` | pesquisa vídeos no YouTube (atendida pelo worker; cache de 10 min) |
 | `POST /api/songs` · `GET /api/songs` · `GET /api/songs/:id` · `PUT /api/songs/:id/lyrics` | músicas e processamento (usados pela sala) |
 | `GET /media/cache/<id>/...` | arquivos, com `Range` |

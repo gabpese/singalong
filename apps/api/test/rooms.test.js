@@ -58,10 +58,10 @@ async function newRoom() {
 }
 
 /** Conexão WebSocket simulada: guarda o que o servidor enviou. */
-function fakeConn(code, { role = 'controller', client = ANA, host } = {}) {
+async function fakeConn(code, { role = 'controller', client = ANA, host } = {}) {
   const sent = [];
   const socket = { readyState: 1, send: (data) => sent.push(JSON.parse(data)), ping() {}, terminate() {} };
-  const session = app.rooms.connect(code, { socket, role, clientId: client, hostToken: host });
+  const session = await app.rooms.connect(code, { socket, role, clientId: client, hostToken: host });
   const lastState = () => sent.findLast((m) => m.type === 'state')?.state;
   return { session, sent, lastState };
 }
@@ -138,7 +138,7 @@ test('música ainda em processamento mantém a posição e a próxima pronta toc
   // o processamento termina: o relógio da sala (tick) a coloca para tocar
   await seed(SLOW);
   jobs.update(SLOW, { status: 'ready' });
-  const conn = fakeConn(code);
+  const conn = await fakeConn(code);
   await app.rooms.tick();
   const state = conn.lastState();
   assert.deepEqual([state.playback, state.queue[0].video_id, state.queue[0].status], ['playing', SLOW, 'playing']);
@@ -149,7 +149,7 @@ test('tick difunde o progresso do processamento e o estado chega só a quem est�
   const { code } = await newRoom();
   const id = 'progress001';
   await add(code, id);
-  const conn = fakeConn(code);
+  const conn = await fakeConn(code);
   jobs.update(id, { status: 'processing', stage: 'separating' });
   await app.rooms.tick();
   assert.equal(conn.lastState().queue[0].song.stage, 'separating');
@@ -378,14 +378,16 @@ test('persistência: salas e fila sobrevivem a um reinício (mesmo arquivo SQLit
   first.updateRoom('ABCD', { fair: 1 });
   first.close();
 
-  const second = openDb(path);
-  assert.equal(second.getRoom('ABCD').fair, 1);
-  const [restored] = second.listActive('ABCD');
-  assert.deepEqual([restored.id, restored.video_id, restored.pitch, restored.position], [id, READY_A, 2, 1]);
-  assert.equal(second.deleteInactiveRooms(2000), 1); // limpeza de salas paradas
-  assert.equal(second.getRoom('ABCD'), null);
-  assert.deepEqual(second.listActive('ABCD'), []); // os itens vão junto (ON DELETE CASCADE)
-  second.close();
+  // the API starts again on the same file
+  const second = await buildApp({ config: { dbPath: path, publicDir: root }, storage: new LocalStorage(root), jobs });
+  const state = await second.rooms.getState('ABCD', { clientId: ANA, hostToken: '' });
+  assert.equal(state.fair, true);
+  const [restored] = state.queue;
+  assert.deepEqual([restored.id, restored.video_id, restored.pitch], [id, READY_A, 2]);
+  assert.equal(await second.rooms.deleteInactiveRooms(2000), 1); // limpeza de salas paradas
+  await assert.rejects(second.rooms.getState('ABCD', { clientId: ANA, hostToken: '' }), { status: 404 });
+  assert.equal(second.db.connection.prepare("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = 'ABCD'").get().n, 0); // os itens vão junto (ON DELETE CASCADE)
+  await second.close();
 });
 
 test('WebSocket real: estado inicial, TV avisa o fim, posição só vai para os controles', async () => {
@@ -396,7 +398,7 @@ test('WebSocket real: estado inicial, TV avisa o fim, posição só vai para os 
   await app.listen({ port: 0, host: '127.0.0.1' });
   const { port } = app.server.address();
   const open = (query) => new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/api/rooms/${code}/ws?${query}`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/api/rooms/ws?code=${code}&${query}`);
     const messages = [];
     ws.on('message', (data) => messages.push(JSON.parse(String(data))));
     ws.on('open', () => resolve({ ws, messages }));
@@ -437,7 +439,7 @@ test('WebSocket real: estado inicial, TV avisa o fim, posição só vai para os 
   await until(() => controller.messages.findLast((m) => m.type === 'state')?.state.tv_connected === false, 'TV desconectada');
   controller.ws.close();
 
-  const bad = new WebSocket(`ws://127.0.0.1:${port}/api/rooms/ZZZZ/ws?role=tv`);
+  const bad = new WebSocket(`ws://127.0.0.1:${port}/api/rooms/ws?code=ZZZZ&role=tv`);
   const code1008 = await new Promise((resolve) => bad.on('close', (c) => resolve(c)));
   assert.equal(code1008, 1008); // sala inexistente
 });
@@ -498,8 +500,8 @@ test('a melodia de referência só aparece quando existe no cache', async () => 
 
 test('avançar/voltar a música: só o anfitrião, só com música tocando, e quem executa é a TV', async () => {
   const { code, host } = await newRoom();
-  const tv = fakeConn(code, { role: 'tv' });
-  const ctrl = fakeConn(code);
+  const tv = await fakeConn(code, { role: 'tv' });
+  const ctrl = await fakeConn(code);
   assert.equal((await call('POST', `/rooms/${code}/player/seek`, { host, body: { seconds: 10 } })).status, 200); // nada tocando: ignorado
   const a = (await add(code, READY_A)).body;
   assert.equal((await call('POST', `/rooms/${code}/player/seek`, { client: BIA, body: { seconds: 10 } })).status, 403);
@@ -511,7 +513,7 @@ test('avançar/voltar a música: só o anfitrião, só com música tocando, e qu
 
 test('mudar a posição da música: a barra arrastada manda o ponto de destino (`to`), exclusivo com o salto relativo', async () => {
   const { code, host } = await newRoom();
-  const tv = fakeConn(code, { role: 'tv' });
+  const tv = await fakeConn(code, { role: 'tv' });
   const a = (await add(code, READY_A)).body;
   const seek = (body, opts = { host }) => call('POST', `/rooms/${code}/player/seek`, { ...opts, body });
   assert.equal((await seek({ to: 95.5 })).status, 200);
@@ -592,4 +594,17 @@ test('guia de melodia: só o anfitrião liga, começa desligado e um ajuste não
   assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: { scoring: true } })).body.melody_bars, true); // outro ajuste não o desliga
   assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: { melody_bars: 'sim' } })).status, 400);
   assert.equal((await call('PATCH', `/rooms/${code}`, { host, body: { melody_bars: false } })).body.melody_bars, false);
+});
+
+test('playing a song records when it played and keeps its lyrics offset', async () => {
+  const { code, host } = await newRoom();
+  await add(code, READY_A); // plays now
+  await add(code, READY_B);
+  assert.equal((await call('PUT', `/rooms/${code}/songs/${READY_B}/offset`, { host, body: { offset: 2.5 } })).status, 200);
+  await call('POST', `/rooms/${code}/player/skip`, { host }); // READY_B goes on
+  const state = (await call('GET', `/rooms/${code}`)).body;
+  assert.deepEqual([state.queue[0].video_id, state.queue[0].status, state.queue[0].lyric_offset], [READY_B, 'playing', 2.5]);
+  const row = app.db.connection.prepare('SELECT lyric_offset, last_played_at FROM song_settings WHERE video_id = ?').get(READY_B);
+  assert.equal(row.lyric_offset, 2.5);
+  assert.ok(row.last_played_at > 0);
 });

@@ -62,8 +62,8 @@ Singalong uses no full-stack framework: it composes these pieces ([ADR 0016](adr
 
 | Piece | Role |
 |---|---|
-| Fastify (`@fastify/websocket`) | HTTP server and WebSockets |
-| NestJS | The API's modules and dependency injection, on the same Fastify (the areas move in one by one) |
+| Fastify | HTTP server, under NestJS |
+| NestJS | The API's modules and dependency injection, on the same Fastify, and the Room's WebSocket gateway (`@nestjs/platform-ws`, [ADR 0018](adr/0018-room-websocket-on-a-nest-gateway.md)) |
 | MikroORM | The database layer over SQLite: entities and migrations (`apps/api/src/database/`) |
 | React | The pages' interface |
 | Vite | Builds the four pages |
@@ -76,7 +76,7 @@ Singalong uses no full-stack framework: it composes these pieces ([ADR 0016](adr
 
 | Term | Code |
 |---|---|
-| Room, Queue, Turn, Intermission | `apps/api/src/rooms.js` (state and rules), `apps/api/src/queue-logic.js` (order, Fair rotation) |
+| Room, Queue, Turn, Intermission | `apps/api/src/rooms/` (`room.service.ts` for state and rules, `queue-logic.ts` for order and the Fair rotation, `rooms.gateway.ts` for the WebSocket) |
 | TV | `apps/web/src/tv/` (`TvPage.tsx`, `controller.ts` for sound and scoring, `Interlude.tsx`, `Lobby.tsx`) |
 | Phone (Room page) | `apps/web/src/room/` |
 | Stage | `apps/web/src/stage/StagePage.tsx` |
@@ -148,7 +148,7 @@ Each phase lasts `INTERMISSION_APPLAUSE_SECONDS` and `INTERMISSION_STAGE_SECONDS
 
 ### Real-time messages
 
-One WebSocket per device (`/api/rooms/:code/ws?role=tv|controller`):
+One WebSocket per device (`/api/rooms/ws?code=…&role=tv|controller`):
 
 | Message | From → to | Meaning |
 |---|---|---|
@@ -188,8 +188,8 @@ The agent only makes outbound requests, so it works behind any home router witho
 
 ```
 apps/
-  api/        Node API (NestJS on Fastify, MikroORM): src/app.ts, src/database/, Nest areas in src/{admin,release,cache,songs,agents}/,
-              the Rooms still on Fastify in src/rooms.js and src/routes/
+  api/        Node API (NestJS on Fastify, MikroORM): src/app.ts, src/database/, one folder per area in
+              src/{admin,release,cache,songs,agents,rooms}/
   web/        React + Vite: src/{landing,room,tv,stage,ui,lib,i18n,styles}, e2e/ (Playwright)
   worker/     Python: singalong_worker/ (pipeline, runner, align, lyrics...), tests/
   desktop/    Electron: src/ (main, controller), ui/ (the app's own screens)

@@ -3,9 +3,9 @@ import type { Static } from '@sinclair/typebox';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { JobStore } from '../app.ts';
 import { AgentService } from '../agents/agent.service.ts';
-import type { LegacyServices } from '../legacy.module.ts';
 import { RateLimit } from '../rate-limit.guard.ts';
-import { JOBS, ROOMS } from '../tokens.ts';
+import { RoomService } from '../rooms/room.service.ts';
+import { JOBS } from '../tokens.ts';
 import { TypeBoxPipe } from '../validation.ts';
 import { extractVideoId } from '../youtube.js';
 import { ExportBody, ExportQuery, LyricsBody, missingLyricsText, SearchQuery, SongBody, SongIdParams } from './song.schemas.ts';
@@ -26,7 +26,7 @@ export class SongsController {
   constructor(
     private readonly songs: SongService,
     @Inject(JOBS) private readonly jobs: JobStore,
-    @Inject(ROOMS) private readonly rooms: LegacyServices['rooms'],
+    private readonly rooms: RoomService,
     private readonly agents: AgentService,
   ) {}
 
@@ -34,7 +34,7 @@ export class SongsController {
    * Where the request goes: the X-Room header says which Room it comes from. If the Room has a Session, its owner's agent
    * answers; with no header (or a Room without a Session), the classic worker. A Room that does not exist: 404.
    */
-  private sessionOf(request: FastifyRequest): string | null {
+  private async sessionOf(request: FastifyRequest): Promise<string | null> {
     const code = String(request.headers['x-room'] ?? '');
     return ROOM_HEADER.test(code) ? this.rooms.sessionIdOf(code) : null;
   }
@@ -43,7 +43,7 @@ export class SongsController {
   @Get('search')
   @RateLimit('search', 'Muitas buscas seguidas. Espere alguns segundos e tente de novo.')
   async search(@Query(new TypeBoxPipe(SearchQuery)) { q }: Static<typeof SearchQuery>, @Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
-    const sessionId = this.sessionOf(request);
+    const sessionId = await this.sessionOf(request);
     if (sessionId && !(await this.agents.isOnline(sessionId))) {
       reply.code(503);
       return { error: 'owner_offline', message: 'O dono da sessão está desconectado. Cole o link do vídeo ou tente mais tarde.' };
@@ -60,8 +60,8 @@ export class SongsController {
 
   /** The library: with the X-Room of a Room with local storage, the owner's catalog; otherwise, the server's. */
   @Get('songs')
-  list(@Req() request: FastifyRequest) {
-    return this.songs.list({ sessionId: this.sessionOf(request) });
+  async list(@Req() request: FastifyRequest) {
+    return this.songs.list({ sessionId: await this.sessionOf(request) });
   }
 
   /** Adds a link: it uses the cache when ready; otherwise it creates a job (or reuses the one under way). */
@@ -76,7 +76,7 @@ export class SongsController {
       reply.code(400);
       return LYRICS_TEXT_REQUIRED;
     }
-    const result = await this.songs.request(id, body, { sessionId: this.sessionOf(request) });
+    const result = await this.songs.request(id, body, { sessionId: await this.sessionOf(request) });
     if (result.error) { // an imported song's id never passes extractVideoId: this branch only keeps the types honest
 
       reply.code(404);
@@ -92,7 +92,7 @@ export class SongsController {
 
   @Get('songs/:id')
   async describe(@Param(new TypeBoxPipe(SongIdParams)) { id }: Static<typeof SongIdParams>, @Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
-    const song = await this.songs.describe(id, { sessionId: this.sessionOf(request) });
+    const song = await this.songs.describe(id, { sessionId: await this.sessionOf(request) });
     if (song) return song;
     reply.code(404);
     return { error: 'not_found' };
@@ -107,7 +107,7 @@ export class SongsController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const result = await this.songs.requestExport(id, body.pitch ?? 0, { sessionId: this.sessionOf(request) });
+    const result = await this.songs.requestExport(id, body.pitch ?? 0, { sessionId: await this.sessionOf(request) });
     if ('error' in result) {
       reply.code(result.error === 'not_found' ? 404 : 409);
       return result.error === 'not_found' ? { error: 'not_found' } : { error: 'not_ready', message: 'A música ainda está sendo preparada.' };
@@ -117,8 +117,8 @@ export class SongsController {
   }
 
   @Get('songs/:id/export')
-  exportInfo(@Param(new TypeBoxPipe(SongIdParams)) { id }: Static<typeof SongIdParams>, @Query(new TypeBoxPipe(ExportQuery)) query: Static<typeof ExportQuery>, @Req() request: FastifyRequest) {
-    return this.songs.exportInfo(id, query.pitch ?? 0, { sessionId: this.sessionOf(request) });
+  async exportInfo(@Param(new TypeBoxPipe(SongIdParams)) { id }: Static<typeof SongIdParams>, @Query(new TypeBoxPipe(ExportQuery)) query: Static<typeof ExportQuery>, @Req() request: FastifyRequest) {
+    return this.songs.exportInfo(id, query.pitch ?? 0, { sessionId: await this.sessionOf(request) });
   }
 
   /** Chooses or changes the lyrics' source (the cached instrumental is reused; only the lyrics are redone). */
@@ -133,7 +133,7 @@ export class SongsController {
       reply.code(400);
       return LYRICS_TEXT_REQUIRED;
     }
-    const result = await this.songs.setLyrics(id, lyrics, { artist, title }, { sessionId: this.sessionOf(request) });
+    const result = await this.songs.setLyrics(id, lyrics, { artist, title }, { sessionId: await this.sessionOf(request) });
     if (result.error) {
       const [status, answer] = LYRICS_REFUSALS[result.error];
       reply.code(status);

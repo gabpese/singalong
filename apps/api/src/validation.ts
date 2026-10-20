@@ -1,7 +1,10 @@
 import type { PipeTransform } from '@nestjs/common';
-import type { Static, TSchema } from '@sinclair/typebox';
+import { type Static, type TSchema, Type } from '@sinclair/typebox';
 import { Ajv, type ValidateFunction } from 'ajv';
-import { HttpError } from './rooms.js';
+import { HttpError } from './http-error.ts';
+
+/** One of these strings, as a JSON Schema enum: a mismatch reads "must be equal to one of the allowed values". */
+export const OneOf = <const T extends string>(values: readonly T[]) => Type.Unsafe<T>({ type: 'string', enum: [...values] });
 
 /**
  * The validator Fastify uses for its routes, with Fastify's default options: simple types are coerced (a query's "2" becomes

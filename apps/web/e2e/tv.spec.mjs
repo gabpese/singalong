@@ -250,7 +250,7 @@ test('sala de espera: não há limite de cantores; passando de 7, o último luga
   // dez celulares conectados (o mesmo WebSocket da sala que o celular abre)
   await page.evaluate((code) => {
     window.phones = Array.from({ length: 10 }, (_, i) =>
-      new WebSocket(`ws://${location.host}/api/rooms/${code}/ws?role=controller&client=lobby-phone-${i}&name=Pessoa${i}`));
+      new WebSocket(`ws://${location.host}/api/rooms/ws?code=${code}&role=controller&client=lobby-phone-${i}&name=Pessoa${i}`));
   }, room.code);
   await expect(page.getByText('10 cantores conectados')).toBeVisible();
   await expect(page.locator('.slot.filled')).toHaveCount(6);
@@ -270,7 +270,7 @@ test('o bichinho de quem canta aparece ao lado do nome; num dueto aceito aparece
   // a Bia está na sala (um celular conectado), para poder ser convidada
   await page.goto(room.tvUrl);
   await page.evaluate((code) => {
-    window.bia = new WebSocket(`ws://${location.host}/api/rooms/${code}/ws?role=controller&client=client-bia-0001&name=Bia`);
+    window.bia = new WebSocket(`ws://${location.host}/api/rooms/ws?code=${code}&role=controller&client=client-bia-0001&name=Bia`);
   }, room.code);
   await expect.poll(async () => (await roomState(request, room.code)).people.length).toBe(1);
   const itemId = await addToQueue(request, room.code, SONGS.alpha, { client: ANA, name: 'Ana' });

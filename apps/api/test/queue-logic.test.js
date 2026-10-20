@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampOffset, clampPitch, fairOrder, nextPlayable, swapTarget } from '../dist/queue-logic.js';
+import { clampOffset, clampPitch, fairOrder, nextPlayable, swapTarget } from '../dist/rooms/queue-logic.js';
 
-const item = (id, video_id, client_id) => ({ id, video_id, client_id });
+const item = (id, videoId, clientId) => ({ id, videoId, clientId });
 
 test('clampPitch e clampOffset', () => {
   assert.equal(clampPitch(3.6), 4);

@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { buildApp } from '../dist/app.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
-import { sanitizeCues } from '../dist/rooms.js';
+import { RoomsGateway } from '../dist/rooms/rooms.gateway.js';
+import { sanitizeCues } from '../dist/rooms/rooms.js';
 import { LocalStorage } from '../dist/storage.js';
 
 const SONG = 'songAlpha01';
@@ -31,11 +32,14 @@ before(async () => {
 
 after(() => app.close());
 
-function fakeConn(code, role) {
+/** A device connected through the gateway, as a real socket would be (the gateway is the one that knows who is the TV). */
+async function fakeConn(code, role) {
   const sent = [];
-  const socket = { readyState: 1, send: (data) => sent.push(JSON.parse(data)), ping() {}, terminate() {} };
-  const session = app.rooms.connect(code, { socket, role, clientId: ANA, hostToken: '' });
-  return { session, sent, lyrics: () => sent.filter((m) => m.type === 'lyrics') };
+  const socket = { readyState: 1, send: (data) => sent.push(JSON.parse(data)), ping() {}, terminate() {}, close() {}, on() {} };
+  const gateway = new RoomsGateway(app.rooms);
+  gateway.handleConnection(socket, { url: `/api/rooms/ws?code=${code}&role=${role}&client=${ANA}` });
+  await socket.joined;
+  return { gateway, socket, sent, lyrics: () => sent.filter((m) => m.type === 'lyrics') };
 }
 
 async function roomPlaying() {
@@ -44,33 +48,33 @@ async function roomPlaying() {
   return { code: room.code, itemId: add.json().item_id };
 }
 
-const tvSends = (code, conn, message) => app.rooms.onMessage(code, conn.session.conn, JSON.stringify(message));
+const tvSends = (conn, message) => conn.gateway.lyrics(conn.socket, message);
 
 test('a letra mandada pela TV chega aos celulares (não à própria TV) e quem entra depois a recebe', async () => {
   const { code, itemId } = await roomPlaying();
-  const phone = fakeConn(code, 'controller');
-  const tv = fakeConn(code, 'tv');
-  tvSends(code, tv, { type: 'lyrics', item_id: itemId, cues: CUES });
+  const phone = await fakeConn(code, 'controller');
+  const tv = await fakeConn(code, 'tv');
+  await tvSends(tv, { type: 'lyrics', item_id: itemId, cues: CUES });
   assert.deepEqual(phone.lyrics(), [{ type: 'lyrics', item_id: itemId, cues: CUES }]);
   assert.deepEqual(tv.lyrics(), []);
 
-  const late = fakeConn(code, 'controller'); // o palco abre depois de a música começar
+  const late = await fakeConn(code, 'controller'); // o palco abre depois de a música começar
   assert.deepEqual(late.lyrics(), [{ type: 'lyrics', item_id: itemId, cues: CUES }]);
-  const anotherTv = fakeConn(code, 'tv');
+  const anotherTv = await fakeConn(code, 'tv');
   assert.deepEqual(anotherTv.lyrics(), []);
 });
 
 test('só a TV manda a letra, só da música que está tocando e só se estiver bem formada', async () => {
   const { code, itemId } = await roomPlaying();
-  const phone = fakeConn(code, 'controller');
-  const other = fakeConn(code, 'controller');
-  tvSends(code, other, { type: 'lyrics', item_id: itemId, cues: CUES }); // um celular não tem esse poder
-  const tv = fakeConn(code, 'tv');
-  tvSends(code, tv, { type: 'lyrics', item_id: itemId + 99, cues: CUES }); // não é a música atual
-  tvSends(code, tv, { type: 'lyrics', item_id: itemId, cues: [{ start: 'x', end: 2, text: 'a' }] });
-  tvSends(code, tv, { type: 'lyrics', item_id: itemId, cues: 'lixo' });
+  const phone = await fakeConn(code, 'controller');
+  const other = await fakeConn(code, 'controller');
+  await tvSends(other, { type: 'lyrics', item_id: itemId, cues: CUES }); // um celular não tem esse poder
+  const tv = await fakeConn(code, 'tv');
+  await tvSends(tv, { type: 'lyrics', item_id: itemId + 99, cues: CUES }); // não é a música atual
+  await tvSends(tv, { type: 'lyrics', item_id: itemId, cues: [{ start: 'x', end: 2, text: 'a' }] });
+  await tvSends(tv, { type: 'lyrics', item_id: itemId, cues: 'lixo' });
   assert.deepEqual(phone.lyrics(), []);
-  assert.deepEqual(fakeConn(code, 'controller').lyrics(), []); // nada ficou guardado
+  assert.deepEqual((await fakeConn(code, 'controller')).lyrics(), []); // nada ficou guardado
 });
 
 test('sanitizeCues limpa, limita e recusa o que não presta', () => {

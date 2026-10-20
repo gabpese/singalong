@@ -1,7 +1,7 @@
 import { type CanActivate, createParamDecorator, type ExecutionContext, Injectable } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import type { Device } from '../database/entities.ts';
-import { HttpError } from '../rooms.js';
+import { HttpError } from '../http-error.ts';
 import { AgentService } from './agent.service.ts';
 
 /** A request the guard let through: it carries the device that sent it. */

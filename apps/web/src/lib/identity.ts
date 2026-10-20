@@ -90,7 +90,7 @@ export function roomSocketUrl(code: string, role: SocketRole): string {
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   const host = role === 'controller' ? hostToken(code) : '';
   const name = role === 'controller' && userName() ? `&name=${encodeURIComponent(userName())}` : '';
-  return `${scheme}://${location.host}/api/rooms/${code}/ws?role=${role}&client=${clientId()}${host ? `&host=${host}` : ''}${name}`;
+  return `${scheme}://${location.host}/api/rooms/ws?code=${code}&role=${role}&client=${clientId()}${host ? `&host=${host}` : ''}${name}`;
 }
 
 /** A WebSocket that reconnects by itself (the TV dropped the Wi-Fi, the API restarted...). A close with 1008 = the Room does not exist: no retry. */

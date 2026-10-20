@@ -4,9 +4,13 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { MikroORM } from '@mikro-orm/core';
 import { buildApp } from '../dist/app.js';
+import { ormOptions } from '../dist/database/orm.js';
 import { openDb } from '../dist/db.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
+import { RoomService } from '../dist/rooms/room.service.js';
+import { RoomsGateway } from '../dist/rooms/rooms.gateway.js';
 import { LocalStorage } from '../dist/storage.js';
 
 const SONGS = ['statSongA01', 'statSongB02', 'statSongC03'];
@@ -49,12 +53,17 @@ async function owner() {
 const add = (code, videoId, client, name) =>
   app.inject({ method: 'POST', url: `/api/rooms/${code}/queue`, headers: { 'x-client-id': client }, payload: { video_id: videoId, name, artist: 'A', title: 'T' } });
 
-function fakeConn(code, role, client) {
-  const socket = { readyState: 1, send() {}, ping() {}, terminate() {} };
-  return app.rooms.connect(code, { socket, role, clientId: client, hostToken: '', name: role === 'controller' ? 'Plateia' : '' }).conn;
+/** A device connected through the gateway, as a real socket would be. */
+async function fakeConn(code, role, client) {
+  const socket = { readyState: 1, send() {}, ping() {}, terminate() {}, close() {}, on() {} };
+  const gateway = new RoomsGateway(app.rooms);
+  gateway.handleConnection(socket, { url: `/api/rooms/ws?code=${code}&role=${role}&client=${client}${role === 'controller' ? '&name=Plateia' : ''}` });
+  await socket.joined;
+  return { gateway, socket };
 }
 
-const msg = (code, conn, message) => app.rooms.onMessage(code, conn, JSON.stringify(message));
+/** What the socket sends: the gateway's handler of that message type (hello, reaction, score, ended...). */
+const msg = (conn, message) => conn.gateway[message.type](conn.socket, message);
 const state = async (code) => (await app.inject({ method: 'GET', url: `/api/rooms/${code}`, headers: { 'x-client-id': ANA } })).json();
 const stats = (headers, query = '') => agentCall('GET', `/stats${query}`, headers);
 
@@ -66,15 +75,15 @@ test('depois de músicas cantadas, o dono vê os totais, as mais tocadas, quem m
   await add(room.code, SONGS[0], BIA, 'Bia'); // a mesma música pela segunda vez
   await add(room.code, SONGS[2], ANA, 'Ana'); // esta vai ser pulada
 
-  const tv = fakeConn(room.code, 'tv', 'tv-client-0001');
-  const phone = fakeConn(room.code, 'controller', 'client-caio-0001');
+  const tv = await fakeConn(room.code, 'tv', 'tv-client-0001');
+  const phone = await fakeConn(room.code, 'controller', 'client-caio-0001');
   const playNext = async ({ score, cheers, end = true }) => {
     const current = (await state(room.code)).current_item_id;
     assert.ok(current, 'tem música tocando');
-    for (let i = 0; i < cheers; i++) msg(room.code, phone, { type: 'reaction', kind: 'clap' });
-    if (score !== undefined) msg(room.code, tv, { type: 'score', item_id: current, score });
+    for (let i = 0; i < cheers; i++) await msg(phone, { type: 'reaction', kind: 'clap' });
+    if (score !== undefined) await msg(tv, { type: 'score', item_id: current, score });
     if (end) {
-      msg(room.code, tv, { type: 'ended', item_id: current });
+      await msg(tv, { type: 'ended', item_id: current });
       await new Promise((resolve) => setTimeout(resolve, 30));
       await app.rooms.tick();
     }
@@ -105,9 +114,9 @@ test('cada dono só vê as próprias salas; sem token é 401; os dias são valid
   const one = await owner();
   const other = await owner();
   await add(one.room.code, SONGS[1], ANA, 'Ana');
-  const tv = fakeConn(one.room.code, 'tv', 'tv-client-0002');
+  const tv = await fakeConn(one.room.code, 'tv', 'tv-client-0002');
   const current = (await state(one.room.code)).current_item_id;
-  msg(one.room.code, tv, { type: 'ended', item_id: current });
+  await msg(tv, { type: 'ended', item_id: current });
   await new Promise((resolve) => setTimeout(resolve, 30));
 
   assert.equal((await stats(one.headers)).json().totals.songs, 1);
@@ -121,19 +130,24 @@ test('cada dono só vê as próprias salas; sem token é 401; os dias são valid
 test('o histórico sobrevive à sala: apagar a sala não apaga as estatísticas do dono', async () => {
   const { headers, room } = await owner();
   await add(room.code, SONGS[0], ANA, 'Ana');
-  const tv = fakeConn(room.code, 'tv', 'tv-client-0003');
-  msg(room.code, tv, { type: 'ended', item_id: (await state(room.code)).current_item_id });
+  const tv = await fakeConn(room.code, 'tv', 'tv-client-0003');
+  await msg(tv, { type: 'ended', item_id: (await state(room.code)).current_item_id });
   await new Promise((resolve) => setTimeout(resolve, 30));
   const before = (await stats(headers)).json().totals.songs;
   assert.equal(before, 1);
 
-  // o banco apaga salas paradas há 24 h; o histórico fica (a mesma conexão ao banco, simulada aqui com o mesmo arquivo em memória)
+  // o banco apaga salas paradas há 24 h; o histórico fica (num banco só deste teste, para a poda não alcançar os outros)
   const db = openDb();
+  const orm = await MikroORM.init(ormOptions(db.connection));
+  await orm.migrator.up();
+  const rooms = new RoomService({ orm, songs: {} });
   db.createDevice({ id: 'd1', name: 'PC', tokenHash: 'h', now: Date.now() });
   db.logPlay({ deviceId: 'd1', sessionId: 's1', videoId: SONGS[0], singer: 'Ana', singerKey: 'k1', outcome: 'done', endedAt: Date.now() });
   db.createRoom('ZZZZ', 'tok', Date.now() - 3 * 24 * 3600 * 1000);
-  assert.equal(db.deleteInactiveRooms(Date.now() - 24 * 3600 * 1000), 1);
-  assert.equal(db.statsFor('d1', 0).totals.songs, 1);
-  assert.equal(db.prunePlayLog(Date.now() + 1000), 1); // o histórico antigo é podado pela idade
-  assert.equal(db.statsFor('d1', 0).totals.songs, 0);
+  assert.equal(await rooms.deleteInactiveRooms(Date.now() - 24 * 3600 * 1000), 1);
+  assert.equal((await rooms.statsFor('d1', 0)).totals.songs, 1);
+  assert.equal(await rooms.prunePlayLog(Date.now() + 1000), 1); // o histórico antigo é podado pela idade
+  assert.equal((await rooms.statsFor('d1', 0)).totals.songs, 0);
+  await orm.close();
+  db.close();
 });

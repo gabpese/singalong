@@ -62,8 +62,8 @@ O Singalong não usa framework completo: ele compõe estas peças ([ADR 0016](ad
 
 | Peça | Papel |
 |---|---|
-| Fastify (`@fastify/websocket`) | Servidor HTTP e WebSockets |
-| NestJS | Os módulos e a injeção de dependência da API, sobre o mesmo Fastify (as áreas entram uma a uma) |
+| Fastify | Servidor HTTP, sob o NestJS |
+| NestJS | Os módulos e a injeção de dependência da API, sobre o mesmo Fastify, e o gateway do WebSocket da Sala (`@nestjs/platform-ws`, [ADR 0018](adr/0018-room-websocket-on-a-nest-gateway.pt-BR.md)) |
 | MikroORM | A camada de banco sobre o SQLite: entidades e migrações (`apps/api/src/database/`) |
 | React | A interface das páginas |
 | Vite | O build das quatro páginas |
@@ -76,7 +76,7 @@ O Singalong não usa framework completo: ele compõe estas peças ([ADR 0016](ad
 
 | Termo | Código |
 |---|---|
-| Sala, Fila, Vez, Intervalo | `apps/api/src/rooms.js` (estado e regras), `apps/api/src/queue-logic.js` (ordem, Rodízio justo) |
+| Sala, Fila, Vez, Intervalo | `apps/api/src/rooms/` (`room.service.ts` para o estado e as regras, `queue-logic.ts` para a ordem e o Rodízio justo, `rooms.gateway.ts` para o WebSocket) |
 | TV | `apps/web/src/tv/` (`TvPage.tsx`, `controller.ts` para som e pontuação, `Interlude.tsx`, `Lobby.tsx`) |
 | Celular (página da Sala) | `apps/web/src/room/` |
 | Palco | `apps/web/src/stage/StagePage.tsx` |
@@ -148,7 +148,7 @@ Cada fase dura `INTERMISSION_APPLAUSE_SECONDS` e `INTERMISSION_STAGE_SECONDS` (1
 
 ### Mensagens em tempo real
 
-Um WebSocket por aparelho (`/api/rooms/:code/ws?role=tv|controller`):
+Um WebSocket por aparelho (`/api/rooms/ws?code=…&role=tv|controller`):
 
 | Mensagem | De → para | Significado |
 |---|---|---|
@@ -188,8 +188,8 @@ O agente só faz pedidos de saída, então funciona atrás de qualquer roteador 
 
 ```
 apps/
-  api/        API em Node (NestJS sobre o Fastify, MikroORM): src/app.ts, src/database/, áreas no Nest em src/{admin,release,cache,songs,agents}/,
-              as Salas, que ainda estão no Fastify, em src/rooms.js e src/routes/
+  api/        API em Node (NestJS sobre o Fastify, MikroORM): src/app.ts, src/database/, uma pasta por área em
+              src/{admin,release,cache,songs,agents,rooms}/
   web/        React + Vite: src/{landing,room,tv,stage,ui,lib,i18n,styles}, e2e/ (Playwright)
   worker/     Python: singalong_worker/ (pipeline, runner, align, lyrics...), tests/
   desktop/    Electron: src/ (main, controller), ui/ (as telas do próprio app)
