@@ -319,31 +319,11 @@ export function openDb(path = ':memory:') {
         }
       }),
     getAgentSong: (deviceId, videoId) => one('SELECT * FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId),
-    // --- administração (página em ADMIN_PATH) ---
-    listEmailRules: () => all('SELECT email, can_pair, can_cloud, created_at FROM email_rules ORDER BY email'),
+    // --- what the agents read of the admin page's rules (the page itself uses MikroORM: src/admin/) ---
     getEmailRule: (email) => one('SELECT email, can_pair, can_cloud FROM email_rules WHERE email = ?', email),
-    upsertEmailRule: (email, canPair, canCloud, now) =>
-      run(
-        `INSERT INTO email_rules (email, can_pair, can_cloud, created_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT(email) DO UPDATE SET can_pair = excluded.can_pair, can_cloud = excluded.can_cloud`,
-        email, canPair ? 1 : 0, canCloud ? 1 : 0, now,
-      ),
-    deleteEmailRule: (email) => run('DELETE FROM email_rules WHERE email = ?', email).changes > 0,
     hasPairRules: () => one('SELECT 1 AS n FROM email_rules WHERE can_pair = 1 LIMIT 1') !== null,
-    listDevices: () => all('SELECT id, name, email, created_at, last_seen, revoked_at, app_version FROM devices ORDER BY created_at DESC'),
     setDeviceVersion: (id, version) => run('UPDATE devices SET app_version = ? WHERE id = ? AND COALESCE(app_version, \'\') <> ?', version, id, version),
-    getRelease: () => one('SELECT latest, minimum, notes, url, updated_at FROM app_release WHERE id = 1'),
-    setRelease: ({ latest, minimum, notes, url }, now) =>
-      run(
-        `INSERT INTO app_release (id, latest, minimum, notes, url, updated_at) VALUES (1, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET latest = excluded.latest, minimum = excluded.minimum, notes = excluded.notes, url = excluded.url, updated_at = excluded.updated_at`,
-        latest, minimum, notes, url, now,
-      ),
-    clearRelease: () => run('DELETE FROM app_release WHERE id = 1').changes > 0,
-    blockSong: (videoId, now) => run('INSERT OR REPLACE INTO cloud_blocked (video_id, blocked_at) VALUES (?, ?)', videoId, now),
-    unblockSong: (videoId) => run('DELETE FROM cloud_blocked WHERE video_id = ?', videoId).changes > 0,
     isSongBlocked: (videoId) => one('SELECT 1 AS n FROM cloud_blocked WHERE video_id = ?', videoId) !== null,
-    listBlockedSongs: () => all('SELECT video_id, blocked_at FROM cloud_blocked ORDER BY blocked_at DESC'),
 
     listAgentSongs: (deviceId) => all('SELECT * FROM agent_songs WHERE device_id = ? ORDER BY video_id', deviceId),
     deleteAgentSong: (deviceId, videoId) => run('DELETE FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId).changes > 0,
@@ -361,9 +341,6 @@ export function openDb(path = ':memory:') {
          ON CONFLICT(video_id) DO UPDATE SET last_played_at = excluded.last_played_at`,
         videoId, now,
       ),
-    lastPlayed: (videoId) => one('SELECT last_played_at FROM song_settings WHERE video_id = ?', videoId)?.last_played_at ?? null,
-    /** Músicas em uso (tocando ou na fila de alguma sala): nunca entram na limpeza. */
-    activeVideoIds: () => new Set(all("SELECT DISTINCT video_id FROM queue_items WHERE status IN ('queued', 'playing')").map((r) => r.video_id)),
     getOffset: (videoId) => one('SELECT lyric_offset FROM song_settings WHERE video_id = ?', videoId)?.lyric_offset ?? 0,
     getParts: (videoId) => one('SELECT parts FROM song_settings WHERE video_id = ?', videoId)?.parts ?? null,
     setParts: (videoId, parts) =>

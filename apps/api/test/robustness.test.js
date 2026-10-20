@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { buildApp } from '../dist/app.js';
-import { cleanCache } from '../dist/cache-cleaner.js';
+import { MikroORM } from '@mikro-orm/core';
+import { cleanCache, ormCacheUsage } from '../dist/cache/cache-cleaner.js';
+import { ormOptions } from '../dist/database/orm.js';
 import { openDb } from '../dist/db.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
 import { buildLoggerOptions, redactUrl } from '../dist/logging.js';
@@ -29,26 +31,28 @@ const exists = async (root, id) => stat(join(root, 'cache', id)).then(() => true
 
 async function setup() {
   const root = await mkdtemp(join(tmpdir(), 'singalong-clean-'));
-  return { root, storage: new LocalStorage(root), db: openDb(':memory:'), jobs: createMemoryJobStore() };
+  const db = openDb(':memory:');
+  const usage = ormCacheUsage(await MikroORM.init(ormOptions(db.connection))); // MikroORM over the same database the test fills through db.js
+  return { root, storage: new LocalStorage(root), db, jobs: createMemoryJobStore(), usage };
 }
 
 // ---------- limpeza do cache (LRU) ----------
 
 test('limpeza: abaixo do limite não apaga nada; limite 0 desliga', async () => {
-  const { root, storage, db, jobs } = await setup();
+  const { root, storage, db, jobs, usage } = await setup();
   await song(root, 'aaaaaaaaaaa', 10, 30);
-  assert.deepEqual((await cleanCache({ storage, db, jobs, maxBytes: 50 * MB, now: () => NOW })).removed, []);
-  assert.equal((await cleanCache({ storage, db, jobs, maxBytes: 0 })).skipped, 'disabled');
+  assert.deepEqual((await cleanCache({ storage, usage, jobs, maxBytes: 50 * MB, now: () => NOW })).removed, []);
+  assert.equal((await cleanCache({ storage, usage, jobs, maxBytes: 0 })).skipped, 'disabled');
   assert.ok(await exists(root, 'aaaaaaaaaaa'));
 });
 
 test('limpeza: acima do limite apaga primeiro as mais antigas, até ficar em 90% do limite', async () => {
-  const { root, storage, db, jobs } = await setup();
+  const { root, storage, db, jobs, usage } = await setup();
   await song(root, 'velha000001', 10, 90); // mais antiga
   await song(root, 'media000001', 10, 40);
   await song(root, 'nova0000001', 10, 1);
   // limite de 25 MB: 30 MB > 25; alvo = 22,5 MB; basta apagar a mais antiga (sobram 20 MB)
-  const report = await cleanCache({ storage, db, jobs, maxBytes: 25 * MB, now: () => NOW });
+  const report = await cleanCache({ storage, usage, jobs, maxBytes: 25 * MB, now: () => NOW });
   assert.deepEqual(report.removed.map((r) => r.id), ['velha000001']);
   assert.equal(await exists(root, 'velha000001'), false);
   assert.ok(await exists(root, 'media000001'));
@@ -57,24 +61,24 @@ test('limpeza: acima do limite apaga primeiro as mais antigas, até ficar em 90%
 });
 
 test('limpeza: o que foi TOCADO recentemente vale mais que a data do arquivo', async () => {
-  const { root, storage, db, jobs } = await setup();
+  const { root, storage, db, jobs, usage } = await setup();
   await song(root, 'processada01', 10, 200); // processada há muito tempo...
   await song(root, 'processada02', 10, 20);
   db.touchPlayed('processada01', NOW - 1 * DAY); // ...mas cantada ontem
-  const report = await cleanCache({ storage, db, jobs, maxBytes: 15 * MB, now: () => NOW });
+  const report = await cleanCache({ storage, usage, jobs, maxBytes: 15 * MB, now: () => NOW });
   assert.deepEqual(report.removed.map((r) => r.id), ['processada02']); // a "mais velha" de verdade é a outra
   assert.ok(await exists(root, 'processada01'));
 });
 
 test('limpeza: música em alguma fila ou com processamento em andamento nunca é apagada', async () => {
-  const { root, storage, db, jobs } = await setup();
+  const { root, storage, db, jobs, usage } = await setup();
   await song(root, 'naFila00001', 10, 300); // a mais antiga de todas, mas está na fila de uma sala
   await song(root, 'processando', 10, 200); // com job em andamento
   await song(root, 'livre000001', 10, 100);
   db.createRoom('ABCD', 'tok', NOW);
   db.addItem({ roomCode: 'ABCD', videoId: 'naFila00001', title: null, artist: null, addedBy: 'Ana', clientId: 'c1', pitch: 0, now: NOW });
   await jobs.enqueue('processando', { url: 'x', lyrics_source: 'auto' });
-  const report = await cleanCache({ storage, db, jobs, maxBytes: 5 * MB, now: () => NOW });
+  const report = await cleanCache({ storage, usage, jobs, maxBytes: 5 * MB, now: () => NOW });
   assert.deepEqual(report.removed.map((r) => r.id), ['livre000001']); // só a livre; as outras ficam mesmo acima do limite
   assert.ok(await exists(root, 'naFila00001'));
   assert.ok(await exists(root, 'processando'));
@@ -82,14 +86,14 @@ test('limpeza: música em alguma fila ou com processamento em andamento nunca é
 });
 
 test('limpeza: música que já foi tocada e saiu da fila volta a ser candidata', async () => {
-  const { root, storage, db, jobs } = await setup();
+  const { root, storage, db, jobs, usage } = await setup();
   await song(root, 'jaCantada01', 10, 5);
   await song(root, 'outra000001', 10, 4);
   db.createRoom('ABCD', 'tok', NOW);
   const id = db.addItem({ roomCode: 'ABCD', videoId: 'jaCantada01', title: null, artist: null, addedBy: 'Ana', clientId: 'c1', pitch: 0, now: NOW });
   db.updateItem(id, { status: 'done' });
   db.touchPlayed('jaCantada01', NOW - 10 * DAY);
-  const report = await cleanCache({ storage, db, jobs, maxBytes: 15 * MB, now: () => NOW });
+  const report = await cleanCache({ storage, usage, jobs, maxBytes: 15 * MB, now: () => NOW });
   assert.deepEqual(report.removed.map((r) => r.id), ['jaCantada01']); // tocada há 10 dias, mais antiga que 'outra' (4 dias)
 });
 
@@ -102,11 +106,12 @@ test('banco antigo (sem last_played_at) é migrado ao abrir', async () => {
   old.close();
   const db = openDb(path);
   assert.equal(db.getOffset('abc'), 1.5); // dados antigos preservados
+  const lastPlayed = (id) => db.connection.prepare('SELECT last_played_at FROM song_settings WHERE video_id = ?').get(id)?.last_played_at ?? null;
   db.touchPlayed('abc', 123);
-  assert.equal(db.lastPlayed('abc'), 123);
+  assert.equal(lastPlayed('abc'), 123);
   assert.equal(db.getOffset('abc'), 1.5); // tocar não zera o ajuste da letra
   db.setOffset('abc', 2);
-  assert.equal(db.lastPlayed('abc'), 123); // e ajustar a letra não apaga quando tocou
+  assert.equal(lastPlayed('abc'), 123); // e ajustar a letra não apaga quando tocou
   db.close();
 });
 

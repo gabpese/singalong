@@ -41,6 +41,7 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
    - MikroORM 7 shares `db.js`'s `node:sqlite` connection (`src/database/sqlite-dialect.ts`), with entities from `defineEntity` that a test compares with the frozen schema, and a baseline migration that changes nothing.
    - TypeScript 7's `tsc` builds `dist/`; the Dockerfile gains a build stage; CI builds the API before its tests and before the web and desktop e2e. `buildApp()` is now async and still returns the Fastify instance.
 3. **One pull request per area,** from the least to the most concurrent: `release`, `cache-cleaner` and `admin`; `songs`; `agents`; `rooms`. Each moves its files to TypeScript and into a Nest module, writes its JSON Schemas with TypeBox, and makes its database calls asynchronous through MikroORM, with one forked EntityManager per request, WebSocket message, timer and long-poll round. The `rooms` pull request defines the protocol types (`state`, `position`, the HTTP responses) in the API, and the web imports them with `import type`.
+   - **`release`, `cache-cleaner` and `admin`: done.** Each call gets its own forked EntityManager. The published app version is read once at start and kept in memory, so the agents' routes still read it synchronously. The admin page's static files stay a Fastify route (its address must end in "/"); its API is a Nest module under the secret address, with a guard for the token and the limits, TypeBox through a pipe, and a filter that answers an `HttpError` as before.
 
 ### 4. The engine
 
