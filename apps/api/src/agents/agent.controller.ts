@@ -3,12 +3,12 @@ import type { Static } from '@sinclair/typebox';
 import type { FastifyReply } from 'fastify';
 import type { JobStore } from '../app.ts';
 import type { Device, Session } from '../database/entities.ts';
-import type { LegacyServices } from '../legacy.module.ts';
 import { RateLimit } from '../rate-limit.guard.ts';
 import { ReleaseService } from '../release/release.service.ts';
-import { HttpError } from '../rooms.js';
+import { HttpError } from '../http-error.ts';
 import type { LocalStorage } from '../storage.js';
-import { JOBS, ROOMS, STORAGE } from '../tokens.ts';
+import { RoomService } from '../rooms/room.service.ts';
+import { JOBS, STORAGE } from '../tokens.ts';
 import { TypeBoxPipe } from '../validation.ts';
 import { updateInfo } from '../version.js';
 import { AgentAuthGuard, CurrentDevice } from './agent-auth.guard.ts';
@@ -49,7 +49,7 @@ export class AgentController {
     private readonly agents: AgentService,
     private readonly release: ReleaseService,
     @Inject(JOBS) private readonly jobs: JobStore,
-    @Inject(ROOMS) private readonly rooms: LegacyServices['rooms'],
+    private readonly rooms: RoomService,
     @Inject(STORAGE) private readonly storage: LocalStorage,
   ) {}
 
@@ -77,10 +77,10 @@ export class AgentController {
 
   /** The owner's statistics: what played in the Rooms of this computer's Sessions over the last `days` days (1 to 365). */
   @Get('stats')
-  stats(@CurrentDevice() device: Device, @Query(new TypeBoxPipe(StatsQuery)) query: Static<typeof StatsQuery>) {
+  async stats(@CurrentDevice() device: Device, @Query(new TypeBoxPipe(StatsQuery)) query: Static<typeof StatsQuery>) {
     const days = query.days ?? 30;
     const since = Date.now() - days * DAY_MS;
-    return { days, since, ...this.rooms.statsFor(device.id, since) };
+    return { days, since, ...(await this.rooms.statsFor(device.id, since)) };
   }
 
   @Delete('devices/me')
@@ -107,7 +107,7 @@ export class AgentController {
   async createRoom(@CurrentDevice() device: Device, @Param('id') id: string) {
     const session = await this.agents.ownSession(device, id);
     if (session.endedAt) throw new HttpError(409, 'session_ended', 'A sessão já terminou.');
-    return { ...this.rooms.createRoom({ sessionId: session.id }), session_id: session.id };
+    return { ...(await this.rooms.createRoom({ sessionId: session.id })), session_id: session.id };
   }
 
   @Post('heartbeat')

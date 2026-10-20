@@ -2,8 +2,9 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { MikroORM } from '@mikro-orm/core';
 import type { JobStore } from '../app.ts';
 import { AgentSong, CloudBlocked, Device, EmailRule, PairCode, Session } from '../database/entities.ts';
-import { generateCode, HttpError } from '../rooms.js';
-import { createSerializer } from '../serial.js';
+import { HttpError } from '../http-error.ts';
+import { generateCode } from '../rooms/rooms.ts';
+import { createSerializer } from '../serial.ts';
 import { parseVersion } from '../version.js';
 import {
   checkLibraryEntry,

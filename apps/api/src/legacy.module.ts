@@ -5,10 +5,10 @@ import type { AppConfig, JobStore } from './app.ts';
 import type { openDb } from './db.js';
 import type { createMailer } from './mailer.js';
 import type { createRateLimiter } from './rate-limit.js';
-import type { createRoomService } from './rooms.js';
+import { RoomService } from './rooms/room.service.ts';
 import { SongService } from './songs/song.service.ts';
 import type { LocalStorage } from './storage.js';
-import { CONFIG, DB, JOBS, LIMITERS, MAILER, ROOMS, STORAGE } from './tokens.ts';
+import { CONFIG, DB, JOBS, LIMITERS, MAILER, STORAGE } from './tokens.ts';
 
 /** The services built before Nest, as app.ts hands them over. */
 export interface LegacyServices {
@@ -21,12 +21,12 @@ export interface LegacyServices {
   agents: AgentService;
   limiters: Record<string, ReturnType<typeof createRateLimiter>>;
   songs: SongService;
-  rooms: ReturnType<typeof createRoomService>;
+  rooms: RoomService;
 }
 
 /**
  * Makes the services built before Nest injectable in every module: by the tokens in tokens.ts, or by their class (MikroORM,
- * the AgentService and the SongService).
+ * the AgentService, the SongService and the RoomService).
  */
 @Global()
 @Module({})
@@ -41,7 +41,7 @@ export class LegacyModule {
       { provide: MAILER, useValue: services.mailer },
       { provide: AgentService, useValue: services.agents },
       { provide: LIMITERS, useValue: services.limiters },
-      { provide: ROOMS, useValue: services.rooms },
+      { provide: RoomService, useValue: services.rooms },
       { provide: SongService, useValue: services.songs },
     ];
     return { module: LegacyModule, providers, exports: providers.map((provider) => provider.provide) };

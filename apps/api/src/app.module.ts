@@ -8,11 +8,12 @@ import { HealthController } from './health.controller.ts';
 import { HttpErrorFilter } from './http-error.filter.ts';
 import { LegacyModule, type LegacyServices } from './legacy.module.ts';
 import { ReleaseModule } from './release/release.module.ts';
+import { RoomsModule } from './rooms/rooms.module.ts';
 import { SongsModule } from './songs/songs.module.ts';
 
 /**
- * The API's root module. The areas move here one by one (ROADMAP, step 3); until then their routes stay Fastify plugins
- * registered by app.ts, and the services they share reach Nest through LegacyModule.
+ * The API's root module: every area's routes, and the Rooms' WebSocket gateway. The services the areas share (the database,
+ * the agents, the songs and the Rooms) are built by app.ts and reach Nest through LegacyModule.
  */
 @Module({})
 export class AppModule {
@@ -28,6 +29,7 @@ export class AppModule {
         CacheModule,
         SongsModule,
         AgentsModule,
+        RoomsModule,
         ...(adminPath ? [AdminModule, RouterModule.register([{ path: adminPath, module: AdminModule }])] : []),
       ],
       controllers: [HealthController],

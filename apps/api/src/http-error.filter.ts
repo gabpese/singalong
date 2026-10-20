@@ -1,6 +1,6 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
-import { HttpError } from './rooms.js';
+import { HttpError } from './http-error.ts';
 
 /** A request over a rate limit: 429 with Retry-After, the same answer the Fastify routes' rateLimited() gives. */
 export class RateLimitError extends HttpError {

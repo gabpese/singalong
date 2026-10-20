@@ -196,8 +196,11 @@ export function openDb(path = ':memory:') {
     /** The open connection, for MikroORM to share (src/database/orm.ts). */
     connection: db,
     close: () => db.close(),
+    /** The readiness check (/readyz). */
+    ping: () => one('SELECT 1 AS ok').ok === 1,
 
-    // --- salas ---
+    // --- test fixtures: the API reads and writes through MikroORM (src/rooms/, src/agents/); the tests fill the database with
+    // these until db.js goes (ROADMAP, step 3.4) ---
     /** Creates the Room; false when the code is already taken (the insert itself checks, so no other request can slip in between). */
     createRoom: (code, hostToken, now, sessionId = null, intermission = true) =>
       run(
@@ -205,46 +208,13 @@ export function openDb(path = ':memory:') {
         code, hostToken, now, now, sessionId, intermission ? 1 : 0,
       ).changes === 1,
     getRoom: (code) => one('SELECT * FROM rooms WHERE code = ?', code),
-    listRoomCodes: () => all('SELECT code FROM rooms').map((r) => r.code),
     updateRoom: (code, fields) => update('rooms', ROOM_FIELDS, 'code', code, fields),
-    deleteInactiveRooms: (before) => run('DELETE FROM rooms WHERE last_active_at < ?', before).changes,
-
-    // --- histórico e estatísticas do dono ---
     logPlay: (entry) =>
       run(
         'INSERT INTO play_log (device_id, session_id, video_id, title, artist, singer, singer_key, duet, score, cheers, outcome, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         entry.deviceId, entry.sessionId, entry.videoId, entry.title ?? null, entry.artist ?? null, entry.singer, entry.singerKey,
         entry.duet ? 1 : 0, entry.score ?? null, entry.cheers ?? 0, entry.outcome, entry.endedAt,
       ),
-    prunePlayLog: (before) => run('DELETE FROM play_log WHERE ended_at < ?', before).changes,
-    /** As estatísticas de um dono desde `since` (ms): totais, mais tocadas, quem mais cantou, mais aplaudidas e o movimento por dia. */
-    statsFor(deviceId, since) {
-      const done = "device_id = ? AND ended_at >= ? AND outcome = 'done'";
-      const totals = one(
-        `SELECT COUNT(*) AS songs, COUNT(DISTINCT singer_key) AS singers, COUNT(DISTINCT session_id) AS sessions,
-                COALESCE(SUM(cheers), 0) AS cheers, ROUND(AVG(score), 1) AS avg_score, COALESCE(SUM(duet), 0) AS duets
-           FROM play_log WHERE ${done}`, deviceId, since);
-      const skipped = one("SELECT COUNT(*) AS n FROM play_log WHERE device_id = ? AND ended_at >= ? AND outcome = 'skipped'", deviceId, since).n;
-      return {
-        totals: { ...totals, skipped },
-        top_songs: all(
-          `SELECT video_id, MAX(title) AS title, MAX(artist) AS artist, COUNT(*) AS plays, ROUND(AVG(score), 1) AS avg_score
-             FROM play_log WHERE ${done} GROUP BY video_id ORDER BY plays DESC, MAX(ended_at) DESC LIMIT 10`, deviceId, since),
-        top_singers: all(
-          `SELECT singer_key, (SELECT singer FROM play_log p WHERE p.device_id = play_log.device_id AND p.singer_key = play_log.singer_key ORDER BY p.ended_at DESC LIMIT 1) AS name,
-                  COUNT(*) AS songs, ROUND(AVG(score), 1) AS avg_score
-             FROM play_log WHERE ${done} GROUP BY singer_key ORDER BY songs DESC, MAX(ended_at) DESC LIMIT 10`, deviceId, since)
-          .map(({ singer_key, ...rest }) => rest),
-        most_cheered: all(
-          `SELECT video_id, MAX(title) AS title, MAX(artist) AS artist, SUM(cheers) AS cheers
-             FROM play_log WHERE ${done} GROUP BY video_id HAVING cheers > 0 ORDER BY cheers DESC LIMIT 5`, deviceId, since),
-        by_day: all(
-          `SELECT date(ended_at / 1000, 'unixepoch') AS day, COUNT(*) AS songs
-             FROM play_log WHERE ${done} GROUP BY day ORDER BY day`, deviceId, since),
-      };
-    },
-
-    // --- fila ---
     addItem: ({ roomCode, videoId, title, artist, addedBy, clientId, pitch, now }) =>
       transaction(() => {
         const { next } = one('SELECT COALESCE(MAX(position), 0) + 1 AS next FROM queue_items WHERE room_code = ?', roomCode);
@@ -255,31 +225,7 @@ export function openDb(path = ':memory:') {
         );
         return Number(result.lastInsertRowid);
       }),
-    getItem: (id) => one('SELECT * FROM queue_items WHERE id = ?', id),
-    /** Itens ativos da sala: o que está tocando e os que aguardam, na ordem da fila. */
-    listActive: (roomCode) =>
-      all("SELECT * FROM queue_items WHERE room_code = ? AND status IN ('queued', 'playing') ORDER BY position", roomCode),
-    /** Placar da sala: as maiores pontuações (nome, música, nota). */
-    listScored: (roomCode, limit = 10) =>
-      all('SELECT id, added_by, guest_name, guest_status, title, score FROM queue_items WHERE room_code = ? AND score IS NOT NULL ORDER BY score DESC, id LIMIT ?', roomCode, limit),
-    countQueuedBy: (roomCode, clientId) =>
-      one("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = ? AND client_id = ? AND status = 'queued'", roomCode, clientId).n,
-    countQueued: (roomCode) => one("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = ? AND status = 'queued'", roomCode).n,
     updateItem: (id, fields) => update('queue_items', ITEM_FIELDS, 'id', id, fields),
-    addCheers: (id, n = 1) => run('UPDATE queue_items SET cheers = cheers + ? WHERE id = ?', n, id),
-    /** Cheers for the song playing in the Room, in one statement (nothing can change the song between reading and writing). */
-    addCheersToCurrent: (roomCode, n = 1) =>
-      run('UPDATE queue_items SET cheers = cheers + ? WHERE id = (SELECT current_item_id FROM rooms WHERE code = ?)', n, roomCode),
-    deleteItem: (id) => run('DELETE FROM queue_items WHERE id = ?', id),
-    swapPositions: (idA, idB) =>
-      transaction(() => {
-        const a = one('SELECT position FROM queue_items WHERE id = ?', idA);
-        const b = one('SELECT position FROM queue_items WHERE id = ?', idB);
-        run('UPDATE queue_items SET position = ? WHERE id = ?', b.position, idA);
-        run('UPDATE queue_items SET position = ? WHERE id = ?', a.position, idB);
-      }),
-
-    // --- the agents' computers and Sessions: the agents use MikroORM (src/agents/); the play history and the tests read these ---
     createDevice: ({ id, name, tokenHash, now, email = null }) =>
       run('INSERT INTO devices (id, name, token_hash, created_at, last_seen, email) VALUES (?, ?, ?, ?, ?, ?)', id, name, tokenHash, now, now, email),
     getDevice: (id) => one('SELECT * FROM devices WHERE id = ?', id),
@@ -290,10 +236,6 @@ export function openDb(path = ':memory:') {
       }),
     getSession: (id) => one('SELECT * FROM sessions WHERE id = ?', id),
     touchSession: (id, now) => run('UPDATE sessions SET last_seen = ? WHERE id = ? AND ended_at IS NULL', now, id),
-
-    // --- ajustes por música (valem em qualquer sala) ---
-    ping: () => one('SELECT 1 AS ok').ok === 1,
-    /** Marca que a música foi (ou vai ser) tocada agora: a limpeza do cache apaga primeiro as mais antigas. */
     touchPlayed: (videoId, now) =>
       run(
         `INSERT INTO song_settings (video_id, last_played_at) VALUES (?, ?)
@@ -301,13 +243,6 @@ export function openDb(path = ':memory:') {
         videoId, now,
       ),
     getOffset: (videoId) => one('SELECT lyric_offset FROM song_settings WHERE video_id = ?', videoId)?.lyric_offset ?? 0,
-    getParts: (videoId) => one('SELECT parts FROM song_settings WHERE video_id = ?', videoId)?.parts ?? null,
-    setParts: (videoId, parts) =>
-      run(
-        `INSERT INTO song_settings (video_id, parts) VALUES (?, ?)
-         ON CONFLICT(video_id) DO UPDATE SET parts = excluded.parts`,
-        videoId, parts,
-      ),
     setOffset: (videoId, offset) =>
       run(
         `INSERT INTO song_settings (video_id, lyric_offset) VALUES (?, ?)

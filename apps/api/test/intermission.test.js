@@ -56,7 +56,7 @@ async function call(method, url, { client = ANA, host, body } = {}) {
 async function roomWithTv() {
   const { body } = await call('POST', '/rooms');
   const socket = { readyState: 1, send() {}, ping() {}, terminate() {} };
-  app.rooms.connect(body.code, { socket, role: 'tv', clientId: '' });
+  await app.rooms.connect(body.code, { socket, role: 'tv', clientId: '' });
   return { code: body.code, host: body.host_token };
 }
 

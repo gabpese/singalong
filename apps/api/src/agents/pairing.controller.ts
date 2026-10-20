@@ -6,7 +6,7 @@ import type { LegacyServices } from '../legacy.module.ts';
 import { pairingEmail } from '../mailer.js';
 import { RateLimit } from '../rate-limit.guard.ts';
 import { ReleaseService } from '../release/release.service.ts';
-import { HttpError } from '../rooms.js';
+import { HttpError } from '../http-error.ts';
 import { CONFIG, LIMITERS, MAILER } from '../tokens.ts';
 import { TypeBoxPipe } from '../validation.ts';
 import { updateInfo } from '../version.js';

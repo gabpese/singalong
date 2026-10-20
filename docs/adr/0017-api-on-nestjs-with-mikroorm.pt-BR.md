@@ -1,5 +1,5 @@
 ---
-status: aceito
+status: aceito; o contrato do WebSocket substituído pelo 0018
 date: 2026-10-20
 supersedes: 0016 (na parte da API) e a etapa de build do 0011
 ---
@@ -7,6 +7,8 @@ supersedes: 0016 (na parte da API) e a etapa de build do 0011
 # 0017. A API migra para NestJS sobre o Fastify, com MikroORM sobre o SQLite
 
 [English](0017-api-on-nestjs-with-mikroorm.md) · **Português (Brasil)**
+
+> O contrato do WebSocket foi substituído pelo [ADR 0018](0018-room-websocket-on-a-nest-gateway.pt-BR.md): um gateway do Nest em `/api/rooms/ws?code=…`, com as mesmas mensagens.
 
 A fase de aprendizado que o [ADR 0016](0016-no-full-stack-framework.pt-BR.md) esperava terminou. A API migra para NestJS em cima do mesmo Fastify, pelos módulos e pela injeção de dependência. O acesso ao banco migra para o MikroORM 7 sobre o driver embutido `node:sqlite`: entidades, relações, migrações versionadas e um caminho para o Postgres quando houver mais de um servidor ([ADR 0006](0006-sqlite.pt-BR.md)). As páginas continuam em React com Vite e o app de computador continua em Electron, como o ADR 0016 decidiu.
 

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { buildApp } from '../dist/app.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
-import { pidOf } from '../dist/rooms.js';
+import { pidOf } from '../dist/rooms/rooms.js';
 import { LocalStorage } from '../dist/storage.js';
 
 const ANA = 'client-ana-0001';
@@ -31,10 +31,10 @@ before(async () => {
 
 after(() => app.close());
 
-function person(code, client, name, role = 'controller') {
+async function person(code, client, name, role = 'controller') {
   const sent = [];
   const socket = { readyState: 1, send: (data) => sent.push(JSON.parse(data)), ping() {}, terminate() {} };
-  const session = app.rooms.connect(code, { socket, role, clientId: client, hostToken: '', name });
+  const session = await app.rooms.connect(code, { socket, role, clientId: client, hostToken: '', name });
   return { session, sent, state: () => sent.findLast((m) => m.type === 'state')?.state };
 }
 
@@ -46,9 +46,9 @@ const call = async (method, url, client, body) => {
 async function setup() {
   const room = (await app.inject({ method: 'POST', url: '/api/rooms' })).json();
   const code = room.code;
-  const ana = person(code, ANA, 'Ana');
-  const bia = person(code, BIA, 'Bia');
-  const caio = person(code, CAIO, 'Caio');
+  const ana = await person(code, ANA, 'Ana');
+  const bia = await person(code, BIA, 'Bia');
+  const caio = await person(code, CAIO, 'Caio');
   // a primeira música começa a tocar na hora; a segunda aguarda (só músicas que aguardam recebem convite)
   const first = await call('POST', `/rooms/${code}/queue`, CAIO, { video_id: SONGS[0], name: 'Caio' });
   const second = await call('POST', `/rooms/${code}/queue`, ANA, { video_id: SONGS[1], name: 'Ana' });
@@ -71,12 +71,12 @@ test('a sala sabe quem está nela: nome e um identificador que não revela o cli
 
 test('o nome pode mudar depois (mensagem hello do celular) e vale uma pessoa por client_id', async () => {
   const { code, ana } = await setup();
-  const second = person(code, ANA, 'Ana (outra aba)');
+  const second = await person(code, ANA, 'Ana (outra aba)');
   assert.equal((await call('GET', `/rooms/${code}`, ANA)).body.people.filter((p) => p.pid === pidOf(ANA)).length, 1);
-  app.rooms.onMessage(code, ana.session.conn, JSON.stringify({ type: 'hello', name: '  Aninha  ' }));
+  app.rooms.rename(ana.session.conn, '  Aninha  ');
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.ok((await call('GET', `/rooms/${code}`, BIA)).body.people.some((p) => p.name === 'Aninha' || p.name === 'Ana (outra aba)'));
-  app.rooms.onMessage(code, ana.session.conn, JSON.stringify({ type: 'hello', name: 42 })); // inválido: ignorado
+  app.rooms.rename(ana.session.conn, 42); // inválido: ignorado
   second.session.leave();
 });
 
@@ -146,20 +146,21 @@ test('convidar de novo troca o convidado; a música que já está tocando també
 test('a nota da dupla vai para o placar com os dois nomes', async () => {
   const room = (await app.inject({ method: 'POST', url: '/api/rooms' })).json();
   const code = room.code;
-  const ana = person(code, ANA, 'Ana');
-  person(code, BIA, 'Bia');
+  const ana = await person(code, ANA, 'Ana');
+  await person(code, BIA, 'Bia');
   const added = await call('POST', `/rooms/${code}/queue`, ANA, { video_id: SONGS[2], name: 'Ana' });
   await app.inject({ method: 'PATCH', url: `/api/rooms/${code}`, headers: { 'x-client-id': ANA, 'x-host-token': room.host_token }, payload: { scoring: true } });
   // a música da Ana já está tocando, então o convite vale para a próxima: põe outra na fila
   const next = await call('POST', `/rooms/${code}/queue`, ANA, { video_id: SONGS[1], name: 'Ana' });
   await call('POST', `/rooms/${code}/queue/${next.body.item_id}/invite`, ANA, { pid: pidOf(BIA) });
   await call('POST', `/rooms/${code}/queue/${next.body.item_id}/invite/respond`, BIA, { accept: true });
-  app.rooms.tvScore(code, added.body.item_id, 80);
-  app.rooms.onMessage(code, person(code, 'tv-client-0001', '', 'tv').session.conn, JSON.stringify({ type: 'ended', item_id: added.body.item_id }));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await person(code, 'tv-client-0001', '', 'tv');
+  const scored = app.rooms.tvScore(code, added.body.item_id, 80);
+  await app.rooms.tvEnded(code, added.body.item_id);
+  await scored;
   const playing = (await call('GET', `/rooms/${code}`, ANA)).body.queue.find((i) => i.id === next.body.item_id);
   assert.equal(playing.status, 'playing'); // a dupla entrou
-  app.rooms.tvScore(code, next.body.item_id, 91);
+  await app.rooms.tvScore(code, next.body.item_id, 91);
   const { scoreboard } = (await call('GET', `/rooms/${code}`, ANA)).body;
   assert.deepEqual(scoreboard.find((row) => row.score === 91)?.name, 'Ana & Bia');
   assert.ok(ana.state());

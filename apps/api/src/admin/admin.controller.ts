@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, UseGuards } 
 import type { Static } from '@sinclair/typebox';
 import { ReleaseError } from '../release/release.ts';
 import { ReleaseService } from '../release/release.service.ts';
-import { HttpError } from '../rooms.js';
+import { HttpError } from '../http-error.ts';
 import { TypeBoxPipe } from '../validation.ts';
 import { AdminGuard } from './admin.guard.ts';
 import { EmailRuleBody, ReleaseBody, VideoIdParams } from './admin.schemas.ts';

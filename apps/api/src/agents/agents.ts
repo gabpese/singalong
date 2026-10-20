@@ -6,7 +6,7 @@
 //
 // This file holds the area's limits and plain helpers; the database work is in agent.service.ts, the routes in the controllers.
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { HttpError } from '../rooms.js';
+import { HttpError } from '../http-error.ts';
 
 export const PAIR_CODE_LENGTH = 8;
 export const PAIR_TTL_MS = 10 * 60 * 1000;

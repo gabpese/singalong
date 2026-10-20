@@ -1,9 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import { MAX_WAIT_MS } from '../jobs.js';
+import { OneOf } from '../validation.ts';
 import { MAX_LIBRARY_BATCH, MAX_NAME, VIDEO_ID_PATTERN } from './agents.ts';
-
-/** One of these strings, as a JSON Schema enum: a mismatch reads "must be equal to one of the allowed values". */
-export const OneOf = <T extends string>(values: readonly T[]) => Type.Unsafe<T>({ type: 'string', enum: [...values] });
 
 const Text = Type.String({ maxLength: 500 });
 const JobId = Type.String({ pattern: '^[A-Za-z0-9_-]{11,14}$' });

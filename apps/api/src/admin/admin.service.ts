@@ -4,7 +4,7 @@ import type { AppConfig } from '../app.ts';
 import { AgentService } from '../agents/agent.service.ts';
 import { CloudBlocked, Device, EmailRule } from '../database/entities.ts';
 import { ReleaseService } from '../release/release.service.ts';
-import { HttpError } from '../rooms.js';
+import { HttpError } from '../http-error.ts';
 import type { LocalStorage } from '../storage.js';
 import { CONFIG, STORAGE } from '../tokens.ts';
 import { updateInfo } from '../version.js';

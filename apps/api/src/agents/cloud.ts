@@ -2,11 +2,11 @@
 import { type Static, Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Device } from '../database/entities.ts';
-import { HttpError } from '../rooms.js';
+import { HttpError } from '../http-error.ts';
 import type { LocalStorage } from '../storage.js';
+import { OneOf } from '../validation.ts';
 import { deviceOf } from './agent-auth.guard.ts';
 import type { AgentService } from './agent.service.ts';
-import { OneOf } from './agent.schemas.ts';
 import { VIDEO_ID_PATTERN } from './agents.ts';
 
 const MAX_CLOUD_FILE = 80 * 1024 * 1024; // a long song's instrumental as an MP3 comes nowhere near this

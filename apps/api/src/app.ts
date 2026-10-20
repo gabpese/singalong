@@ -1,8 +1,8 @@
 import 'reflect-metadata';
-import websocket from '@fastify/websocket';
 import { MikroORM } from '@mikro-orm/core';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { WsAdapter } from '@nestjs/platform-ws';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { adminPage } from './admin/admin-page.ts';
 import { AgentService } from './agents/agent.service.ts';
@@ -13,12 +13,13 @@ import type { loadConfig } from './config.js';
 import { ormOptions } from './database/orm.ts';
 import { openDb } from './db.js';
 import { sendFile } from './files.js';
+import { HttpError } from './http-error.ts';
 import type { createMemoryJobStore, createRedisJobStore } from './jobs.js';
 import { createMailer } from './mailer.js';
 import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.js';
 import { ReleaseService } from './release/release.service.ts';
-import { createHub, createRoomService, HttpError } from './rooms.js';
-import { roomRoutes } from './routes/rooms.js';
+import { RoomService } from './rooms/room.service.ts';
+import { parseRoomMessage } from './rooms/rooms.gateway.ts';
 import { SongService } from './songs/song.service.ts';
 import { type LocalStorage, safeJoin } from './storage.js';
 
@@ -40,7 +41,7 @@ export interface BuildOptions {
 
 /** What the API adds to the Fastify instance (the server and the tests reach the services through it). */
 export interface AppDecorations {
-  rooms: ReturnType<typeof createRoomService>;
+  rooms: RoomService;
   agents: AgentService;
   db: ReturnType<typeof openDb>;
   release: ReleaseService;
@@ -54,8 +55,9 @@ export type App = FastifyInstance & AppDecorations;
  * Builds the application with its dependencies injected (config, storage, jobs), which keeps the tests simple.
  * No `config.dbPath` = an in-memory database. The Rooms' clock (`app.rooms.start()`) is started only by server.ts.
  *
- * Nest (ADR 0017) runs on this same Fastify instance. The areas that have not moved to it yet stay Fastify plugins, inside a
- * context of their own: Nest installs its error and not-found handlers at the root, and those routes keep theirs.
+ * Nest (ADR 0017) runs on this same Fastify instance and serves every API route and the Rooms' WebSocket. A few routes stay
+ * Fastify routes, inside a context of their own (Nest installs its error and not-found handlers at the root, and these keep
+ * theirs): the cloud upload, with its own body parser and limit; the admin page's files; the media files; and the pages.
  */
 export async function buildApp({
   config,
@@ -77,16 +79,15 @@ export async function buildApp({
   );
   const agents = new AgentService(orm, jobs, { cloudEmails: config.cloudUploadEmails ?? [] });
   const songs = new SongService(storage, jobs, agents);
-  const rooms = createRoomService({
-    db,
+  const rooms = new RoomService({
+    orm,
     songs,
-    hub: createHub(),
     agents,
     // with no durations in the config (the API tests) there is no Intermission: the next song starts at once, as before
     intermission: { applauseMs: config.intermissionApplauseMs ?? 0, stageMs: config.intermissionStageMs ?? 0, byDefault: config.intermissionByDefault ?? true },
   });
 
-  // Nest takes the root: /healthz, /readyz and the areas that moved (ROADMAP, step 3). The Fastify routes below use its services.
+  // Nest takes the root; the Fastify routes below use the same services
   const nest = await NestFactory.create<NestFastifyApplication>(
     AppModule.forRoot({ config, db, orm, jobs, storage, mailer, agents, limiters, songs, rooms }),
     new FastifyAdapter(app as never),
@@ -95,6 +96,8 @@ export async function buildApp({
       bodyParser: false, // Fastify's own JSON parser (with the body limit above) keeps serving every route
     },
   );
+  // the Rooms' WebSocket gateway, with the protocol's own messages ({ type, ... })
+  nest.useWebSocketAdapter(new WsAdapter(nest, { messageParser: parseRoomMessage }));
   const release = nest.get(ReleaseService);
   app.decorate('rooms', rooms);
   app.decorate('agents', agents);
@@ -109,8 +112,6 @@ export async function buildApp({
       return reply.send(error);
     });
 
-    legacy.register(websocket);
-    legacy.register(roomRoutes, { prefix: '/api', rooms, config, limiters, release });
     legacy.register(cloudUploads, { prefix: '/agent/v1', agents, storage });
     legacy.register(adminPage, { config });
 

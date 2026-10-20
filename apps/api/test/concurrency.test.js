@@ -6,10 +6,13 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { MikroORM } from '@mikro-orm/core';
 import { buildApp } from '../dist/app.js';
+import { ormOptions } from '../dist/database/orm.js';
 import { openDb } from '../dist/db.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
-import { createHub, createRoomService, MAX_PER_CLIENT } from '../dist/rooms.js';
+import { RoomService } from '../dist/rooms/room.service.js';
+import { MAX_PER_CLIENT } from '../dist/rooms/rooms.js';
 import { LocalStorage } from '../dist/storage.js';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
@@ -122,9 +125,12 @@ test('starting a session twice at once leaves the computer with one active sessi
 
 test('rooms created at once never share a code', async () => {
   const db = openDb(':memory:');
+  const orm = await MikroORM.init(ormOptions(db.connection));
+  await orm.migrator.up();
   const codes = ['SAME', 'SAME', 'SAME', 'NEXT'];
-  const rooms = createRoomService({ db, songs: {}, hub: createHub(), newCode: () => codes.shift() });
+  const rooms = new RoomService({ orm, songs: {}, newCode: () => codes.shift() });
   const created = await Promise.all([rooms.createRoom(), rooms.createRoom()]);
   assert.deepEqual(created.map((room) => room.code).sort(), ['NEXT', 'SAME']);
+  await orm.close();
   db.close();
 });

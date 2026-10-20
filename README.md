@@ -110,7 +110,7 @@ Rooms and the queue live in a SQLite database in the Docker volume `api-data`.
 | `POST /api/rooms/:code/player/{pause,resume,skip}` · `PATCH /api/rooms/:code {fair, scoring, voice, voice_volume, melody_bars}` | control and room settings (host) |
 | `PUT /api/rooms/:code/songs/:id/parts {parts}` | who sings each lyric line in a duet (`a b * -`; the singers or the host) |
 | `PUT /api/rooms/:code/songs/:id/offset {offset}` | lyrics offset, in seconds (host) |
-| `WS /api/rooms/:code/ws?role=tv\|controller` | real-time state; the TV sends `ended` and `position` |
+| `WS /api/rooms/ws?code=…&role=tv\|controller` | real-time state; the TV sends `ended` and `position` |
 | `GET /api/search?q=` | searches YouTube videos (served by the worker; 10-minute cache) |
 | `POST /api/songs` · `GET /api/songs` · `GET /api/songs/:id` · `PUT /api/songs/:id/lyrics` | songs and processing (used by the room) |
 | `GET /media/cache/<id>/...` | files, with `Range` support |
