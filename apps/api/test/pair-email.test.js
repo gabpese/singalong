@@ -4,17 +4,17 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { createMailer, pairingEmail } from '../src/mailer.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { createMailer, pairingEmail } from '../dist/mailer.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const LOOSE = { max: 1e6, windowMs: 60_000 };
 
 async function build({ allowed = ['ana@exemplo.com'], enabled = true, rateLimits = {}, mailer } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'singalong-mail-'));
   const sent = [];
-  const app = buildApp({
+  const app = await buildApp({
     config: { publicDir: root, adminToken: 'adm', pairAllowedEmails: allowed, publicUrl: 'https://karaoke.exemplo', rateLimits: { pair: LOOSE, pairRequest: LOOSE, pairEmail: LOOSE, ...rateLimits } },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),

@@ -5,10 +5,10 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { normalizeMediaBase } from '../src/agents.js';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
+import { normalizeMediaBase } from '../dist/agents.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const ADMIN = { 'x-admin-token': 'segredo-do-admin' };
@@ -22,7 +22,7 @@ let root;
 
 before(async () => {
   root = await mkdtemp(join(tmpdir(), 'singalong-local-'));
-  app = buildApp({
+  app = await buildApp({
     config: { publicDir: root, adminToken: 'segredo-do-admin', rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG } },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),

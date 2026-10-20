@@ -91,6 +91,16 @@ docker compose -f docker-compose.prod.yml --env-file .env run --rm --no-deps api
 IMAGE_TAG=<sha> ./deploy.sh                                                              # or ./deploy.sh for the latest image
 ```
 
+### The files on the VM
+
+`setup-vm.sh` downloads `deploy.sh`, `docker-compose.prod.yml` and `Caddyfile` to `/opt/singalong` once, when the VM is set up. A deploy pulls a new API image, not those files: when a change touches one of them, download it again before `./deploy.sh`.
+
+```sh
+cd /opt/singalong
+curl -fsSL https://raw.githubusercontent.com/gabpese/singalong/main/deploy/deploy.sh -o deploy.sh && chmod +x deploy.sh
+# the same for docker-compose.prod.yml and Caddyfile, without the chmod
+```
+
 ## Settings
 
 The API reads environment variables ([`apps/api/src/config.js`](../apps/api/src/config.js)):

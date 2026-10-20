@@ -117,7 +117,7 @@ export function createRoomService({
   db,
   songs,
   hub,
-  agents = null, // o serviço do agente local: dá o apelido e o estado (online) do dono da sessão de uma sala
+  agents = /** @type {any} */ (null), // o serviço do agente local: dá o apelido e o estado (online) do dono da sessão de uma sala
   // intervalo entre músicas: duração dos aplausos e da subida ao palco (0 desliga a fase) e se a sala nasce com ele ligado
   intermission = { applauseMs: 0, stageMs: 0, byDefault: true },
   now = Date.now,

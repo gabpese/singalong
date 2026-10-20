@@ -63,6 +63,8 @@ O Singalong não usa framework completo: ele compõe estas peças ([ADR 0016](ad
 | Peça | Papel |
 |---|---|
 | Fastify (`@fastify/websocket`) | Servidor HTTP e WebSockets |
+| NestJS | Os módulos e a injeção de dependência da API, sobre o mesmo Fastify (as áreas entram uma a uma) |
+| MikroORM | A camada de banco sobre o SQLite: entidades e migrações (`apps/api/src/database/`) |
 | React | A interface das páginas |
 | Vite | O build das quatro páginas |
 | Electron | O app instalável |
@@ -186,7 +188,7 @@ O agente só faz pedidos de saída, então funciona atrás de qualquer roteador 
 
 ```
 apps/
-  api/        API em Node (Fastify): src/rooms.js, src/agents.js, src/routes/
+  api/        API em Node (NestJS sobre o Fastify, MikroORM): src/app.ts, src/database/, src/rooms.js, src/agents.js, src/routes/
   web/        React + Vite: src/{landing,room,tv,stage,ui,lib,i18n,styles}, e2e/ (Playwright)
   worker/     Python: singalong_worker/ (pipeline, runner, align, lyrics...), tests/
   desktop/    Electron: src/ (main, controller), ui/ (as telas do próprio app)

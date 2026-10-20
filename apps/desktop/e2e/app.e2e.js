@@ -12,9 +12,9 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { chromium } from 'playwright-core';
 import electronPath from 'electron';
-import { buildApp } from '../../api/src/app.js';
-import { createMemoryJobStore } from '../../api/src/jobs.js';
-import { LocalStorage } from '../../api/src/storage.js';
+import { buildApp } from '../../api/dist/app.js';
+import { createMemoryJobStore } from '../../api/dist/jobs.js';
+import { LocalStorage } from '../../api/dist/storage.js';
 
 const python = process.env.SINGALONG_TEST_PYTHON;
 const skip = python ? false : 'defina SINGALONG_TEST_PYTHON para rodar o teste do app';
@@ -35,7 +35,7 @@ let musicFolder;
 before(async () => {
   if (skip) return;
   const root = await mkdtemp(join(tmpdir(), 'singalong-e2e-api-'));
-  api = buildApp({
+  api = await buildApp({
     config: { publicDir: existsSync(WEB_DIST) ? WEB_DIST : root, adminToken: 'adm', pairAllowedEmails: ['dona@exemplo.com'], rateLimits: { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG, pairRequest: BIG, pairEmail: BIG }, appLatestVersion: '9.0.0', appNotes: 'Corrige o login do YouTube', appDownloadUrl: 'http://127.0.0.1/baixar' },
     storage: new LocalStorage(root),
     jobs: createMemoryJobStore(),

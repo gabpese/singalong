@@ -4,9 +4,9 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const NO_LIMITS = { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG };
@@ -27,9 +27,9 @@ async function seed(id) {
   await writeFile(join(dir, 'meta.json'), JSON.stringify({ video_id: id, title: 'T', artist: 'A' }));
 }
 
-function build(options = {}) {
+async function build(options = {}) {
   const store = options.jobs ?? createMemoryJobStore();
-  const instance = buildApp({
+  const instance = await buildApp({
     config: { publicDir: root, adminToken: 'segredo-do-admin', rateLimits: options.rateLimits ?? NO_LIMITS },
     storage: new LocalStorage(root),
     jobs: store,
@@ -39,7 +39,7 @@ function build(options = {}) {
 
 before(async () => {
   root = await mkdtemp(join(tmpdir(), 'singalong-agent-'));
-  ({ app, jobs } = build());
+  ({ app, jobs } = await build());
   await app.ready();
 });
 
@@ -76,7 +76,7 @@ const claim = (agent, application = app) => call('POST', '/agent/v1/jobs/claim',
 const roomState = async (room, application = app) => (await call('GET', `/api/rooms/${room.code}`, { headers: CLIENT, application })).json();
 
 test('pareamento: sem ADMIN_TOKEN fica desligado; com ele, só o administrador gera o código', async () => {
-  const noAdmin = buildApp({ config: { publicDir: root, rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs: createMemoryJobStore() });
+  const noAdmin = await buildApp({ config: { publicDir: root, rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs: createMemoryJobStore() });
   assert.equal((await call('POST', '/agent/v1/pair/start', { headers: ADMIN, payload: {}, application: noAdmin })).statusCode, 404);
   await noAdmin.close();
 
@@ -109,7 +109,7 @@ test('pareamento: o código vence em 10 minutos', async () => {
 });
 
 test('pareamento: tentativas de código são limitadas por pessoa', async () => {
-  const limited = build({ rateLimits: { ...NO_LIMITS, pair: { max: 3, windowMs: 60_000 } } });
+  const limited = await build({ rateLimits: { ...NO_LIMITS, pair: { max: 3, windowMs: 60_000 } } });
   const codes = [];
   for (let i = 0; i < 5; i++) codes.push((await call('POST', '/agent/v1/pair/complete', { payload: { code: 'AAAAAAAA' }, application: limited.app })).statusCode);
   assert.deepEqual(codes, [400, 400, 400, 429, 429]);
@@ -276,7 +276,7 @@ test('claim com espera (long-poll): entrega o job assim que ele chega', async ()
 test('job sem sinal volta para a fila; o agente que reinicia recebe primeiro o que ficou com ele', async () => {
   let clock = 1_000_000;
   const store = createMemoryJobStore({ now: () => clock, staleMs: 60_000 });
-  const local = build({ jobs: store });
+  const local = await build({ jobs: store });
   const a = await pair('A', local.app);
   const b = await pair('B', local.app);
   const sa = await startSession(a, 'Ana', {}, local.app);

@@ -36,10 +36,10 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
    - Concurrency tests (`apps/api/test/concurrency.test.js`) for the rules that read and then write: songs added at once at the per-person limit, "the TV ended" and "the Host skipped" arriving together, a score sent as the song ends, moves at once, a pairing code used twice, two session starts, two Rooms with the same code.
    - The first-in-first-out queue per Room (`src/serial.js`) already covered the HTTP routes, "ended" and the Intermission timers; the TV's score and the publishes of people joining and leaving now go through it too. A skip names the song on the Host's screen, so it never skips the next singer's song; session changes queue per computer; a cheer, a Room code and a pairing code are each settled by one SQL statement. The agents' job claims live in Redis or in memory, not in SQLite, so the ORM does not reach them.
    - `deploy.sh` copies the SQLite file with `VACUUM INTO` before each deploy and keeps the last five copies.
-2. **NestJS and MikroORM in place.**
-   - Nest boots on the existing Fastify instance; the old routes stay registered as Fastify plugins.
-   - MikroORM 7 on `node:sqlite` (`NodeSqliteDialect`), with entities from `defineEntity`, and the baseline migration.
-   - TypeScript 7's `tsc` builds `dist/`; the Dockerfile gains a build stage; CI builds the API before its tests and before the web and desktop e2e. `buildApp()` still returns the Fastify instance.
+2. **NestJS and MikroORM in place (done).**
+   - Nest boots on the existing Fastify instance and serves `/healthz` and `/readyz`. The other routes stay Fastify plugins, in a context of their own that keeps their error handler.
+   - MikroORM 7 shares `db.js`'s `node:sqlite` connection (`src/database/sqlite-dialect.ts`), with entities from `defineEntity` that a test compares with the frozen schema, and a baseline migration that changes nothing.
+   - TypeScript 7's `tsc` builds `dist/`; the Dockerfile gains a build stage; CI builds the API before its tests and before the web and desktop e2e. `buildApp()` is now async and still returns the Fastify instance.
 3. **One pull request per area,** from the least to the most concurrent: `release`, `cache-cleaner` and `admin`; `songs`; `agents`; `rooms`. Each moves its files to TypeScript and into a Nest module, writes its JSON Schemas with TypeBox, and makes its database calls asynchronous through MikroORM, with one forked EntityManager per request, WebSocket message, timer and long-poll round. The `rooms` pull request defines the protocol types (`state`, `position`, the HTTP responses) in the API, and the web imports them with `import type`.
 
 ### 4. The engine

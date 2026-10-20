@@ -19,7 +19,7 @@ Os contratos ficam como estão:
 - O WebSocket continua uma rota do `@fastify/websocket` em `/api/rooms/:code/ws`, com as mesmas mensagens, registrada a partir de um módulo do Nest.
 - A `/agent/v1`, chamada pelos agentes já instalados, não muda.
 - Os JSON Schemas continuam, escritos com TypeBox, para o mesmo schema validar a requisição e dar o tipo TypeScript dela.
-- O `buildApp()` continua devolvendo a instância do Fastify, então os testes com `inject` e os servidores dos testes de ponta a ponta continuam funcionando; eles importam a API de `dist/`.
+- O `buildApp()` continua devolvendo a instância do Fastify (agora de forma assíncrona, porque o Nest sobe de forma assíncrona), então os testes com `inject` e os servidores dos testes de ponta a ponta continuam funcionando; eles importam a API de `dist/`.
 - Os tipos do protocolo (`state`, `position`, as respostas HTTP) são definidos na API, e o site os importa com `import type`.
 
 As entidades guardam dados e relações explícitas, carregadas com `populate` e nunca de forma preguiçosa (lazy). As regras da Sala continuam nos services, então os testes atuais continuam descrevendo o comportamento.
@@ -40,7 +40,7 @@ As entidades guardam dados e relações explícitas, carregadas com `populate` e
 ## Consequências
 
 - **Ordem.** Primeiro, ainda em JavaScript: testes de concorrência para cada regra que lê e depois grava, e a fila por Sala. Depois o Nest sobe sobre a instância atual do Fastify, com o MikroORM e uma migração base. Depois um pull request por área, da menos para a mais concorrida: `release`, `cache-cleaner` e `admin`; `songs`; `agents`; `rooms`. Cada um passa os seus arquivos para TypeScript, para um módulo do Nest e para o MikroORM, e traduz os comentários deles. O [ROADMAP](../ROADMAP.pt-BR.md) lista os passos.
-- **Base.** O código de inicialização atual (`CREATE TABLE IF NOT EXISTS` e as conferências `hasColumn`) roda uma última vez, e uma migração inicial é registrada como já aplicada. Toda mudança de schema depois dela é um arquivo de migração.
+- **Base.** O código de inicialização atual (`CREATE TABLE IF NOT EXISTS` e as conferências `hasColumn`) fica congelado: continua criando um banco novo e atualizando um antigo até o `db.js` sair, mas nenhuma mudança entra nele. O MikroORM compartilha a conexão dele, as entidades batem com o que ele cria (um teste compara) e uma migração base que não muda nada fica registrada. Toda mudança de schema depois dela é um arquivo de migração.
 - **Voltar atrás.** Enquanto a API migra, as migrações só criam tabelas e colunas, então a imagem anterior continua rodando sobre um banco já migrado. O `deploy.sh` copia o arquivo do SQLite antes de cada deploy, e a API vai para a VM depois de cada pull request aceito.
 - **`erasableSyntaxOnly`** vale onde o Node roda `.ts` direto (o `lib` e o i18n do site, o motor, o app de computador, os testes). A API é compilada, então pode usar as parameter properties do Nest.
 - **Motor e app de computador.** O [ADR 0011](0011-migrate-javascript-to-typescript.pt-BR.md) espera que eles rodem `.ts` sem build. O Node se recusa a remover tipos dentro de `node_modules`, onde o app empacotado guarda o motor, e o processo principal roda no Node do próprio Electron. Antes de o motor migrar, um teste empacota um arquivo `.ts` com o electron-builder. Se falhar, os dois compilam com o mesmo `tsc` da API.

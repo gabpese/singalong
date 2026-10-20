@@ -3,13 +3,13 @@ import { mkdir, mkdtemp, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { buildApp } from '../src/app.js';
-import { cleanCache } from '../src/cache-cleaner.js';
-import { openDb } from '../src/db.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { buildLoggerOptions, redactUrl } from '../src/logging.js';
-import { createRateLimiter } from '../src/rate-limit.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { cleanCache } from '../dist/cache-cleaner.js';
+import { openDb } from '../dist/db.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { buildLoggerOptions, redactUrl } from '../dist/logging.js';
+import { createRateLimiter } from '../dist/rate-limit.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MB = 1024 * 1024;
@@ -142,7 +142,7 @@ async function appWith(rateLimits) {
   await writeFile(join(root, 'public', 'index.html'), 'ok');
   const jobs = createMemoryJobStore();
   jobs.searchResults = [];
-  const app = buildApp({ config: { publicDir: join(root, 'public'), rateLimits }, storage: new LocalStorage(root), jobs });
+  const app = await buildApp({ config: { publicDir: join(root, 'public'), rateLimits }, storage: new LocalStorage(root), jobs });
   await app.ready();
   return { app, jobs, root };
 }

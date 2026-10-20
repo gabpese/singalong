@@ -19,7 +19,7 @@ The contracts stay as they are:
 - The WebSocket stays a `@fastify/websocket` route at `/api/rooms/:code/ws`, with the same messages, registered from a Nest module.
 - `/agent/v1`, which installed agents call, does not change.
 - The JSON Schemas stay, written with TypeBox, so one schema both validates a request and gives its TypeScript type.
-- `buildApp()` still returns the Fastify instance, so the `inject` tests and the e2e servers keep working; they import the API from `dist/`.
+- `buildApp()` still returns the Fastify instance (now asynchronously, as Nest boots asynchronously), so the `inject` tests and the e2e servers keep working; they import the API from `dist/`.
 - The protocol types (`state`, `position`, the HTTP responses) are defined in the API, and the web imports them with `import type`.
 
 Entities hold data and explicit relations, loaded with `populate` and never lazily. The Room rules stay in the services, so the existing tests keep describing the behaviour.
@@ -40,7 +40,7 @@ Entities hold data and explicit relations, loaded with `populate` and never lazi
 ## Consequences
 
 - **Order.** First, still in JavaScript: concurrency tests for every rule that reads then writes, and the per-Room queue. Then Nest boots on the existing Fastify instance with MikroORM and a baseline migration. Then one pull request per area, from the least to the most concurrent: `release`, `cache-cleaner` and `admin`; `songs`; `agents`; `rooms`. Each moves its files to TypeScript, into a Nest module, onto MikroORM, and translates their comments. The [ROADMAP](../ROADMAP.md) lists the steps.
-- **Baseline.** The current start-up code (`CREATE TABLE IF NOT EXISTS` and the `hasColumn` checks) runs one last time, then an initial migration is recorded as already applied. Every later schema change is a migration file.
+- **Baseline.** The current start-up code (`CREATE TABLE IF NOT EXISTS` and the `hasColumn` checks) is frozen: it keeps building a new database and updating an old one until `db.js` goes, but no change enters it. MikroORM shares its connection, the entities match what it builds (a test compares them), and a baseline migration that changes nothing is recorded. Every later schema change is a migration file.
 - **Going back.** While the API migrates, migrations only add tables and columns, so the previous image still runs on a migrated database. `deploy.sh` copies the SQLite file before each deploy, and the API is deployed after each merged pull request.
 - **`erasableSyntaxOnly`** applies where Node runs `.ts` directly (the web's `lib` and i18n, the engine, the desktop app, the tests). The API is compiled, so it may use Nest's parameter properties.
 - **Engine and desktop app.** [ADR 0011](0011-migrate-javascript-to-typescript.md) expects them to run `.ts` without a build. Node refuses to strip types under `node_modules`, where the packaged app keeps the engine, and the main process runs on Electron's own Node. Before the engine migrates, a spike packages a `.ts` file with electron-builder. If it fails, both compile with the same `tsc` as the API.

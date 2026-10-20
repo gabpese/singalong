@@ -10,7 +10,7 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 
 | Caminho | O que é | Tecnologia |
 |---|---|---|
-| `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, Fastify (migrando para NestJS e MikroORM, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)), SQLite, Redis |
+| `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, NestJS sobre o Fastify e MikroORM sobre o SQLite (as áreas migrando, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)), Redis; compilada pelo `tsc` em `dist/` |
 | `apps/web` | Página inicial, Sala (celular), TV, Palco | React + Vite, TypeScript |
 | `apps/worker` | Download, separação da voz, alinhamento da letra, exportação em MP4 | Python 3.11, PyTorch |
 | `apps/desktop` | O app instalável do dono (bandeja, páginas da TV e do anfitrião embutidas) | Electron |
@@ -39,9 +39,10 @@ Os comandos são os `scripts` de cada `package.json`. O que eles não contam:
 
 | App | Rodar | Pegadinha |
 |---|---|---|
-| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | O servidor dos testes de ponta a ponta serve o `dist/`: faça o build antes. As salas dele nascem com o intervalo desligado; os testes que precisam dele o ligam. Os testes unitários rodam o `src/lib` e o `src/i18n` direto no Node, então os imports ali nomeiam o arquivo `.ts`. |
+| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | O servidor dos testes de ponta a ponta serve o `dist/`: faça o build antes. Ele roda a API compilada, então rode antes `npm run build` em `apps/api`. As salas dele nascem com o intervalo desligado; os testes que precisam dele o ligam. Os testes unitários rodam o `src/lib` e o `src/i18n` direto no Node, então os imports ali nomeiam o arquivo `.ts`. |
 | `apps/worker` | `python -I -m unittest discover -s tests -t .` | Precisa só de `numpy langdetect websockets yt-dlp` (sem PyTorch). |
-| `apps/api`, `apps/desktop`, `apps/engine` | `npm test` | |
+| `apps/api` | `npm test` | Ele gera o `dist/` antes: os testes, e os de ponta a ponta do site e do app, importam a API compilada. Mudança de schema é uma migração do MikroORM em `src/database/migrations/`; o schema do `db.js` está congelado. |
+| `apps/desktop`, `apps/engine` | `npm test` | O teste de ponta a ponta do app também roda a API compilada. |
 
 O CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda todos na `main`. A imagem da API só é publicada depois que o CI passa.
 
@@ -59,4 +60,4 @@ O CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda todos na `mai
 4. Gere o instalador do Windows nesta máquina (`npm run dist:win` em `apps/desktop`) e anexe `singalong_karaoke.exe`, `singalong_karaoke.exe.blockmap` e `latest.yml`.
 5. Rode o workflow "Instaladores de Linux e macOS" (`release-installers.yml`) com a tag; ele anexa o AppImage, o `latest-linux.yml` e o DMG.
 6. Publique o rascunho como Latest quando os seis arquivos estiverem anexados.
-7. O dono roda `./deploy.sh` na VM (o deploy automático está desligado) e informa a versão nova na página do administrador.
+7. O dono roda `./deploy.sh` na VM (o deploy automático está desligado) e informa a versão nova na página do administrador. A VM guarda as próprias cópias do `deploy.sh`, do `docker-compose.prod.yml` e do `Caddyfile`: quando uma mudança mexe num deles, baixe-o de novo antes ([infraestrutura](docs/infrastructure.pt-BR.md#os-arquivos-da-vm)).

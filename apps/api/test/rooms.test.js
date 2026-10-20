@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import WebSocket from 'ws';
-import { buildApp } from '../src/app.js';
-import { openDb } from '../src/db.js';
-import { createMemoryJobStore } from '../src/jobs.js';
-import { LocalStorage } from '../src/storage.js';
+import { buildApp } from '../dist/app.js';
+import { openDb } from '../dist/db.js';
+import { createMemoryJobStore } from '../dist/jobs.js';
+import { LocalStorage } from '../dist/storage.js';
 
 const NO_LIMITS = { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } };
 const READY_A = 'readySongA1'; // 11 caracteres, como os IDs do YouTube
@@ -36,7 +36,7 @@ before(async () => {
   await writeFile(join(publicDir, 'index.html'), 'ok');
   for (const id of [READY_A, READY_B, READY_C]) await seed(id);
   jobs = createMemoryJobStore();
-  app = buildApp({ config: { publicDir, publicUrl: 'http://192.168.0.10:3000', rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs });
+  app = await buildApp({ config: { publicDir, publicUrl: 'http://192.168.0.10:3000', rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs });
   await app.ready();
 });
 

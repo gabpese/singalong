@@ -22,7 +22,7 @@ export const exportKey = (id, pitch) => `cache/${id}/karaoke${pitch === 0 ? '' :
 /** Uma música importada (arquivo ou fonte aberta do dono): "f-" + 12 hexadecimais. Não vem do YouTube, então não há o que baixar. */
 const isImported = (id) => id.startsWith('f-');
 
-export function createSongService({ storage, jobs, agents = null }) {
+export function createSongService({ storage, jobs, agents = /** @type {any} */ (null) }) {
   /** O catálogo local do contexto (de quem é e onde está a mídia), ou null: a música está no servidor. */
   const localOf = ({ sessionId = null } = {}) => (agents && sessionId ? agents.libraryOfSession(sessionId) : null);
   const localUrl = (lib, key) => `${lib.mediaBase}/${key}`;
