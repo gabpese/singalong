@@ -30,7 +30,7 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
 
 ### 3. The API on NestJS and MikroORM
 
-[ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.md). The API goes to the VM after each merged pull request. Until step 3 ends, migrations only add tables and columns, so the previous image keeps running on a migrated database.
+[ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.md). The API goes to the VM after each merged pull request. Until step 3 ends, a migration keeps every table and column the previous image uses (it adds tables and columns, or tightens a constraint the data already meets), so the previous image keeps running on a migrated database.
 
 1. **Still in JavaScript (done).**
    - Concurrency tests (`apps/api/test/concurrency.test.js`) for the rules that read and then write: songs added at once at the per-person limit, "the TV ended" and "the Host skipped" arriving together, a score sent as the song ends, moves at once, a pairing code used twice, two session starts, two Rooms with the same code.
@@ -43,6 +43,7 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
 3. **One pull request per area,** from the least to the most concurrent: `release`, `cache-cleaner` and `admin`; `songs`; `agents`; `rooms`. Each moves its files to TypeScript and into a Nest module, writes its JSON Schemas with TypeBox, and makes its database calls asynchronous through MikroORM, with one forked EntityManager per request, WebSocket message, timer and long-poll round. The `rooms` pull request defines the protocol types (`state`, `position`, the HTTP responses) in the API, and the web imports them with `import type`.
    - **`release`, `cache-cleaner` and `admin`: done.** Each call gets its own forked EntityManager. The published app version is read once at start and kept in memory, so the agents' routes still read it synchronously. The admin page's static files stay a Fastify route (its address must end in "/"); its API is a Nest module under the secret address, with a guard for the token and the limits, TypeBox through a pipe, and a filter that answers an `HttpError` as before.
    - **`songs`: done.** No database work: TypeScript, a Nest controller, TypeBox schemas and a reusable `@RateLimit()` guard. The `SongService` is still built by `app.ts`, because the Rooms use it too. The pipe validates TypeBox schemas with Fastify's own Ajv and options, so coercion and dropped properties match the Fastify routes exactly.
+   - **Primary keys `NOT NULL`: done.** db.js's schema declared `TEXT PRIMARY KEY` without `NOT NULL`, which lets SQLite store a null, so the entities typed every key as nullable. The first migration that changes the schema rebuilds the ten tables the way SQLite documents, with the foreign keys switched off outside the transaction: with them on, dropping `rooms` or `devices` deletes the Queue, the Sessions and the history in cascade. It keeps the rows, the `UNIQUE` and `CHECK` constraints, the indexes and the `AUTOINCREMENT` counters. Migrations now run one by one, each in its own transaction.
 
 ### 4. The engine
 
