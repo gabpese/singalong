@@ -33,6 +33,6 @@ Out of scope:
 
 - **The YouTube session never leaves the user's computer.** The installable app keeps the YouTube login on the machine that downloads; the server receives only a display nickname, never cookies, email or password.
 - **Agents only make outbound connections** and accept a closed set of job options (a video id and lyrics choices), never arbitrary commands.
-- **Device tokens** are stored in the app's configuration file inside the user's own data folder (`config.json`), and the owner can revoke a device from the server at any time.
+- **Device tokens** are stored in the app's configuration file inside the user's own data folder (`config.json`), encrypted by the system vault (DPAPI, the Keychain or the Secret Service); where the system offers none, the app says the token is unprotected. The owner can revoke a device from the server at any time.
 - **Secrets stay out of the repository:** `secrets/` is git-ignored, and the server reads tokens and keys from environment variables.
 - **The installers are not code-signed yet**; Windows SmartScreen and macOS Gatekeeper will warn on first run.

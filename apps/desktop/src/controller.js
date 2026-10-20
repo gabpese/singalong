@@ -71,6 +71,19 @@ export const DEFAULT_SERVER = 'https://singalong.duckdns.org'; // o servidor pad
 
 export const BROWSER_NAMES = { chrome: 'Google Chrome', edge: 'Microsoft Edge', auto: 'o seu navegador' };
 
+/**
+ * Without a system vault (the tests, or a system that offers none) the device token stays in config.json as plain text, and
+ * the window says it is not protected. The app passes Electron's `safeStorage` instead (see `systemVault` in main.js).
+ * A vault: `available` (it can encrypt), `protects` (the key is the system's, not a fixed one), `encrypt(text)` → base64,
+ * `decrypt(base64)` → `{ text, reEncrypt }`.
+ */
+export const PLAIN_VAULT = {
+  available: false,
+  protects: false,
+  encrypt: async () => { throw new Error('no vault'); },
+  decrypt: async () => { throw new Error('no vault'); },
+};
+
 export function createController({
   dataDir,
   workerSource, // onde está o código do worker que vai para dentro do motor (no app instalado: a pasta de recursos)
@@ -81,6 +94,7 @@ export function createController({
   refreshWorkerImpl = refreshWorker,
   verifyImpl = verifyEngine,
   detectBrowser = detectDefaultBrowser,
+  openVault = async () => PLAIN_VAULT, // called by init(): Electron's vault only works once the app is ready
   now = Date.now,
   launcher = (root, args, extraEnv) => workerCommand(root, args, extraEnv), // [exe, args, options]: os testes trocam por um worker de mentira
   emit = () => {},
@@ -89,6 +103,7 @@ export function createController({
 } = {}) {
   const configFile = join(dataDir, 'config.json');
   let config = { server: '', token: '', device_name: '', nickname: '', engine_dir: join(dataDir, 'engine'), library_dir: join(dataDir, 'library') };
+  let vault = PLAIN_VAULT;
   let browser = 'auto'; // o navegador padrão da máquina (detectado ao abrir)
   const state = {
     engine: { status: 'unknown', progress: null, error: null, kind: null, reason: null },
@@ -113,12 +128,36 @@ export function createController({
     emit('log', state.logs.at(-1));
   };
 
-  async function save(patch) {
+  // Writes run one after another: encrypting the token waits on the system, and two writes must not share the temporary file.
+  let writing = Promise.resolve();
+  function save(patch) {
     config = { ...config, ...patch };
+    const run = writing.catch(() => {}).then(write);
+    writing = run;
+    return run;
+  }
+
+  /** The token reaches the disk only encrypted (`token_enc`); without a vault it stays as plain text. */
+  async function write() {
     await mkdir(dataDir, { recursive: true });
+    const { token, ...rest } = config;
+    const stored = !token ? rest : vault.available ? { ...rest, token_enc: await vault.encrypt(token) } : { ...rest, token };
     const tmp = `${configFile}.tmp`;
-    await writeFile(tmp, JSON.stringify(config, null, 2));
+    await writeFile(tmp, JSON.stringify(stored, null, 2));
     await rename(tmp, configFile);
+  }
+
+  /** Reads the encrypted token. If this computer cannot decrypt it (a copied profile, a replaced keychain), it pairs again. */
+  async function openToken(sealed) {
+    const opened = await vault.decrypt(sealed).catch(() => null);
+    if (opened?.text) {
+      config.token = opened.text;
+      if (opened.reEncrypt) await save({}).catch(() => {}); // the system rotated its key: store the token under the new one
+      return;
+    }
+    config.token = '';
+    await save({}).catch(() => {});
+    log('Não consegui ler o pareamento guardado neste computador. Pareie de novo; o aparelho antigo continua na lista do servidor, para ser revogado.', 'error');
   }
 
   function snapshot() {
@@ -126,6 +165,7 @@ export function createController({
       version,
       defaultServer: DEFAULT_SERVER,
       paired: Boolean(config.server && config.token),
+      tokenProtected: !config.token || vault.protects, // false: the system has no vault and the window warns
       server: config.server,
       deviceName: config.device_name,
       nickname: config.nickname,
@@ -167,11 +207,18 @@ export function createController({
 
   // --- inicialização ---
   async function init() {
+    vault = await openVault().catch(() => PLAIN_VAULT);
+    let stored = {};
     try {
-      config = { ...config, ...JSON.parse(await readFile(configFile, 'utf8')) };
+      stored = JSON.parse(await readFile(configFile, 'utf8'));
     } catch {
       /* primeira abertura */
     }
+    const { token_enc: sealed, ...rest } = stored;
+    config = { ...config, ...rest };
+    if (sealed) await openToken(sealed);
+    else if (config.token && vault.available) await save({}).catch(() => {}); // the first run after the update: encrypt the plain token (retried on the next run if the disk refuses)
+
     browser = await detectBrowser().catch(() => 'auto');
     const engineState = await readState(config.engine_dir);
     if (engineState?.complete) {

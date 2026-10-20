@@ -1,6 +1,6 @@
 // Processo principal do Electron: abre a janela, a bandeja e liga a interface ao controlador (src/controller.js).
 // A janela tem a interface do app (abas "Sessão", "Anfitrião" e "TV") e, nas duas últimas, páginas do servidor embutidas.
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, session as electronSession, shell, Tray, WebContentsView } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, session as electronSession, shell, Tray, WebContentsView } from 'electron';
 import electronUpdater from 'electron-updater';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -32,9 +32,29 @@ const launcher = process.env.SINGALONG_TEST_PYTHON
 
 const { autoUpdater } = electronUpdater;
 
+/**
+ * The system vault for the device token: DPAPI on Windows, the Keychain on macOS, the Secret Service on Linux. Only usable
+ * once the app is ready. On Linux without a Secret Service, Electron falls back to a fixed key (`basic_text`): the token is
+ * then not protected, and the window says so.
+ */
+async function systemVault() {
+  const available = await safeStorage.isAsyncEncryptionAvailable();
+  const fixedKey = process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text';
+  return {
+    available,
+    protects: available && !fixedKey,
+    encrypt: async (text) => (await safeStorage.encryptStringAsync(text)).toString('base64'),
+    decrypt: async (sealed) => {
+      const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(Buffer.from(sealed, 'base64'));
+      return { text: result, reEncrypt: shouldReEncrypt };
+    },
+  };
+}
+
 const controller = createController({
   dataDir: app.getPath('userData'),
   version: app.getVersion(),
+  openVault: systemVault,
   // instalado: o código do worker vai nos recursos do instalador; em desenvolvimento vale o padrão (apps/worker)
   ...(app.isPackaged ? { workerSource: join(process.resourcesPath, 'worker') } : {}),
   emit: (event, payload) => {
