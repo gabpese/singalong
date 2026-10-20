@@ -1,9 +1,6 @@
 import { Controller, Get, Inject, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
-
-export const DB = Symbol('db');
-export const JOBS = Symbol('jobs');
-export const STORAGE = Symbol('storage');
+import { DB, JOBS, STORAGE } from './tokens.ts';
 
 /** What the readiness check needs from the database, the job queue and the song storage. */
 export interface ReadinessDeps {

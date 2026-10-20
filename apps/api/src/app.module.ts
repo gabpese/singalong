@@ -1,31 +1,35 @@
 import { type DynamicModule, Module } from '@nestjs/common';
+import { APP_FILTER, RouterModule } from '@nestjs/core';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import type { DatabaseSync } from 'node:sqlite';
+import { adminPathOf } from './admin/admin-path.ts';
+import { AdminModule } from './admin/admin.module.ts';
+import { CacheModule } from './cache/cache.module.ts';
 import { ormOptions } from './database/orm.ts';
-import { DB, HealthController, JOBS, type ReadinessDeps, STORAGE } from './health.controller.ts';
-
-/** The services built before Nest (db.js, the job store, the storage), handed to the modules that need them. */
-export interface AppDeps extends ReadinessDeps {
-  db: ReadinessDeps['db'] & { connection: DatabaseSync };
-}
+import { HealthController } from './health.controller.ts';
+import { HttpErrorFilter } from './http-error.filter.ts';
+import { LegacyModule, type LegacyServices } from './legacy.module.ts';
+import { ReleaseModule } from './release/release.module.ts';
 
 /**
  * The API's root module. The areas move here one by one (ROADMAP, step 3); until then their routes stay Fastify plugins
- * registered by app.ts.
+ * registered by app.ts, and the services they share reach Nest through LegacyModule.
  */
 @Module({})
 export class AppModule {
-  static forRoot({ db, jobs, storage }: AppDeps): DynamicModule {
+  static forRoot(services: LegacyServices): DynamicModule {
+    const adminPath = adminPathOf(services.config);
     return {
       module: AppModule,
-      // the request context comes with the first area that uses the ORM: each request, WebSocket message and timer gets its own
-      imports: [MikroOrmModule.forRoot({ ...ormOptions(db.connection), registerRequestContext: false })],
-      controllers: [HealthController],
-      providers: [
-        { provide: DB, useValue: db },
-        { provide: JOBS, useValue: jobs },
-        { provide: STORAGE, useValue: storage },
+      imports: [
+        LegacyModule.forRoot(services),
+        // the database work runs with a fresh EntityManager per call: in a request, a WebSocket message or a timer alike
+        MikroOrmModule.forRoot({ ...ormOptions(services.db.connection), registerRequestContext: false }),
+        ReleaseModule,
+        CacheModule,
+        ...(adminPath ? [AdminModule, RouterModule.register([{ path: adminPath, module: AdminModule }])] : []),
       ],
+      controllers: [HealthController],
+      providers: [{ provide: APP_FILTER, useClass: HttpErrorFilter }],
     };
   }
 }

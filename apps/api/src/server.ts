@@ -1,6 +1,5 @@
 import { Redis } from 'ioredis';
 import { type App, buildApp } from './app.ts';
-import { startCacheMaintenance } from './cache-cleaner.js';
 import { loadConfig } from './config.js';
 import { createRedisJobStore } from './jobs.js';
 import { buildLoggerOptions } from './logging.js';
@@ -17,7 +16,7 @@ app = await buildApp({ config, storage, jobs, logger: buildLoggerOptions(config.
 const server = app;
 
 // cache cleaning by use: deletes the least-sung songs when the folder goes over the limit (CACHE_MAX_GB; 0 turns it off)
-const stopMaintenance = startCacheMaintenance({ storage, db: server.db, jobs, maxBytes: config.cacheMaxBytes, log: server.log });
+const stopMaintenance = server.cacheCleaner.start({ maxBytes: config.cacheMaxBytes, log: server.log });
 
 // a clean shutdown (Docker and Kubernetes send SIGTERM)
 for (const signal of ['SIGTERM', 'SIGINT']) {
