@@ -6,7 +6,7 @@ import { HttpError } from '../http-error.ts';
 import type { AddedSong, CreatedRoom, Guest, Interlude, LyricCue, Playback, SongKey } from '../protocol.ts';
 import { createSerializer } from '../serial.ts';
 import type { LyricsChoice, SongService } from '../songs/song.service.ts';
-import { extractVideoId } from '../youtube.js';
+import { extractVideoId } from '../youtube.ts';
 import { type Connection, Hub, type RoomSocket } from './hub.ts';
 import { clampBacking, clampGuide, clampOffset, clampPitch, cleanParts, nextPlayable, playOrder, swapTarget } from './queue-logic.ts';
 import { createBucket, REACTION_KINDS } from './reactions.ts';

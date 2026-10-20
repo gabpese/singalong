@@ -103,7 +103,7 @@ curl -fsSL https://raw.githubusercontent.com/gabpese/singalong/main/deploy/deplo
 
 ## Settings
 
-The API reads environment variables ([`apps/api/src/config.js`](../apps/api/src/config.js)):
+The API reads environment variables ([`apps/api/src/config.ts`](../apps/api/src/config.ts)):
 
 | Variable | Default | What it does |
 |---|---|---|

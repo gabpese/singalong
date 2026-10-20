@@ -1,12 +1,23 @@
-// Envio de e-mail pela API HTTP do Brevo (https://developers.brevo.com/reference/sendtransacemail): sem biblioteca e sem SMTP
-// (a Oracle bloqueia a porta de envio direto). O plano grátis do Brevo basta para códigos de pareamento.
+// E-mail through Brevo's HTTP API (https://developers.brevo.com/reference/sendtransacemail): no library and no SMTP (Oracle
+// blocks the port for sending directly). Brevo's free plan is enough for pairing codes.
+
+export interface Mail {
+  to: string;
+  subject: string;
+  text: string;
+}
+
+export interface Mailer {
+  enabled: boolean;
+  /** Throws when Brevo refuses it. */
+  send(mail: Mail): Promise<void>;
+}
 
 /**
- * @param apiKey     a chave de API do Brevo (segredo: só no .env do servidor)
- * @param fromEmail  o remetente, já verificado no Brevo
- * @returns { enabled, send({ to, subject, text }) } — `send` levanta erro se o Brevo recusar.
+ * `apiKey` is Brevo's API key (a secret: only in the server's .env); `fromEmail` is the sender, already verified in Brevo.
+ * Without both, the mailer is off.
  */
-export function createMailer({ apiKey = '', fromEmail = '', fromName = 'Singalong', fetchImpl = fetch } = {}) {
+export function createMailer({ apiKey = '', fromEmail = '', fromName = 'Singalong', fetchImpl = fetch }: { apiKey?: string; fromEmail?: string; fromName?: string; fetchImpl?: typeof fetch } = {}): Mailer {
   const enabled = Boolean(apiKey && fromEmail);
   return {
     enabled,
@@ -23,8 +34,8 @@ export function createMailer({ apiKey = '', fromEmail = '', fromName = 'Singalon
   };
 }
 
-/** O que a pessoa recebe. Só o código, o prazo e de onde veio: nada de link clicável (menos risco de phishing). */
-export function pairingEmail({ code, minutes, server }) {
+/** What the person receives. Only the code, how long it lasts and where it came from: no link to click (less risk of phishing). */
+export function pairingEmail({ code, minutes, server }: { code: string; minutes: number; server: string }): Omit<Mail, 'to'> {
   return {
     subject: `Seu código do Singalong: ${code}`,
     text: [

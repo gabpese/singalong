@@ -3,7 +3,7 @@
 A letra vira uma legenda ASS (efeito de karaokê \\kf, com os tempos reais de cada palavra quando existem) queimada por
 cima de um fundo liso; o tom é trocado, se pedido, com o filtro rubberband do ffmpeg.
 
-O transporte dos pedidos (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.js.
+O transporte dos pedidos (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.ts.
 """
 import json
 import logging

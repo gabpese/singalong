@@ -1,6 +1,6 @@
 // Os instaladores publicados na release do GitHub, um por sistema, com nome FIXO: o servidor monta o link de download de cada um
 // a partir da base (APP_DOWNLOAD_URL, a pasta `…/releases/latest/download/`) e o app do dono abre o do próprio sistema.
-// Quem muda um nome muda aqui, no electron-builder (package.json) e no servidor (apps/api/src/installers.js); um teste confere os três.
+// Quem muda um nome muda aqui, no electron-builder (package.json) e no servidor (apps/api/src/installers.ts); um teste confere os três.
 
 /** Sistema e arquitetura (`process.platform`-`process.arch`) → arquivo do instalador. */
 export const INSTALLERS = {

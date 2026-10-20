@@ -2,7 +2,7 @@
 
 O pipeline (runner.py, pipeline.py...) não sabe de Redis nem de HTTP; fala com um `Backend`:
 
-  RedisBackend  o worker clássico (Docker, o PC do dono lendo o Redis direto). Contrato em apps/api/src/jobs.js, jeito (1).
+  RedisBackend  o worker clássico (Docker, o PC do dono lendo o Redis direto). Contrato em apps/api/src/jobs.ts, jeito (1).
   HttpBackend   o agente local: só HTTP de SAÍDA para /agent/v1 do servidor, sem acesso ao Redis. Jeito (2) do mesmo contrato.
 
 Os dois têm os mesmos métodos, então o runner e as threads (busca, exportação, vozes de apoio) rodam iguais nos dois.

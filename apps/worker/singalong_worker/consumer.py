@@ -1,6 +1,6 @@
 """Loop principal do worker: puxa jobs do servidor e os processa. O transporte (backend.py) é um de dois:
 
-  Redis  o worker clássico (Docker): lê o stream "jobs" direto do Redis. Contrato em apps/api/src/jobs.js.
+  Redis  o worker clássico (Docker): lê o stream "jobs" direto do Redis. Contrato em apps/api/src/jobs.ts.
   HTTP   o agente local: só conexões de saída para /agent/v1 do servidor (AGENT_URL + AGENT_TOKEN), sem acesso ao Redis.
 
 O worker sempre PUXA trabalho (nunca é chamado pela API), então pode rodar atrás de NAT / em outra máquina.

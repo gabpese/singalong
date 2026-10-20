@@ -9,19 +9,19 @@ import { AgentService } from './agents/agent.service.ts';
 import { cloudUploads } from './agents/cloud.ts';
 import { AppModule } from './app.module.ts';
 import { CacheCleaner } from './cache/cache-cleaner.service.ts';
-import type { loadConfig } from './config.js';
+import type { loadConfig } from './config.ts';
 import { ormOptions } from './database/orm.ts';
 import { openDb } from './db.js';
-import { sendFile } from './files.js';
+import { sendFile } from './files.ts';
 import { HttpError } from './http-error.ts';
-import type { createMemoryJobStore, createRedisJobStore } from './jobs.js';
-import { createMailer } from './mailer.js';
-import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.js';
+import type { JobStore } from './jobs.ts';
+import { createMailer } from './mailer.ts';
+import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.ts';
 import { ReleaseService } from './release/release.service.ts';
 import { RoomService } from './rooms/room.service.ts';
 import { parseRoomMessage } from './rooms/rooms.gateway.ts';
 import { SongService } from './songs/song.service.ts';
-import { type LocalStorage, safeJoin } from './storage.js';
+import { type LocalStorage, safeJoin } from './storage.ts';
 
 /** The settings from loadConfig(); the tests pass only the ones they need, plus their own rate limits. */
 export type AppConfig = Partial<ReturnType<typeof loadConfig>> & {
@@ -29,7 +29,7 @@ export type AppConfig = Partial<ReturnType<typeof loadConfig>> & {
   intermissionByDefault?: boolean;
 };
 
-export type JobStore = ReturnType<typeof createMemoryJobStore> | ReturnType<typeof createRedisJobStore>;
+export type { JobStore };
 
 export interface BuildOptions {
   config: AppConfig;
@@ -126,7 +126,7 @@ export async function buildApp({
     legacy.get('/*', (request, reply) => {
       const path = (request.params as Record<string, string>)['*'];
       if (path.startsWith('api/') || path.startsWith('agent/')) return reply.code(404).send({ error: 'not_found' });
-      const file = safeJoin(config.publicDir, path || 'index.html');
+      const file = safeJoin(config.publicDir!, path || 'index.html');
       return file ? sendFile(request, reply, file) : reply.code(403).send({ error: 'forbidden' });
     });
   });

@@ -5,7 +5,7 @@ import { AgentSong, CloudBlocked, Device, EmailRule, PairCode, Session } from '.
 import { HttpError } from '../http-error.ts';
 import { generateCode } from '../rooms/rooms.ts';
 import { createSerializer } from '../serial.ts';
-import { parseVersion } from '../version.js';
+import { parseVersion } from '../version.ts';
 import {
   checkLibraryEntry,
   clean,

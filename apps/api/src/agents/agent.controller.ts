@@ -6,11 +6,11 @@ import type { Device, Session } from '../database/entities.ts';
 import { RateLimit } from '../rate-limit.guard.ts';
 import { ReleaseService } from '../release/release.service.ts';
 import { HttpError } from '../http-error.ts';
-import type { LocalStorage } from '../storage.js';
+import type { LocalStorage } from '../storage.ts';
 import { RoomService } from '../rooms/room.service.ts';
 import { JOBS, STORAGE } from '../tokens.ts';
 import { TypeBoxPipe } from '../validation.ts';
-import { updateInfo } from '../version.js';
+import { updateInfo } from '../version.ts';
 import { AgentAuthGuard, CurrentDevice } from './agent-auth.guard.ts';
 import {
   CloudMissingBody,

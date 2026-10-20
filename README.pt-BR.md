@@ -122,7 +122,7 @@ Salas e fila ficam num SQLite no volume `api-data` do Docker.
 | `GET /healthz`, `GET /readyz` | liveness / readiness (checa o Redis) |
 
 Os pedidos levam `X-Client-Id` (id do navegador) e, para o anfitrião, `X-Host-Token`.
-O contrato entre a API e o worker (Redis Streams) está documentado em [apps/api/src/jobs.js](apps/api/src/jobs.js).
+O contrato entre a API e o worker (Redis Streams) está documentado em [apps/api/src/jobs.ts](apps/api/src/jobs.ts).
 
 ### Agente local (marco M0: lado do servidor e transporte do worker)
 
