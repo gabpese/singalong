@@ -279,58 +279,17 @@ export function openDb(path = ':memory:') {
         run('UPDATE queue_items SET position = ? WHERE id = ?', a.position, idB);
       }),
 
-    // --- agente local: dispositivos, pareamento e sessões ---
+    // --- the agents' computers and Sessions: the agents use MikroORM (src/agents/); the play history and the tests read these ---
     createDevice: ({ id, name, tokenHash, now, email = null }) =>
       run('INSERT INTO devices (id, name, token_hash, created_at, last_seen, email) VALUES (?, ?, ?, ?, ?, ?)', id, name, tokenHash, now, now, email),
-    getDeviceByTokenHash: (tokenHash) => one('SELECT * FROM devices WHERE token_hash = ? AND revoked_at IS NULL', tokenHash),
     getDevice: (id) => one('SELECT * FROM devices WHERE id = ?', id),
-    touchDevice: (id, now) => run('UPDATE devices SET last_seen = ? WHERE id = ?', now, id),
-    revokeDevice: (id, now) => run('UPDATE devices SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL', now, id).changes > 0,
-
     savePairCode: (codeHash, expiresAt, now, email = null) =>
       transaction(() => {
-        run('DELETE FROM pair_codes WHERE expires_at <= ?', now); // não acumula códigos vencidos
+        run('DELETE FROM pair_codes WHERE expires_at <= ?', now); // expired codes do not pile up
         run('INSERT OR REPLACE INTO pair_codes (code_hash, expires_at, email) VALUES (?, ?, ?)', codeHash, expiresAt, email);
       }),
-    /** Gasta o código (uso único): { email } (o e-mail a que foi enviado, se houve) só se existia e não tinha vencido; senão null. */
-    consumePairCode: (codeHash, now) => {
-      // one statement deletes and reads the code: two requests with the same code can never both get it
-      const row = one('DELETE FROM pair_codes WHERE code_hash = ? RETURNING expires_at, email', codeHash);
-      return row && row.expires_at > now ? { email: row.email ?? null } : null;
-    },
-
-    createSession: ({ id, deviceId, displayName, now }) =>
-      run('INSERT INTO sessions (id, device_id, display_name, created_at, last_seen) VALUES (?, ?, ?, ?, ?)', id, deviceId, displayName, now, now),
     getSession: (id) => one('SELECT * FROM sessions WHERE id = ?', id),
-    activeSessionOf: (deviceId) => one('SELECT * FROM sessions WHERE device_id = ? AND ended_at IS NULL ORDER BY created_at DESC LIMIT 1', deviceId),
     touchSession: (id, now) => run('UPDATE sessions SET last_seen = ? WHERE id = ? AND ended_at IS NULL', now, id),
-    renameSession: (id, displayName) => run('UPDATE sessions SET display_name = ? WHERE id = ?', displayName, id),
-    setSessionMedia: (id, mediaBase) => run('UPDATE sessions SET media_base = ? WHERE id = ?', mediaBase, id),
-
-    /** Publica (ou atualiza) músicas do catálogo do dispositivo: `entries` = [{ videoId, meta, files }]. */
-    upsertAgentSongs: (deviceId, entries, now) =>
-      transaction(() => {
-        for (const { videoId, meta, files } of entries) {
-          run(
-            `INSERT INTO agent_songs (device_id, video_id, meta, files, updated_at) VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(device_id, video_id) DO UPDATE SET meta = excluded.meta, files = excluded.files, updated_at = excluded.updated_at`,
-            deviceId, videoId, JSON.stringify(meta), JSON.stringify(files), now,
-          );
-        }
-      }),
-    getAgentSong: (deviceId, videoId) => one('SELECT * FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId),
-    // --- what the agents read of the admin page's rules (the page itself uses MikroORM: src/admin/) ---
-    getEmailRule: (email) => one('SELECT email, can_pair, can_cloud FROM email_rules WHERE email = ?', email),
-    hasPairRules: () => one('SELECT 1 AS n FROM email_rules WHERE can_pair = 1 LIMIT 1') !== null,
-    setDeviceVersion: (id, version) => run('UPDATE devices SET app_version = ? WHERE id = ? AND COALESCE(app_version, \'\') <> ?', version, id, version),
-    isSongBlocked: (videoId) => one('SELECT 1 AS n FROM cloud_blocked WHERE video_id = ?', videoId) !== null,
-
-    listAgentSongs: (deviceId) => all('SELECT * FROM agent_songs WHERE device_id = ? ORDER BY video_id', deviceId),
-    deleteAgentSong: (deviceId, videoId) => run('DELETE FROM agent_songs WHERE device_id = ? AND video_id = ?', deviceId, videoId).changes > 0,
-    /** Encerra a sessão e devolve true se ela estava ativa. */
-    endSession: (id, now) => run('UPDATE sessions SET ended_at = ? WHERE id = ? AND ended_at IS NULL', now, id).changes > 0,
-    /** Sessões ativas sem sinal desde `before` (o app fechou sem avisar). */
-    listStaleSessions: (before) => all('SELECT * FROM sessions WHERE ended_at IS NULL AND last_seen < ?', before),
 
     // --- ajustes por música (valem em qualquer sala) ---
     ping: () => one('SELECT 1 AS ok').ok === 1,

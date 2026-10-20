@@ -1,5 +1,5 @@
 import { type Static, Type } from '@sinclair/typebox';
-import { VIDEO_ID_PATTERN } from '../agents.js';
+import { VIDEO_ID_PATTERN } from '../agents/agents.ts';
 
 /**
  * How to get the lyrics. auto: the video's captions; lrclib: an online search; text: plain lyrics timed from another source;

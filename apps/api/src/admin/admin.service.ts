@@ -1,12 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
 import type { AppConfig } from '../app.ts';
+import { AgentService } from '../agents/agent.service.ts';
 import { CloudBlocked, Device, EmailRule } from '../database/entities.ts';
-import type { LegacyServices } from '../legacy.module.ts';
 import { ReleaseService } from '../release/release.service.ts';
 import { HttpError } from '../rooms.js';
 import type { LocalStorage } from '../storage.js';
-import { AGENTS, CONFIG, STORAGE } from '../tokens.ts';
+import { CONFIG, STORAGE } from '../tokens.ts';
 import { updateInfo } from '../version.js';
 
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
@@ -22,7 +22,7 @@ export class AdminService {
     private readonly orm: MikroORM,
     private readonly release: ReleaseService,
     @Inject(STORAGE) private readonly storage: LocalStorage,
-    @Inject(AGENTS) private readonly agents: LegacyServices['agents'],
+    private readonly agents: AgentService,
     @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -42,18 +42,18 @@ export class AdminService {
         rules: rules.map((rule) => ({ email: rule.email, can_pair: rule.canPair, can_cloud: rule.canCloud })),
         fixed: { pair: this.config.pairAllowedEmails ?? [], cloud: this.config.cloudUploadEmails ?? [] }, // from the .env: they only change there
       },
-      devices: devices.map((device) => ({
+      devices: await Promise.all(devices.map(async (device) => ({
         id: device.id,
         name: device.name,
         email: device.email,
         created_at: device.createdAt,
         last_seen: device.lastSeen,
         revoked: Boolean(device.revokedAt),
-        cloud: this.agents.canUploadToCloud(device),
+        cloud: await this.agents.canUploadToCloud(device),
         // the app version it reported and whether it is up to date: ok | update_available | update_required | unknown
         version: device.appVersion ?? null,
         update_status: updateInfo(device.appVersion, published).status,
-      })),
+      }))),
       cloud,
       cloud_total: cloud.reduce((sum, song) => sum + song.size, 0),
       blocked: blocked.map((song) => ({ video_id: song.videoId, blocked_at: song.blockedAt })),

@@ -6,8 +6,8 @@
 //  - on the Session OWNER's COMPUTER (local storage): the cloud does not see the files, only the catalog the agent publishes
 //    (the meta.json and which files exist) and the address of the local media server the browser fetches them from.
 // Which one applies depends on the context `{ sessionId }`: if the Session has a `media_base`, its catalog; otherwise, the server.
+import type { AgentService } from '../agents/agent.service.ts';
 import type { JobStore } from '../app.ts';
-import type { LegacyServices } from '../legacy.module.ts';
 import type { LocalStorage } from '../storage.js';
 
 /** Where a request comes from: a Room's Session (its owner's agent answers it) or none (the classic worker). */
@@ -71,11 +71,11 @@ export class SongService {
   constructor(
     private readonly storage: LocalStorage,
     private readonly jobs: JobStore,
-    private readonly agents: LegacyServices['agents'] | null = null,
+    private readonly agents: AgentService | null = null,
   ) {}
 
   /** The context's local catalog (whose it is and where the media is), or null: the song is on the server. */
-  private localOf({ sessionId = null }: SongContext = {}) {
+  private async localOf({ sessionId = null }: SongContext = {}) {
     return this.agents && sessionId ? this.agents.libraryOfSession(sessionId) : null;
   }
 
@@ -90,14 +90,14 @@ export class SongService {
   private async releaseStale(id: string, sessionId: string | null) {
     const job = await this.jobs.get(id);
     if (!job?.session_id || job.session_id === sessionId || !['pending', 'processing'].includes(job.status)) return;
-    if (this.agents?.isOnline(job.session_id)) return;
+    if (await this.agents?.isOnline(job.session_id)) return;
     await this.jobs.release?.(id);
   }
 
-  /** Ready in the catalog of this Session owner's computer? */
-  private localReady(lib: { deviceId: string }, id: string) {
-    const files = this.agents?.librarySong(lib.deviceId, id)?.files;
-    return Boolean(files?.instrumental && files?.lyrics);
+  /** The song in the catalog of this Session owner's computer, when it is ready there (instrumental and lyrics); otherwise null. */
+  private async readyLocally(lib: { deviceId: string } | null, id: string) {
+    const song = lib ? await this.agents?.librarySong(lib.deviceId, id) : null;
+    return song?.files.instrumental && song.files.lyrics ? song : null;
   }
 
   /** Ready in the server's storage (the "cloud")? All three files exist: the partial folder of an interrupted job does not count. */
@@ -112,8 +112,7 @@ export class SongService {
    * downloading them from YouTube again).
    */
   async isReady(id: string, ctx?: SongContext): Promise<boolean> {
-    const lib = this.localOf(ctx);
-    if (lib && this.localReady(lib, id)) return true;
+    if (await this.readyLocally(await this.localOf(ctx), id)) return true;
     return this.cloudReady(id);
   }
 
@@ -123,16 +122,17 @@ export class SongService {
 
   /** The addresses of a ready song's files. */
   private async mediaOf(id: string, ctx?: SongContext): Promise<SongMedia> {
-    const lib = this.localOf(ctx);
+    const lib = await this.localOf(ctx);
     const k = keys(id);
-    if (lib && this.localReady(lib, id)) { // the owner's computer is faster: their TV fetches from there
-      const files = this.agents?.librarySong(lib.deviceId, id)?.files;
+    const local = await this.readyLocally(lib, id);
+    if (lib && local) { // the owner's computer is faster: their TV fetches from there
+      const { files } = local;
       return {
         instrumental: this.localUrl(lib, k.instrumental),
         lyrics: this.localUrl(lib, k.lyrics),
-        melody: files?.melody ? this.localUrl(lib, k.melody) : null,
-        backing: files?.backing ? this.localUrl(lib, k.backing) : null,
-        vocals: files?.vocals ? this.localUrl(lib, k.vocals) : null,
+        melody: files.melody ? this.localUrl(lib, k.melody) : null,
+        backing: files.backing ? this.localUrl(lib, k.backing) : null,
+        vocals: files.vocals ? this.localUrl(lib, k.vocals) : null,
         local: true,
       };
     }
@@ -155,7 +155,7 @@ export class SongService {
     // a job under way (e.g. changing the lyrics) wins over the earlier "ready"
     const jobActive = Boolean(job && ACTIVE_JOB.includes(job.status));
     const status = jobActive ? job.status : ready ? 'ready' : job.status;
-    const lib = this.localOf(ctx);
+    const local = ready ? await this.readyLocally(await this.localOf(ctx), id) : null;
     return {
       video_id: id,
       status,
@@ -163,7 +163,7 @@ export class SongService {
       error: jobActive ? job.error : null,
       error_code: jobActive ? job.error_code ?? null : null,
       retry: jobActive ? job.retry ?? null : null,
-      meta: ready ? (lib && this.localReady(lib, id) ? this.agents?.librarySong(lib.deviceId, id)?.meta : await this.readMeta(id)) : null,
+      meta: ready ? (local ? local.meta : await this.readMeta(id)) : null,
       media: ready ? await this.mediaOf(id, ctx) : null,
     };
   }
@@ -182,10 +182,10 @@ export class SongService {
 
   /** The MP4's state in a key: the file existing is the truth (the state in Redis expires). */
   async exportInfo(id: string, pitch: number, ctx?: SongContext): Promise<ExportState> {
-    const lib = this.localOf(ctx);
+    const lib = await this.localOf(ctx);
     if (lib) {
       // the agent publishes in the catalog the keys that already have an MP4 on the owner's computer
-      const exports: number[] = this.agents?.librarySong(lib.deviceId, id)?.files.exports ?? [];
+      const exports = (await this.agents?.librarySong(lib.deviceId, id))?.files.exports ?? [];
       if (exports.includes(pitch)) return { status: 'ready', url: this.localUrl(lib, exportKey(id, pitch)), error: null, local: true };
     } else {
       const key = exportKey(id, pitch);
@@ -206,8 +206,8 @@ export class SongService {
 
   /** Ready songs (their meta.json): the owner's catalog when the Session has local storage, plus the server's. */
   async list(ctx: SongContext = {}): Promise<Record<string, unknown>[]> {
-    const lib = this.localOf(ctx);
-    const local: { video_id: string }[] = lib && this.agents ? this.agents.libraryList(lib.deviceId) : [];
+    const lib = await this.localOf(ctx);
+    const local = lib && this.agents ? await this.agents.libraryList(lib.deviceId) : [];
     const metaKeys = (await this.storage.list('cache')).filter((key: string) => key.endsWith('/meta.json'));
     const songs = [];
     for (const key of metaKeys) {

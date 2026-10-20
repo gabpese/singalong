@@ -2,9 +2,10 @@ import { Body, Controller, Get, Inject, Param, Post, Put, Query, Req, Res } from
 import type { Static } from '@sinclair/typebox';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { JobStore } from '../app.ts';
+import { AgentService } from '../agents/agent.service.ts';
 import type { LegacyServices } from '../legacy.module.ts';
 import { RateLimit } from '../rate-limit.guard.ts';
-import { AGENTS, JOBS, ROOMS } from '../tokens.ts';
+import { JOBS, ROOMS } from '../tokens.ts';
 import { TypeBoxPipe } from '../validation.ts';
 import { extractVideoId } from '../youtube.js';
 import { ExportBody, ExportQuery, LyricsBody, missingLyricsText, SearchQuery, SongBody, SongIdParams } from './song.schemas.ts';
@@ -26,7 +27,7 @@ export class SongsController {
     private readonly songs: SongService,
     @Inject(JOBS) private readonly jobs: JobStore,
     @Inject(ROOMS) private readonly rooms: LegacyServices['rooms'],
-    @Inject(AGENTS) private readonly agents: LegacyServices['agents'],
+    private readonly agents: AgentService,
   ) {}
 
   /**
@@ -43,7 +44,7 @@ export class SongsController {
   @RateLimit('search', 'Muitas buscas seguidas. Espere alguns segundos e tente de novo.')
   async search(@Query(new TypeBoxPipe(SearchQuery)) { q }: Static<typeof SearchQuery>, @Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     const sessionId = this.sessionOf(request);
-    if (sessionId && !this.agents.isOnline(sessionId)) {
+    if (sessionId && !(await this.agents.isOnline(sessionId))) {
       reply.code(503);
       return { error: 'owner_offline', message: 'O dono da sessão está desconectado. Cole o link do vídeo ou tente mais tarde.' };
     }

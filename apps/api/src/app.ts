@@ -5,10 +5,12 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { adminPage } from './admin/admin-page.ts';
-import { createAgentService } from './agents.js';
+import { AgentService } from './agents/agent.service.ts';
+import { cloudUploads } from './agents/cloud.ts';
 import { AppModule } from './app.module.ts';
 import { CacheCleaner } from './cache/cache-cleaner.service.ts';
 import type { loadConfig } from './config.js';
+import { ormOptions } from './database/orm.ts';
 import { openDb } from './db.js';
 import { sendFile } from './files.js';
 import type { createMemoryJobStore, createRedisJobStore } from './jobs.js';
@@ -16,7 +18,6 @@ import { createMailer } from './mailer.js';
 import { DEFAULT_LIMITS, createRateLimiter } from './rate-limit.js';
 import { ReleaseService } from './release/release.service.ts';
 import { createHub, createRoomService, HttpError } from './rooms.js';
-import { agentRoutes } from './routes/agent.js';
 import { roomRoutes } from './routes/rooms.js';
 import { SongService } from './songs/song.service.ts';
 import { type LocalStorage, safeJoin } from './storage.js';
@@ -40,7 +41,7 @@ export interface BuildOptions {
 /** What the API adds to the Fastify instance (the server and the tests reach the services through it). */
 export interface AppDecorations {
   rooms: ReturnType<typeof createRoomService>;
-  agents: ReturnType<typeof createAgentService>;
+  agents: AgentService;
   db: ReturnType<typeof openDb>;
   release: ReleaseService;
   orm: MikroORM;
@@ -66,11 +67,15 @@ export async function buildApp({
   const app = Fastify({ logger, bodyLimit: 256 * 1024, trustProxy: Boolean(config.trustProxy) });
 
   const db = openDb(config.dbPath ?? ':memory:');
+  // MikroORM shares db.js's connection (ADR 0017). The migrations run before anything reads the database: the baseline
+  // changes nothing; the ones after it change the schema
+  const orm = await MikroORM.init(ormOptions(db.connection));
+  await orm.migrator.up();
   // request limits per person (config.rateLimits overrides the defaults; the tests use it)
   const limiters = Object.fromEntries(
     Object.entries({ ...DEFAULT_LIMITS, ...(config.rateLimits ?? {}) }).map(([name, options]) => [name, createRateLimiter(options)]),
   );
-  const agents = createAgentService({ db, jobs, cloudEmails: config.cloudUploadEmails ?? [] });
+  const agents = new AgentService(orm, jobs, { cloudEmails: config.cloudUploadEmails ?? [] });
   const songs = new SongService(storage, jobs, agents);
   const rooms = createRoomService({
     db,
@@ -83,7 +88,7 @@ export async function buildApp({
 
   // Nest takes the root: /healthz, /readyz and the areas that moved (ROADMAP, step 3). The Fastify routes below use its services.
   const nest = await NestFactory.create<NestFastifyApplication>(
-    AppModule.forRoot({ config, db, jobs, storage, agents, limiters, songs, rooms }),
+    AppModule.forRoot({ config, db, orm, jobs, storage, mailer, agents, limiters, songs, rooms }),
     new FastifyAdapter(app as never),
     {
       logger: false,
@@ -91,7 +96,6 @@ export async function buildApp({
     },
   );
   const release = nest.get(ReleaseService);
-  const orm = nest.get(MikroORM);
   app.decorate('rooms', rooms);
   app.decorate('agents', agents);
   app.decorate('db', db);
@@ -107,7 +111,7 @@ export async function buildApp({
 
     legacy.register(websocket);
     legacy.register(roomRoutes, { prefix: '/api', rooms, config, limiters, release });
-    legacy.register(agentRoutes, { prefix: '/agent/v1', agents, jobs, rooms, config, limiters, mailer, storage, release });
+    legacy.register(cloudUploads, { prefix: '/agent/v1', agents, storage });
     legacy.register(adminPage, { config });
 
     if (storage.local) {
@@ -127,8 +131,6 @@ export async function buildApp({
   });
 
   await nest.init();
-  // the migrations run before any request: the baseline changes nothing; the ones after it change the schema
-  await orm.migrator.up();
 
   app.addHook('onClose', async () => {
     rooms.stop();

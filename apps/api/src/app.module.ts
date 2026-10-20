@@ -1,10 +1,9 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER, RouterModule } from '@nestjs/core';
-import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { adminPathOf } from './admin/admin-path.ts';
 import { AdminModule } from './admin/admin.module.ts';
+import { AgentsModule } from './agents/agents.module.ts';
 import { CacheModule } from './cache/cache.module.ts';
-import { ormOptions } from './database/orm.ts';
 import { HealthController } from './health.controller.ts';
 import { HttpErrorFilter } from './http-error.filter.ts';
 import { LegacyModule, type LegacyServices } from './legacy.module.ts';
@@ -22,12 +21,13 @@ export class AppModule {
     return {
       module: AppModule,
       imports: [
+        // MikroORM included: the database work runs with a fresh EntityManager per call, in a request, a WebSocket message
+        // or a timer alike
         LegacyModule.forRoot(services),
-        // the database work runs with a fresh EntityManager per call: in a request, a WebSocket message or a timer alike
-        MikroOrmModule.forRoot({ ...ormOptions(services.db.connection), registerRequestContext: false }),
         ReleaseModule,
         CacheModule,
         SongsModule,
+        AgentsModule,
         ...(adminPath ? [AdminModule, RouterModule.register([{ path: adminPath, module: AdminModule }])] : []),
       ],
       controllers: [HealthController],
