@@ -343,9 +343,9 @@ export function createRoomService({
       position_ms: position?.item_id === room.current_item_id ? position.ms : 0,
       tv_connected: hub.count(room.code, 'tv') > 0,
       // o dono da sessão da sala (só o apelido e se está conectado); null nas salas sem sessão
-      owner: room.session_id && agents ? agents.ownerOf(room.session_id) : null,
+      owner: room.session_id && agents ? await agents.ownerOf(room.session_id) : null,
       // as músicas desta sala estão no computador do dono (armazenamento local): só a TV nele as alcança; o celular não tem prévia
-      local_media: Boolean(room.session_id && agents?.libraryOfSession(room.session_id)),
+      local_media: Boolean(room.session_id && (await agents?.libraryOfSession(room.session_id))),
       queue: items.map((item) => {
         const song = described.get(item.video_id);
         return {
@@ -415,7 +415,7 @@ export function createRoomService({
 
   return {
     /** Cria a sala. Com `sessionId`, os pedidos de música dela vão para o agente dono dessa sessão. */
-    createRoom({ sessionId = null } = {}) {
+    createRoom({ sessionId = /** @type {string | null} */ (null) } = {}) {
       for (let attempt = 0; attempt < 20; attempt++) {
         const code = newCode();
         const hostToken = newToken();

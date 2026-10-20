@@ -82,7 +82,7 @@ Singalong uses no full-stack framework: it composes these pieces ([ADR 0016](adr
 | Stage | `apps/web/src/stage/StagePage.tsx` |
 | Lyrics drawing, Key, Score | `apps/web/src/lib/` (`lyrics-view.ts`, `engine.ts`, `scoring.ts`) |
 | Song preparation | `apps/worker/singalong_worker/pipeline.py` and `runner.py` |
-| Agent API, Pairing, Session | `apps/api/src/agents.js`, `apps/api/src/routes/agent.js` |
+| Agent API, Pairing, Session | `apps/api/src/agents/` (`agent.service.ts`, `pairing.controller.ts`, `agent.controller.ts`, `cloud.ts`) |
 | Engine assembly | `apps/engine/src/assemble.js` (from `apps/engine/manifest.json`) |
 | Local media | `apps/worker/singalong_worker/media_server.py` |
 | UI texts | `apps/web/src/i18n/{pt,en,es}.ts` |
@@ -188,8 +188,8 @@ The agent only makes outbound requests, so it works behind any home router witho
 
 ```
 apps/
-  api/        Node API (NestJS on Fastify, MikroORM): src/app.ts, src/database/, Nest areas in src/{admin,release,cache,songs}/,
-              the areas still on Fastify in src/rooms.js, src/agents.js, src/routes/
+  api/        Node API (NestJS on Fastify, MikroORM): src/app.ts, src/database/, Nest areas in src/{admin,release,cache,songs,agents}/,
+              the Rooms still on Fastify in src/rooms.js and src/routes/
   web/        React + Vite: src/{landing,room,tv,stage,ui,lib,i18n,styles}, e2e/ (Playwright)
   worker/     Python: singalong_worker/ (pipeline, runner, align, lyrics...), tests/
   desktop/    Electron: src/ (main, controller), ui/ (the app's own screens)

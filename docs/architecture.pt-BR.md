@@ -82,7 +82,7 @@ O Singalong não usa framework completo: ele compõe estas peças ([ADR 0016](ad
 | Palco | `apps/web/src/stage/StagePage.tsx` |
 | Desenho da letra, Tom, Pontuação | `apps/web/src/lib/` (`lyrics-view.ts`, `engine.ts`, `scoring.ts`) |
 | Preparo das músicas | `apps/worker/singalong_worker/pipeline.py` e `runner.py` |
-| API do agente, Pareamento, Sessão | `apps/api/src/agents.js`, `apps/api/src/routes/agent.js` |
+| API do agente, Pareamento, Sessão | `apps/api/src/agents/` (`agent.service.ts`, `pairing.controller.ts`, `agent.controller.ts`, `cloud.ts`) |
 | Montagem do Motor | `apps/engine/src/assemble.js` (a partir de `apps/engine/manifest.json`) |
 | Mídia local | `apps/worker/singalong_worker/media_server.py` |
 | Textos da interface | `apps/web/src/i18n/{pt,en,es}.ts` |
@@ -188,8 +188,8 @@ O agente só faz pedidos de saída, então funciona atrás de qualquer roteador 
 
 ```
 apps/
-  api/        API em Node (NestJS sobre o Fastify, MikroORM): src/app.ts, src/database/, áreas no Nest em src/{admin,release,cache,songs}/,
-              as que ainda estão no Fastify em src/rooms.js, src/agents.js, src/routes/
+  api/        API em Node (NestJS sobre o Fastify, MikroORM): src/app.ts, src/database/, áreas no Nest em src/{admin,release,cache,songs,agents}/,
+              as Salas, que ainda estão no Fastify, em src/rooms.js e src/routes/
   web/        React + Vite: src/{landing,room,tv,stage,ui,lib,i18n,styles}, e2e/ (Playwright)
   worker/     Python: singalong_worker/ (pipeline, runner, align, lyrics...), tests/
   desktop/    Electron: src/ (main, controller), ui/ (as telas do próprio app)

@@ -1,6 +1,6 @@
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
-import { safeEqual } from '../agents.js';
+import { safeEqual } from '../agents/agents.ts';
 import type { AppConfig } from '../app.ts';
 import { RateLimitError } from '../http-error.filter.ts';
 import type { LegacyServices } from '../legacy.module.ts';

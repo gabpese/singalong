@@ -6,7 +6,7 @@
 // - flags are booleans stored as INTEGER with `.defaultRaw('0')` or `('1')`, where MikroORM would write `false` or `true`;
 // - relations get `.index(false)`: the old schema has its own composite indexes, not one per foreign key;
 // - foreign keys keep the old rules: `cascade` where the schema says so, otherwise `no action`.
-import { defineEntity } from '@mikro-orm/core';
+import { defineEntity, type InferEntity } from '@mikro-orm/core';
 
 export const Device = defineEntity({
   name: 'Device',
@@ -202,3 +202,16 @@ export const AgentSong = defineEntity({
 });
 
 export const entities = [Device, Session, Room, QueueItem, SongSettings, AppRelease, PairCode, PlayLog, EmailRule, CloudBlocked, AgentSong];
+
+// Each entity's instance type, under the entity's own name (a value and a type can share it).
+export type Device = InferEntity<typeof Device>;
+export type Session = InferEntity<typeof Session>;
+export type Room = InferEntity<typeof Room>;
+export type QueueItem = InferEntity<typeof QueueItem>;
+export type SongSettings = InferEntity<typeof SongSettings>;
+export type AppRelease = InferEntity<typeof AppRelease>;
+export type PairCode = InferEntity<typeof PairCode>;
+export type PlayLog = InferEntity<typeof PlayLog>;
+export type EmailRule = InferEntity<typeof EmailRule>;
+export type CloudBlocked = InferEntity<typeof CloudBlocked>;
+export type AgentSong = InferEntity<typeof AgentSong>;

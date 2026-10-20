@@ -5,7 +5,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { normalizeMediaBase } from '../dist/agents.js';
+import { normalizeMediaBase } from '../dist/agents/agents.js';
 import { buildApp } from '../dist/app.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
 import { LocalStorage } from '../dist/storage.js';

@@ -1,5 +1,5 @@
 import { Type } from '@sinclair/typebox';
-import { VIDEO_ID_PATTERN } from '../agents.js';
+import { VIDEO_ID_PATTERN } from '../agents/agents.ts';
 
 /** Publishes the app version: whoever has the app below it sees the notice (and, below the minimum, the server refuses work). */
 export const ReleaseBody = Type.Object(
