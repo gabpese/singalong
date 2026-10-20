@@ -34,4 +34,5 @@ Cada ADR registra uma decisão e o porquê dela. Para mudar uma decisão, escrev
 - [0013. Uma VM gratuita atrás do Caddy, num endereço do DuckDNS](adr/0013-free-vm-with-caddy-and-duckdns.pt-BR.md)
 - [0014. CSS próprio a partir de tokens, sem Tailwind nem kit de componentes](adr/0014-own-css-with-tokens.pt-BR.md)
 - [0015. O repositório é escrito em inglês, com traduções em português](adr/0015-english-first-repository.pt-BR.md)
-- [0016. Sem framework completo: Fastify, React com Vite e Electron](adr/0016-no-full-stack-framework.pt-BR.md)
+- [0016. Sem framework completo: Fastify, React com Vite e Electron](adr/0016-no-full-stack-framework.pt-BR.md) (a parte da API foi substituída pelo 0017)
+- [0017. A API migra para NestJS sobre o Fastify, com MikroORM sobre o SQLite](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)

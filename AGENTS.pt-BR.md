@@ -10,7 +10,7 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 
 | Caminho | O que é | Tecnologia |
 |---|---|---|
-| `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, Fastify (migrando para NestJS, [ADR 0016](docs/adr/0016-no-full-stack-framework.pt-BR.md)), SQLite, Redis |
+| `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, Fastify (migrando para NestJS e MikroORM, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)), SQLite, Redis |
 | `apps/web` | Página inicial, Sala (celular), TV, Palco | React + Vite, TypeScript (`src/lib` ainda tem JavaScript, em migração) |
 | `apps/worker` | Download, separação da voz, alinhamento da letra, exportação em MP4 | Python 3.11, PyTorch |
 | `apps/desktop` | O app instalável do dono (bandeja, páginas da TV e do anfitrião embutidas) | Electron |
@@ -28,7 +28,8 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 ## Antes de mudar
 
 - **A interface**: leia antes o [docs/BRAND.pt-BR.md](docs/BRAND.pt-BR.md). Cores e fontes vêm dos tokens em `apps/web/src/styles/theme-bridge.css` (o app instalável guarda uma cópia; um teste compara as duas). A biblioteca de músicas prontas se chama **Jukebox**. O texto nunca fala de preço.
-- **Uma decisão de arquitetura**: leia os [docs/adr/](docs/adr/). Mudar uma delas pede um ADR novo que substitui o antigo.
+- **Uma decisão de arquitetura**: leia os [docs/adr/](docs/adr/). Mudar uma delas pede um ADR novo que substitui o antigo. O trabalho de arquitetura, em ordem, está no [ROADMAP](docs/ROADMAP.pt-BR.md).
+- **Uma ferramenta ou dependência**: o repositório mantém uma versão por linguagem: TypeScript 7, Node 24, Python 3.11. O TypeScript 7 vem sem API do compilador, então escolha ferramentas que rodem pelo `tsc` ou pelo próprio Node; o CLI do Nest, o ts-node e o ts-morph exigiriam o TypeScript 6 ao lado ([ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)).
 - **A versão do app**: ela mora em `apps/desktop/package.json` (e no lock), `apps/desktop/src/controller.js` (`APP_VERSION`) e `apps/worker/singalong_worker/version.py`. Mude as três juntas; um teste confere.
 - **Qualquer coisa que custe dinheiro** (uma API paga, um serviço pago): pergunte ao dono antes. O projeto roda a custo zero ([ADR 0001](docs/adr/0001-zero-cost-while-non-profit.pt-BR.md)).
 

@@ -1,11 +1,13 @@
 ---
-status: accepted (learning phase)
+status: accepted for the pages and the desktop app; superseded for the API by 0017
 date: 2026-10-19
 ---
 
 # 0016. No full-stack framework: Fastify, React with Vite, and Electron
 
 **English** · [Português (Brasil)](0016-no-full-stack-framework.pt-BR.md)
+
+> The API part is superseded by [ADR 0017](0017-api-on-nestjs-with-mikroorm.md): NestJS on Fastify, with MikroORM.
 
 Singalong began as a way to study tools the owner did not know well, such as ffmpeg and Demucs. Without knowing their limits yet, the owner chose not to commit to a full-stack framework that could lock later phases in, and wanted to learn the pieces a framework hides: Fastify for the server, React with Vite for the pages and Electron for the desktop app.
 

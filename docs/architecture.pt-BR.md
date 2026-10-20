@@ -58,7 +58,7 @@ flowchart LR
 
 ### Frameworks e bibliotecas
 
-O Singalong não usa framework completo: ele compõe estas peças ([ADR 0016](adr/0016-no-full-stack-framework.pt-BR.md)). A API tem migração planejada para NestJS em cima do mesmo Fastify.
+O Singalong não usa framework completo: ele compõe estas peças ([ADR 0016](adr/0016-no-full-stack-framework.pt-BR.md)). A API está migrando para NestJS em cima do mesmo Fastify, com MikroORM sobre o SQLite ([ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)).
 
 | Peça | Papel |
 |---|---|

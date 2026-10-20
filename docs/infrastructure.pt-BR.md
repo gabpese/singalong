@@ -78,6 +78,10 @@ flowchart LR
 
 Os passos da release estão no [AGENTS.pt-BR.md → Release](../AGENTS.pt-BR.md#release).
 
+### Voltar para uma API anterior
+
+Toda imagem da API é publicada duas vezes: como `latest` e com o SHA curto do seu commit. Na VM, `IMAGE_TAG=<sha> ./deploy.sh` baixa e sobe aquela imagem anterior; a variável do shell vence a do `.env`. O banco fica como a versão mais nova o deixou, então uma migração precisa manter a imagem anterior funcionando sobre ele ([ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)).
+
 ## Ajustes
 
 A API lê variáveis de ambiente ([`apps/api/src/config.js`](../apps/api/src/config.js)):
@@ -102,6 +106,6 @@ O worker hospedado em casa lê `YTDLP_COOKIES` e `YTDLP_COOKIES_POLICY` (`when-a
 
 ## Cópias e dados
 
-- **Salas e fila**: o arquivo do SQLite no volume `api-data`; Salas paradas há 24 horas são apagadas.
+- **Salas e fila**: o arquivo do SQLite no volume `api-data`; Salas paradas há 24 horas são apagadas. Nada o copia sozinho ainda: o passo 3 do [ROADMAP](ROADMAP.pt-BR.md) faz o `deploy.sh` guardar as cinco últimas cópias.
 - **Músicas**: `storage/cache/<video_id>/`, nunca no repositório nem numa imagem (o repositório é público). O [`deploy/sync-library.sh`](../deploy/sync-library.sh) copia músicas preparadas para a VM quando preciso.
 - **Segredos**: `secrets/` e o `.env` da VM, os dois fora do git.
