@@ -1,6 +1,6 @@
 // O logotipo: "singalong" em duas tintas e, ao lado, a placa "AO VIVO" das portas de estúdio (gasta, mas funcionando: pisca de leve).
 // Só entra onde a placa fica legível (a partir de uns 56 px de altura de letra); nos tamanhos pequenos vale a marca (/brand/mark.svg).
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 
 export function Logo({ onPaper = false }: { onPaper?: boolean }) {
   const letters = [...t('brand.live')];

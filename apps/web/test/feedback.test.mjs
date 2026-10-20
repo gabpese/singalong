@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createFeedbackGuard, FEEDBACK, findTonalPeak } from '../src/lib/feedback.js';
+import { createFeedbackGuard, FEEDBACK, findTonalPeak } from '../src/lib/feedback.ts';
 
 const SR = 48000;
 const BINS = 1024; // fftSize 2048

@@ -1,7 +1,7 @@
 // Seletor de idioma: três bandeiras pequenas (Brasil, Estados Unidos e Espanha); a escolha fica guardada neste navegador.
 // As bandeiras são desenhos simplificados em SVG (emoji de bandeira não aparece no Windows). O nome do idioma vai no rótulo.
 import type { ReactNode } from 'react';
-import { getLanguage, LANGUAGES, setLanguage, t } from '../i18n/index.js';
+import { getLanguage, LANGUAGES, setLanguage, t } from '../i18n/index.ts';
 
 const STARS = Array.from({ length: 20 }, (_, i) => ({ cx: 1.3 + (i % 5) * 2.4, cy: 1.2 + Math.floor(i / 5) * 2.5 }));
 

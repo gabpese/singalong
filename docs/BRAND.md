@@ -21,7 +21,7 @@ The interface looked "AI-made" for a reason that comes before any font or color:
   - **Proposal:** replace the metaphor with one born from real use (section 4). `[< 1 day]` to decide; the rest follows.
   - **Trade-off:** loses the "gamer" appeal the brief asked for; gains coherence and something nobody else has.
 - **[HIGH] Nothing belonged only to Singalong.**
-  - **Evidence:** `style.css` was a display font, a coral and dark cards; change the name and it fits any app. The one truly distinctive trait, the word-by-word lyric fill (`.current .w`, `lyrics-view.js`), was treated as a detail.
+  - **Evidence:** `style.css` was a display font, a coral and dark cards; change the name and it fits any app. The one truly distinctive trait, the word-by-word lyric fill (`.current .w`, `lyrics-view.ts`), was treated as a detail.
   - **Proposal:** build the brand around two things only this product does: **the lyrics lighting up word by word** and **"now it is your turn"**.
   - **Trade-off:** a more specific (less "safe") brand, recognizable in a single screenshot.
 - **[MEDIUM] The icon and the logo told another story.**
@@ -30,7 +30,7 @@ The interface looked "AI-made" for a reason that comes before any font or color:
 - **[MEDIUM] `welcome.png` still carried the old palette** (blue, purple and yellow) and appeared on the Home page and in the app.
   - **Proposal:** redo it after the palette is decided, not before. `[< 1 day]`
 - **[MEDIUM] The voice of the copy wavered.** "You are the host: you choose the order" (instructional), "Isolating the band…" (playful) and "Applause for you" (generic) do not sound like the same person. Proposal: section 5.
-- **[LOW] Reactions are system emoji** (`lib/reactions.js`), off-brand. Proposal: an own set of five, drawn together with the logo.
+- **[LOW] Reactions are system emoji** (`lib/reactions.ts`), off-brand. Proposal: an own set of five, drawn together with the logo.
 - **[GOOD]** The duet uses color **and** shape (circle, square, diamond) and passed axe. That is a brand decision (accessible without fuss) and should become a principle. The tokens live in one file (`theme-bridge.css`), so changing the identity costs days, not weeks.
 
 ## 3. What the interface should convey (in order of importance)

@@ -2,7 +2,7 @@
 // (os relógios dos aparelhos não precisam bater com o do servidor). Uma fase nova (aplausos ou subida ao palco de outra música)
 // recomeça a conta.
 import { useEffect, useRef, useState } from 'react';
-import type { Interlude } from '../lib/types';
+import type { Interlude } from '../lib/types.ts';
 
 export interface InterludeClock {
   /** Quanto já passou desde o começo da fase (ms), contando o que passou antes de este aparelho receber o estado. */

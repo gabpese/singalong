@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSyncClock } from '../src/lib/clock.js';
+import { createSyncClock } from '../src/lib/clock.ts';
 
 /** Um relógio local que o teste move à mão (ms). */
 function fake() {

@@ -1,8 +1,8 @@
 // Os botões de reação do celular: um toque manda um aplauso, fogo... que sobe pela tela da TV.
 import { useState } from 'react';
-import { t } from '../i18n/index.js';
-import { REACTIONS } from '../lib/reactions.js';
-import type { ReactionKind } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { REACTIONS } from '../lib/reactions.ts';
+import type { ReactionKind } from '../lib/types.ts';
 
 export function ReactionBar({ onReact }: { onReact: (kind: ReactionKind) => void }) {
   const [pop, setPop] = useState<string | null>(null); // o botão que acabou de ser tocado (um estalo visual de confirmação)

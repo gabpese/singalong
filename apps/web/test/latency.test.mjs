@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clampLatency, detectOnsets, estimateDelay, heardPosition, MAX_LATENCY_MS, splitRoundTrip, sungPosition } from '../src/lib/latency.js';
+import { clampLatency, detectOnsets, estimateDelay, heardPosition, MAX_LATENCY_MS, splitRoundTrip, sungPosition } from '../src/lib/latency.ts';
 
 const SR = 48000;
 

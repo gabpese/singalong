@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cleanMics, listMicrophones, MAX_MICS, micsKey, openVoice, VOICE_UNITY, voiceGain } from '../src/lib/voice.js';
+import { cleanMics, listMicrophones, MAX_MICS, micsKey, openVoice, VOICE_UNITY, voiceGain } from '../src/lib/voice.ts';
 
 test('o volume vira ganho: 50% é o ganho 1, 100% o dobro, 0 é mudo', () => {
   assert.equal(VOICE_UNITY, 50);

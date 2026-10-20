@@ -1,9 +1,9 @@
 // A interface esconde a parte técnica: nenhum texto fala em Whisper, Demucs, LRC, semitons ou inclui emoji (a escolha da estética "Cyber-Club").
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import en from '../src/i18n/en.js';
-import es from '../src/i18n/es.js';
-import pt from '../src/i18n/pt.js';
+import en from '../src/i18n/en.ts';
+import es from '../src/i18n/es.ts';
+import pt from '../src/i18n/pt.ts';
 
 const TECHNICAL = /whisper|demucs|\blrc\b|\.lrc|\.srt|semiton|semitone|\bia\b|\bai\b/i;
 // emojis de verdade (símbolos de nota como ♯ e ♭ e o ✓ continuam valendo)

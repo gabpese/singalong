@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { easeRange, foldToNearestOctave, isGood, makeScale, melodyNotes, noteAt, notesInWindow, pitchRange, pushTrail, SECONDS_AFTER, SECONDS_BEFORE } from '../src/lib/melody-guide.js';
+import { easeRange, foldToNearestOctave, isGood, makeScale, melodyNotes, noteAt, notesInWindow, pitchRange, pushTrail, SECONDS_AFTER, SECONDS_BEFORE } from '../src/lib/melody-guide.ts';
 
 /** Uma melodia sintética: `hop` de 0,05 s; cada trecho = [nota | -1, quadros]. */
 function melody(parts, hop = 0.05) {

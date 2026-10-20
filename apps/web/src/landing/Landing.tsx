@@ -1,9 +1,9 @@
 // Página inicial: a imagem (TV, notebook e celular) de um lado e as ações do outro, como a tela de boas-vindas do app do dono:
 // criar uma sala (e abrir a TV), entrar numa sala pelo código e baixar o app.
 import { type FormEvent, useEffect, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { api, setHostToken } from '../lib/identity.js';
-import { detectSystem } from '../lib/platform.js';
+import { t } from '../i18n/index.ts';
+import { api, setHostToken } from '../lib/identity.ts';
+import { detectSystem } from '../lib/platform.ts';
 import { LanguageSwitch } from '../ui/LanguageSwitch';
 import { Logo } from '../ui/Logo';
 

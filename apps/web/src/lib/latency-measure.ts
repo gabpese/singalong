@@ -1,28 +1,34 @@
-// Medição do atraso na TV: toca estalos pelas caixas e escuta no microfone quanto demoram a voltar. Só funciona com som alto o
-// bastante para o microfone ouvir e uma sala sem barulho; o resultado é a ida e volta (saída + entrada + o ar entre os dois).
-import { detectOnsets, estimateDelay } from './latency.js';
+// Measuring the TV's delay: plays clicks through the speakers and listens on the microphone for how long they take to come back.
+// It only works with the sound loud enough for the microphone to hear and a quiet room; the result is the round trip (output +
+// input + the air between them).
+import { detectOnsets, estimateDelay } from './latency.ts';
 
 const CLICKS = 6;
-const SPACING = 0.8; // s entre um estalo e o seguinte
-const LEAD = 0.6; // s de silêncio antes do primeiro (o microfone já está ouvindo)
+const SPACING = 0.8; // s between one click and the next
+const LEAD = 0.6; // s of silence before the first one (the microphone is already listening)
 
-/**
- * @param {{ getUserMedia?: Function, AudioContextClass?: typeof AudioContext }} [deps]
- * @returns {Promise<{ roundTripMs: number | null, outputLatencyMs: number, heard: number }>}
- *   `roundTripMs` null = os estalos não foram ouvidos (volume baixo, microfone errado, barulho).
- */
-export async function measureRoundTrip({ getUserMedia = (c) => navigator.mediaDevices.getUserMedia(c), AudioContextClass = AudioContext } = {}) {
-  // sem cancelamento de eco nem supressão de ruído: eles "limpariam" o estalo como se fosse eco da própria TV
+export interface RoundTrip {
+  /** null = the clicks were not heard (low volume, wrong microphone, noise). */
+  roundTripMs: number | null;
+  outputLatencyMs: number;
+  heard: number;
+}
+
+export async function measureRoundTrip({
+  getUserMedia = (c) => navigator.mediaDevices.getUserMedia(c),
+  AudioContextClass = AudioContext,
+}: { getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>; AudioContextClass?: typeof AudioContext } = {}): Promise<RoundTrip> {
+  // no echo cancellation or noise suppression: they would "clean" the click as if it were the TV's own echo
   const stream = await getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
   const ctx = new AudioContextClass();
   try {
     await ctx.resume();
-    const chunks = [];
+    const chunks: Float32Array[] = [];
     const source = ctx.createMediaStreamSource(stream);
     const recorder = ctx.createScriptProcessor(512, 1, 1);
     const mute = ctx.createGain();
-    mute.gain.value = 0; // o processador só funciona ligado à saída, mas não queremos ouvir o microfone
-    let startedAt = null; // instante do contexto em que a primeira amostra gravada foi entregue
+    mute.gain.value = 0; // the processor only runs connected to the output, but we do not want to hear the microphone
+    let startedAt: number | null = null; // the context's instant when the first recorded sample was delivered
     recorder.onaudioprocess = (event) => {
       if (startedAt === null) startedAt = event.playbackTime - event.inputBuffer.length / ctx.sampleRate;
       chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
@@ -31,8 +37,8 @@ export async function measureRoundTrip({ getUserMedia = (c) => navigator.mediaDe
     recorder.connect(mute);
     mute.connect(ctx.destination);
 
-    await new Promise((resolve) => setTimeout(resolve, 200)); // deixa a gravação começar
-    const clickTimes = []; // instantes do contexto em que cada estalo foi mandado para a saída
+    await new Promise((resolve) => setTimeout(resolve, 200)); // let the recording start
+    const clickTimes: number[] = []; // the context's instants when each click was sent to the output
     const first = ctx.currentTime + LEAD;
     for (let i = 0; i < CLICKS; i++) {
       const at = first + i * SPACING;

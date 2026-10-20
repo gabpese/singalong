@@ -1,10 +1,10 @@
 // Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
 import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { api, setUserName, userName } from '../lib/identity.js';
-import { splitQueue } from '../lib/queue-view.js';
-import { stageDismissed, stageItemFor } from '../lib/stage.js';
-import type { LibrarySong, LyricCue, QueueItem, RoomState } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { api, setUserName, userName } from '../lib/identity.ts';
+import { splitQueue } from '../lib/queue-view.ts';
+import { stageDismissed, stageItemFor } from '../lib/stage.ts';
+import type { LibrarySong, LyricCue, QueueItem, RoomState } from '../lib/types.ts';
 import { AddSong, type AddSongHandle } from './AddSong';
 import { InviteBanner } from './Duet';
 import { RoomProvider, type RoomContextValue, type Tab, useAct, useToast, type View } from './context';

@@ -1,9 +1,9 @@
 // A divisão da letra do dueto: quem canta cada linha (voz 1, voz 2 ou os dois juntos). Começa pela divisão que a música já tem
 // (a escolhida pelos cantores ou a automática) e, ao salvar, vale para a música em qualquer sala.
 import { useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { decodeParts, encodeParts, splitParts } from '../lib/duet.js';
-import type { LyricCue, QueueItem } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { decodeParts, encodeParts, splitParts } from '../lib/duet.ts';
+import type { LyricCue, QueueItem } from '../lib/types.ts';
 import { useRoom } from './context';
 
 type Part = 'a' | 'b' | 'both' | null;

@@ -1,10 +1,10 @@
 // Aviso "já temos esta música": quando o artista e o nome digitados batem com músicas prontas no Jukebox, a pessoa
 // escolhe uma delas (entra na fila na hora) ou segue a busca de outra versão no YouTube.
 import { useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { keySummary } from '../lib/music.js';
-import { formatDuration, thumbnailUrl } from '../lib/queue-view.js';
-import type { LibrarySong } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { keySummary } from '../lib/music.ts';
+import { formatDuration, thumbnailUrl } from '../lib/queue-view.ts';
+import type { LibrarySong } from '../lib/types.ts';
 
 interface Props {
   songs: LibrarySong[];

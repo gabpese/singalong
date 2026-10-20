@@ -1,10 +1,10 @@
 // Dueto: convidar alguém da sala para cantar junto, responder a um convite e ver com quem a música vai ser cantada.
 // Os componentes de convite e de aviso não dependem do contexto da sala: servem à sala, ao palco e à TV.
 import { useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 import { tRich } from '../i18n/rich';
-import { api } from '../lib/identity.js';
-import type { ApiError, QueueItem, RoomState } from '../lib/types';
+import { api } from '../lib/identity.ts';
+import type { ApiError, QueueItem, RoomState } from '../lib/types.ts';
 import { PartsDialog } from './PartsDialog';
 import { useRoom } from './context';
 

@@ -1,5 +1,5 @@
-// Português (Brasil): o texto de referência. As outras línguas usam as mesmas chaves.
-export default {
+// Portuguese (Brazil): the reference text. The other languages use the same keys.
+const pt = {
   'lang.label': 'Idioma',
 
   'landing.lead': 'Karaokê de qualquer vídeo do YouTube: o instrumental, a letra sincronizada e a fila da festa.',
@@ -440,3 +440,8 @@ export default {
   'mics.filter': 'Reduzir ruído e eco da voz',
   'mics.filterHint': 'filtro de graves e portão de ruído: o microfone baixa quando ninguém canta. Desligue se a voz estiver sendo cortada.',
 };
+
+/** Every catalog has exactly the reference keys. */
+export type Catalog = Record<keyof typeof pt, string>;
+
+export default pt;

@@ -1,7 +1,7 @@
 // Estado da sala em tempo real (WebSocket com reconexão) e a posição da música que a TV informa.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { connectRoom } from '../lib/identity.js';
-import type { LyricCue, ReactionKind, RoomState, ServerMessage } from '../lib/types';
+import { connectRoom } from '../lib/identity.ts';
+import type { LyricCue, ReactionKind, RoomState, ServerMessage } from '../lib/types.ts';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
 

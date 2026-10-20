@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { embedUrl, extractVideoId } from '../src/lib/youtube.js';
-import { nextUp, playOrder } from '../src/lib/queue-view.js';
+import { embedUrl, extractVideoId } from '../src/lib/youtube.ts';
+import { nextUp, playOrder } from '../src/lib/queue-view.ts';
 
 const VID = 'dQw4w9WgXcQ';
 
@@ -41,7 +41,7 @@ test('playOrder: o próximo escolhido pelo servidor vem na frente; o resto segue
 });
 
 test('buildSearchQuery: "Artista - Nome da música" ou só um dos dois, com espaços normalizados', async () => {
-  const { buildSearchQuery } = await import('../src/lib/youtube.js');
+  const { buildSearchQuery } = await import('../src/lib/youtube.ts');
   assert.equal(buildSearchQuery('Faouzia', 'Unethical'), 'Faouzia - Unethical');
   assert.equal(buildSearchQuery('  Bring Me  The Horizon ', '\tLosT\n'), 'Bring Me The Horizon - LosT');
   assert.equal(buildSearchQuery('Danny Elfman', "Jack's Lament"), "Danny Elfman - Jack's Lament"); // aspas e acentos intactos
@@ -52,7 +52,7 @@ test('buildSearchQuery: "Artista - Nome da música" ou só um dos dois, com espa
 });
 
 test('guessArtistTitle: artista e nome a partir do título do vídeo, sem os enfeites do YouTube', async () => {
-  const { guessArtistTitle } = await import('../src/lib/youtube.js');
+  const { guessArtistTitle } = await import('../src/lib/youtube.ts');
   const guess = (title) => guessArtistTitle(title);
   assert.deepEqual(guess('Faouzia - UNETHICAL (Official Music Video)'), { artist: 'Faouzia', title: 'UNETHICAL' });
   assert.deepEqual(guess('Avi Kaplan - "First Place I Go" (Official Lyric Video)'), { artist: 'Avi Kaplan', title: 'First Place I Go' });

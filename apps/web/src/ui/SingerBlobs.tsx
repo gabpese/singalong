@@ -4,7 +4,7 @@
 import { Blobatar } from '@blobatar/react';
 import type { ComponentProps } from 'react';
 import 'blobatar/motion.css';
-import type { QueueItem } from '../lib/types';
+import type { QueueItem } from '../lib/types.ts';
 
 export function singerNames(item: Pick<QueueItem, 'added_by' | 'guest'>): string[] {
   return item.guest?.status === 'accepted' ? [item.added_by, item.guest.name] : [item.added_by];

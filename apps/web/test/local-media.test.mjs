@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { accessMessage, HINT_AFTER_MS, localMediaBase, probeLocalMedia } from '../src/lib/local-media.js';
+import { accessMessage, HINT_AFTER_MS, localMediaBase, probeLocalMedia } from '../src/lib/local-media.ts';
 
 const item = (media) => ({ song: { media } });
 

@@ -3,9 +3,9 @@
 // O blobatar sai do nome da pessoa (o mesmo nome dá sempre o mesmo bichinho) e é desenhado aqui, sem chamar nenhum servidor.
 import { Blobatar } from '@blobatar/react';
 import 'blobatar/motion.css';
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 import { tRich } from '../i18n/rich';
-import type { RoomState } from '../lib/types';
+import type { RoomState } from '../lib/types.ts';
 import { Logo } from '../ui/Logo';
 import { QrCode } from './QrCode';
 

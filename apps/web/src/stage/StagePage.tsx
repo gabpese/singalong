@@ -1,19 +1,19 @@
 // Palco: a tela de canto do celular. Mostra a letra no ritmo da TV (que toca a música) e devolve o cantor à sala quando acaba.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 import { BetaTag } from '../ui/BetaTag';
 import { LyricsSize } from '../ui/LyricsSize';
 import { ReactionLayer, useReactionLayer } from '../ui/ReactionLayer';
-import { createSyncClock } from '../lib/clock.js';
-import { myPart, partName } from '../lib/duet.js';
-import { connectRoom } from '../lib/identity.js';
-import { createLyricsView } from '../lib/lyrics-view.js';
-import { splitQueue } from '../lib/queue-view.js';
+import { createSyncClock } from '../lib/clock.ts';
+import { myPart, partName } from '../lib/duet.ts';
+import { connectRoom } from '../lib/identity.ts';
+import { createLyricsView } from '../lib/lyrics-view.ts';
+import { splitQueue } from '../lib/queue-view.ts';
 import { useInterlude } from '../ui/useInterlude';
 import { InviteDialog, InviteNotice, respondInvite } from '../room/Duet';
-import { api } from '../lib/identity.js';
-import { dismissStage, STAGE_END_SECONDS, stageItemFor } from '../lib/stage.js';
-import type { LyricCue, QueueItem, RoomState, ServerMessage } from '../lib/types';
+import { api } from '../lib/identity.ts';
+import { dismissStage, STAGE_END_SECONDS, stageItemFor } from '../lib/stage.ts';
+import type { LyricCue, QueueItem, RoomState, ServerMessage } from '../lib/types.ts';
 
 const roomUrl = (code: string) => `/room.html?room=${code}`;
 

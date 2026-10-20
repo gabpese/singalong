@@ -1,8 +1,8 @@
 // Guia de melodia: as notas da voz original como barras que andam para a esquerda, com a afinação de quem canta por cima
 // (verde = no tom, vermelho = fora). O "agora" fica a 1/4 da esquerda; o que vem aí, à direita, para a pessoa se preparar.
 import { useEffect, useRef } from 'react';
-import { t } from '../i18n/index.js';
-import { easeRange, foldToNearestOctave, isGood, makeScale, noteAt, notesInWindow, PART_COLORS, pitchRange, SECONDS_AFTER, SECONDS_BEFORE } from '../lib/melody-guide.js';
+import { t } from '../i18n/index.ts';
+import { easeRange, foldToNearestOctave, isGood, makeScale, noteAt, notesInWindow, PART_COLORS, pitchRange, SECONDS_AFTER, SECONDS_BEFORE } from '../lib/melody-guide.ts';
 import type { GuideFrame, TvController } from './controller';
 
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;

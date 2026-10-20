@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { parseHostHash, parseRoomCode, setHostToken } from '../lib/identity.js';
+import { parseHostHash, parseRoomCode, setHostToken } from '../lib/identity.ts';
 import '../styles/style.css';
 import { RoomPage } from './RoomPage';
 

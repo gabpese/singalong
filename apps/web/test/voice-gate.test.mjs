@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { blockRms, createGate, GATE, rmsToDb } from '../src/lib/voice-gate.js';
+import { blockRms, createGate, GATE, rmsToDb } from '../src/lib/voice-gate.ts';
 
 const rmsOf = (db) => 10 ** (db / 20);
 

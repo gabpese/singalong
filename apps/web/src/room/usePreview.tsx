@@ -1,9 +1,9 @@
 // Prévia do instrumental no celular, com troca de tom: o estado, a ligação com o player de áudio e a barra na tela.
-import { t } from '../i18n/index.js';
+import { t } from '../i18n/index.ts';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { keySummary } from '../lib/music.js';
-import { createPreviewPlayer } from '../lib/preview.js';
-import type { QueueItem, RoomState, SongKey } from '../lib/types';
+import { keySummary } from '../lib/music.ts';
+import { createPreviewPlayer } from '../lib/preview.ts';
+import type { QueueItem, RoomState, SongKey } from '../lib/types.ts';
 import { Icon } from '../ui/Icon';
 import { clampPitch, PitchPicker } from './PitchControl';
 

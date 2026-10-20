@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import { parseRoomCode } from '../lib/identity.js';
+import { parseRoomCode } from '../lib/identity.ts';
 import '../styles/style.css';
 import { StagePage } from './StagePage';
 

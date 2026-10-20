@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dismissStage, stageDismissed, stageItemFor } from '../src/lib/stage.js';
+import { dismissStage, stageDismissed, stageItemFor } from '../src/lib/stage.ts';
 
 const state = (over = {}) => ({
   playback: 'playing',

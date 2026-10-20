@@ -9,7 +9,7 @@ Singalong is a self-hosted collaborative karaoke: phones queue songs in a Room, 
 | Path | What it is | Runtime |
 |---|---|---|
 | `apps/api` | Rooms, queue, WebSocket state, media files, the agent API | Node 24, Fastify (moving to NestJS and MikroORM, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.md)), SQLite, Redis |
-| `apps/web` | Landing page, Room (phone), TV, Stage | React + Vite, TypeScript (`src/lib` is partly JavaScript, migrating) |
+| `apps/web` | Landing page, Room (phone), TV, Stage | React + Vite, TypeScript |
 | `apps/worker` | Download, vocal separation, lyrics alignment, MP4 export | Python 3.11, PyTorch |
 | `apps/desktop` | The owner's installable app (tray, embedded TV and host pages) | Electron |
 | `apps/engine` | Assembles the worker's runtime on the user's computer | Node |
@@ -21,7 +21,7 @@ Singalong is a self-hosted collaborative karaoke: phones queue songs in a Room, 
 - Write everything in the repository in English: identifiers, comments, test names, docs, commit messages, PR titles and bodies.
 - Portuguese lives in two places only: the `*.pt-BR.md` translation next to each doc, and the UI catalogs in `apps/web/src/i18n/`. Keep a doc and its translation in sync in the same change.
 - Older files still carry Portuguese comments. Translate a file's comments in the same pass that migrates it to TypeScript ([ROADMAP](docs/ROADMAP.md)).
-- The product speaks Portuguese: pt-BR is the UI's default language, and every on-screen string goes through the i18n catalogs (`pt.js`, `en.js`, `es.js` share the same keys; a test checks).
+- The product speaks Portuguese: pt-BR is the UI's default language, and every on-screen string goes through the i18n catalogs (`pt.ts` defines the keys; `en.ts` and `es.ts` must have the same ones, and the compiler checks).
 
 ## Before you change
 
@@ -37,7 +37,7 @@ The commands are the `scripts` in each `package.json`. What they do not tell you
 
 | App | Run | Gotcha |
 |---|---|---|
-| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | The e2e server serves `dist/`: build before e2e. Its rooms start with the intermission off; tests that need it turn it on. |
+| `apps/web` | `npm test`, `npm run build`, `npm run e2e` | The e2e server serves `dist/`: build before e2e. Its rooms start with the intermission off; tests that need it turn it on. The unit tests run `src/lib` and `src/i18n` straight in Node, so imports there name the `.ts` file. |
 | `apps/worker` | `python -I -m unittest discover -s tests -t .` | Needs only `numpy langdetect websockets yt-dlp` (no PyTorch). |
 | `apps/api`, `apps/desktop`, `apps/engine` | `npm test` | |
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { myPart, partName, splitParts } from '../src/lib/duet.js';
+import { myPart, partName, splitParts } from '../src/lib/duet.ts';
 
 const cues = (...texts) => texts.map((text, i) => ({ start: i * 4, end: i * 4 + 3, text }));
 
@@ -39,7 +39,7 @@ test('o dono da música é o turquesa e o convidado o violeta', () => {
 });
 
 test('a divisão escolhida pelos cantores vale quando combina com a letra; senão volta a automática', async () => {
-  const { decodeParts, encodeParts, splitParts } = await import('../src/lib/duet.js');
+  const { decodeParts, encodeParts, splitParts } = await import('../src/lib/duet.ts');
   const cues = [{ text: 'Primeira linha' }, { text: 'Segunda linha' }, { text: '' }, { text: 'Quarta linha' }];
   assert.deepEqual(splitParts(cues, 'ba-*'), ['b', 'a', null, 'both']);
   assert.deepEqual(splitParts(cues, 'ba-'), splitParts(cues)); // o tamanho não combina (a letra mudou): automática
@@ -52,7 +52,7 @@ test('a divisão escolhida pelos cantores vale quando combina com a letra; senã
 });
 
 test('partAtTime e singsAt: quem canta no instante; as linhas "juntos" contam para os dois', async () => {
-  const { partAtTime, singsAt } = await import('../src/lib/duet.js');
+  const { partAtTime, singsAt } = await import('../src/lib/duet.ts');
   const cues = [{ start: 0, end: 2 }, { start: 3, end: 5 }, { start: 6, end: 8 }];
   const parts = ['a', 'b', 'both'];
   assert.equal(partAtTime(cues, parts, 1), 'a');

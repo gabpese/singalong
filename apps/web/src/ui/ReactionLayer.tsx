@@ -1,7 +1,7 @@
 // Reações que sobem pela tela (TV, aba TV da sala e palco): cada uma sobe e some sozinha. Só decoração: o leitor de tela não as lê.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addFloating, glyphOf, REACTION_LIFETIME_MS } from '../lib/reactions.js';
-import type { ReactionKind } from '../lib/types';
+import { addFloating, glyphOf, REACTION_LIFETIME_MS } from '../lib/reactions.ts';
+import type { ReactionKind } from '../lib/types.ts';
 
 export interface FloatingReaction {
   id: number;

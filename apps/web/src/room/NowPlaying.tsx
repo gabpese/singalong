@@ -1,10 +1,10 @@
 // Card "Tocando agora": a música, quem canta, a barra de progresso e os controles do anfitrião.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { getLanguage, t } from '../i18n/index.js';
-import { describeLyricsSource } from '../lib/lyrics-sync.js';
-import { keySummary } from '../lib/music.js';
-import { formatDuration, nextUp, progressPercent, splitQueue, thumbnailUrl } from '../lib/queue-view.js';
-import type { QueueItem, RoomState } from '../lib/types';
+import { getLanguage, t } from '../i18n/index.ts';
+import { describeLyricsSource } from '../lib/lyrics-sync.ts';
+import { keySummary } from '../lib/music.ts';
+import { formatDuration, nextUp, progressPercent, splitQueue, thumbnailUrl } from '../lib/queue-view.ts';
+import type { QueueItem, RoomState } from '../lib/types.ts';
 import { Icon } from '../ui/Icon';
 import { SingerBlobs } from '../ui/SingerBlobs';
 import { useRoom } from './context';

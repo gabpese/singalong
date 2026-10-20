@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../src/lib/scoring.js';
+import { createScorer, detectPitch, hzToMidi, noteName, smoothMelody, pitchClassDistance, rms } from '../src/lib/scoring.ts';
 
 const sine = (hz, sampleRate = 48000, n = 2048, amp = 0.5) => Float32Array.from({ length: n }, (_, i) => amp * Math.sin((2 * Math.PI * hz * i) / sampleRate));
 
@@ -116,16 +116,16 @@ test('createScorer: onBlock e report descrevem a comparação (trecho, nota orig
   const s = createScorer({ hop: 0.05, midi }, { onBlock: (row) => logged.push(row) });
   for (let i = 0; i < midi.length; i += 2) s.tick(i * 0.05 + 0.01, i < FRAMES ? 60 : 62); // acerta o 1º bloco, erra o 2º
   assert.equal(logged.length, 1); // o 2º bloco ainda não terminou
-  assert.deepEqual(logged[0], { trecho: '00:00–00:02', original: 'C4', principais: 'C', cantada: 'C4', distancia: 0, acerto: 1, leituras: '20/20', participacao: 1 });
+  assert.deepEqual(logged[0], { span: '00:00–00:02', original: 'C4', main: 'C', sung: 'C4', distance: 0, accuracy: 1, readings: '20/20', participation: 1 });
   const [first, second] = s.report();
-  assert.equal(first.trecho, '00:00–00:02');
-  assert.deepEqual([second.trecho, second.original, second.cantada, second.distancia, second.acerto], ['00:02–00:04', 'G4', 'D4', 5, 0]);
+  assert.equal(first.span, '00:00–00:02');
+  assert.deepEqual([second.span, second.original, second.sung, second.distance, second.accuracy], ['00:02–00:04', 'G4', 'D4', 5, 0]);
 });
 
 test('createScorer: se a original passa por várias notas no bloco, vale a mais frequente (não zero)', () => {
   const wandering = [...hold(60, 14), ...hold(63, 13), ...hold(66, 13)]; // nenhuma chega a 40% do bloco
   assert.equal(run(wandering, () => 60).score(), 100);
-  assert.equal(run(wandering, () => 60).report()[0].principais, 'C');
+  assert.equal(run(wandering, () => 60).report()[0].main, 'C');
 });
 
 test('createScorer: a nota cantada mostrada tem a oitava de quem canta', () => {

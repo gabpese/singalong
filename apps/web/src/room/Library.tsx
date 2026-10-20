@@ -1,11 +1,11 @@
 // Músicas já processadas (biblioteca), com filtro por artista e nome, para entrar na fila na hora ou baixar em MP4.
 import { useRef, useState } from 'react';
-import { t } from '../i18n/index.js';
-import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from '../lib/export-mp4.js';
-import { api } from '../lib/identity.js';
-import { keySummary, pitchLabel } from '../lib/music.js';
-import { filterSongs, formatDuration, sortSongs, thumbnailUrl } from '../lib/queue-view.js';
-import type { ApiError, LibrarySong } from '../lib/types';
+import { t } from '../i18n/index.ts';
+import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from '../lib/export-mp4.ts';
+import { api } from '../lib/identity.ts';
+import { keySummary, pitchLabel } from '../lib/music.ts';
+import { filterSongs, formatDuration, sortSongs, thumbnailUrl } from '../lib/queue-view.ts';
+import type { ApiError, LibrarySong } from '../lib/types.ts';
 import { useRoom } from './context';
 
 function LibraryRow({ song }: { song: LibrarySong }) {
