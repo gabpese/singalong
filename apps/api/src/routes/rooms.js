@@ -1,6 +1,6 @@
 import { rateLimited } from '../rate-limit.js';
 import { VIDEO_ID_PATTERN } from '../agents.js';
-import { LYRICS_SCHEMA } from './songs.js';
+import { LyricsChoice as LYRICS_SCHEMA } from '../songs/song.schemas.js'; // a TypeBox schema is a JSON Schema: Fastify validates with it
 import { downloadPage, downloadsFor } from '../installers.js';
 import { HttpError, normalizeCode } from '../rooms.js';
 
