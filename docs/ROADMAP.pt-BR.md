@@ -51,13 +51,13 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
    - **Os arquivos compartilhados em TypeScript: feito.** `jobs`, `storage`, `files`, `config`, `mailer`, `version`, `youtube`, `installers`, `logging` e `rate-limit`, com os comentários em inglês. As filas de trabalho no Redis e na memória implementam uma única interface `JobStore`, e a da memória acrescenta o que só os testes usam. O `rateLimited()` do Fastify saiu, porque toda rota com limite agora é do Nest.
    - **O `db.js` se aposenta: feito.** O schema congelado agora é a primeira migração (`Migration20261019000000_initial_schema`), listada antes da base. Ela cria o que falta num banco novo e acrescenta as colunas que faltam num antigo, então, num banco que o db.js já tinha montado, ela roda uma vez e não muda nada. A conexão abre em `src/database/connection.ts`, o `/readyz` pergunta ao MikroORM e os testes preenchem o banco pelo MikroORM (`test/fixtures.js`). O código da API não tem mais JavaScript, então o `allowJs` saiu.
 
-### 4. O motor
+### 4. O motor (feito)
 
-Primeiro um teste: empacotar um arquivo `.ts` com o electron-builder e rodá-lo no Electron 44. O Node se recusa a remover tipos dentro de `node_modules`, onde o app empacotado guarda o motor, e o processo principal roda no Node do Electron, não no do sistema. Se o teste rodar, o motor e o app de computador rodam `.ts` direto; se não, os dois compilam com o mesmo `tsc` da API.
+O teste empacotou arquivos `.ts` com o electron-builder e os rodou no Electron 44 (Node 24.21, com remoção de tipos). O `.ts` do próprio app rodou, empacotado também, mas um `.ts` dentro do `node_modules`, onde o app empacotado guarda o motor, foi recusado. Então o código do motor é TypeScript que o Node roda direto (os testes, o `node src/cli.ts` e o job do CI com o motor de verdade), e o `tsc` gera o `dist/` só para o app de computador, que o importa pelos `exports` do pacote ([ADR 0019](adr/0019-engine-runs-typescript-and-compiles-for-the-app.pt-BR.md)). O app de computador o compila antes de subir, testar ou empacotar, e o instalador leva só o `dist/` e o `manifest.json` dele.
 
 ### 5. O app de computador
 
-Como o motor, seguindo a resposta do teste.
+O teste mostra que o processo principal pode rodar `.ts` direto, empacotado também. Os scripts de preload rodam com sandbox e as telas (`ui/`) rodam num navegador, então nenhum dos dois roda `.ts` sem build. Este passo decide como os dois compilam.
 
 ### 6. Os testes
 

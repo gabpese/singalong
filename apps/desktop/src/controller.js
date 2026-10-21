@@ -5,9 +5,9 @@ import { execFile, spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assemble, refreshWorker } from '@singalong/engine/src/assemble.js';
-import { paths, readState, workerCommand } from '@singalong/engine/src/engine.js';
-import { verifyEngine } from '@singalong/engine/src/verify.js';
+import { assemble, refreshWorker } from '@singalong/engine/assemble';
+import { paths, readState, workerCommand } from '@singalong/engine/engine';
+import { verifyEngine } from '@singalong/engine/verify';
 import { libraryStats } from './library-stats.js';
 
 export const APP_VERSION = '1.4.2'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)

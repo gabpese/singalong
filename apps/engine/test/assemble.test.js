@@ -6,9 +6,9 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { assemble, isAccelerated, loadManifest, manifestHash, refreshWorker, resolveManifest, torchIndexFor } from '../src/assemble.js';
-import { extract, installFiles, resolveGlob, tarCommand } from '../src/extract.js';
-import { engineEnv, launchEnv, paths, readState, workerCommand } from '../src/engine.js';
+import { assemble, isAccelerated, loadManifest, manifestHash, refreshWorker, resolveManifest, torchIndexFor } from '../src/assemble.ts';
+import { extract, installFiles, resolveGlob, tarCommand } from '../src/extract.ts';
+import { engineEnv, launchEnv, paths, readState, workerCommand } from '../src/engine.ts';
 
 process.env.SINGALONG_ENGINE_ANY_PLATFORM = '1';
 

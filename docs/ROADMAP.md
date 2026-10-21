@@ -51,13 +51,13 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
    - **The shared files in TypeScript: done.** `jobs`, `storage`, `files`, `config`, `mailer`, `version`, `youtube`, `installers`, `logging` and `rate-limit`, with their comments in English. The Redis and the in-memory job stores implement one `JobStore` interface, and the in-memory one adds what only the tests use. Fastify's `rateLimited()` went, since every limited route is a Nest route now.
    - **`db.js` retires: done.** Its frozen schema is now the first migration (`Migration20261019000000_initial_schema`), listed before the baseline. It creates what a new database lacks and adds the columns an old one lacks, so on a database db.js had already built it runs once and changes nothing. The connection opens in `src/database/connection.ts`, `/readyz` asks MikroORM, and the tests fill the database through MikroORM (`test/fixtures.js`). The API's source has no JavaScript left, so `allowJs` went.
 
-### 4. The engine
+### 4. The engine (done)
 
-First a spike: package a `.ts` file with electron-builder and run it in Electron 44. Node refuses to strip types under `node_modules`, where the packaged app keeps the engine, and the main process runs on Electron's Node, not the system's. If the spike runs, the engine and the desktop app run `.ts` directly; if not, both compile with the same `tsc` as the API.
+The spike packaged `.ts` files with electron-builder and ran them in Electron 44 (Node 24.21, types stripped). The app's own `.ts` ran, packaged too, but a `.ts` under `node_modules`, where the packaged app keeps the engine, was refused. So the engine's source is TypeScript that Node runs directly (its tests, `node src/cli.ts` and the real-engine CI job), and `tsc` builds `dist/` only for the desktop app, which imports it through the package's `exports` ([ADR 0019](adr/0019-engine-runs-typescript-and-compiles-for-the-app.md)). The desktop app builds it before it starts, tests or packages, and the installer carries only its `dist/` and `manifest.json`.
 
 ### 5. The desktop app
 
-As the engine, following the spike's answer.
+The spike shows that the main process can run `.ts` directly, packaged too. The preload scripts run sandboxed and the screens (`ui/`) run in a browser, so neither runs `.ts` without a build. This step decides how those two compile.
 
 ### 6. The tests
 
