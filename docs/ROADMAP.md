@@ -33,7 +33,7 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
 [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.md). The API goes to the VM after each merged pull request. Until step 3 ends, a migration keeps every table and column the previous image uses (it adds tables and columns, or tightens a constraint the data already meets), so the previous image keeps running on a migrated database.
 
 1. **Still in JavaScript (done).**
-   - Concurrency tests (`apps/api/test/concurrency.test.js`) for the rules that read and then write: songs added at once at the per-person limit, "the TV ended" and "the Host skipped" arriving together, a score sent as the song ends, moves at once, a pairing code used twice, two session starts, two Rooms with the same code.
+   - Concurrency tests (`apps/api/test/concurrency.test.ts`) for the rules that read and then write: songs added at once at the per-person limit, "the TV ended" and "the Host skipped" arriving together, a score sent as the song ends, moves at once, a pairing code used twice, two session starts, two Rooms with the same code.
    - The first-in-first-out queue per Room (`src/serial.js`) already covered the HTTP routes, "ended" and the Intermission timers; the TV's score and the publishes of people joining and leaving now go through it too. A skip names the song on the Host's screen, so it never skips the next singer's song; session changes queue per computer; a cheer, a Room code and a pairing code are each settled by one SQL statement. The agents' job claims live in Redis or in memory, not in SQLite, so the ORM does not reach them.
    - `deploy.sh` copies the SQLite file with `VACUUM INTO` before each deploy and keeps the last five copies.
 2. **NestJS and MikroORM in place (done).**
@@ -49,7 +49,7 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
    - **The protocol types: done.** `apps/api/src/protocol.ts` defines the Room's state, the WebSocket messages both ways and the HTTP answers the pages read. The API is typed against it: the snapshot, `personalize`, the gateway's events and the controllers. The web's `lib/types.ts` re-exports it with `export type`, so nothing of the API reaches the bundle. The web's own copies (the landing page's config, the search result, the export state) are gone, and the TV's and the phones' WebSocket messages are checked against `ClientMessage`.
 4. **The rest of the API, and `db.js` retires,** in two pull requests.
    - **The shared files in TypeScript: done.** `jobs`, `storage`, `files`, `config`, `mailer`, `version`, `youtube`, `installers`, `logging` and `rate-limit`, with their comments in English. The Redis and the in-memory job stores implement one `JobStore` interface, and the in-memory one adds what only the tests use. Fastify's `rateLimited()` went, since every limited route is a Nest route now.
-   - **`db.js` retires: done.** Its frozen schema is now the first migration (`Migration20261019000000_initial_schema`), listed before the baseline. It creates what a new database lacks and adds the columns an old one lacks, so on a database db.js had already built it runs once and changes nothing. The connection opens in `src/database/connection.ts`, `/readyz` asks MikroORM, and the tests fill the database through MikroORM (`test/fixtures.js`). The API's source has no JavaScript left, so `allowJs` went.
+   - **`db.js` retires: done.** Its frozen schema is now the first migration (`Migration20261019000000_initial_schema`), listed before the baseline. It creates what a new database lacks and adds the columns an old one lacks, so on a database db.js had already built it runs once and changes nothing. The connection opens in `src/database/connection.ts`, `/readyz` asks MikroORM, and the tests fill the database through MikroORM (`test/fixtures.ts`). The API's source has no JavaScript left, so `allowJs` went.
 
 ### 4. The engine (done)
 
@@ -59,13 +59,13 @@ The spike packaged `.ts` files with electron-builder and ran them in Electron 44
 
 The main process runs its `.ts` directly, packaged too, and `tsc` only checks its types. The preloads (`.cts`) and the window's scripts (`ui/*.ts`) compile with `tsc`, each beside its source, so the app loads the same paths as before ([ADR 0020](adr/0020-desktop-main-process-runs-typescript.md)). `ui/bridge.ts` types the contract between the window and the main process: the snapshot, the tabs and every action with its argument and answer. `npm run build` builds the engine and the window before the app starts, tests or packages.
 
-### 6. The tests
+### 6. The tests (done)
 
 The remaining `*.mjs` and `*.test.js` files become `.ts`, in one pull request per app. Each app's `tsconfig.json` covers its tests and scripts, so CI checks their types too.
 
 - **The engine and the desktop app: done.** The engine's `tsconfig.json` checks `src/` and `test/`, and `tsconfig.build.json` builds `dist/`. The desktop app's covers `src/`, `test/`, `e2e/` and `scripts/`. The two files that start the API from its compiled `dist/` (the e2e and `scripts/test-update.ts`) import it untyped.
 - **The web: done.** The unit tests, the Playwright tests (now with English names), `e2e/server.ts` and the Vite and Playwright configs. `tsconfig.node.json` checks them, beside the pages' own `tsconfig.json`. The e2e server starts the API from its compiled `dist/`, which it imports untyped.
-- **The API:** its tests become `.ts` without a type check, because they import the compiled `dist/`, which carries no types. The admin page's script (`src/admin/page/admin.js`) compiles like the desktop app's window.
+- **The API: done.** Its tests (now with English names) and `scripts/copy-assets.ts` are `.ts` without a type check, because the tests import the compiled `dist/`, which carries no types. The admin page's script (`src/admin/page/admin.ts`) compiles with `tsconfig.admin.json` (the browser's types) straight into `dist/`, and reads its state through the `AdminState` type in `protocol.ts`; `copy-assets.ts` copies only the page's HTML and CSS.
 
 ## Code in English
 

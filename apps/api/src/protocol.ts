@@ -1,6 +1,7 @@
 // The contract between the API and the pages (ADR 0017): the Room's state, the WebSocket messages both ways, and the HTTP
-// answers the pages read. The API's code is checked against these types, and the web imports them with `import type`, so a
-// shape changes in one place. This file imports nothing: the web's compiler reads it too, without the API's dependencies.
+// answers the pages read. The API's code is checked against these types, and the web and the admin page import them with
+// `import type`, so a shape changes in one place. This file imports nothing: their compilers read it too, without the API's
+// dependencies.
 
 /** The key a song is in, from its analysis (meta.json). */
 export interface SongKey {
@@ -220,4 +221,66 @@ export interface ExportState {
   error: string | null;
   /** The file is on the owner's computer. */
   local?: boolean;
+}
+
+/** A published app version; an empty field is not set. */
+export interface ReleaseFields {
+  latest: string;
+  minimum: string;
+  notes: string;
+  url: string;
+}
+
+/** What applies now, with where it came from: `panel` (the admin page), `env` (APP_* variables) or `none` (nothing set). */
+export interface PublishedRelease extends ReleaseFields {
+  source: 'panel' | 'env' | 'none';
+  updated_at: number | null;
+}
+
+/** What the installed app should do: up to date, an update available, an update required, or unknown. */
+export type UpdateStatus = 'ok' | 'update_available' | 'update_required' | 'unknown';
+
+/** A paired computer, on the admin page. */
+export interface AdminDevice {
+  id: string;
+  name: string;
+  /** The e-mail the pairing code went to; null when it paired without one. */
+  email: string | null;
+  created_at: number;
+  last_seen: number | null;
+  revoked: boolean;
+  /** It sends its songs to the cloud. */
+  cloud: boolean;
+  /** The app version it reported. */
+  version: string | null;
+  update_status: UpdateStatus;
+}
+
+/** A prepared song in the server's storage, on the admin page. */
+export interface CloudSong {
+  id: string;
+  title: string | null;
+  artist: string | null;
+  /** Its files' bytes. */
+  size: number;
+  updated: number;
+  /** `youtube`, `file` (the owner's own file) or `url:<site>`. */
+  origin: string;
+}
+
+/** GET /<ADMIN_PATH>/api/state: everything the admin page shows. */
+export interface AdminState {
+  /** The published version, and what the .env would say if the page's were cleared. */
+  release: PublishedRelease & { env: ReleaseFields };
+  mail: { enabled: boolean };
+  emails: {
+    rules: { email: string; can_pair: boolean; can_cloud: boolean }[];
+    /** From the .env: they only change there. */
+    fixed: { pair: string[]; cloud: string[] };
+  };
+  /** Newest first. */
+  devices: AdminDevice[];
+  cloud: CloudSong[];
+  cloud_total: number;
+  blocked: { video_id: string; blocked_at: number }[];
 }

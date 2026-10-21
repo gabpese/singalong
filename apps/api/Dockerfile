@@ -14,7 +14,7 @@ FROM --platform=$BUILDPLATFORM node:24-slim AS api
 WORKDIR /api
 COPY apps/api/package.json apps/api/package-lock.json ./
 RUN npm ci
-COPY apps/api/tsconfig.json ./
+COPY apps/api/tsconfig.json apps/api/tsconfig.admin.json ./
 COPY apps/api/scripts ./scripts
 COPY apps/api/src ./src
 RUN npm run build

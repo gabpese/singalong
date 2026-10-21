@@ -1,8 +1,6 @@
 // The installed app's version against the published one: the server says which is the latest, the minimum it still accepts and
 // what changed.
-
-/** What the installed app should do: up to date, an update available, an update required, or unknown. */
-export type UpdateStatus = 'ok' | 'update_available' | 'update_required' | 'unknown';
+import type { UpdateStatus } from './protocol.ts';
 
 /** The published version, as the admin page or the APP_* variables set it (empty = not set). */
 export interface PublishedVersion {

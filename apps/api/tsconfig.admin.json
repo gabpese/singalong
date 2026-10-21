@@ -1,0 +1,11 @@
+{
+  // The admin page's script, for the browser. It extends the server's settings, so protocol.ts, whose types the page imports,
+  // compiles again to the same dist/protocol.js.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src/admin/page/*.ts"],
+  "exclude": []
+}

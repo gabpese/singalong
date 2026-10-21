@@ -1,5 +1,5 @@
-// Armazenamento local: as músicas estão no computador do dono; a nuvem só conhece o catálogo que o agente publica e o endereço
-// do servidor local de mídia (media_base), de onde o navegador as busca.
+// Local storage: the songs are on the owner's computer; the cloud only knows the catalog the agent publishes and the address of
+// the local media server (media_base), where the browser fetches them.
 import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -61,7 +61,7 @@ const claim = (agent) => call('POST', '/agent/v1/jobs/claim', { headers: agent.h
 const state = async (r) => (await call('GET', `/api/rooms/${r.code}`, { headers: CLIENT })).json();
 const addSong = (r, id = SONG, payload = {}) => call('POST', `/api/rooms/${r.code}/queue`, { headers: CLIENT, payload: { video_id: id, ...payload } });
 
-test('normalizeMediaBase: só máquina local ou rede privada, só http, sem credenciais, consulta nem caminho aninhado', () => {
+test('normalizeMediaBase: only the local machine or a private network, only http, no credentials, query or nested path', () => {
   for (const ok of ['http://127.0.0.1:8765', 'http://127.0.0.1:8765/', 'http://127.0.0.1:8765/tok_123-A', 'http://localhost:9000/x', 'http://192.168.0.4:8765/t', 'http://10.1.2.3/t', 'http://172.20.0.9:80/t', 'http://[::1]:8765/t']) {
     assert.ok(normalizeMediaBase(ok), ok);
   }
@@ -73,26 +73,26 @@ test('normalizeMediaBase: só máquina local ou rede privada, só http, sem cred
   }
 });
 
-test('o servidor recusa um endereço de mídia inválido ao iniciar a sessão e na batida de coração', async () => {
+test('the server refuses an invalid media address when the Session starts and in the heartbeat', async () => {
   const agent = await pair();
   const bad = await call('POST', '/agent/v1/sessions', { headers: agent.headers, payload: { display_name: 'X', media_base: 'http://evil.example.com/t' } });
   assert.equal(bad.statusCode, 400);
   assert.equal(bad.json().error, 'invalid_media_base');
-  assert.equal((await call('GET', '/agent/v1/me', { headers: agent.headers })).json().session, null); // nada foi criado
+  assert.equal((await call('GET', '/agent/v1/me', { headers: agent.headers })).json().session, null); // nothing was created
 
   await session(agent);
   const beat = await call('POST', '/agent/v1/heartbeat', { headers: agent.headers, payload: { media_base: 'http://evil.example.com/t' } });
   assert.equal(beat.statusCode, 400);
 });
 
-test('a música do catálogo do dono aparece pronta na sala, com os endereços do servidor local de mídia', async () => {
+test("a song from the owner's catalog shows as ready in the Room, with the local media server's addresses", async () => {
   const agent = await pair();
   const sess = await session(agent);
   const r = await room(agent, sess);
   assert.equal((await publish(agent, [entry(SONG, { files: { melody: true } })])).statusCode, 200);
 
-  // a nuvem NÃO tem os arquivos (nada no armazenamento do servidor): só o catálogo
-  assert.equal((await addSong(r, SONG)).statusCode, 201); // pronta: dispensa artista e nome
+  // the cloud does NOT have the files (nothing in the server's storage): only the catalog
+  assert.equal((await addSong(r, SONG)).statusCode, 201); // ready: no artist or title needed
   const item = (await state(r)).queue[0];
   assert.equal(item.song.ready, true);
   assert.equal(item.song.status, 'ready');
@@ -105,28 +105,28 @@ test('a música do catálogo do dono aparece pronta na sala, com os endereços d
     vocals: null,
     local: true,
   });
-  assert.equal((await state(r)).current_item_id !== null, true); // e já toca
+  assert.equal((await state(r)).current_item_id !== null, true); // and it plays at once
 });
 
-test('só o instrumental e a letra publicados contam como pronta; vozes de apoio publicadas depois entram na sala', async () => {
+test('only the published instrumental and lyrics make it ready; backing vocals published later join the Room', async () => {
   const agent = await pair();
   const sess = await session(agent);
   const r = await room(agent, sess);
   await publish(agent, [entry(SONG, { files: { instrumental: true, lyrics: false } })]);
-  assert.equal((await addSong(r, SONG)).statusCode, 400); // não está pronta e faltam artista e nome
+  assert.equal((await addSong(r, SONG)).statusCode, 400); // not ready, and the artist and title are missing
   await publish(agent, [entry(SONG)]);
   assert.equal((await addSong(r, SONG)).statusCode, 201);
   assert.equal((await state(r)).queue[0].song.media.backing, null);
 
-  await publish(agent, [entry(SONG, { files: { backing: true } })]); // a análise das vozes de apoio terminou
+  await publish(agent, [entry(SONG, { files: { backing: true } })]); // the backing vocals' analysis finished
   assert.equal((await state(r)).queue[0].song.media.backing, `${BASE}/cache/${SONG}/backing.mp3`);
 
-  assert.equal((await state(r)).queue[0].song.media.vocals, null); // a voz original (guia) só entra se o computador a publicar
+  assert.equal((await state(r)).queue[0].song.media.vocals, null); // the original voice (the guide) joins only when the computer publishes it
   await publish(agent, [entry(SONG, { files: { backing: true, vocals: true } })]);
   assert.equal((await state(r)).queue[0].song.media.vocals, `${BASE}/cache/${SONG}/vocals.mp3`);
 });
 
-test('a biblioteca da sala é o catálogo do dono; sem a sala, é a do servidor', async () => {
+test("the Room's Jukebox is the owner's catalog; without the Room, it is the server's", async () => {
   const agent = await pair();
   const sess = await session(agent);
   const r = await room(agent, sess);
@@ -134,13 +134,13 @@ test('a biblioteca da sala é o catálogo do dono; sem a sala, é a do servidor'
 
   const mine = (await call('GET', '/api/songs', { headers: { 'x-room': r.code } })).json();
   assert.deepEqual(mine.map((m) => m.video_id).sort(), ['aaaaaaaaaaa', 'bbbbbbbbbbb']);
-  assert.deepEqual((await call('GET', '/api/songs')).json(), []); // a do servidor está vazia
+  assert.deepEqual((await call('GET', '/api/songs')).json(), []); // the server's is empty
   const one = (await call('GET', '/api/songs/aaaaaaaaaaa', { headers: { 'x-room': r.code } })).json();
   assert.equal(one.status, 'ready');
-  assert.equal((await call('GET', '/api/songs/aaaaaaaaaaa')).statusCode, 404); // sem a sala, o servidor não a conhece
+  assert.equal((await call('GET', '/api/songs/aaaaaaaaaaa')).statusCode, 404); // without the Room, the server does not know it
 });
 
-test('o catálogo é de cada dono: outra sessão não vê as músicas dele', async () => {
+test("the catalog is each owner's own: another Session does not see their songs", async () => {
   const a = await pair('A');
   const b = await pair('B');
   const ra = await room(a, await session(a, 'http://127.0.0.1:8001/ta', 'Ana'));
@@ -148,20 +148,20 @@ test('o catálogo é de cada dono: outra sessão não vê as músicas dele', asy
   await publish(a, [entry(SONG)]);
 
   assert.equal((await call('GET', '/api/songs', { headers: { 'x-room': rb.code } })).json().length, 0);
-  assert.equal((await addSong(rb, SONG)).statusCode, 400); // para o Beto não está pronta (e faltam artista e nome)
+  assert.equal((await addSong(rb, SONG)).statusCode, 400); // for Beto it is not ready (and the artist and title are missing)
   assert.equal((await addSong(ra, SONG)).statusCode, 201);
   assert.equal((await state(ra)).queue[0].song.media.instrumental, `http://127.0.0.1:8001/ta/cache/${SONG}/instrumental.mp3`);
 });
 
-test('uma sessão sem servidor local de mídia continua usando o armazenamento do servidor', async () => {
+test("a Session without a local media server keeps using the server's storage", async () => {
   const agent = await pair();
   const r = await room(agent, await session(agent, null));
-  await publish(agent, [entry(SONG)]); // o catálogo existe, mas sem media_base a sala não o usa
+  await publish(agent, [entry(SONG)]); // the catalog exists, but without media_base the Room does not use it
   assert.equal((await call('GET', '/api/songs', { headers: { 'x-room': r.code } })).json().length, 0);
   assert.equal((await addSong(r, SONG)).statusCode, 400);
 });
 
-test('a batida de coração ou retomar a sessão troca o endereço de mídia (o agente reiniciou o servidor local)', async () => {
+test('the heartbeat or resuming the Session changes the media address (the agent restarted the local server)', async () => {
   const agent = await pair();
   const sess = await session(agent);
   const r = await room(agent, sess);
@@ -177,7 +177,7 @@ test('a batida de coração ou retomar a sessão troca o endereço de mídia (o 
   assert.match((await state(r)).queue[0].song.media.instrumental, /127\.0\.0\.1:7777\/outro\//);
 });
 
-test('tirar do catálogo: a música deixa de estar pronta; tirar de novo é 404', async () => {
+test('taking it off the catalog: the song is no longer ready; taking it off again is 404', async () => {
   const agent = await pair();
   const r = await room(agent, await session(agent));
   await publish(agent, [entry(SONG)]);
@@ -186,7 +186,7 @@ test('tirar do catálogo: a música deixa de estar pronta; tirar de novo é 404'
   assert.equal((await call('GET', '/api/songs', { headers: { 'x-room': r.code } })).json().length, 0);
 });
 
-test('validação do catálogo: identificador, meta, lote e autenticação', async () => {
+test("the catalog's validation: id, meta, batch and authentication", async () => {
   const agent = await pair();
   await session(agent);
   assert.equal((await publish(agent, [{ ...entry(), id: 'curto' }])).statusCode, 400);
@@ -196,7 +196,7 @@ test('validação do catálogo: identificador, meta, lote e autenticação', asy
   assert.equal((await publish(agent, Array.from({ length: 101 }, (_, i) => entry(`m${String(i).padStart(10, '0')}`)))).statusCode, 400);
   assert.equal((await publish(agent, [entry()])).statusCode, 200);
   assert.equal((await call('PUT', '/agent/v1/library', { payload: { songs: [] } })).statusCode, 401);
-  // um tom de MP4 fora de −6..+6 é descartado
+  // an MP4 Key outside −6..+6 is dropped
   await publish(agent, [entry('ccccccccccc', { files: { exports: [2, 99, -3, 'x'] } })]);
   const room1 = await room(agent, await session(agent));
   await addSong(room1, 'ccccccccccc');
@@ -204,7 +204,7 @@ test('validação do catálogo: identificador, meta, lote e autenticação', asy
   assert.equal((await call('GET', '/api/songs/ccccccccccc/export?pitch=99', { headers: { 'x-room': room1.code } })).statusCode, 400);
 });
 
-test('MP4 exportado no computador do dono: o catálogo diz quais tons existem e a URL aponta para o servidor local', async () => {
+test("an MP4 exported on the owner's computer: the catalog says which Keys exist and the URL points to the local server", async () => {
   const agent = await pair();
   const r = await room(agent, await session(agent));
   await publish(agent, [entry(SONG)]);
@@ -213,11 +213,11 @@ test('MP4 exportado no computador do dono: o catálogo diz quais tons existem e 
   const none = (await call('GET', `/api/songs/${SONG}/export?pitch=2`, { headers })).json();
   assert.deepEqual([none.status, none.url], ['none', null]);
   const asked = await call('POST', `/api/songs/${SONG}/export`, { headers, payload: { pitch: 2 } });
-  assert.equal(asked.statusCode, 202); // vai para o agente da sessão
+  assert.equal(asked.statusCode, 202); // it goes to the Session's agent
   const claimed = await call('POST', '/agent/v1/exports/claim', { headers: agent.headers, payload: { wait_ms: 0 } });
   assert.deepEqual(claimed.json().request, { video_id: SONG, pitch: 2 });
 
-  await publish(agent, [entry(SONG, { files: { exports: [2] } })]); // o agente gerou o MP4 e atualizou o catálogo
+  await publish(agent, [entry(SONG, { files: { exports: [2] } })]); // the agent made the MP4 and updated the catalog
   const ready = (await call('GET', `/api/songs/${SONG}/export?pitch=2`, { headers })).json();
   assert.deepEqual([ready.status, ready.url, ready.local], ['ready', `${BASE}/cache/${SONG}/karaoke_p+2.mp4`, true]);
   await publish(agent, [entry(SONG, { files: { exports: [0, -3] } })]);
@@ -225,17 +225,17 @@ test('MP4 exportado no computador do dono: o catálogo diz quais tons existem e 
   assert.equal((await call('GET', `/api/songs/${SONG}/export?pitch=-3`, { headers })).json().url, `${BASE}/cache/${SONG}/karaoke_p-3.mp4`);
 });
 
-test('músicas importadas (f-<hash>) entram no catálogo, na fila e na rota de músicas', async () => {
+test('imported songs (f-<hash>) go into the catalog, the Queue and the songs route', async () => {
   const agent = await pair();
   const r = await room(agent, await session(agent));
   assert.equal((await publish(agent, [entry(IMPORTED, { meta: { title: 'Meu arquivo' } })])).statusCode, 200);
   assert.equal((await addSong(r, IMPORTED)).statusCode, 201);
   assert.equal((await state(r)).queue[0].song.media.instrumental, `${BASE}/cache/${IMPORTED}/instrumental.mp3`);
   assert.equal((await call('GET', `/api/songs/${IMPORTED}`, { headers: { 'x-room': r.code } })).json().status, 'ready');
-  assert.equal((await addSong(r, 'f-zzzzzzzzzzzz')).statusCode, 400); // formato inválido
+  assert.equal((await addSong(r, 'f-zzzzzzzzzzzz')).statusCode, 400); // invalid format
 });
 
-test('o dono sair da sessão não apaga o catálogo dele (a biblioteca é do dispositivo, não da sessão)', async () => {
+test('the owner leaving the Session does not delete their catalog (the Jukebox belongs to the device, not the Session)', async () => {
   const agent = await pair();
   const s1 = await session(agent);
   await publish(agent, [entry(SONG)]);
@@ -244,17 +244,17 @@ test('o dono sair da sessão não apaga o catálogo dele (a biblioteca é do dis
   assert.equal((await call('GET', '/api/songs', { headers: { 'x-room': r2.code } })).json().length, 1);
 });
 
-test('música importada que não está no catálogo do dono não vira job do YouTube', async () => {
+test("an imported song that is not in the owner's catalog does not become a YouTube job", async () => {
   const agent = await pair();
   const r = await room(agent, await session(agent));
-  const res = await addSong(r, IMPORTED, { artist: 'A', title: 'B' }); // mesmo com artista e nome: não há o que baixar
+  const res = await addSong(r, IMPORTED, { artist: 'A', title: 'B' }); // even with an artist and title: there is nothing to download
   assert.equal(res.statusCode, 404);
   assert.equal(res.json().error, 'song_not_found');
-  assert.equal((await claim(agent)).statusCode, 204); // nenhum job foi enfileirado para o agente
+  assert.equal((await claim(agent)).statusCode, 204); // no job was queued for the agent
   assert.equal((await state(r)).queue.length, 0);
 });
 
-test('a letra de uma música importada não se troca por job (importa-se o arquivo de novo)', async () => {
+test("an imported song's lyrics are not changed by a job (the file is imported again)", async () => {
   const agent = await pair();
   const r = await room(agent, await session(agent));
   await publish(agent, [entry(IMPORTED, { meta: { title: 'Meu arquivo' } })]);

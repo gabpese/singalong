@@ -11,7 +11,7 @@ import { createMemoryJobStore } from '../dist/jobs.js';
 import { RoomService } from '../dist/rooms/room.service.js';
 import { MAX_PER_CLIENT } from '../dist/rooms/rooms.js';
 import { LocalStorage } from '../dist/storage.js';
-import { fixtures, openDatabase } from './fixtures.js';
+import { fixtures, openDatabase } from './fixtures.ts';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const NO_LIMITS = { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG };

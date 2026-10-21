@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Room } from '../dist/database/entities.js';
 import { migrations } from '../dist/database/orm.js';
-import { fixtures, openDatabase } from './fixtures.js';
+import { fixtures, openDatabase } from './fixtures.ts';
 
 const INITIAL = 'Migration20261019000000_initial_schema';
 const BASELINE = 'Migration20261020000000_baseline';

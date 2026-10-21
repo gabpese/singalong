@@ -1,4 +1,4 @@
-// A TV repassa a letra ao palco dos cantores (celular), que não alcança as músicas guardadas no computador do dono.
+// The TV passes the lyrics on to the singers' Stage (a phone), which cannot reach the songs kept on the owner's computer.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -50,7 +50,7 @@ async function roomPlaying() {
 
 const tvSends = (conn, message) => conn.gateway.lyrics(conn.socket, message);
 
-test('a letra mandada pela TV chega aos celulares (não à própria TV) e quem entra depois a recebe', async () => {
+test('the lyrics the TV sends reach the phones (not the TV itself), and whoever joins later gets them', async () => {
   const { code, itemId } = await roomPlaying();
   const phone = await fakeConn(code, 'controller');
   const tv = await fakeConn(code, 'tv');
@@ -58,31 +58,31 @@ test('a letra mandada pela TV chega aos celulares (não à própria TV) e quem e
   assert.deepEqual(phone.lyrics(), [{ type: 'lyrics', item_id: itemId, cues: CUES }]);
   assert.deepEqual(tv.lyrics(), []);
 
-  const late = await fakeConn(code, 'controller'); // o palco abre depois de a música começar
+  const late = await fakeConn(code, 'controller'); // the Stage opens after the song started
   assert.deepEqual(late.lyrics(), [{ type: 'lyrics', item_id: itemId, cues: CUES }]);
   const anotherTv = await fakeConn(code, 'tv');
   assert.deepEqual(anotherTv.lyrics(), []);
 });
 
-test('só a TV manda a letra, só da música que está tocando e só se estiver bem formada', async () => {
+test('only the TV sends the lyrics, only for the song playing, and only when well formed', async () => {
   const { code, itemId } = await roomPlaying();
   const phone = await fakeConn(code, 'controller');
   const other = await fakeConn(code, 'controller');
-  await tvSends(other, { type: 'lyrics', item_id: itemId, cues: CUES }); // um celular não tem esse poder
+  await tvSends(other, { type: 'lyrics', item_id: itemId, cues: CUES }); // a phone does not have that power
   const tv = await fakeConn(code, 'tv');
-  await tvSends(tv, { type: 'lyrics', item_id: itemId + 99, cues: CUES }); // não é a música atual
+  await tvSends(tv, { type: 'lyrics', item_id: itemId + 99, cues: CUES }); // not the current song
   await tvSends(tv, { type: 'lyrics', item_id: itemId, cues: [{ start: 'x', end: 2, text: 'a' }] });
   await tvSends(tv, { type: 'lyrics', item_id: itemId, cues: 'lixo' });
   assert.deepEqual(phone.lyrics(), []);
-  assert.deepEqual((await fakeConn(code, 'controller')).lyrics(), []); // nada ficou guardado
+  assert.deepEqual((await fakeConn(code, 'controller')).lyrics(), []); // nothing was kept
 });
 
-test('sanitizeCues limpa, limita e recusa o que não presta', () => {
+test('sanitizeCues cleans, limits and refuses what is no good', () => {
   assert.deepEqual(sanitizeCues([{ start: 1, end: 2, text: 'oi', extra: 'x', words: [[1, 2]] }]), [{ start: 1, end: 2, text: 'oi', words: [[1, 2]] }]);
-  assert.deepEqual(sanitizeCues([{ start: 1, end: 2, text: 'oi', words: [[1, 'a']] }]), [{ start: 1, end: 2, text: 'oi' }]); // palavras ruins: só a linha
+  assert.deepEqual(sanitizeCues([{ start: 1, end: 2, text: 'oi', words: [[1, 'a']] }]), [{ start: 1, end: 2, text: 'oi' }]); // bad words: only that line
   assert.equal(sanitizeCues(null), null);
   assert.equal(sanitizeCues(new Array(3001).fill({ start: 0, end: 1, text: 'a' })), null);
   assert.equal(sanitizeCues([{ start: 0, end: 1, text: 'a'.repeat(401) }]), null);
-  assert.equal(sanitizeCues(new Array(2000).fill({ start: 0, end: 1, text: 'a'.repeat(300) })), null); // grande demais no total
+  assert.equal(sanitizeCues(new Array(2000).fill({ start: 0, end: 1, text: 'a'.repeat(300) })), null); // too big in total
   assert.deepEqual(sanitizeCues([]), []);
 });

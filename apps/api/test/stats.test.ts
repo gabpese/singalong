@@ -1,4 +1,4 @@
-// Estatísticas do dono: o que tocou nas salas das sessões de um computador, com o histórico guardado depois de a sala sumir.
+// The owner's statistics: what played in the Rooms of a computer's Sessions, with the history kept after the Room is gone.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,7 +9,7 @@ import { createMemoryJobStore } from '../dist/jobs.js';
 import { RoomService } from '../dist/rooms/room.service.js';
 import { RoomsGateway } from '../dist/rooms/rooms.gateway.js';
 import { LocalStorage } from '../dist/storage.js';
-import { fixtures, openDatabase } from './fixtures.js';
+import { fixtures, openDatabase } from './fixtures.ts';
 
 const SONGS = ['statSongA01', 'statSongB02', 'statSongC03'];
 const ANA = 'client-ana-0001';
@@ -38,7 +38,7 @@ after(() => app.close());
 
 const agentCall = (method, url, headers, payload) => app.inject({ method, url: `/agent/v1${url}`, headers, payload });
 
-/** Um computador pareado, com sessão e uma sala. */
+/** A paired computer, with a Session and a Room. */
 async function owner() {
   const start = await agentCall('POST', '/pair/start', { 'x-admin-token': 'adm' }, {});
   const done = await agentCall('POST', '/pair/complete', {}, { code: start.json().code, name: 'PC do teste' });
@@ -65,19 +65,19 @@ const msg = (conn, message) => conn.gateway[message.type](conn.socket, message);
 const state = async (code) => (await app.inject({ method: 'GET', url: `/api/rooms/${code}`, headers: { 'x-client-id': ANA } })).json();
 const stats = (headers, query = '') => agentCall('GET', `/stats${query}`, headers);
 
-test('depois de músicas cantadas, o dono vê os totais, as mais tocadas, quem mais cantou e o que foi mais aplaudido', async () => {
+test('after songs were sung, the owner sees the totals, the most played, who sang the most and what got the most applause', async () => {
   const { headers, room } = await owner();
   await app.inject({ method: 'PATCH', url: `/api/rooms/${room.code}`, headers: { 'x-client-id': ANA, 'x-host-token': room.host_token }, payload: { scoring: true } });
   await add(room.code, SONGS[0], ANA, 'Ana');
   await add(room.code, SONGS[1], BIA, 'Bia');
-  await add(room.code, SONGS[0], BIA, 'Bia'); // a mesma música pela segunda vez
-  await add(room.code, SONGS[2], ANA, 'Ana'); // esta vai ser pulada
+  await add(room.code, SONGS[0], BIA, 'Bia'); // the same song a second time
+  await add(room.code, SONGS[2], ANA, 'Ana'); // this one will be skipped
 
   const tv = await fakeConn(room.code, 'tv', 'tv-client-0001');
   const phone = await fakeConn(room.code, 'controller', 'client-caio-0001');
   const playNext = async ({ score, cheers, end = true }) => {
     const current = (await state(room.code)).current_item_id;
-    assert.ok(current, 'tem música tocando');
+    assert.ok(current, 'a song is playing');
     for (let i = 0; i < cheers; i++) await msg(phone, { type: 'reaction', kind: 'clap' });
     if (score !== undefined) await msg(tv, { type: 'score', item_id: current, score });
     if (end) {
@@ -87,28 +87,28 @@ test('depois de músicas cantadas, o dono vê os totais, as mais tocadas, quem m
     }
   };
 
-  await playNext({ score: 80, cheers: 4 }); // Ana, música A
-  await playNext({ score: 60, cheers: 1 }); // Bia, música B
-  await playNext({ score: 100, cheers: 0 }); // Bia, música A de novo
+  await playNext({ score: 80, cheers: 4 }); // Ana, song A
+  await playNext({ score: 60, cheers: 1 }); // Bia, song B
+  await playNext({ score: 100, cheers: 0 }); // Bia, song A again
   const skipped = await app.inject({ method: 'POST', url: `/api/rooms/${room.code}/player/skip`, headers: { 'x-client-id': ANA, 'x-host-token': room.host_token } });
-  assert.equal(skipped.statusCode, 200); // a quarta (Ana, música C) é pulada
+  assert.equal(skipped.statusCode, 200); // the fourth (Ana, song C) is skipped
 
   const res = await stats(headers);
   assert.equal(res.statusCode, 200);
   const body = res.json();
   assert.equal(body.days, 30);
   assert.deepEqual(body.totals, { songs: 3, singers: 2, sessions: 1, cheers: 5, avg_score: 80, duets: 0, skipped: 1 });
-  assert.deepEqual(body.top_songs.map((s) => [s.video_id, s.plays]), [[SONGS[0], 2], [SONGS[1], 1]]); // a mais tocada primeiro
+  assert.deepEqual(body.top_songs.map((s) => [s.video_id, s.plays]), [[SONGS[0], 2], [SONGS[1], 1]]); // the most played first
   assert.equal(body.top_songs[0].avg_score, 90);
   assert.deepEqual(body.top_singers.map((s) => [s.name, s.songs]), [['Bia', 2], ['Ana', 1]]);
   assert.deepEqual(body.most_cheered.map((s) => [s.video_id, s.cheers]), [[SONGS[0], 4], [SONGS[1], 1]]);
   assert.equal(body.by_day.length, 1);
   assert.equal(body.by_day[0].songs, 3);
-  // nada que identifique alguém: nem o client_id, nem a chave interna da pessoa
+  // nothing that identifies anyone: neither the client_id nor the person's internal key
   assert.ok(!JSON.stringify(body).includes(ANA) && !JSON.stringify(body).includes('singer_key'));
 });
 
-test('cada dono só vê as próprias salas; sem token é 401; os dias são validados', async () => {
+test('each owner sees only their own Rooms; without a token it is 401; the days are validated', async () => {
   const one = await owner();
   const other = await owner();
   await add(one.room.code, SONGS[1], ANA, 'Ana');
@@ -125,7 +125,7 @@ test('cada dono só vê as próprias salas; sem token é 401; os dias são valid
   assert.equal((await stats(one.headers, '?days=7')).json().days, 7);
 });
 
-test('o histórico sobrevive à sala: apagar a sala não apaga as estatísticas do dono', async () => {
+test("the history outlives the Room: deleting the Room does not delete the owner's statistics", async () => {
   const { headers, room } = await owner();
   await add(room.code, SONGS[0], ANA, 'Ana');
   const tv = await fakeConn(room.code, 'tv', 'tv-client-0003');
@@ -134,7 +134,7 @@ test('o histórico sobrevive à sala: apagar a sala não apaga as estatísticas 
   const before = (await stats(headers)).json().totals.songs;
   assert.equal(before, 1);
 
-  // o banco apaga salas paradas há 24 h; o histórico fica (num banco só deste teste, para a poda não alcançar os outros)
+  // the database deletes Rooms idle for 24 h; the history stays (in a database of this test's own, so the pruning cannot reach the others)
   const { orm, close } = await openDatabase();
   const rooms = new RoomService({ orm, songs: {} });
   const db = fixtures(orm);
@@ -143,7 +143,7 @@ test('o histórico sobrevive à sala: apagar a sala não apaga as estatísticas 
   await db.createRoom('ZZZZ', 'tok', Date.now() - 3 * 24 * 3600 * 1000);
   assert.equal(await rooms.deleteInactiveRooms(Date.now() - 24 * 3600 * 1000), 1);
   assert.equal((await rooms.statsFor('d1', 0)).totals.songs, 1);
-  assert.equal(await rooms.prunePlayLog(Date.now() + 1000), 1); // o histórico antigo é podado pela idade
+  assert.equal(await rooms.prunePlayLog(Date.now() + 1000), 1); // old history is pruned by age
   assert.equal((await rooms.statsFor('d1', 0)).totals.songs, 0);
   await close();
 });

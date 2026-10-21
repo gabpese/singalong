@@ -3,6 +3,7 @@ import { MikroORM } from '@mikro-orm/core';
 import type { AppConfig } from '../app.ts';
 import { AgentService } from '../agents/agent.service.ts';
 import { CloudBlocked, Device, EmailRule } from '../database/entities.ts';
+import type { AdminState, CloudSong } from '../protocol.ts';
 import { ReleaseService } from '../release/release.service.ts';
 import { HttpError } from '../http-error.ts';
 import type { LocalStorage } from '../storage.ts';
@@ -27,7 +28,7 @@ export class AdminService {
   ) {}
 
   /** Everything the page shows at once. */
-  async state() {
+  async state(): Promise<AdminState> {
     const em = this.orm.em.fork();
     const blocked = await em.find(CloudBlocked, {}, { orderBy: { blockedAt: 'desc' } });
     const rules = await em.find(EmailRule, {}, { orderBy: { email: 'asc' } });
@@ -45,9 +46,9 @@ export class AdminService {
       devices: await Promise.all(devices.map(async (device) => ({
         id: device.id,
         name: device.name,
-        email: device.email,
+        email: device.email ?? null,
         created_at: device.createdAt,
-        last_seen: device.lastSeen,
+        last_seen: device.lastSeen ?? null,
         revoked: Boolean(device.revokedAt),
         cloud: await this.agents.canUploadToCloud(device),
         // the app version it reported and whether it is up to date: ok | update_available | update_required | unknown
@@ -61,7 +62,7 @@ export class AdminService {
   }
 
   /** The prepared songs in the server's storage, newest first. */
-  private async cloudSongs() {
+  private async cloudSongs(): Promise<CloudSong[]> {
     const songs = new Map<string, { id: string; size: number; ready: Set<string>; updated: number }>();
     for (const { key, size, mtimeMs: modified } of await this.storage.listDetailed('cache')) {
       const [, id, name] = key.split('/');
@@ -72,7 +73,7 @@ export class AdminService {
       entry.ready.add(name);
       songs.set(id, entry);
     }
-    const cloud = [];
+    const cloud: CloudSong[] = [];
     for (const entry of songs.values()) {
       if (!READY_FILES.every((name) => entry.ready.has(name))) continue;
       let meta: { title?: string; artist?: string; origin?: string } = {};
