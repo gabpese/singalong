@@ -1,4 +1,4 @@
-// Agente local: pareamento, sessões e o roteamento dos pedidos de uma sala para o agente DONO da sessão dela.
+// The local agent: pairing, Sessions, and routing a Room's requests to the agent that OWNS its Session.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,7 +7,7 @@ import { after, before, test } from 'node:test';
 import { buildApp } from '../dist/app.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
 import { LocalStorage } from '../dist/storage.js';
-import { fixtures } from './fixtures.js';
+import { fixtures } from './fixtures.ts';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const NO_LIMITS = { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG };
@@ -48,7 +48,7 @@ after(() => app.close());
 
 const call = (method, url, { headers = {}, payload, application = app } = {}) => application.inject({ method, url, headers, payload });
 
-/** Pareia um dispositivo novo (o caminho completo: o administrador gera o código, o agente o troca por um token). */
+/** Pairs a new device (the whole path: the administrator makes the code, the agent trades it for a token). */
 async function pair(name = 'PC do Gabriel', application = app) {
   const start = await call('POST', '/agent/v1/pair/start', { headers: ADMIN, payload: {}, application });
   assert.equal(start.statusCode, 201);
@@ -76,7 +76,7 @@ const addSong = (room, id = SONG, application = app) =>
 const claim = (agent, application = app) => call('POST', '/agent/v1/jobs/claim', { headers: agent.headers, payload: { wait_ms: 0 }, application });
 const roomState = async (room, application = app) => (await call('GET', `/api/rooms/${room.code}`, { headers: CLIENT, application })).json();
 
-test('pareamento: sem ADMIN_TOKEN fica desligado; com ele, só o administrador gera o código', async () => {
+test('pairing: without ADMIN_TOKEN it is off; with it, only the administrator makes the code', async () => {
   const noAdmin = await buildApp({ config: { publicDir: root, rateLimits: NO_LIMITS }, storage: new LocalStorage(root), jobs: createMemoryJobStore() });
   assert.equal((await call('POST', '/agent/v1/pair/start', { headers: ADMIN, payload: {}, application: noAdmin })).statusCode, 404);
   await noAdmin.close();
@@ -89,27 +89,27 @@ test('pareamento: sem ADMIN_TOKEN fica desligado; com ele, só o administrador g
   assert.equal(ok.json().expires_in, 600);
 });
 
-test('pareamento: o código é de uso único, ignora maiúsculas/espaços e o token só aparece uma vez', async () => {
+test('pairing: the code works once, ignores capitals and spaces, and the token shows only once', async () => {
   const code = (await call('POST', '/agent/v1/pair/start', { headers: ADMIN, payload: {} })).json().code;
   const spaced = `${code.slice(0, 4).toLowerCase()} ${code.slice(4)}`;
   const first = await call('POST', '/agent/v1/pair/complete', { payload: { code: spaced, name: '  Notebook  ' } });
   assert.equal(first.statusCode, 201);
   assert.match(first.json().token, /^sga_/);
-  assert.equal((await call('POST', '/agent/v1/pair/complete', { payload: { code } })).statusCode, 400); // já usado
+  assert.equal((await call('POST', '/agent/v1/pair/complete', { payload: { code } })).statusCode, 400); // already used
   assert.equal((await call('POST', '/agent/v1/pair/complete', { payload: { code: 'ZZZZZZZZ' } })).statusCode, 400);
   assert.equal((await call('GET', '/agent/v1/me', { headers: { authorization: `Bearer ${first.json().token}` } })).json().device.name, 'Notebook');
 });
 
-test('pareamento: o código vence em 10 minutos', async () => {
+test('pairing: the code expires in 10 minutes', async () => {
   const code = (await call('POST', '/agent/v1/pair/start', { headers: ADMIN, payload: {} })).json().code;
-  // envelhece o código no banco (o relógio do serviço é o do processo)
+  // ages the code in the database (the service's clock is the process's)
   const { createHash } = await import('node:crypto');
   const hash = createHash('sha256').update(code).digest('hex');
   await fixtures(app.orm).savePairCode(hash, Date.now() - 1000);
   assert.equal((await call('POST', '/agent/v1/pair/complete', { payload: { code } })).statusCode, 400);
 });
 
-test('pareamento: tentativas de código são limitadas por pessoa', async () => {
+test('pairing: code attempts are limited per person', async () => {
   const limited = await build({ rateLimits: { ...NO_LIMITS, pair: { max: 3, windowMs: 60_000 } } });
   const codes = [];
   for (let i = 0; i < 5; i++) codes.push((await call('POST', '/agent/v1/pair/complete', { payload: { code: 'AAAAAAAA' }, application: limited.app })).statusCode);
@@ -117,7 +117,7 @@ test('pareamento: tentativas de código são limitadas por pessoa', async () => 
   await limited.app.close();
 });
 
-test('autenticação: sem token, com token errado ou revogado vira 401', async () => {
+test('authentication: without a token, or with a wrong or revoked one, it is 401', async () => {
   assert.equal((await call('GET', '/agent/v1/me')).statusCode, 401);
   assert.equal((await call('GET', '/agent/v1/me', { headers: { authorization: 'Bearer sga_falso' } })).statusCode, 401);
   const agent = await pair();
@@ -126,20 +126,20 @@ test('autenticação: sem token, com token errado ou revogado vira 401', async (
   assert.equal((await call('GET', '/agent/v1/me', { headers: agent.headers })).statusCode, 401);
 });
 
-test('sessão: apelido obrigatório e limitado; só o dono mexe nela', async () => {
+test('Session: the nickname is required and limited; only its owner changes it', async () => {
   const agent = await pair();
   const other = await pair('Outro PC');
   assert.equal((await call('POST', '/agent/v1/sessions', { headers: agent.headers, payload: { display_name: '   ' } })).statusCode, 400);
   const session = await startSession(agent, `  ${'A'.repeat(50)}  `);
   assert.equal(session.display_name.length, 30);
-  assert.equal((await call('DELETE', `/agent/v1/sessions/${session.id}`, { headers: other.headers })).statusCode, 404); // de outro dispositivo
+  assert.equal((await call('DELETE', `/agent/v1/sessions/${session.id}`, { headers: other.headers })).statusCode, 404); // from another device
   assert.equal((await call('POST', `/agent/v1/sessions/${session.id}/rooms`, { headers: other.headers, payload: {} })).statusCode, 404);
   assert.equal((await call('GET', '/agent/v1/me', { headers: agent.headers })).json().session.id, session.id);
   assert.equal((await call('DELETE', `/agent/v1/sessions/${session.id}`, { headers: agent.headers })).statusCode, 204);
   assert.equal((await call('GET', '/agent/v1/me', { headers: agent.headers })).json().session, null);
 });
 
-test('sala da sessão: o estado mostra só o apelido do dono e se ele está online', async () => {
+test("the Session's Room: the state shows only the owner's nickname and whether they are online", async () => {
   const agent = await pair();
   const session = await startSession(agent, 'Gabriel');
   const room = await makeRoom(agent, session);
@@ -147,20 +147,20 @@ test('sala da sessão: o estado mostra só o apelido do dono e se ele está onli
   assert.equal(room.session_id, session.id);
   let state = await roomState(room);
   assert.deepEqual(state.owner, { nickname: 'Gabriel', online: true });
-  assert.equal(JSON.stringify(state).includes(session.id), false); // o id da sessão não vai para os convidados
+  assert.equal(JSON.stringify(state).includes(session.id), false); // the Session's id does not go to the Guests
   assert.equal(JSON.stringify(state).includes(agent.id), false);
 
-  await fixtures(app.orm).touchSession(session.id, Date.now() - 60_000); // sem sinal há 1 min
+  await fixtures(app.orm).touchSession(session.id, Date.now() - 60_000); // no sign of life for 1 min
   state = await roomState(room);
   assert.equal(state.owner.online, false);
   await call('POST', '/agent/v1/heartbeat', { headers: agent.headers, payload: { version: '0.1.0' } });
   assert.equal((await roomState(room)).owner.online, true);
 
-  const plain = (await call('POST', '/api/rooms')).json(); // sala sem sessão (worker clássico)
+  const plain = (await call('POST', '/api/rooms')).json(); // a Room without a Session (the classic worker)
   assert.equal((await roomState(plain)).owner, null);
 });
 
-test('roteamento: o pedido de uma sala vai só para o agente da sessão dela; o worker clássico não o vê', async () => {
+test("routing: a Room's request goes only to its Session's agent; the classic worker does not see it", async () => {
   const a = await pair('PC A');
   const b = await pair('PC B');
   const sa = await startSession(a, 'Ana');
@@ -169,29 +169,29 @@ test('roteamento: o pedido de uma sala vai só para o agente da sessão dela; o 
   const legacyBefore = jobs.queue.length;
 
   assert.equal((await addSong(room, 'rotaA000001')).statusCode, 201);
-  assert.equal(jobs.queue.length, legacyBefore); // não foi para a fila do worker clássico
-  assert.equal((await claim(b)).statusCode, 204); // o agente de OUTRA sessão não recebe
+  assert.equal(jobs.queue.length, legacyBefore); // it did not go to the classic worker's queue
+  assert.equal((await claim(b)).statusCode, 204); // ANOTHER Session's agent does not get it
   const got = await claim(a);
   assert.equal(got.statusCode, 200);
   assert.equal(got.json().job.id, 'rotaA000001');
   assert.equal(got.json().job.attempt, 1);
-  assert.equal(got.json().job.payload.url, 'https://www.youtube.com/watch?v=rotaA000001'); // sempre a URL canônica
+  assert.equal(got.json().job.payload.url, 'https://www.youtube.com/watch?v=rotaA000001'); // always the canonical URL
   assert.equal(got.json().job.payload.artist, 'Artista');
-  // um segundo claim do MESMO agente devolve o job que ficou com ele (é assim que um agente que reiniciou o retoma)
+  // a second claim by the SAME agent returns the job it was holding (that is how a restarted agent picks it up again)
   const again = await claim(a);
   assert.equal(again.json().job.id, 'rotaA000001');
   assert.equal(again.json().job.attempt, 2);
   assert.equal(sb.id === sa.id, false);
 });
 
-test('sala sem sessão continua no worker clássico (fila "jobs")', async () => {
+test('a Room without a Session stays on the classic worker (the "jobs" queue)', async () => {
   const plain = (await call('POST', '/api/rooms')).json();
   const before = jobs.queue.length;
   assert.equal((await addSong(plain, 'classico001')).statusCode, 201);
   assert.equal(jobs.queue.length, before + 1);
 });
 
-test('ciclo do job por HTTP: claim, progresso visível na sala, pronto', async () => {
+test("the job's cycle over HTTP: claim, progress shown in the Room, ready", async () => {
   const agent = await pair();
   const session = await startSession(agent);
   const room = await makeRoom(agent, session);
@@ -206,7 +206,7 @@ test('ciclo do job por HTTP: claim, progresso visível na sala, pronto', async (
   assert.equal(state.queue[0].song.status, 'processing');
   assert.equal(state.queue[0].song.stage, 'separando a voz');
 
-  await seed(SONG); // o agente grava os arquivos no storage
+  await seed(SONG); // the agent writes the files to the storage
   const done = await call('POST', `/agent/v1/jobs/${job.id}/complete`, { headers: agent.headers, payload: { status: 'ready', stage: '', error: '' } });
   assert.equal(done.statusCode, 204);
   state = await roomState(room);
@@ -214,7 +214,7 @@ test('ciclo do job por HTTP: claim, progresso visível na sala, pronto', async (
   assert.equal(state.queue[0].song.status, 'ready');
 });
 
-test('job que precisa de letra e job que falha chegam à sala com a mensagem', async () => {
+test('a job that needs lyrics and a job that fails reach the Room with their message', async () => {
   const agent = await pair();
   const session = await startSession(agent);
   const room = await makeRoom(agent, session);
@@ -233,7 +233,7 @@ test('job que precisa de letra e job que falha chegam à sala com a mensagem', a
   assert.deepEqual([byId.falha000001.error_code, byId.falha000001.retry], ['private', 'never']);
 });
 
-test('só o agente que recebeu o job pode dar progresso ou terminá-lo; status e campos são validados', async () => {
+test('only the agent that got the job can report progress or finish it; the status and the fields are validated', async () => {
   const a = await pair('A');
   const b = await pair('B');
   const sa = await startSession(a);
@@ -246,7 +246,7 @@ test('só o agente que recebeu o job pode dar progresso ou terminá-lo; status e
   assert.equal(intruder.statusCode, 409);
   assert.equal((await call('POST', `/agent/v1/jobs/${job.id}/complete`, { headers: b.headers, payload: { status: 'ready' } })).statusCode, 409);
   assert.equal((await call('POST', `/agent/v1/jobs/${job.id}/complete`, { headers: a.headers, payload: { status: 'inventado' } })).statusCode, 400);
-  // o progresso nunca muda o status para um final: o campo `status` é descartado
+  // progress never changes the status to a final one: the `status` field is dropped
   assert.equal((await call('POST', `/agent/v1/jobs/${job.id}/progress`, { headers: a.headers, payload: { status: 'ready' } })).statusCode, 204);
   assert.equal((await jobs.get(job.id)).status, 'processing');
   assert.equal((await call('POST', '/agent/v1/jobs/curto/progress', { headers: a.headers, payload: {} })).statusCode, 400);
@@ -254,14 +254,14 @@ test('só o agente que recebeu o job pode dar progresso ou terminá-lo; status e
   assert.equal((await claim({ headers: {} })).statusCode, 401);
 });
 
-test('claim exige uma sessão ativa', async () => {
+test('claim requires an active Session', async () => {
   const agent = await pair();
   const res = await claim(agent);
   assert.equal(res.statusCode, 409);
   assert.equal(res.json().error, 'no_active_session');
 });
 
-test('claim com espera (long-poll): entrega o job assim que ele chega', async () => {
+test('claim with a wait (long-poll): delivers the job as soon as it arrives', async () => {
   const agent = await pair();
   const session = await startSession(agent);
   const room = await makeRoom(agent, session);
@@ -271,10 +271,10 @@ test('claim com espera (long-poll): entrega o job assim que ele chega', async ()
   const res = await waiting;
   assert.equal(res.statusCode, 200);
   assert.equal(res.json().job.id, 'espera00001');
-  assert.equal((await call('POST', '/agent/v1/jobs/claim', { headers: agent.headers, payload: { wait_ms: 999_999 } })).statusCode, 400); // teto da espera
+  assert.equal((await call('POST', '/agent/v1/jobs/claim', { headers: agent.headers, payload: { wait_ms: 999_999 } })).statusCode, 400); // the wait's ceiling
 });
 
-test('job sem sinal volta para a fila; o agente que reinicia recebe primeiro o que ficou com ele', async () => {
+test('a job with no sign of life goes back to the queue; an agent that restarts first gets back what it was holding', async () => {
   let clock = 1_000_000;
   const store = createMemoryJobStore({ now: () => clock, staleMs: 60_000 });
   const local = await build({ jobs: store });
@@ -286,33 +286,33 @@ test('job sem sinal volta para a fila; o agente que reinicia recebe primeiro o q
 
   const first = (await claim(a, local.app)).json().job;
   assert.equal(first.attempt, 1);
-  assert.equal((await claim(a, local.app)).statusCode, 200); // o mesmo agente reiniciou: recebe o que ficou com ele
+  assert.equal((await claim(a, local.app)).statusCode, 200); // the same agent restarted: it gets back what it was holding
   const again = await store.claim(sa.id, a.id);
   assert.equal(again.attempt, 3);
   clock += 30_000;
   await call('POST', `/agent/v1/jobs/${first.id}/progress`, { headers: a.headers, payload: { stage: 'ainda vivo' }, application: local.app });
-  clock += 59_000; // 59 s desde o último sinal: ainda é dele
+  clock += 59_000; // 59 s since the last sign: still its own
   assert.equal(await store.claim(sa.id, b.id), null);
-  clock += 2_000; // passou do prazo sem sinal
+  clock += 2_000; // past the deadline with no sign of life
   const taken = await store.claim(sa.id, b.id);
   assert.equal(taken.id, first.id);
   assert.equal(taken.attempt, 4);
   await local.app.close();
 });
 
-test('o dono sai da sessão: os pedidos pendentes falham com uma mensagem clara e a música pode ser pedida de novo', async () => {
+test('the owner leaves the Session: pending requests fail with a clear message, and the song can be asked for again', async () => {
   const agent = await pair();
   const session = await startSession(agent);
   const room = await makeRoom(agent, session);
   await addSong(room, 'saiu0000001');
-  await claim(agent); // em andamento com o agente
+  await claim(agent); // running with the agent
   await call('DELETE', `/agent/v1/sessions/${session.id}`, { headers: agent.headers });
   const song = (await roomState(room)).queue[0].song;
   assert.equal(song.status, 'failed');
   assert.equal(song.error_code, 'owner_left');
   assert.equal(song.retry, 'manual');
   assert.match(song.error, /dono da sessão saiu/);
-  // outra sessão pode pedir a mesma música (o pedido antigo não trava mais)
+  // another Session can ask for the same song (the old request no longer blocks it)
   const next = await pair('Novo');
   const ns = await startSession(next, 'Novo');
   const nr = await makeRoom(next, ns);
@@ -320,7 +320,7 @@ test('o dono sai da sessão: os pedidos pendentes falham com uma mensagem clara 
   assert.equal((await claim(next)).json().job.id, 'saiu0000001');
 });
 
-test('iniciar uma nova sessão encerra a anterior; retomar (resume_id) mantém as salas e os pedidos', async () => {
+test('starting a new Session ends the earlier one; resuming (resume_id) keeps the Rooms and the requests', async () => {
   const agent = await pair();
   const first = await startSession(agent, 'Primeira');
   const room = await makeRoom(agent, first);
@@ -328,14 +328,14 @@ test('iniciar uma nova sessão encerra a anterior; retomar (resume_id) mantém a
   const resumed = await startSession(agent, 'Primeira (de volta)', { resume_id: first.id });
   assert.equal(resumed.id, first.id);
   assert.equal(resumed.display_name, 'Primeira (de volta)');
-  assert.equal((await claim(agent)).json().job.id, 'resume00001'); // o pedido continua com ele
+  assert.equal((await claim(agent)).json().job.id, 'resume00001'); // the request stays with it
 
-  const second = await startSession(agent, 'Segunda'); // sem resume: encerra a anterior
+  const second = await startSession(agent, 'Segunda'); // no resume: ends the earlier one
   assert.notEqual(second.id, first.id);
   assert.equal((await roomState(room)).queue[0].song.error_code, 'owner_left');
 });
 
-test('busca: a sala da sessão é atendida pelo agente dela; sem o dono online, falha na hora', async () => {
+test("search: the Session's Room is served by its agent; without the owner online, it fails at once", async () => {
   const agent = await pair();
   const session = await startSession(agent);
   const room = await makeRoom(agent, session);
@@ -353,16 +353,16 @@ test('busca: a sala da sessão é atendida pelo agente dela; sem o dono online, 
   assert.equal(found.statusCode, 200);
   assert.equal(found.json()[0].video_id, 'YPLQHeUSX2g');
   assert.match(found.json()[0].thumbnail, /YPLQHeUSX2g/);
-  assert.equal((await call('POST', `/agent/v1/search/${claimed.json().request.id}/result`, { headers: agent.headers, payload: { results: [] } })).statusCode, 409); // já respondida
+  assert.equal((await call('POST', `/agent/v1/search/${claimed.json().request.id}/result`, { headers: agent.headers, payload: { results: [] } })).statusCode, 409); // already answered
 
-  await fixtures(app.orm).touchSession(session.id, Date.now() - 60_000); // dono offline
+  await fixtures(app.orm).touchSession(session.id, Date.now() - 60_000); // the owner is offline
   const offline = await call('GET', '/api/search?q=outra+busca', { headers });
   assert.equal(offline.statusCode, 503);
   assert.equal(offline.json().error, 'owner_offline');
-  assert.equal((await call('GET', '/api/search?q=qualquer', { headers: { ...CLIENT, 'x-room': 'ZZZZ' } })).statusCode, 404); // sala inexistente
+  assert.equal((await call('GET', '/api/search?q=qualquer', { headers: { ...CLIENT, 'x-room': 'ZZZZ' } })).statusCode, 404); // a Room that does not exist
 });
 
-test('busca: só a sessão que recebeu o pedido pode respondê-lo; erro do agente vira 503', async () => {
+test('search: only the Session that got the request can answer it; an agent error becomes 503', async () => {
   const a = await pair('A');
   const b = await pair('B');
   const sa = await startSession(a);
@@ -376,11 +376,11 @@ test('busca: só a sessão que recebeu o pedido pode respondê-lo; erro do agent
   assert.equal((await call('POST', `/agent/v1/search/${claimed.id}/result`, { headers: b.headers, payload: { results: [] } })).statusCode, 409);
   assert.equal((await call('POST', `/agent/v1/search/${claimed.id}/result`, { headers: a.headers, payload: { error: 'YouTube bloqueou' } })).statusCode, 204);
   assert.equal((await search).statusCode, 503);
-  // resultado malformado é recusado
+  // a malformed result is refused
   assert.equal((await call('POST', `/agent/v1/search/${claimed.id}/result`, { headers: a.headers, payload: { results: [{ video_id: 'curto', title: 'x' }] } })).statusCode, 400);
 });
 
-test('exportação de MP4: o pedido da sala vai para o agente da sessão, que informa o andamento', async () => {
+test("MP4 export: the Room's request goes to the Session's agent, which reports its progress", async () => {
   await seed(SONG);
   const agent = await pair();
   const other = await pair('Outro');
@@ -404,7 +404,7 @@ test('exportação de MP4: o pedido da sala vai para o agente da sessão, que in
   assert.deepEqual([failed.status, failed.error], ['failed', 'ffmpeg falhou']);
 });
 
-test('trocar a letra de uma música (PUT) também vai para o agente da sessão da sala', async () => {
+test("changing a song's lyrics (PUT) also goes to the agent of the Room's Session", async () => {
   await seed(OTHER);
   const agent = await pair();
   const session = await startSession(agent);
@@ -416,7 +416,7 @@ test('trocar a letra de uma música (PUT) também vai para o agente da sessão d
   assert.equal(job.payload.lyrics_source, 'lrclib');
 });
 
-test('a varredura encerra as sessões que ficaram dias sem sinal', async () => {
+test('the sweep ends the Sessions that went days without a sign of life', async () => {
   const agent = await pair();
   const session = await startSession(agent);
   const room = await makeRoom(agent, session);
@@ -427,13 +427,13 @@ test('a varredura encerra as sessões que ficaram dias sem sinal', async () => {
   assert.equal((await roomState(room)).queue[0].song.error_code, 'owner_left');
 });
 
-test('rota desconhecida do agente é 404 JSON', async () => {
+test('an unknown agent route is a JSON 404', async () => {
   const res = await call('GET', '/agent/v1/nao-existe');
   assert.equal(res.statusCode, 404);
   assert.equal(res.json().error, 'not_found');
 });
 
-test('pedido preso com um dono que sumiu é liberado para quem pedir depois; com o dono online, continua com ele', async () => {
+test('a request stuck with an owner who vanished is released to whoever asks next; with the owner online, it stays with them', async () => {
   const a = await pair('A');
   const b = await pair('B');
   const sa = await startSession(a, 'Ana');
@@ -442,23 +442,23 @@ test('pedido preso com um dono que sumiu é liberado para quem pedir depois; com
   const rb = await makeRoom(b, sb);
   await addSong(ra, 'preso000001');
 
-  await addSong(rb, 'preso000001'); // Ana está online: o pedido continua com ela (dedupe)
+  await addSong(rb, 'preso000001'); // Ana is online: the request stays with her (dedupe)
   assert.equal((await claim(b)).statusCode, 204);
 
-  await fixtures(app.orm).touchSession(sa.id, Date.now() - 60_000); // Ana sumiu
+  await fixtures(app.orm).touchSession(sa.id, Date.now() - 60_000); // Ana vanished
   await addSong(rb, 'preso000001');
   const got = await claim(b);
   assert.equal(got.statusCode, 200);
   assert.equal(got.json().job.id, 'preso000001');
 
-  // Ana volta: o pedido antigo dela já não existe (foi liberado e é do Beto agora)
+  // Ana is back: her old request no longer exists (it was released and is Beto's now)
   await call('POST', '/agent/v1/heartbeat', { headers: a.headers, payload: {} });
   assert.equal((await claim(a)).statusCode, 204);
   assert.equal((await call('POST', '/agent/v1/jobs/preso000001/progress', { headers: a.headers, payload: { stage: 'x' } })).statusCode, 409);
   assert.equal((await call('POST', '/agent/v1/jobs/preso000001/progress', { headers: b.headers, payload: { stage: 'x' } })).statusCode, 204);
 });
 
-test('o dono que sai não derruba o pedido que já foi passado a outro dono', async () => {
+test('an owner who leaves does not bring down the request already handed to another owner', async () => {
   const a = await pair('A2');
   const b = await pair('B2');
   const sa = await startSession(a, 'Ana');
@@ -467,9 +467,9 @@ test('o dono que sai não derruba o pedido que já foi passado a outro dono', as
   const rb = await makeRoom(b, sb);
   await addSong(ra, 'passa000001');
   await fixtures(app.orm).touchSession(sa.id, Date.now() - 60_000);
-  await addSong(rb, 'passa000001'); // liberado e pedido de novo pelo Beto
-  await call('DELETE', `/agent/v1/sessions/${sa.id}`, { headers: a.headers }); // Ana encerra a sessão depois
+  await addSong(rb, 'passa000001'); // released and asked for again by Beto
+  await call('DELETE', `/agent/v1/sessions/${sa.id}`, { headers: a.headers }); // Ana ends her Session afterwards
   const song = (await roomState(rb)).queue.find((i) => i.video_id === 'passa000001').song;
-  assert.notEqual(song.error_code, 'owner_left'); // continua pendente com o Beto
+  assert.notEqual(song.error_code, 'owner_left'); // still pending with Beto
   assert.equal((await claim(b)).json().job.id, 'passa000001');
 });

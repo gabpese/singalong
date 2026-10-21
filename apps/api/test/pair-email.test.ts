@@ -1,4 +1,4 @@
-// Pareamento por e-mail: o código só sai para e-mails autorizados, a resposta nunca revela quem está na lista e há limites.
+// Pairing by e-mail: the code goes only to authorized e-mails, the answer never reveals who is on the list, and there are limits.
 import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -25,9 +25,9 @@ async function build({ allowed = ['ana@exemplo.com'], enabled = true, rateLimits
 }
 
 const ask = (app, email) => app.inject({ method: 'POST', url: '/agent/v1/pair/request', payload: { email } });
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20)); // o envio roda em segundo plano
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20)); // sending runs in the background
 
-test('e-mail autorizado recebe um código que de fato pareia', async () => {
+test('an authorized e-mail gets a code that really pairs', async () => {
   const { app, sent } = await build();
   const res = await ask(app, 'ana@exemplo.com');
   assert.equal(res.statusCode, 202);
@@ -42,11 +42,11 @@ test('e-mail autorizado recebe um código que de fato pareia', async () => {
   assert.equal(done.statusCode, 201);
   assert.ok(done.json().token);
   const again = await app.inject({ method: 'POST', url: '/agent/v1/pair/complete', payload: { code, name: 'PC' } });
-  assert.equal(again.statusCode, 400); // o código é de uso único
+  assert.equal(again.statusCode, 400); // the code works once
   await app.close();
 });
 
-test('com asterisco na lista qualquer e-mail recebe o código (os limites continuam)', async () => {
+test('with an asterisk on the list any e-mail gets the code (the limits still apply)', async () => {
   const { app, sent } = await build({ allowed: ['*'] });
   assert.equal((await ask(app, 'qualquer@exemplo.com')).statusCode, 202);
   assert.equal((await ask(app, 'outra@exemplo.org')).statusCode, 202);
@@ -56,12 +56,12 @@ test('com asterisco na lista qualquer e-mail recebe o código (os limites contin
   await ask(limited.app, 'a@exemplo.com');
   await ask(limited.app, 'a@exemplo.com');
   await settle();
-  assert.equal(limited.sent.length, 1); // o limite por endereço vale também com asterisco
+  assert.equal(limited.sent.length, 1); // the per-address limit applies with the asterisk too
   await app.close();
   await limited.app.close();
 });
 
-test('maiúsculas e espaços no e-mail não atrapalham', async () => {
+test('capitals and spaces in the e-mail do not get in the way', async () => {
   const { app, sent } = await build();
   assert.equal((await ask(app, '  Ana@Exemplo.COM ')).statusCode, 202);
   await settle();
@@ -70,7 +70,7 @@ test('maiúsculas e espaços no e-mail não atrapalham', async () => {
   await app.close();
 });
 
-test('e-mail fora da lista recebe a MESMA resposta, mas nada é enviado', async () => {
+test('an e-mail off the list gets the SAME answer, but nothing is sent', async () => {
   const { app, sent } = await build();
   const allowed = await ask(app, 'ana@exemplo.com');
   const stranger = await ask(app, 'intruso@exemplo.com');
@@ -82,7 +82,7 @@ test('e-mail fora da lista recebe a MESMA resposta, mas nada é enviado', async 
   await app.close();
 });
 
-test('e-mail malformado é recusado; servidor sem e-mail configurado responde 503', async () => {
+test('a malformed e-mail is refused; a server without e-mail set up answers 503', async () => {
   const { app } = await build();
   for (const bad of ['lixo', 'a@b', '@x.com', 'a b@c.com', '']) assert.equal((await ask(app, bad)).statusCode, 400, bad);
   assert.equal((await app.inject({ method: 'POST', url: '/agent/v1/pair/request', payload: {} })).statusCode, 400);
@@ -97,11 +97,11 @@ test('e-mail malformado é recusado; servidor sem e-mail configurado responde 50
   }
 });
 
-test('limites: poucos pedidos por e-mail por hora e por IP; passou do limite, nenhum e-mail sai', async () => {
+test('limits: few requests per e-mail per hour and per IP; past the limit, no e-mail goes out', async () => {
   const perEmail = await build({ rateLimits: { pairEmail: { max: 2, windowMs: 3_600_000 } } });
-  for (let i = 0; i < 5; i++) assert.equal((await ask(perEmail.app, 'ana@exemplo.com')).statusCode, 202); // a resposta não muda
+  for (let i = 0; i < 5; i++) assert.equal((await ask(perEmail.app, 'ana@exemplo.com')).statusCode, 202); // the answer does not change
   await settle();
-  assert.equal(perEmail.sent.length, 2); // mas só 2 mensagens saíram
+  assert.equal(perEmail.sent.length, 2); // but only 2 messages went out
   await perEmail.app.close();
 
   const perIp = await build({ rateLimits: { pairRequest: { max: 3, windowMs: 600_000 } } });
@@ -111,8 +111,8 @@ test('limites: poucos pedidos por e-mail por hora e por IP; passou do limite, ne
   await perIp.app.close();
 });
 
-test('uma falha do serviço de e-mail não derruba o pedido nem mostra o motivo', async () => {
-  const { app } = await build({ mailer: { enabled: true, send: async () => { throw new Error('Brevo fora do ar'); } } });
+test('a failure of the e-mail service neither breaks the request nor shows the reason', async () => {
+  const { app } = await build({ mailer: { enabled: true, send: async () => { throw new Error('Brevo is down'); } } });
   const res = await ask(app, 'ana@exemplo.com');
   assert.equal(res.statusCode, 202);
   assert.equal(JSON.stringify(res.json()).includes('Brevo'), false);
@@ -120,7 +120,7 @@ test('uma falha do serviço de e-mail não derruba o pedido nem mostra o motivo'
   await app.close();
 });
 
-test('o mailer fala com a API do Brevo com a chave e o remetente certos, e recusa se não estiver configurado', async () => {
+test("the mailer calls Brevo's API with the right key and sender, and refuses when it is not set up", async () => {
   const calls = [];
   const fetchImpl = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 201 }; };
   const mailer = createMailer({ apiKey: 'chave-secreta', fromEmail: 'karaoke@exemplo.com', fromName: 'Singalong', fetchImpl });
@@ -140,7 +140,7 @@ test('o mailer fala com a API do Brevo com a chave e o remetente certos, e recus
   await assert.rejects(off.send({ to: 'x@y.com', subject: 's', text: 't' }), /não está configurado/);
 });
 
-test('o texto do e-mail tem o código, o prazo e nenhum link', () => {
+test("the e-mail's text has the code, the deadline and no link", () => {
   const { subject, text } = pairingEmail({ code: 'ABCD2345', minutes: 10, server: 'https://x.org' });
   assert.match(subject, /ABCD2345/);
   assert.match(text, /10 minutos/);

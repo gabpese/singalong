@@ -1,4 +1,4 @@
-// Intervalo entre músicas: os aplausos depois de uma música e a subida ao palco antes da próxima (com durações curtas aqui).
+// The Intermission between songs: the Applause after a song and Taking the stage before the next one (with short durations here).
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -52,7 +52,7 @@ async function call(method, url, { client = ANA, host, body } = {}) {
   return { status: res.statusCode, body: res.body ? res.json() : null };
 }
 
-/** Uma sala com a TV conectada (sem TV não há intervalo: nada tocaria). */
+/** A Room with the TV connected (without a TV there is no Intermission: nothing would play). */
 async function roomWithTv() {
   const { body } = await call('POST', '/rooms');
   const socket = { readyState: 1, send() {}, ping() {}, terminate() {} };
@@ -64,7 +64,7 @@ const add = (code, videoId, client = ANA, name = 'Ana') =>
   call('POST', `/rooms/${code}/queue`, { client, body: { video_id: videoId, name, artist: 'Artista', title: 'Título' } });
 const state = async (code) => (await call('GET', `/rooms/${code}`)).body;
 
-test('a sala nasce com o intervalo ligado; a primeira música entra em "intro" (subida ao palco) e depois toca', async () => {
+test('a Room starts with the Intermission on; the first song goes into "intro" (Taking the stage) and then plays', async () => {
   const { code } = await roomWithTv();
   const a = (await add(code, READY_A)).body.item_id;
   let s = await state(code);
@@ -82,21 +82,21 @@ test('a sala nasce com o intervalo ligado; a primeira música entra em "intro" (
   assert.equal(s.interlude, null);
 });
 
-test('fim da música: aplausos (com a nota, se houve pontuação), a fila espera, e só depois o próximo sobe ao palco', async () => {
+test('a song ends: the Applause (with the Score, when scoring is on), the Queue waits, and only then the next Singer takes the stage', async () => {
   const { code, host } = await roomWithTv();
   await call('PATCH', `/rooms/${code}`, { host, body: { scoring: true } });
   const a = (await add(code, READY_A)).body.item_id;
   const b = (await add(code, READY_B, BIA, 'Bia')).body.item_id;
-  await call('POST', `/rooms/${code}/player/start`, { host }); // pula a subida da primeira
+  await call('POST', `/rooms/${code}/player/start`, { host }); // skips the first song's Taking the stage
   app.rooms.tvScore(code, a, 87);
   await app.rooms.tvEnded(code, a);
   let s = await state(code);
-  assert.equal(s.current_item_id, null); // durante os aplausos ninguém está na vez
+  assert.equal(s.current_item_id, null); // during the Applause nobody's turn is on
   assert.equal(s.interlude.phase, 'applause');
   assert.equal(s.interlude.item_id, a);
   assert.equal(s.interlude.singers, 'Ana');
   assert.equal(s.interlude.score, 87);
-  assert.equal(s.next_item_id, b); // quem vem depois já aparece
+  assert.equal(s.next_item_id, b); // whoever comes next already shows
   await sleep(APPLAUSE_MS + 150);
   s = await state(code);
   assert.equal(s.current_item_id, b);
@@ -105,7 +105,7 @@ test('fim da música: aplausos (com a nota, se houve pontuação), a fila espera
   assert.equal(s.interlude.singers, 'Bia');
 });
 
-test('pular a música (anfitrião) não tem aplausos: a próxima sobe ao palco direto', async () => {
+test('skipping the song (the Host) has no Applause: the next one goes straight to Taking the stage', async () => {
   const { code, host } = await roomWithTv();
   await add(code, READY_A);
   const b = (await add(code, READY_B, BIA, 'Bia')).body.item_id;
@@ -116,7 +116,7 @@ test('pular a música (anfitrião) não tem aplausos: a próxima sobe ao palco d
   assert.equal(s.interlude.phase, 'stage');
 });
 
-test('"começar agora" é do anfitrião: nos aplausos pula o intervalo inteiro, na subida ao palco começa a música', async () => {
+test("'start now' is the Host's: during the Applause it skips the whole Intermission, while Taking the stage it starts the song", async () => {
   const { code, host } = await roomWithTv();
   const a = (await add(code, READY_A)).body.item_id;
   const b = (await add(code, READY_B, BIA, 'Bia')).body.item_id;
@@ -126,11 +126,11 @@ test('"começar agora" é do anfitrião: nos aplausos pula o intervalo inteiro, 
   assert.equal((await state(code)).interlude.phase, 'applause');
   const s = (await call('POST', `/rooms/${code}/player/start`, { host })).body;
   assert.equal(s.current_item_id, b);
-  assert.equal(s.playback, 'playing'); // sem a subida ao palco
+  assert.equal(s.playback, 'playing'); // without Taking the stage
   assert.equal(s.interlude, null);
 });
 
-test('com o intervalo desligado a próxima música toca na hora; desligar no meio do intervalo começa a música', async () => {
+test('with the Intermission off the next song plays at once; turning it off mid-Intermission starts the song', async () => {
   const { code, host } = await roomWithTv();
   const a = (await add(code, READY_A)).body.item_id;
   assert.equal((await state(code)).playback, 'intro');
@@ -143,10 +143,10 @@ test('com o intervalo desligado a próxima música toca na hora; desligar no mei
   assert.equal(s.current_item_id, b);
   assert.equal(s.playback, 'playing');
   assert.equal(s.interlude, null);
-  assert.equal((await call('PATCH', `/rooms/${code}`, { client: BIA, body: { intermission: true } })).status, 403); // só o anfitrião
+  assert.equal((await call('PATCH', `/rooms/${code}`, { client: BIA, body: { intermission: true } })).status, 403); // only the Host
 });
 
-test('sem TV conectada não há intervalo (nada tocaria: esperar não ajuda ninguém)', async () => {
+test('without a TV connected there is no Intermission (nothing would play: waiting helps nobody)', async () => {
   const { body } = await call('POST', '/rooms');
   await add(body.code, READY_A);
   const s = await state(body.code);
@@ -154,11 +154,11 @@ test('sem TV conectada não há intervalo (nada tocaria: esperar não ajuda ning
   assert.equal(s.interlude, null);
 });
 
-test('pausar na subida ao palco segura a música; retomar começa', async () => {
+test('pausing while Taking the stage holds the song; resuming starts it', async () => {
   const { code, host } = await roomWithTv();
   await add(code, READY_A);
   assert.equal((await call('POST', `/rooms/${code}/player/pause`, { host })).body.playback, 'paused');
   await sleep(STAGE_MS + 150);
-  assert.equal((await state(code)).playback, 'paused'); // o fim da subida não passa por cima da pausa
+  assert.equal((await state(code)).playback, 'paused'); // the end of Taking the stage does not override the pause
   assert.equal((await call('POST', `/rooms/${code}/player/resume`, { host })).body.playback, 'playing');
 });

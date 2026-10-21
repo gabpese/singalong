@@ -33,7 +33,7 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
 [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md). A API vai para a VM depois de cada pull request aceito. Até o passo 3 terminar, uma migração mantém toda tabela e coluna que a imagem anterior usa (ela cria tabelas e colunas, ou aperta uma restrição que os dados já cumprem), então a imagem anterior continua rodando sobre um banco já migrado.
 
 1. **Ainda em JavaScript (feito).**
-   - Testes de concorrência (`apps/api/test/concurrency.test.js`) para as regras que leem e depois gravam: músicas adicionadas ao mesmo tempo no limite por pessoa, "a TV terminou" e "o Anfitrião pulou" chegando juntos, uma nota enviada quando a música termina, movimentos ao mesmo tempo, um código de pareamento usado duas vezes, dois inícios de sessão, duas Salas com o mesmo código.
+   - Testes de concorrência (`apps/api/test/concurrency.test.ts`) para as regras que leem e depois gravam: músicas adicionadas ao mesmo tempo no limite por pessoa, "a TV terminou" e "o Anfitrião pulou" chegando juntos, uma nota enviada quando a música termina, movimentos ao mesmo tempo, um código de pareamento usado duas vezes, dois inícios de sessão, duas Salas com o mesmo código.
    - A fila por Sala, na ordem de chegada (`src/serial.js`), já cobria as rotas HTTP, o "terminou" e os timers do Intervalo; a nota da TV e as difusões de quem entra e sai da sala agora também passam por ela. O "pular" nomeia a música da tela do Anfitrião, então nunca pula a do próximo cantor; as mudanças de sessão fazem fila por computador; uma reação, um código de Sala e um código de pareamento se resolvem cada um numa única instrução SQL. A reserva de trabalhos dos agentes fica no Redis ou na memória, não no SQLite, então o ORM não chega nela.
    - O `deploy.sh` copia o arquivo do SQLite com `VACUUM INTO` antes de cada deploy e guarda as cinco últimas cópias.
 2. **NestJS e MikroORM no lugar (feito).**
@@ -49,7 +49,7 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
    - **Os tipos do protocolo: feito.** O `apps/api/src/protocol.ts` define o estado da Sala, as mensagens do WebSocket nos dois sentidos e as respostas HTTP que as páginas leem. A API é tipada por ele: o snapshot, o `personalize`, os eventos do gateway e os controllers. O `lib/types.ts` do site o reexporta com `export type`, então nada da API entra no bundle. As cópias que o site tinha (a configuração da página inicial, o resultado da busca, o estado da exportação) saíram, e as mensagens que a TV e os celulares enviam pelo WebSocket são conferidas contra o `ClientMessage`.
 4. **O resto da API, e o `db.js` se aposenta,** em dois pull requests.
    - **Os arquivos compartilhados em TypeScript: feito.** `jobs`, `storage`, `files`, `config`, `mailer`, `version`, `youtube`, `installers`, `logging` e `rate-limit`, com os comentários em inglês. As filas de trabalho no Redis e na memória implementam uma única interface `JobStore`, e a da memória acrescenta o que só os testes usam. O `rateLimited()` do Fastify saiu, porque toda rota com limite agora é do Nest.
-   - **O `db.js` se aposenta: feito.** O schema congelado agora é a primeira migração (`Migration20261019000000_initial_schema`), listada antes da base. Ela cria o que falta num banco novo e acrescenta as colunas que faltam num antigo, então, num banco que o db.js já tinha montado, ela roda uma vez e não muda nada. A conexão abre em `src/database/connection.ts`, o `/readyz` pergunta ao MikroORM e os testes preenchem o banco pelo MikroORM (`test/fixtures.js`). O código da API não tem mais JavaScript, então o `allowJs` saiu.
+   - **O `db.js` se aposenta: feito.** O schema congelado agora é a primeira migração (`Migration20261019000000_initial_schema`), listada antes da base. Ela cria o que falta num banco novo e acrescenta as colunas que faltam num antigo, então, num banco que o db.js já tinha montado, ela roda uma vez e não muda nada. A conexão abre em `src/database/connection.ts`, o `/readyz` pergunta ao MikroORM e os testes preenchem o banco pelo MikroORM (`test/fixtures.ts`). O código da API não tem mais JavaScript, então o `allowJs` saiu.
 
 ### 4. O motor (feito)
 
@@ -59,13 +59,13 @@ O teste empacotou arquivos `.ts` com o electron-builder e os rodou no Electron 4
 
 O processo principal roda o próprio `.ts` direto, empacotado também, e o `tsc` só confere os tipos dele. Os preloads (`.cts`) e os scripts da janela (`ui/*.ts`) compilam com o `tsc`, cada um ao lado do seu fonte, então o app carrega os mesmos caminhos de antes ([ADR 0020](adr/0020-desktop-main-process-runs-typescript.pt-BR.md)). O `ui/bridge.ts` tipa o contrato entre a janela e o processo principal: o snapshot, as abas e cada ação com o seu argumento e a sua resposta. O `npm run build` compila o motor e a janela antes de o app abrir, testar ou empacotar.
 
-### 6. Os testes
+### 6. Os testes (feito)
 
 Os `*.mjs` e `*.test.js` que restam viram `.ts`, num pull request por app. O `tsconfig.json` de cada app cobre os testes e os scripts dele, então o CI confere os tipos deles também.
 
 - **O motor e o app de computador: feito.** O `tsconfig.json` do motor confere `src/` e `test/`, e o `tsconfig.build.json` gera o `dist/`. O do app de computador cobre `src/`, `test/`, `e2e/` e `scripts/`. Os dois arquivos que sobem a API pelo `dist/` compilado (o teste de ponta a ponta e o `scripts/test-update.ts`) a importam sem tipos.
 - **O site: feito.** Os testes de unidade, os testes do Playwright (agora com nomes em inglês), o `e2e/server.ts` e os configs do Vite e do Playwright. O `tsconfig.node.json` os confere, ao lado do `tsconfig.json` das páginas. O servidor dos testes de ponta a ponta sobe a API pelo `dist/` compilado, que ele importa sem tipos.
-- **A API:** os testes viram `.ts` sem conferência de tipos, porque importam o `dist/` compilado, que não leva tipos. O script da página do administrador (`src/admin/page/admin.js`) compila como a janela do app de computador.
+- **A API: feito.** Os testes (agora com nomes em inglês) e o `scripts/copy-assets.ts` são `.ts` sem conferência de tipos, porque os testes importam o `dist/` compilado, que não leva tipos. O script da página do administrador (`src/admin/page/admin.ts`) compila com o `tsconfig.admin.json` (os tipos do navegador) direto no `dist/`, e lê o estado pelo tipo `AdminState` do `protocol.ts`; o `copy-assets.ts` copia só o HTML e o CSS da página.
 
 ## Código em inglês
 

@@ -1,49 +1,56 @@
-// Página do administrador. Nenhum texto vindo do servidor entra como HTML (só textContent). O token fica só na aba (sessionStorage).
-const $ = (id) => document.getElementById(id);
+// The admin page. No text from the server goes in as HTML (only textContent). The token stays only in this tab (sessionStorage).
+import type { AdminState, PublishedRelease, UpdateStatus } from '../../protocol.ts';
+
+const $ = (id: string) => document.getElementById(id)!;
+const $input = (id: string) => $(id) as HTMLInputElement;
+const $textarea = (id: string) => $(id) as HTMLTextAreaElement;
 const KEY = 'singalong-admin-token';
 let token = '';
 try {
   token = sessionStorage.getItem(KEY) ?? '';
 } catch {
-  /* sessionStorage bloqueado: o token vale só até recarregar */
+  /* sessionStorage blocked: the token lasts until the page reloads */
 }
 
-function remember(value) {
+function remember(value: string) {
   token = value;
   try {
     if (value) sessionStorage.setItem(KEY, value);
     else sessionStorage.removeItem(KEY);
   } catch {
-    /* ignora */
+    /* ignored */
   }
 }
 
-async function api(method, path, body) {
+/** An answer the server refused, with its message and HTTP status. */
+class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+async function api<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`api${path}`, {
     method,
     headers: { 'x-admin-token': token, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(data?.message ?? `Erro ${response.status}`);
-    error.status = response.status;
-    throw error;
-  }
-  return data;
+  if (!response.ok) throw new ApiError(data?.message ?? `Erro ${response.status}`, response.status);
+  return data as T;
 }
 
-const fmtDate = (ms) => (ms ? new Date(ms).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
-const fmtSize = (bytes) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(2)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`);
+const fmtDate = (ms: number | null) => (ms ? new Date(ms).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
+const fmtSize = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(2)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`);
 
-function cell(content) {
+function cell(content: Node | string) {
   const td = document.createElement('td');
   if (content instanceof Node) td.append(content);
-  else td.textContent = content ?? '';
+  else td.textContent = content;
   return td;
 }
 
-function button(label, onClick, className = '') {
+function button(label: string, onClick: () => unknown, className = '') {
   const el = document.createElement('button');
   el.type = 'button';
   el.textContent = label;
@@ -52,7 +59,7 @@ function button(label, onClick, className = '') {
   return el;
 }
 
-function checkbox(checked, onChange, label) {
+function checkbox(checked: boolean, onChange: (checked: boolean) => unknown, label: string) {
   const el = document.createElement('input');
   el.type = 'checkbox';
   el.checked = checked;
@@ -61,25 +68,25 @@ function checkbox(checked, onChange, label) {
   return el;
 }
 
-function say(message, isError = false) {
+function say(message: string, isError = false) {
   const el = $('status');
   el.textContent = message;
   el.className = isError ? 'error' : 'muted';
 }
 
-async function run(action, done) {
+async function run(action: () => Promise<unknown>, done?: string) {
   try {
     await action();
     if (done) say(done);
   } catch (error) {
-    say(error.message, true);
-    if (error.status === 403) logout();
+    say((error as Error).message, true);
+    if (error instanceof ApiError && error.status === 403) logout();
   }
   await load();
 }
 
-function rows(table, items, build, emptyText) {
-  const body = table.querySelector('tbody');
+function rows<T>(table: HTMLElement, items: T[], build: (item: T) => HTMLTableCellElement[], emptyText: string) {
+  const body = table.querySelector('tbody')!;
   body.replaceChildren();
   if (items.length === 0) {
     const tr = document.createElement('tr');
@@ -97,46 +104,46 @@ function rows(table, items, build, emptyText) {
   }
 }
 
-// --- versão do app: a publicada, a mensagem e quem está desatualizado ---
-const STATUS_TEXT = { ok: 'em dia', update_available: 'atualização disponível', update_required: 'atualização obrigatória', unknown: 'não informou a versão' };
-const SOURCE_TEXT = { panel: 'publicada aqui', env: 'vem do .env', none: 'nada publicado' };
-let releaseDirty = false; // a pessoa está editando o formulário: um recarregamento não apaga o que ela digitou
+// --- the app version: the published one, its message, and who is out of date ---
+const STATUS_TEXT: Record<UpdateStatus, string> = { ok: 'em dia', update_available: 'atualização disponível', update_required: 'atualização obrigatória', unknown: 'não informou a versão' };
+const SOURCE_TEXT: Record<PublishedRelease['source'], string> = { panel: 'publicada aqui', env: 'vem do .env', none: 'nada publicado' };
+let releaseDirty = false; // the person is editing the form: a reload keeps what they typed
 
 function renderPreview() {
-  const latest = $('rel-latest').value.trim();
-  const minimum = $('rel-min').value.trim();
-  const notes = $('rel-notes').value.trim() || '(sem mensagem)';
-  // os mesmos textos que o app mostra (apps/desktop/ui/app.ts)
+  const latest = $input('rel-latest').value.trim();
+  const minimum = $input('rel-min').value.trim();
+  const notes = $textarea('rel-notes').value.trim() || '(sem mensagem)';
+  // the same texts the app shows (apps/desktop/ui/app.ts)
   $('prev-title').textContent = `Há uma versão nova: ${latest || '—'}`;
   $('prev-notes').textContent = notes;
   $('prev-required-box').hidden = !minimum;
   $('prev-required-hint').hidden = !minimum;
   $('prev-required-title').textContent = `Atualização necessária (versão ${minimum} ou mais nova)`;
   $('prev-required-notes').textContent = notes;
-  $('rel-count').textContent = `${$('rel-notes').value.length}/500`;
+  $('rel-count').textContent = `${$textarea('rel-notes').value.length}/500`;
 }
 
-function renderRelease(state) {
+function renderRelease(state: AdminState) {
   const release = state.release;
-  $('release-source').textContent = SOURCE_TEXT[release.source] ?? '';
+  $('release-source').textContent = SOURCE_TEXT[release.source];
   if (!releaseDirty) {
-    $('rel-latest').value = release.latest;
-    $('rel-min').value = release.minimum;
-    $('rel-notes').value = release.notes;
-    $('rel-url').value = release.url;
+    $input('rel-latest').value = release.latest;
+    $input('rel-min').value = release.minimum;
+    $textarea('rel-notes').value = release.notes;
+    $input('rel-url').value = release.url;
   }
   $('rel-clear').hidden = release.source !== 'panel';
   $('release-note').textContent = release.source === 'panel' ? `Última publicação: ${fmtDate(release.updated_at)}.` : release.source === 'env' ? 'Estes valores vêm das variáveis APP_* do .env; publicar aqui passa a valer no lugar deles.' : 'Nada configurado: os apps não recebem aviso.';
   renderPreview();
 
   const active = state.devices.filter((d) => !d.revoked);
-  const count = (status) => active.filter((d) => d.update_status === status).length;
+  const count = (status: UpdateStatus) => active.filter((d) => d.update_status === status).length;
   $('release-devices').textContent = active.length
     ? `${active.length} computador${active.length === 1 ? '' : 'es'}: ${count('ok')} em dia, ${count('update_available')} com atualização disponível, ${count('update_required')} abaixo da mínima, ${count('unknown')} sem informar a versão.`
     : 'Nenhum computador conectado.';
 }
 
-function render(state) {
+function render(state: AdminState) {
   $('mail-warning').hidden = state.mail.enabled;
   renderRelease(state);
 
@@ -154,7 +161,7 @@ function render(state) {
   rows($('devices'), state.devices, (device) => [
     cell(device.revoked ? `${device.name} (desconectado)` : device.name),
     cell(device.email ?? '— (pareado sem e-mail)'),
-    cell(device.revoked ? '' : `${device.version ?? '?'} · ${STATUS_TEXT[device.update_status] ?? ''}`),
+    cell(device.revoked ? '' : `${device.version ?? '?'} · ${STATUS_TEXT[device.update_status]}`),
     cell(device.cloud ? 'sim' : 'não'),
     cell(fmtDate(device.last_seen)),
     cell(device.revoked ? '' : button('Desconectar', () => confirm(`Desconectar "${device.name}"? O app dele vai precisar parear de novo.`) && run(() => api('DELETE', `/devices/${device.id}`), 'Computador desconectado.'), 'danger')),
@@ -163,7 +170,7 @@ function render(state) {
   $('cloud-total').textContent = state.cloud.length ? `(${state.cloud.length} músicas, ${fmtSize(state.cloud_total)})` : '';
   rows($('songs'), state.cloud, (song) => [
     cell(`${song.artist ?? '?'} — ${song.title ?? song.id}`),
-    cell(song.origin === 'file' ? 'arquivo do dono' : song.origin?.startsWith('url:') ? song.origin.slice(4) : 'YouTube'),
+    cell(song.origin === 'file' ? 'arquivo do dono' : song.origin.startsWith('url:') ? song.origin.slice(4) : 'YouTube'),
     cell(fmtSize(song.size)),
     cell(fmtDate(song.updated)),
     cell(button('Remover da nuvem', () => confirm(`Remover "${song.title ?? song.id}" da nuvem e bloquear?`) && run(() => api('DELETE', `/cloud/${song.id}`), 'Música removida e bloqueada.'), 'danger')),
@@ -179,13 +186,13 @@ function render(state) {
 async function load() {
   if (!token) return;
   try {
-    const state = await api('GET', '/state');
+    const state = await api<AdminState>('GET', '/state');
     $('login').hidden = true;
     $('panel').hidden = false;
     render(state);
   } catch (error) {
-    if (error.status === 403) logout(error.message);
-    else say(error.message, true);
+    if (error instanceof ApiError && error.status === 403) logout(error.message);
+    else say((error as Error).message, true);
   }
 }
 
@@ -199,8 +206,8 @@ function logout(message = '') {
 
 $('login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  remember($('token').value.trim());
-  $('token').value = '';
+  remember($input('token').value.trim());
+  $input('token').value = '';
   $('login-error').hidden = true;
   await load();
 });
@@ -214,9 +221,9 @@ for (const id of ['rel-latest', 'rel-min', 'rel-notes', 'rel-url']) {
 
 $('release-form').addEventListener('submit', (event) => {
   event.preventDefault();
-  const body = { latest: $('rel-latest').value.trim(), minimum: $('rel-min').value.trim(), notes: $('rel-notes').value.trim(), url: $('rel-url').value.trim() };
+  const body = { latest: $input('rel-latest').value.trim(), minimum: $input('rel-min').value.trim(), notes: $textarea('rel-notes').value.trim(), url: $input('rel-url').value.trim() };
   run(() => api('PUT', '/release', body), 'Versão publicada: os apps já recebem o aviso.').then(() => {
-    // se o servidor recusou (formato, mínima acima da mais recente...), o que a pessoa digitou fica para ela corrigir
+    // when the server refused it (the format, a minimum above the latest...), what the person typed stays for them to fix
     if ($('status').className !== 'error') releaseDirty = false;
     return load();
   });
@@ -230,10 +237,10 @@ $('rel-clear').addEventListener('click', () => {
 
 $('email-form').addEventListener('submit', (event) => {
   event.preventDefault();
-  const email = $('new-email').value.trim();
+  const email = $input('new-email').value.trim();
   if (!email) return;
-  run(() => api('PUT', '/emails', { email, can_pair: $('new-pair').checked, can_cloud: $('new-cloud').checked }), 'E-mail salvo.').then(() => {
-    $('new-email').value = '';
+  run(() => api('PUT', '/emails', { email, can_pair: $input('new-pair').checked, can_cloud: $input('new-cloud').checked }), 'E-mail salvo.').then(() => {
+    $input('new-email').value = '';
   });
 });
 

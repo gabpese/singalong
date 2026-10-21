@@ -1,4 +1,4 @@
-// Reações dos celulares (aplausos, fogo...): só as permitidas, com limite por conexão, e vão para a TV e para quem a assiste.
+// The phones' reactions (applause, fire...): only the allowed ones, limited per connection, and they reach the TV and whoever watches it.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -46,17 +46,17 @@ const send = async (conn, raw) => {
 };
 const newRoom = async () => (await app.inject({ method: 'POST', url: '/api/rooms' })).json().code;
 
-test('o balde de fichas deixa uma rajada, descarta o excesso e volta a encher com o tempo', () => {
+test('the token bucket lets a burst through, drops the excess and refills over time', () => {
   const bucket = createBucket({ capacity: 3, perSecond: 2 });
   assert.deepEqual([0, 0, 0, 0, 0].map(() => bucket.take(1000)), [true, true, true, false, false]);
-  assert.equal(bucket.take(1500), true); // meio segundo: 1 ficha
+  assert.equal(bucket.take(1500), true); // half a second: 1 token
   assert.equal(bucket.take(1500), false);
-  assert.equal(bucket.take(60_000), true); // muito tempo depois: cheio de novo, nunca acima da capacidade
+  assert.equal(bucket.take(60_000), true); // long after: full again, never above capacity
   assert.deepEqual([0, 0].map(() => bucket.take(60_000)), [true, true]);
   assert.equal(bucket.take(60_000), false);
 });
 
-test('uma reação chega à TV e aos outros celulares, com o nome de quem mandou', async () => {
+test("a reaction reaches the TV and the other phones, with the sender's name", async () => {
   const code = await newRoom();
   const tv = await fakeConn(code, 'tv', 'tv-client-0001');
   const ana = await fakeConn(code, 'controller', ANA, 'Ana');
@@ -64,11 +64,11 @@ test('uma reação chega à TV e aos outros celulares, com o nome de quem mandou
   await send(ana, { type: 'reaction', kind: 'clap' });
   assert.deepEqual(tv.reactions(), [{ type: 'reaction', kind: 'clap', name: 'Ana' }]);
   assert.deepEqual(bia.reactions(), [{ type: 'reaction', kind: 'clap', name: 'Ana' }]);
-  assert.equal(ana.reactions().length, 1); // quem mandou também vê (na aba TV)
+  assert.equal(ana.reactions().length, 1); // the sender sees it too (on the TV tab)
   assert.equal(REACTION_KINDS.length, 5);
 });
 
-test('só as reações da lista valem, e só os celulares as mandam (a TV não)', async () => {
+test('only the listed reactions count, and only phones send them (not the TV)', async () => {
   const code = await newRoom();
   const tv = await fakeConn(code, 'tv', 'tv-client-0001');
   const ana = await fakeConn(code, 'controller', ANA, 'Ana');
@@ -76,21 +76,21 @@ test('só as reações da lista valem, e só os celulares as mandam (a TV não)'
   await send(tv, { type: 'reaction', kind: 'fire' });
   assert.deepEqual(tv.reactions(), []);
   assert.deepEqual(ana.reactions(), []);
-  await send(ana, '{ não é json'); // lixo no socket não derruba nada
+  await send(ana, '{ não é json'); // garbage on the socket breaks nothing
   assert.equal(parseRoomMessage('{ não é json'), undefined);
   assert.equal(parseRoomMessage('"só um texto"'), undefined);
   await send(ana, { type: 'reaction', kind: 'fire' });
   assert.equal(tv.reactions().length, 1);
 });
 
-test('quem aperta sem parar é limitado por conexão; outra pessoa não é afetada', async () => {
+test('someone pressing nonstop is limited per connection; another person is not affected', async () => {
   const code = await newRoom();
   const tv = await fakeConn(code, 'tv', 'tv-client-0001');
   const ana = await fakeConn(code, 'controller', ANA, 'Ana');
   const bia = await fakeConn(code, 'controller', BIA, 'Bia');
   for (let i = 0; i < 40; i++) await send(ana, { type: 'reaction', kind: 'party' });
   const fromAna = tv.reactions().filter((m) => m.name === 'Ana').length;
-  assert.ok(fromAna >= 1 && fromAna <= 8, `da Ana: ${fromAna}`); // a rajada inicial, e nada além
+  assert.ok(fromAna >= 1 && fromAna <= 8, `da Ana: ${fromAna}`); // the initial burst, and nothing more
   await send(bia, { type: 'reaction', kind: 'heart' });
   assert.equal(tv.reactions().filter((m) => m.name === 'Bia').length, 1);
 });

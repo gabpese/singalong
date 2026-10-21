@@ -1,22 +1,10 @@
 // The published app version: what the server tells the installed apps (the update notice) and the home page (the download
 // button). A version published on the admin page wins; otherwise the APP_* variables from the .env apply.
+import type { ReleaseFields } from '../protocol.ts';
 import { compareVersions, parseVersion } from '../version.ts';
 
 const NOTES_MAX = 500;
 const URL_MAX = 500;
-
-export interface ReleaseFields {
-  latest: string;
-  minimum: string;
-  notes: string;
-  url: string;
-}
-
-/** What applies now, with where it came from: `panel` (the admin page), `env` (APP_* variables) or `none` (nothing set). */
-export interface PublishedRelease extends ReleaseFields {
-  source: 'panel' | 'env' | 'none';
-  updated_at: number | null;
-}
 
 /** A release the admin page refused, with the code and the message the page shows. */
 export class ReleaseError extends Error {

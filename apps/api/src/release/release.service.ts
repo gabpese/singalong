@@ -2,8 +2,9 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
 import type { AppConfig } from '../app.ts';
 import { AppRelease } from '../database/entities.ts';
+import type { PublishedRelease, ReleaseFields } from '../protocol.ts';
 import { CONFIG } from '../tokens.ts';
-import { cleanRelease, type PublishedRelease, type ReleaseFields } from './release.ts';
+import { cleanRelease } from './release.ts';
 
 /**
  * The published app version. Every agent request checks it, so it is read from the database once, when the API starts, and

@@ -6,9 +6,9 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p . && node scripts/copy-assets.mjs",
+    "build": "tsc -p . && tsc -p tsconfig.admin.json && node scripts/copy-assets.ts",
     "start": "node dist/server.js",
-    "test": "npm run build && node --test \"test/*.test.js\""
+    "test": "npm run build && node --test \"test/*.test.ts\""
   },
   "dependencies": {
     "@mikro-orm/core": "^7.2.5",
