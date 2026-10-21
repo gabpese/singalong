@@ -320,7 +320,7 @@ cd apps/web;    npm run typecheck   # TypeScript
 cd apps/web;    npm run build; npm run e2e   # end-to-end tests (Playwright, against the build in dist/)
 ```
 
-The end-to-end tests start a test API on their own (`apps/web/e2e/server.mjs`, with ready-made songs and an in-memory job queue) and open a real Chromium with a fake microphone. The first time: `npx playwright install chromium`.
+The end-to-end tests start a test API on their own (`apps/web/e2e/server.ts`, with ready-made songs and an in-memory job queue) and open a real Chromium with a fake microphone. The first time: `npx playwright install chromium`.
 
 ## Front-end development
 

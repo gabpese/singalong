@@ -53,7 +53,7 @@ jobs:
           cache-dependency-path: |
             apps/web/package-lock.json
             apps/api/package-lock.json
-      # the end-to-end tests run the real API (apps/web/e2e/server.mjs imports the compiled apps/api/dist)
+      # the end-to-end tests run the real API (apps/web/e2e/server.ts imports the compiled apps/api/dist)
       - name: Instalar dependências da API
         run: npm ci
         working-directory: apps/api
