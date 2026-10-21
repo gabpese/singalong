@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildApp } from '../../api/dist/app.js';
+import { Session } from '../../api/dist/database/entities.js';
 import { createMemoryJobStore } from '../../api/dist/jobs.js';
 import { LocalStorage } from '../../api/dist/storage.js';
 
@@ -99,7 +100,7 @@ app.post('/__test/remove-song', async (request) => {
 });
 // derruba o sinal de vida do dono da sessão (o app dele fechou sem avisar)
 app.post('/__test/session-offline', async (request) => {
-  app.db.touchSession(request.body.id, Date.now() - 3_600_000);
+  await app.orm.em.fork().nativeUpdate(Session, { id: request.body.id, endedAt: null }, { lastSeen: Date.now() - 3_600_000 });
   return { ok: true };
 });
 app.get('/__test/state', async () => ({ queue: jobs.queue, exportQueue: jobs.exportQueue, searchQueries: jobs.searchQueries }));

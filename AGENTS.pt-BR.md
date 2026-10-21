@@ -10,7 +10,7 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 
 | Caminho | O que é | Tecnologia |
 |---|---|---|
-| `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, NestJS sobre o Fastify e MikroORM sobre o SQLite (as áreas migrando, [ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)), Redis; compilada pelo `tsc` em `dist/` |
+| `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, NestJS sobre o Fastify e MikroORM sobre o SQLite ([ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)), Redis; compilada pelo `tsc` em `dist/` |
 | `apps/web` | Página inicial, Sala (celular), TV, Palco | React + Vite, TypeScript |
 | `apps/worker` | Download, separação da voz, alinhamento da letra, exportação em MP4 | Python 3.11, PyTorch |
 | `apps/desktop` | O app instalável do dono (bandeja, páginas da TV e do anfitrião embutidas) | Electron |
@@ -42,7 +42,7 @@ Os comandos são os `scripts` de cada `package.json`. O que eles não contam:
 |---|---|---|
 | `apps/web` | `npm test`, `npm run build`, `npm run e2e` | O servidor dos testes de ponta a ponta serve o `dist/`: faça o build antes. Ele roda a API compilada, então rode antes `npm run build` em `apps/api`. As salas dele nascem com o intervalo desligado; os testes que precisam dele o ligam. Os testes unitários rodam o `src/lib` e o `src/i18n` direto no Node, então os imports ali nomeiam o arquivo `.ts`. |
 | `apps/worker` | `python -I -m unittest discover -s tests -t .` | Precisa só de `numpy langdetect websockets yt-dlp` (sem PyTorch). |
-| `apps/api` | `npm test` | Ele gera o `dist/` antes: os testes, e os de ponta a ponta do site e do app, importam a API compilada. Mudança de schema é uma migração do MikroORM em `src/database/migrations/`; o schema do `db.js` está congelado. |
+| `apps/api` | `npm test` | Ele gera o `dist/` antes: os testes, e os de ponta a ponta do site e do app, importam a API compilada. Mudança de schema é uma migração do MikroORM em `src/database/migrations/`, listada em `src/database/orm.ts`; um teste confere que as entidades batem com o que as migrações criam. |
 | `apps/desktop`, `apps/engine` | `npm test` | O teste de ponta a ponta do app também roda a API compilada. |
 
 O CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda todos na `main`. A imagem da API só é publicada depois que o CI passa.

@@ -4,14 +4,12 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { MikroORM } from '@mikro-orm/core';
 import { buildApp } from '../dist/app.js';
-import { ormOptions } from '../dist/database/orm.js';
-import { openDb } from '../dist/db.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
 import { RoomService } from '../dist/rooms/room.service.js';
 import { RoomsGateway } from '../dist/rooms/rooms.gateway.js';
 import { LocalStorage } from '../dist/storage.js';
+import { fixtures, openDatabase } from './fixtures.js';
 
 const SONGS = ['statSongA01', 'statSongB02', 'statSongC03'];
 const ANA = 'client-ana-0001';
@@ -137,17 +135,15 @@ test('o histórico sobrevive à sala: apagar a sala não apaga as estatísticas 
   assert.equal(before, 1);
 
   // o banco apaga salas paradas há 24 h; o histórico fica (num banco só deste teste, para a poda não alcançar os outros)
-  const db = openDb();
-  const orm = await MikroORM.init(ormOptions(db.connection));
-  await orm.migrator.up();
+  const { orm, close } = await openDatabase();
   const rooms = new RoomService({ orm, songs: {} });
-  db.createDevice({ id: 'd1', name: 'PC', tokenHash: 'h', now: Date.now() });
-  db.logPlay({ deviceId: 'd1', sessionId: 's1', videoId: SONGS[0], singer: 'Ana', singerKey: 'k1', outcome: 'done', endedAt: Date.now() });
-  db.createRoom('ZZZZ', 'tok', Date.now() - 3 * 24 * 3600 * 1000);
+  const db = fixtures(orm);
+  await db.createDevice({ id: 'd1', name: 'PC', tokenHash: 'h', now: Date.now() });
+  await db.logPlay({ device: 'd1', sessionId: 's1', videoId: SONGS[0], singer: 'Ana', singerKey: 'k1', outcome: 'done', endedAt: Date.now() });
+  await db.createRoom('ZZZZ', 'tok', Date.now() - 3 * 24 * 3600 * 1000);
   assert.equal(await rooms.deleteInactiveRooms(Date.now() - 24 * 3600 * 1000), 1);
   assert.equal((await rooms.statsFor('d1', 0)).totals.songs, 1);
   assert.equal(await rooms.prunePlayLog(Date.now() + 1000), 1); // o histórico antigo é podado pela idade
   assert.equal((await rooms.statsFor('d1', 0)).totals.songs, 0);
-  await orm.close();
-  db.close();
+  await close();
 });

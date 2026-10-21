@@ -2,18 +2,16 @@ import { MikroORM } from '@mikro-orm/core';
 import { type DynamicModule, Global, Module } from '@nestjs/common';
 import { AgentService } from './agents/agent.service.ts';
 import type { AppConfig, JobStore } from './app.ts';
-import type { openDb } from './db.js';
 import type { createMailer } from './mailer.ts';
 import type { createRateLimiter } from './rate-limit.ts';
 import { RoomService } from './rooms/room.service.ts';
 import { SongService } from './songs/song.service.ts';
 import type { LocalStorage } from './storage.ts';
-import { CONFIG, DB, JOBS, LIMITERS, MAILER, STORAGE } from './tokens.ts';
+import { CONFIG, JOBS, LIMITERS, MAILER, STORAGE } from './tokens.ts';
 
 /** The services built before Nest, as app.ts hands them over. */
 export interface LegacyServices {
   config: AppConfig;
-  db: ReturnType<typeof openDb>;
   orm: MikroORM;
   jobs: JobStore;
   storage: LocalStorage;
@@ -34,7 +32,6 @@ export class LegacyModule {
   static forRoot(services: LegacyServices): DynamicModule {
     const providers = [
       { provide: CONFIG, useValue: services.config },
-      { provide: DB, useValue: services.db },
       { provide: MikroORM, useValue: services.orm },
       { provide: JOBS, useValue: services.jobs },
       { provide: STORAGE, useValue: services.storage },
