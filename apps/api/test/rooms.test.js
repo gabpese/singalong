@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import WebSocket from 'ws';
 import { buildApp } from '../dist/app.js';
-import { openDb } from '../dist/db.js';
+import { QueueItem } from '../dist/database/entities.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
 import { LocalStorage } from '../dist/storage.js';
+import { fixtures, openDatabase } from './fixtures.js';
 
 const NO_LIMITS = { search: { max: 1e6, windowMs: 60_000 }, addToQueue: { max: 1e6, windowMs: 60_000 }, createRoom: { max: 1e6, windowMs: 60_000 } };
 const READY_A = 'readySongA1'; // 11 caracteres, como os IDs do YouTube
@@ -372,11 +373,13 @@ test('adicionar com letra escolhida cria o job com a escolha (e música em cache
 
 test('persistência: salas e fila sobrevivem a um reinício (mesmo arquivo SQLite)', async () => {
   const path = join(root, 'persist.db');
-  const first = openDb(path);
-  first.createRoom('ABCD', 'tok', 1000);
-  const id = first.addItem({ roomCode: 'ABCD', videoId: READY_A, title: 't', artist: 'a', addedBy: 'Ana', clientId: ANA, pitch: 2, now: 1000 });
-  first.updateRoom('ABCD', { fair: 1 });
-  first.close();
+  const first = await openDatabase(path);
+  const db = fixtures(first.orm);
+  await db.createRoom('ABCD', 'tok', 1000);
+  const id = await db.addItem({ room: 'ABCD', videoId: READY_A, addedBy: 'Ana', clientId: ANA, now: 1000 });
+  await db.updateItem(id, { pitch: 2 });
+  await db.updateRoom('ABCD', { fair: true });
+  await first.close();
 
   // the API starts again on the same file
   const second = await buildApp({ config: { dbPath: path, publicDir: root }, storage: new LocalStorage(root), jobs });
@@ -386,7 +389,7 @@ test('persistência: salas e fila sobrevivem a um reinício (mesmo arquivo SQLit
   assert.deepEqual([restored.id, restored.video_id, restored.pitch], [id, READY_A, 2]);
   assert.equal(await second.rooms.deleteInactiveRooms(2000), 1); // limpeza de salas paradas
   await assert.rejects(second.rooms.getState('ABCD', { clientId: ANA, hostToken: '' }), { status: 404 });
-  assert.equal(second.db.connection.prepare("SELECT COUNT(*) AS n FROM queue_items WHERE room_code = 'ABCD'").get().n, 0); // os itens vão junto (ON DELETE CASCADE)
+  assert.equal(await second.orm.em.fork().count(QueueItem, { room: 'ABCD' }), 0); // os itens vão junto (ON DELETE CASCADE)
   await second.close();
 });
 
@@ -604,7 +607,7 @@ test('playing a song records when it played and keeps its lyrics offset', async 
   await call('POST', `/rooms/${code}/player/skip`, { host }); // READY_B goes on
   const state = (await call('GET', `/rooms/${code}`)).body;
   assert.deepEqual([state.queue[0].video_id, state.queue[0].status, state.queue[0].lyric_offset], [READY_B, 'playing', 2.5]);
-  const row = app.db.connection.prepare('SELECT lyric_offset, last_played_at FROM song_settings WHERE video_id = ?').get(READY_B);
-  assert.equal(row.lyric_offset, 2.5);
-  assert.ok(row.last_played_at > 0);
+  const row = await fixtures(app.orm).songSettings(READY_B);
+  assert.equal(row.lyricOffset, 2.5);
+  assert.ok(row.lastPlayedAt > 0);
 });

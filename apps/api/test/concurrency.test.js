@@ -6,14 +6,12 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { MikroORM } from '@mikro-orm/core';
 import { buildApp } from '../dist/app.js';
-import { ormOptions } from '../dist/database/orm.js';
-import { openDb } from '../dist/db.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
 import { RoomService } from '../dist/rooms/room.service.js';
 import { MAX_PER_CLIENT } from '../dist/rooms/rooms.js';
 import { LocalStorage } from '../dist/storage.js';
+import { fixtures, openDatabase } from './fixtures.js';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const NO_LIMITS = { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG };
@@ -117,20 +115,17 @@ test('starting a session twice at once leaves the computer with one active sessi
   const agent = await pair();
   const earlier = (await startSession(agent)).json();
   // straight to the service: ending the earlier session waits on the job store, which is where two starts used to interleave
-  const device = app.db.getDevice(agent.id);
+  const device = await fixtures(app.orm).getDevice(agent.id);
   const started = await Promise.all([app.agents.startSession(device, 'Ana'), app.agents.startSession(device, 'Ana')]);
-  const sessions = [earlier, ...started].map((session) => app.db.getSession(session.id));
-  assert.equal(sessions.filter((session) => !session.ended_at).length, 1);
+  const sessions = await Promise.all([earlier, ...started].map((session) => fixtures(app.orm).getSession(session.id)));
+  assert.equal(sessions.filter((session) => session.endedAt == null).length, 1);
 });
 
 test('rooms created at once never share a code', async () => {
-  const db = openDb(':memory:');
-  const orm = await MikroORM.init(ormOptions(db.connection));
-  await orm.migrator.up();
+  const { orm, close } = await openDatabase();
   const codes = ['SAME', 'SAME', 'SAME', 'NEXT'];
   const rooms = new RoomService({ orm, songs: {}, newCode: () => codes.shift() });
   const created = await Promise.all([rooms.createRoom(), rooms.createRoom()]);
   assert.deepEqual(created.map((room) => room.code).sort(), ['NEXT', 'SAME']);
-  await orm.close();
-  db.close();
+  await close();
 });

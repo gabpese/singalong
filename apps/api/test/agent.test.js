@@ -7,6 +7,7 @@ import { after, before, test } from 'node:test';
 import { buildApp } from '../dist/app.js';
 import { createMemoryJobStore } from '../dist/jobs.js';
 import { LocalStorage } from '../dist/storage.js';
+import { fixtures } from './fixtures.js';
 
 const BIG = { max: 1e6, windowMs: 60_000 };
 const NO_LIMITS = { search: BIG, addToQueue: BIG, createRoom: BIG, pair: BIG };
@@ -104,7 +105,7 @@ test('pareamento: o código vence em 10 minutos', async () => {
   // envelhece o código no banco (o relógio do serviço é o do processo)
   const { createHash } = await import('node:crypto');
   const hash = createHash('sha256').update(code).digest('hex');
-  app.db.savePairCode(hash, Date.now() - 1000, Date.now() - 2000);
+  await fixtures(app.orm).savePairCode(hash, Date.now() - 1000);
   assert.equal((await call('POST', '/agent/v1/pair/complete', { payload: { code } })).statusCode, 400);
 });
 
@@ -149,7 +150,7 @@ test('sala da sessão: o estado mostra só o apelido do dono e se ele está onli
   assert.equal(JSON.stringify(state).includes(session.id), false); // o id da sessão não vai para os convidados
   assert.equal(JSON.stringify(state).includes(agent.id), false);
 
-  app.db.touchSession(session.id, Date.now() - 60_000); // sem sinal há 1 min
+  await fixtures(app.orm).touchSession(session.id, Date.now() - 60_000); // sem sinal há 1 min
   state = await roomState(room);
   assert.equal(state.owner.online, false);
   await call('POST', '/agent/v1/heartbeat', { headers: agent.headers, payload: { version: '0.1.0' } });
@@ -354,7 +355,7 @@ test('busca: a sala da sessão é atendida pelo agente dela; sem o dono online, 
   assert.match(found.json()[0].thumbnail, /YPLQHeUSX2g/);
   assert.equal((await call('POST', `/agent/v1/search/${claimed.json().request.id}/result`, { headers: agent.headers, payload: { results: [] } })).statusCode, 409); // já respondida
 
-  app.db.touchSession(session.id, Date.now() - 60_000); // dono offline
+  await fixtures(app.orm).touchSession(session.id, Date.now() - 60_000); // dono offline
   const offline = await call('GET', '/api/search?q=outra+busca', { headers });
   assert.equal(offline.statusCode, 503);
   assert.equal(offline.json().error, 'owner_offline');
@@ -420,9 +421,9 @@ test('a varredura encerra as sessões que ficaram dias sem sinal', async () => {
   const session = await startSession(agent);
   const room = await makeRoom(agent, session);
   await addSong(room, 'varre000001');
-  app.db.touchSession(session.id, Date.now() - 25 * 60 * 60 * 1000);
+  await fixtures(app.orm).touchSession(session.id, Date.now() - 25 * 60 * 60 * 1000);
   assert.ok((await app.agents.sweep()) >= 1);
-  assert.equal(app.db.getSession(session.id).ended_at !== null, true);
+  assert.equal((await fixtures(app.orm).getSession(session.id)).endedAt != null, true);
   assert.equal((await roomState(room)).queue[0].song.error_code, 'owner_left');
 });
 
@@ -444,7 +445,7 @@ test('pedido preso com um dono que sumiu é liberado para quem pedir depois; com
   await addSong(rb, 'preso000001'); // Ana está online: o pedido continua com ela (dedupe)
   assert.equal((await claim(b)).statusCode, 204);
 
-  app.db.touchSession(sa.id, Date.now() - 60_000); // Ana sumiu
+  await fixtures(app.orm).touchSession(sa.id, Date.now() - 60_000); // Ana sumiu
   await addSong(rb, 'preso000001');
   const got = await claim(b);
   assert.equal(got.statusCode, 200);
@@ -465,7 +466,7 @@ test('o dono que sai não derruba o pedido que já foi passado a outro dono', as
   const ra = await makeRoom(a, sa);
   const rb = await makeRoom(b, sb);
   await addSong(ra, 'passa000001');
-  app.db.touchSession(sa.id, Date.now() - 60_000);
+  await fixtures(app.orm).touchSession(sa.id, Date.now() - 60_000);
   await addSong(rb, 'passa000001'); // liberado e pedido de novo pelo Beto
   await call('DELETE', `/agent/v1/sessions/${sa.id}`, { headers: a.headers }); // Ana encerra a sessão depois
   const song = (await roomState(rb)).queue.find((i) => i.video_id === 'passa000001').song;

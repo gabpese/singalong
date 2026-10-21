@@ -11,7 +11,7 @@ import { AppModule } from './app.module.ts';
 import { CacheCleaner } from './cache/cache-cleaner.service.ts';
 import type { loadConfig } from './config.ts';
 import { ormOptions } from './database/orm.ts';
-import { openDb } from './db.js';
+import { openConnection } from './database/connection.ts';
 import { sendFile } from './files.ts';
 import { HttpError } from './http-error.ts';
 import type { JobStore } from './jobs.ts';
@@ -43,7 +43,6 @@ export interface BuildOptions {
 export interface AppDecorations {
   rooms: RoomService;
   agents: AgentService;
-  db: ReturnType<typeof openDb>;
   release: ReleaseService;
   orm: MikroORM;
   cacheCleaner: CacheCleaner;
@@ -68,10 +67,10 @@ export async function buildApp({
 }: BuildOptions): Promise<App> {
   const app = Fastify({ logger, bodyLimit: 256 * 1024, trustProxy: Boolean(config.trustProxy) });
 
-  const db = openDb(config.dbPath ?? ':memory:');
-  // MikroORM shares db.js's connection (ADR 0017). The migrations run before anything reads the database: the baseline
-  // changes nothing; the ones after it change the schema
-  const orm = await MikroORM.init(ormOptions(db.connection));
+  const connection = openConnection(config.dbPath ?? ':memory:');
+  // MikroORM over that connection (ADR 0017). The migrations run before anything reads the database: the first one builds a new
+  // database or brings an old one up to date; the ones after it change the schema
+  const orm = await MikroORM.init(ormOptions(connection));
   await orm.migrator.up();
   // request limits per person (config.rateLimits overrides the defaults; the tests use it)
   const limiters = Object.fromEntries(
@@ -89,7 +88,7 @@ export async function buildApp({
 
   // Nest takes the root; the Fastify routes below use the same services
   const nest = await NestFactory.create<NestFastifyApplication>(
-    AppModule.forRoot({ config, db, orm, jobs, storage, mailer, agents, limiters, songs, rooms }),
+    AppModule.forRoot({ config, orm, jobs, storage, mailer, agents, limiters, songs, rooms }),
     new FastifyAdapter(app as never),
     {
       logger: false,
@@ -101,7 +100,6 @@ export async function buildApp({
   const release = nest.get(ReleaseService);
   app.decorate('rooms', rooms);
   app.decorate('agents', agents);
-  app.decorate('db', db);
   app.decorate('release', release);
   app.decorate('orm', orm);
   app.decorate('cacheCleaner', nest.get(CacheCleaner));
@@ -136,7 +134,7 @@ export async function buildApp({
   app.addHook('onClose', async () => {
     rooms.stop();
     await orm.close();
-    db.close();
+    connection.close();
   });
 
   return app as unknown as App;

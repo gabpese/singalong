@@ -1,10 +1,10 @@
+import { MikroORM } from '@mikro-orm/core';
 import { Controller, Get, Inject, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
-import { DB, JOBS, STORAGE } from './tokens.ts';
+import { JOBS, STORAGE } from './tokens.ts';
 
-/** What the readiness check needs from the database, the job queue and the song storage. */
+/** What the readiness check needs from the job queue and the song storage (the database is MikroORM's). */
 export interface ReadinessDeps {
-  db: { ping(): boolean };
   jobs: { ping(): Promise<unknown> };
   storage: { check?(): Promise<unknown> | unknown };
 }
@@ -12,7 +12,7 @@ export interface ReadinessDeps {
 @Controller()
 export class HealthController {
   constructor(
-    @Inject(DB) private readonly db: ReadinessDeps['db'],
+    private readonly orm: MikroORM,
     @Inject(JOBS) private readonly jobs: ReadinessDeps['jobs'],
     @Inject(STORAGE) private readonly storage: ReadinessDeps['storage'],
   ) {}
@@ -35,7 +35,7 @@ export class HealthController {
     };
     const checks = {
       redis: await attempt(() => this.jobs.ping()),
-      db: await attempt(() => this.db.ping()),
+      db: await attempt(async () => (await this.orm.em.getConnection().execute<{ ok: number }>('SELECT 1 AS ok', [], 'get')).ok === 1),
       storage: await attempt(() => (this.storage.check ? this.storage.check() : true)),
     };
     const ok = Object.values(checks).every(Boolean);

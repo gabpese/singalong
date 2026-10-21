@@ -1,8 +1,8 @@
 import { Migration } from '@mikro-orm/migrations';
 
 /**
- * The starting point of the migrations. It changes nothing: db.js's frozen schema already builds this database (a new one)
- * or brings an older one up to date, before MikroORM starts. Every later change to the schema is a migration after this one.
+ * The first migration MikroORM recorded, when db.js still built the database before MikroORM started. It changes nothing;
+ * that work is now the initial schema migration, listed before it.
  */
 export class Migration20261020000000_baseline extends Migration {
   override async up(): Promise<void> {}

@@ -1,6 +1,6 @@
 import { Migration } from '@mikro-orm/migrations';
 
-/** A table as db.js's schema builds it (every column it gained over time included), now with NOT NULL on its primary key. */
+/** A table as the initial schema builds it (every column it gained over time included), now with NOT NULL on its primary key. */
 interface Table {
   name: string;
   /** Column definitions; each starts with the column's name. */
@@ -125,7 +125,7 @@ const TABLES: Table[] = [
 ];
 
 /**
- * Every primary key becomes NOT NULL. db.js's schema declared `TEXT PRIMARY KEY` without it, which SQLite lets hold a null,
+ * Every primary key becomes NOT NULL. The initial schema declared `TEXT PRIMARY KEY` without it, which SQLite lets hold a null,
  * so the entities had to type each key as nullable. SQLite cannot add the constraint in place, so each table is rebuilt the
  * way SQLite documents (https://www.sqlite.org/lang_altertable.html#otheralter): a new table, the rows copied, the old one
  * dropped, the new one renamed, its indexes created again. The UNIQUE and CHECK constraints and the AUTOINCREMENT counters

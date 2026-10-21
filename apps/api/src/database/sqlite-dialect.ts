@@ -2,9 +2,9 @@ import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { SqliteDialect } from 'kysely';
 
 /**
- * A Kysely dialect over a `node:sqlite` connection that is already open: the one db.js owns. MikroORM and the code that still
- * uses db.js then read and write the same database, including the in-memory one the tests use. It follows MikroORM's own
- * `NodeSqliteDialect`, which can only open a new connection. Closing is left to db.js.
+ * A Kysely dialect over a `node:sqlite` connection that is already open: the one connection.ts opens, with the foreign keys
+ * enforced. The tests reach the same database, the in-memory one included. It follows MikroORM's own `NodeSqliteDialect`,
+ * which can only open a new connection. Closing is left to whoever opened it (app.ts closes it after MikroORM).
  */
 export class SharedSqliteDialect extends SqliteDialect {
   constructor(connection: DatabaseSync) {

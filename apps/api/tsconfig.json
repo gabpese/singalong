@@ -5,8 +5,6 @@
     "moduleResolution": "nodenext",
     "rootDir": "src",
     "outDir": "dist",
-    "allowJs": true,
-    "checkJs": false,
     "strict": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

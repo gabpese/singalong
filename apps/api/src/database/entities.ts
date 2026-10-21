@@ -1,8 +1,9 @@
-// The database as MikroORM sees it: one entity per table, describing exactly what db.js's frozen schema builds and the
-// migrations then change (a test compares them). Entities hold data and explicit relations only; the rules stay in the
+// The database as MikroORM sees it: one entity per table, describing exactly what the migrations build (a test compares
+// them). Entities hold data and explicit relations only; the rules stay in the
 // services (ADR 0017). Times are milliseconds since the epoch, kept as integers like the rest of the API.
 //
-// A few details mirror that schema rather than MikroORM's defaults, so that no table has to be rebuilt:
+// A few details mirror the first schema (Migration20261019000000_initial_schema) rather than MikroORM's defaults, so that no
+// table has to be rebuilt:
 // - flags are booleans stored as INTEGER with `.defaultRaw('0')` or `('1')`, where MikroORM would write `false` or `true`;
 // - relations get `.index(false)`: the old schema has its own composite indexes, not one per foreign key;
 // - foreign keys keep the old rules: `cascade` where the schema says so, otherwise `no action`.
