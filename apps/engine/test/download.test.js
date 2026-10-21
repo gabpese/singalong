@@ -6,7 +6,7 @@ import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { ChecksumError, download, sha256File } from '../src/download.js';
+import { ChecksumError, download, sha256File } from '../src/download.ts';
 
 const BODY = Buffer.alloc(300_000, 'karaoke');
 const HASH = createHash('sha256').update(BODY).digest('hex');

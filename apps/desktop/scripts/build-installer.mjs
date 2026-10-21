@@ -14,6 +14,7 @@ import { Arch, build, Platform } from 'electron-builder';
 import { INSTALLERS } from '../src/installers.js';
 import { resolveSigning } from './signing.mjs';
 import { judge, readSignature } from './verify-signature.mjs';
+import './build-engine.mjs'; // the engine's dist/ goes into the installer
 
 const dirOnly = process.argv.includes('--dir');
 const HOST = { win32: 'win', darwin: 'mac', linux: 'linux' };

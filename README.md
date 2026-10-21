@@ -226,7 +226,7 @@ node src\cli.js verify   --dir D:\Singalong\engine
 | `mps` | Apple Silicon (**off**) | **measured and turned off**: on a real Metal GPU (macOS runner of CI, torch 2.5.1) Demucs fails with `Output channels > 65536 not supported at the MPS device`, and `PYTORCH_ENABLE_MPS_FALLBACK` does not cover it. On the Mac the engine is the CPU. `SINGALONG_APPLE_GPU=1` shows the option again ("GPU da Apple (beta)") for whoever wants to measure with another torch version; Demucs would run on Metal, the lyrics alignment on the CPU, and a failed separation is redone on the CPU |
 | `cpu` | any | the fallback of all the others |
 
-`node src/cli.js assemble --dir <folder> --engine auto|cpu|cu121|rocm6.2|mps`. **The AMD GPU was not measured on real hardware** (CI has no AMD card): it is protected by the real test and the fallback to the CPU, and its benefit over the CPU is unknown. The Apple GPU was measured and does not work with Demucs (see the table). The backing-vocals separation (`audio-separator`, ONNX) still runs on the CPU on every engine.
+`node src/cli.ts assemble --dir <folder> --engine auto|cpu|cu121|rocm6.2|mps`. **The AMD GPU was not measured on real hardware** (CI has no AMD card): it is protected by the real test and the fallback to the CPU, and its benefit over the CPU is unknown. The Apple GPU was measured and does not work with Demucs (see the table). The backing-vocals separation (`audio-separator`, ONNX) still runs on the CPU on every engine.
 
 **The owner's app (milestone M3).** An Electron window that does everything above without a terminal: prepares the engine, pairs, starts the session, creates rooms, signs in to YouTube and imports files.
 

@@ -1,22 +1,22 @@
 #!/usr/bin/env node
-// Uso (o app de interface chama as mesmas funções; esta linha de comando serve para testar e para quem quiser montar à mão):
-//   node src/cli.js assemble --dir C:\caminho\motor [--engine auto|cpu|cu121|rocm6.2|mps]
-//   node src/cli.js verify   --dir C:\caminho\motor
-//   node src/cli.js status   --dir C:\caminho\motor
-import { assemble } from './assemble.js';
-import { readState } from './engine.js';
-import { verifyEngine } from './verify.js';
+// Usage (the app calls the same functions; this command line is for testing, and for whoever wants to assemble by hand):
+//   node src/cli.ts assemble --dir C:\path\engine [--engine auto|cpu|cu121|rocm6.2|mps]
+//   node src/cli.ts verify   --dir C:\path\engine
+//   node src/cli.ts status   --dir C:\path\engine
+import { assemble } from './assemble.ts';
+import { readState } from './engine.ts';
+import { verifyEngine } from './verify.ts';
 
 const args = process.argv.slice(2);
-const command = args.shift();
-const option = (name, fallback) => {
+const command = args.shift() ?? '';
+const option = (name: string, fallback: string) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : fallback;
 };
 const root = option('dir', process.env.SINGALONG_ENGINE_DIR ?? '');
 
 if (!['assemble', 'verify', 'status'].includes(command) || !root) {
-  console.error('uso: node src/cli.js assemble|verify|status --dir PASTA [--engine auto|cpu|cu121|rocm6.2|mps]');
+  console.error('uso: node src/cli.ts assemble|verify|status --dir PASTA [--engine auto|cpu|cu121|rocm6.2|mps]');
   process.exit(2);
 }
 
@@ -28,7 +28,7 @@ if (command === 'assemble') {
     engine: option('engine', 'auto'),
     onProgress: ({ label, done, total, line }) => {
       if (total) {
-        const percent = Math.floor((done / total) * 100);
+        const percent = Math.floor(((done ?? 0) / total) * 100);
         if (percent >= lastPercent + 10 || label !== lastLabel) console.log(`${label}: ${percent}%`);
         lastPercent = percent;
       } else if (label !== lastLabel) {

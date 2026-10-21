@@ -10,8 +10,12 @@
     "node": ">=24"
   },
   "scripts": {
+    "build:engine": "node scripts/build-engine.mjs",
+    "prestart": "npm run build:engine",
     "start": "electron .",
+    "pretest": "npm run build:engine",
     "test": "node --test --test-timeout=60000 \"test/*.test.js\"",
+    "pretest:e2e": "npm run build:engine",
     "test:e2e": "node --test \"e2e/*.e2e.js\"",
     "dist": "node scripts/build-installer.mjs",
     "dist:dir": "node scripts/build-installer.mjs --dir",
@@ -43,7 +47,9 @@
       "src/**",
       "ui/**",
       "package.json",
-      "!**/*.map"
+      "!**/*.map",
+      "!node_modules/@singalong/engine/src/**",
+      "!node_modules/@singalong/engine/tsconfig.json"
     ],
     "extraResources": [
       {

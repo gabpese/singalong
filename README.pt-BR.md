@@ -231,7 +231,7 @@ O `assemble` precisa só do Node 22+ e do Windows 10/11 (usa o `tar.exe` do pró
 | `mps` | Apple Silicon (**desligado**) | **medido e desligado**: numa GPU Metal de verdade (executor macOS do CI, torch 2.5.1) o Demucs falha com `Output channels > 65536 not supported at the MPS device`, e o `PYTORCH_ENABLE_MPS_FALLBACK` não cobre isso. No Mac o motor é a CPU. `SINGALONG_APPLE_GPU=1` mostra a opção de novo ("GPU da Apple (beta)") para quem quiser medir com outra versão do torch; o Demucs rodaria no Metal, o alinhamento da letra na CPU, e uma separação que falhar é refeita na CPU |
 | `cpu` | qualquer | a volta de todos os outros |
 
-`node src/cli.js assemble --dir <pasta> --engine auto|cpu|cu121|rocm6.2|mps`. **A GPU da AMD não foi medida em hardware de verdade** (o CI não tem placa AMD): ela conta com o teste real e a volta para a CPU, e o ganho sobre a CPU é desconhecido. A GPU da Apple foi medida e não funciona com o Demucs (veja a tabela). A separação das vozes de apoio (`audio-separator`, ONNX) continua na CPU em todos os motores.
+`node src/cli.ts assemble --dir <pasta> --engine auto|cpu|cu121|rocm6.2|mps`. **A GPU da AMD não foi medida em hardware de verdade** (o CI não tem placa AMD): ela conta com o teste real e a volta para a CPU, e o ganho sobre a CPU é desconhecido. A GPU da Apple foi medida e não funciona com o Demucs (veja a tabela). A separação das vozes de apoio (`audio-separator`, ONNX) continua na CPU em todos os motores.
 
 **O app do dono (marco M3).** Uma janela Electron que faz tudo isso sem terminal: prepara o motor, pareia, inicia a sessão, cria salas, entra no YouTube e importa arquivos.
 

@@ -35,5 +35,6 @@ Each ADR records one decision and why it was made. To change a decision, write a
 - [0014. Own CSS from design tokens, without Tailwind or a component kit](adr/0014-own-css-with-tokens.md)
 - [0015. The repository is written in English, with Portuguese translations](adr/0015-english-first-repository.md)
 - [0016. No full-stack framework: Fastify, React with Vite, and Electron](adr/0016-no-full-stack-framework.md) (the API part superseded by 0017)
-- [0017. The API moves to NestJS on Fastify, with MikroORM over SQLite](adr/0017-api-on-nestjs-with-mikroorm.md) (the WebSocket contract superseded by 0018)
+- [0017. The API moves to NestJS on Fastify, with MikroORM over SQLite](adr/0017-api-on-nestjs-with-mikroorm.md) (the WebSocket contract superseded by 0018, the engine's build by 0019)
 - [0018. The Room's WebSocket is a Nest gateway](adr/0018-room-websocket-on-a-nest-gateway.md)
+- [0019. The engine runs its TypeScript directly, and compiles it only for the packaged app](adr/0019-engine-runs-typescript-and-compiles-for-the-app.md)

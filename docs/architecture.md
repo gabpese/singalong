@@ -84,7 +84,7 @@ Singalong uses no full-stack framework: it composes these pieces ([ADR 0016](adr
 | Song preparation | `apps/worker/singalong_worker/pipeline.py` and `runner.py` |
 | What the pages and the API exchange | `apps/api/src/protocol.ts` (the web reads it through `apps/web/src/lib/types.ts`) |
 | Agent API, Pairing, Session | `apps/api/src/agents/` (`agent.service.ts`, `pairing.controller.ts`, `agent.controller.ts`, `cloud.ts`) |
-| Engine assembly | `apps/engine/src/assemble.js` (from `apps/engine/manifest.json`) |
+| Engine assembly | `apps/engine/src/assemble.ts` (from `apps/engine/manifest.json`) |
 | Local media | `apps/worker/singalong_worker/media_server.py` |
 | UI texts | `apps/web/src/i18n/{pt,en,es}.ts` |
 | Brand tokens | `apps/web/src/styles/theme-bridge.css` |
