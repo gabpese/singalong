@@ -250,12 +250,13 @@ test('the agent gets the right environment (server, token, nickname, library), a
 test('an agent that falls is restarted; a refused token (exit code 2) is not, and asks for pairing again', async () => {
   const crash = await ready({ mode: 'crash' });
   await crash.controller.startAgent({ nickname: 'A' });
-  await until(() => crash.controller.snapshot().logs.filter((l) => l.line === 'worker consuming').length >= 2);
+  // two worker processes start one after the other: a busy CI runner has taken more than the usual 4 s
+  await until(() => crash.controller.snapshot().logs.filter((l) => l.line === 'worker consuming').length >= 2, 10_000);
   await crash.controller.stopAgent();
 
   const auth = await ready({ mode: 'auth' });
   await auth.controller.startAgent({ nickname: 'A' });
-  await until(() => auth.controller.snapshot().agent.status === 'auth_error');
+  await until(() => auth.controller.snapshot().agent.status === 'auth_error', 10_000);
   assert.match(auth.controller.snapshot().agent.error ?? '', /Pareie de novo/);
   const count = auth.controller.snapshot().logs.length;
   await new Promise((resolve) => setTimeout(resolve, 150));
