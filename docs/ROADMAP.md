@@ -64,7 +64,7 @@ The main process runs its `.ts` directly, packaged too, and `tsc` only checks it
 The remaining `*.mjs` and `*.test.js` files become `.ts`, in one pull request per app. Each app's `tsconfig.json` covers its tests and scripts, so CI checks their types too.
 
 - **The engine and the desktop app: done.** The engine's `tsconfig.json` checks `src/` and `test/`, and `tsconfig.build.json` builds `dist/`. The desktop app's covers `src/`, `test/`, `e2e/` and `scripts/`. The two files that start the API from its compiled `dist/` (the e2e and `scripts/test-update.ts`) import it untyped.
-- **The web:** the unit tests, the Playwright tests (with English names), `e2e/server.mjs` and the Vite and Playwright configs.
+- **The web: done.** The unit tests, the Playwright tests (now with English names), `e2e/server.ts` and the Vite and Playwright configs. `tsconfig.node.json` checks them, beside the pages' own `tsconfig.json`. The e2e server starts the API from its compiled `dist/`, which it imports untyped.
 - **The API:** its tests become `.ts` without a type check, because they import the compiled `dist/`, which carries no types. The admin page's script (`src/admin/page/admin.js`) compiles like the desktop app's window.
 
 ## Code in English

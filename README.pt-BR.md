@@ -325,7 +325,7 @@ cd apps/web;    npm run typecheck   # TypeScript
 cd apps/web;    npm run build; npm run e2e   # testes de ponta a ponta (Playwright, contra o build em dist/)
 ```
 
-Os testes de ponta a ponta sobem sozinhos uma API de teste (`apps/web/e2e/server.mjs`, com músicas prontas e fila de jobs em memória) e abrem um Chromium de verdade, com microfone falso. Na primeira vez: `npx playwright install chromium`.
+Os testes de ponta a ponta sobem sozinhos uma API de teste (`apps/web/e2e/server.ts`, com músicas prontas e fila de jobs em memória) e abrem um Chromium de verdade, com microfone falso. Na primeira vez: `npx playwright install chromium`.
 
 ## Desenvolvimento do front-end
 

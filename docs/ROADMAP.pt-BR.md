@@ -64,7 +64,7 @@ O processo principal roda o próprio `.ts` direto, empacotado também, e o `tsc`
 Os `*.mjs` e `*.test.js` que restam viram `.ts`, num pull request por app. O `tsconfig.json` de cada app cobre os testes e os scripts dele, então o CI confere os tipos deles também.
 
 - **O motor e o app de computador: feito.** O `tsconfig.json` do motor confere `src/` e `test/`, e o `tsconfig.build.json` gera o `dist/`. O do app de computador cobre `src/`, `test/`, `e2e/` e `scripts/`. Os dois arquivos que sobem a API pelo `dist/` compilado (o teste de ponta a ponta e o `scripts/test-update.ts`) a importam sem tipos.
-- **O site:** os testes de unidade, os testes do Playwright (com nomes em inglês), o `e2e/server.mjs` e os configs do Vite e do Playwright.
+- **O site: feito.** Os testes de unidade, os testes do Playwright (agora com nomes em inglês), o `e2e/server.ts` e os configs do Vite e do Playwright. O `tsconfig.node.json` os confere, ao lado do `tsconfig.json` das páginas. O servidor dos testes de ponta a ponta sobe a API pelo `dist/` compilado, que ele importa sem tipos.
 - **A API:** os testes viram `.ts` sem conferência de tipos, porque importam o `dist/` compilado, que não leva tipos. O script da página do administrador (`src/admin/page/admin.js`) compila como a janela do app de computador.
 
 ## Código em inglês
