@@ -10,18 +10,18 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "node scripts/build-engine.mjs && tsc -p . && tsc -p tsconfig.renderer.json",
+    "build": "node scripts/build-engine.ts && tsc -p . && tsc -p tsconfig.renderer.json",
     "prestart": "npm run build",
     "start": "electron .",
     "pretest": "npm run build",
-    "test": "node --test --test-timeout=60000 \"test/*.test.js\"",
+    "test": "node --test --test-timeout=60000 \"test/*.test.ts\"",
     "pretest:e2e": "npm run build",
-    "test:e2e": "node --test \"e2e/*.e2e.js\"",
-    "dist": "node scripts/build-installer.mjs",
-    "dist:dir": "node scripts/build-installer.mjs --dir",
-    "dist:win": "node scripts/build-installer.mjs --platform=win",
-    "dist:mac": "node scripts/build-installer.mjs --platform=mac",
-    "dist:linux": "node scripts/build-installer.mjs --platform=linux"
+    "test:e2e": "node --test \"e2e/*.e2e.ts\"",
+    "dist": "node scripts/build-installer.ts",
+    "dist:dir": "node scripts/build-installer.ts --dir",
+    "dist:win": "node scripts/build-installer.ts --platform=win",
+    "dist:mac": "node scripts/build-installer.ts --platform=mac",
+    "dist:linux": "node scripts/build-installer.ts --platform=linux"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
@@ -53,7 +53,8 @@
       "!src/*.cts",
       "!ui/*.ts",
       "!node_modules/@singalong/engine/src/**",
-      "!node_modules/@singalong/engine/tsconfig.json"
+      "!node_modules/@singalong/engine/tsconfig*.json",
+      "!node_modules/@singalong/engine/test/**"
     ],
     "extraResources": [
       {

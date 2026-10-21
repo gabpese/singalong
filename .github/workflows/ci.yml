@@ -122,7 +122,7 @@ jobs:
       - run: npm ci
       - name: Types
         run: npx tsc -p . --noEmit
-      # the tests run the .ts sources straight in Node; the desktop app builds dist/ for itself (apps/desktop/scripts/build-engine.mjs)
+      # the tests run the .ts sources straight in Node; the desktop app builds dist/ for itself (apps/desktop/scripts/build-engine.ts)
       - run: npm test
 
   # a prova do motor com tudo de verdade: baixa os componentes oficiais (confere o SHA-256 de cada um), instala o torch de CPU
@@ -270,7 +270,7 @@ jobs:
           if (-not (Test-Path dist/latest.yml)) { throw "faltou o latest.yml" }
           "instalador: {0:N0} MB" -f ($exe.Length / 1MB)
       - name: Conferir a assinatura
-        run: node scripts/verify-signature.mjs dist/singalong_karaoke.exe
+        run: node scripts/verify-signature.ts dist/singalong_karaoke.exe
 
   # o AppImage (Linux) e o DMG (macOS Apple Silicon) são gerados de verdade; o build confere o nome fixo, o tamanho, o executável do Linux
   # e a assinatura ad-hoc do app do Mac (o Apple Silicon encerra programa sem assinatura). Nada é guardado nem publicado.

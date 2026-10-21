@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const engine = fileURLToPath(new URL('../../engine/', import.meta.url));
-const npm = (args) => execSync(`npm ${args}`, { cwd: engine, stdio: 'inherit' });
+const npm = (args: string) => execSync(`npm ${args}`, { cwd: engine, stdio: 'inherit' });
 
 if (!existsSync(join(engine, 'node_modules', 'typescript'))) npm('ci --no-audit --no-fund');
 npm('run build');

@@ -1,19 +1,40 @@
-// Confere a assinatura (Authenticode) de um arquivo do Windows.
-//   node scripts/verify-signature.mjs dist/singalong_karaoke.exe            → mostra e sai com erro se NÃO estiver assinado
-//   node scripts/verify-signature.mjs <arquivo> --trusted                   → exige também que o Windows confie (certificado de verdade)
-//   node scripts/verify-signature.mjs <arquivo> --expect-unsigned           → o contrário: falha se estiver assinado
-// Um certificado de teste (autoassinado) aparece como "NotTrusted": assinado, mas o Windows não confia. É o esperado no CI.
+// Checks a Windows file's signature (Authenticode).
+//   node scripts/verify-signature.ts dist/singalong_karaoke.exe            → shows it and exits with an error if it is NOT signed
+//   node scripts/verify-signature.ts <file> --trusted                       → also requires Windows to trust it (a real certificate)
+//   node scripts/verify-signature.ts <file> --expect-unsigned               → the opposite: fails if it is signed
+// A test certificate (self-signed) shows as "NotTrusted": signed, but Windows does not trust it. That is expected in CI.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
 const run = promisify(execFile);
 
-const STATUS = { 0: 'Valid', 1: 'UnknownError', 2: 'NotSigned', 3: 'HashMismatch', 4: 'NotTrusted', 5: 'NotSupportedFileFormat', 6: 'Incompatible' };
+const STATUS: Record<number, string> = { 0: 'Valid', 1: 'UnknownError', 2: 'NotSigned', 3: 'HashMismatch', 4: 'NotTrusted', 5: 'NotSupportedFileFormat', 6: 'Incompatible' };
 
-/** O JSON do Get-AuthenticodeSignature como um relatório simples. */
-export function parseSignatureReport(json) {
-  const raw = typeof json === 'string' ? JSON.parse(json) : json;
+/** What Get-AuthenticodeSignature answers, as the script below writes it in JSON. */
+interface RawSignature {
+  Status?: number | string;
+  StatusMessage?: string;
+  SignerCertificate?: { Subject?: string; Thumbprint?: string } | null;
+  TimeStamperCertificate?: string | null;
+  Error?: boolean;
+}
+
+export interface SignatureReport {
+  status: string;
+  signed: boolean;
+  trusted: boolean;
+  subject: string | null;
+  thumbprint: string | null;
+  timestamped: boolean;
+  /** PowerShell could not even read the file (missing, no permission...). */
+  failed: boolean;
+  message: string;
+}
+
+/** Get-AuthenticodeSignature's JSON as a simple report. */
+export function parseSignatureReport(json: string | RawSignature): SignatureReport {
+  const raw: RawSignature = typeof json === 'string' ? JSON.parse(json) : json;
   const status = typeof raw.Status === 'number' ? STATUS[raw.Status] ?? String(raw.Status) : String(raw.Status ?? 'UnknownError');
   const cert = raw.SignerCertificate ?? null;
   return {
@@ -23,13 +44,13 @@ export function parseSignatureReport(json) {
     subject: cert?.Subject ?? null,
     thumbprint: cert?.Thumbprint ?? null,
     timestamped: Boolean(raw.TimeStamperCertificate),
-    failed: Boolean(raw.Error), // o PowerShell não conseguiu nem ler o arquivo (não existe, sem permissão...)
+    failed: Boolean(raw.Error),
     message: raw.StatusMessage ?? '',
   };
 }
 
-/** O script do PowerShell, com o caminho já escapado (aspas simples dobradas). Devolve sempre um JSON, mesmo quando algo dá errado. */
-export function signatureScript(file) {
+/** The PowerShell script, with the path already escaped (single quotes doubled). It always answers JSON, even when something goes wrong. */
+export function signatureScript(file: string): string {
   const path = String(file).replace(/'/g, "''");
   return [
     "$ErrorActionPreference = 'Stop'",
@@ -46,22 +67,23 @@ export function signatureScript(file) {
 }
 
 /**
- * Lê a assinatura de um arquivo. O script vai codificado (UTF-16 em base64): nenhuma aspas do caminho passa pelo shell.
- * O `powershell.exe` (5.1) herda o PSModulePath do PowerShell 7 quando o build roda dentro dele (como nos executores do GitHub) e
- * então não consegue carregar o módulo de segurança: por isso a variável é limpa para ele; se ainda falhar, tenta o `pwsh`.
+ * Reads a file's signature. The script goes encoded (UTF-16 in base64): no quote of the path passes through the shell.
+ * `powershell.exe` (5.1) inherits PowerShell 7's PSModulePath when the build runs inside it (as on GitHub's runners) and then
+ * cannot load the security module: so the variable is cleared for it; if it still fails, it tries `pwsh`.
  */
-export async function readSignature(file) {
+export async function readSignature(file: string): Promise<SignatureReport> {
   const encoded = Buffer.from(signatureScript(file), 'utf16le').toString('base64');
   const { PSModulePath: _ignored, ...cleanEnv } = process.env;
-  let last = null;
+  let last: SignatureReport | null = null;
   let problem = '';
-  for (const [shell, env] of [['powershell.exe', cleanEnv], ['pwsh', process.env]]) {
+  for (const [shell, env] of [['powershell.exe', cleanEnv], ['pwsh', process.env]] as const) {
     let stdout = '';
     try {
       ({ stdout } = await run(shell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout: 120_000, maxBuffer: 4 * 1024 * 1024, env }));
     } catch (error) {
-      problem = `${shell}: ${error.stderr || error.message}`;
-      continue; // não existe ou falhou: tenta o outro
+      const failure = error as Error & { stderr?: string };
+      problem = `${shell}: ${failure.stderr || failure.message}`;
+      continue; // missing or failed: try the other one
     }
     const text = stdout.trim().replace(/^﻿/, '');
     if (!text) {
@@ -70,15 +92,15 @@ export async function readSignature(file) {
     }
     const report = parseSignatureReport(text);
     if (!report.failed) return report;
-    last = report; // o PowerShell respondeu, mas não conseguiu ler: tenta o outro antes de desistir
+    last = report; // PowerShell answered but could not read: try the other one before giving up
   }
   if (last) return last;
   throw new Error(`Não consegui ler a assinatura de ${file}. ${problem.trim()}`);
 }
 
-/** Aplica as exigências: devolve a lista de problemas (vazia = tudo certo). */
-export function judge(report, { trusted = false, expectUnsigned = false } = {}) {
-  const problems = [];
+/** Applies the requirements: answers the list of problems (empty = all good). */
+export function judge(report: SignatureReport, { trusted = false, expectUnsigned = false } = {}): string[] {
+  const problems: string[] = [];
   if (report.failed) return [`não consegui ler a assinatura: ${report.message}`];
   if (expectUnsigned) {
     if (report.signed) problems.push('o arquivo está assinado, mas deveria estar sem assinatura');
@@ -94,7 +116,7 @@ export function judge(report, { trusted = false, expectUnsigned = false } = {}) 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const file = process.argv[2];
   if (!file) {
-    console.error('Uso: node scripts/verify-signature.mjs <arquivo> [--trusted | --expect-unsigned]');
+    console.error('Uso: node scripts/verify-signature.ts <arquivo> [--trusted | --expect-unsigned]');
     process.exit(2);
   }
   const report = await readSignature(file);

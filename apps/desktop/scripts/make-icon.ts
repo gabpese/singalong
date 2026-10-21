@@ -1,19 +1,20 @@
-// Gera o ícone do app (ui/icon.png e build/icon.ico) a partir da marca (brand/mark.svg, na raiz do repositório): o vinil com o
-// microfone num quadrado de papel creme, que aparece bem na barra de tarefas escura e na clara.
-// build/icon.png sai em 1024 px: o macOS (.icns) e o Linux (AppImage) exigem pelo menos 512 px.
-//   node_modules\electron\dist\electron.exe scripts\make-icon.cjs      (sem ELECTRON_RUN_AS_NODE)
-const { app, BrowserWindow, nativeImage } = require('electron');
-const { readFileSync, writeFileSync } = require('node:fs');
-const { tmpdir } = require('node:os');
-const { join } = require('node:path');
+// Makes the app's icon (ui/icon.png and build/icon.ico) from the mark (brand/mark.svg, at the repository's root): the vinyl with
+// the microphone on a square of cream paper, which shows well on both a dark and a light taskbar.
+// build/icon.png comes out at 1024 px: macOS (.icns) and Linux (AppImage) need at least 512 px.
+//   node_modules\electron\dist\electron.exe scripts\make-icon.ts      (without ELECTRON_RUN_AS_NODE)
+import { app, BrowserWindow, nativeImage } from 'electron';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = join(__dirname, '..');
+const root = fileURLToPath(new URL('..', import.meta.url));
 const svg = readFileSync(join(root, '..', '..', 'brand', 'mark.svg'), 'utf8').replace(/<\?xml[^>]*\?>|<!DOCTYPE[^>]*>/g, '');
 const SIZES = [256, 128, 64, 48, 32, 24, 16];
 
-async function render(size) {
+async function render(size: number) {
   const win = new BrowserWindow({ show: false, width: size, height: size, useContentSize: true, transparent: true, frame: false, webPreferences: { offscreen: true } });
-  const html = `<!doctype html><body style="margin:0;background:transparent"><div style="width:${size}px;height:${size}px">${svg.replace('<svg ', '<svg style="width:100%;height:100%" ')}</div>`;
+  const html = `<!doctype html><body style="margin:0;overflow:hidden;background:transparent"><div style="width:${size}px;height:${size}px">${svg.replace('<svg ', '<svg style="width:100%;height:100%" ')}</div>`;
   const file = join(tmpdir(), `singalong-icon-${size}.html`);
   writeFileSync(file, html);
   await win.loadFile(file);
@@ -23,14 +24,14 @@ async function render(size) {
   return image;
 }
 
-app.on('window-all-closed', () => {}); // sem isto o Electron encerra ao fechar a primeira janela e a segunda renderização falha
+app.on('window-all-closed', () => {}); // without this Electron quits when the first window closes and the second render fails
 
 app.whenReady().then(async () => {
-  const pngs = [];
-  const big = await render(256); // renderiza uma vez e reduz para os outros tamanhos
+  const pngs: Buffer[] = [];
+  const big = await render(256); // renders once and scales down for the other sizes
   for (const size of SIZES) pngs.push(size === 256 ? big.toPNG() : nativeImage.createFromBuffer(big.toPNG()).resize({ width: size, height: size, quality: 'best' }).toPNG());
   writeFileSync(join(root, 'ui', 'icon.png'), pngs[0]);
-  // .ico com um PNG por tamanho (aceito pelo Windows desde o Vista)
+  // an .ico with one PNG per size (Windows accepts it since Vista)
   const header = Buffer.alloc(6);
   header.writeUInt16LE(1, 2);
   header.writeUInt16LE(SIZES.length, 4);
