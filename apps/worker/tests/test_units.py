@@ -29,12 +29,12 @@ class ExportTests(unittest.TestCase):
 
     def test_karaoke_uses_real_word_times(self):
         text = karaoke_text(self.CUE, 10.0)
-        # cada palavra se preenche até o início da seguinte: 60 cs (0,5 s + a pausa), 60 cs e 80 cs
+        # each word fills until the next one starts: 60 cs (0.5 s + the pause), 60 cs and 80 cs
         self.assertEqual(text, "{\\kf60}Hello {\\kf60}brave {\\kf80}world")
 
     def test_karaoke_lead_in_and_estimate(self):
-        self.assertTrue(karaoke_text(self.CUE, 8.5).startswith("{\\k150}{\\kf60}Hello"))  # aparece 1,5 s antes
-        estimated = karaoke_text({"start": 0.0, "end": 2.0, "text": "aa bbbb"}, 0.0)  # sem tempos: pelo tamanho das palavras
+        self.assertTrue(karaoke_text(self.CUE, 8.5).startswith("{\\k150}{\\kf60}Hello"))  # shows up 1.5 s before
+        estimated = karaoke_text({"start": 0.0, "end": 2.0, "text": "aa bbbb"}, 0.0)  # no timings: by the words' length
         self.assertEqual(estimated, "{\\kf67}aa {\\kf133}bbbb")
 
     def test_build_ass(self):
@@ -44,10 +44,10 @@ class ExportTests(unittest.TestCase):
         ]
         ass = build_ass(cues, "Título", "Artista", 200)
         self.assertIn("Style: Current", ass)
-        self.assertIn("Dialogue: 0,0:00:00.00,0:00:06.00,Title,,0,0,0,,Título\\N{\\fs38\\1c&H00C8C8D2&}Artista", ass)  # cartão de 6 s com o artista
-        self.assertIn("Dialogue: 1,0:00:08.50,0:00:12.00,Current", ass)  # a linha 2 só aparece quando a 1ª termina
-        self.assertIn("Second (line)", ass)  # chaves viram parênteses: não são tags do ASS
-        self.assertIn(",Next,,0,0,0,,{\\pos(640,490)}Second (line)", ass)  # a próxima linha aparece em cinza embaixo
+        self.assertIn("Dialogue: 0,0:00:00.00,0:00:06.00,Title,,0,0,0,,Título\\N{\\fs38\\1c&H00C8C8D2&}Artista", ass)  # a 6 s card with the artist
+        self.assertIn("Dialogue: 1,0:00:08.50,0:00:12.00,Current", ass)  # line 2 only shows up when the 1st ends
+        self.assertIn("Second (line)", ass)  # braces become parentheses: they are not ASS tags
+        self.assertIn(",Next,,0,0,0,,{\\pos(640,490)}Second (line)", ass)  # the next line shows up in gray below
 
     def test_build_ass_without_lyrics_keeps_the_title(self):
         ass = build_ass([], "Título", None, 180)
@@ -61,12 +61,12 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(pitch_filter(12, rubberband=True), ["-af", "rubberband=pitch=2.000000"])
 
     def test_pitch_filter_without_rubberband_uses_asetrate_and_atempo(self):
-        # o ffmpeg do macOS não tem o rubberband: o tom sobe pela taxa de amostragem e o atempo devolve a duração
+        # macOS's ffmpeg has no rubberband: the pitch rises through the sample rate, and atempo restores the duration
         self.assertEqual(pitch_filter(0, rubberband=False), [])
         self.assertEqual(pitch_filter(12, rubberband=False), ["-af", "aresample=44100,asetrate=88200,aresample=44100,atempo=0.500000"])
         down = pitch_filter(-12, rubberband=False)[1]
         self.assertIn("asetrate=22050", down)
-        self.assertIn("atempo=2.000000", down)  # dentro do limite do atempo (0,5 a 100)
+        self.assertIn("atempo=2.000000", down)  # within atempo's limit (0.5 to 100)
         self.assertTrue(all(0.5 <= 2 ** (-p / 12) <= 2 for p in range(-12, 13)))
 
     def test_has_rubberband_reads_the_ffmpeg_filter_list_and_assumes_yes_when_it_cannot_run(self):
@@ -99,12 +99,12 @@ class MelodyTests(unittest.TestCase):
         self.assertEqual(out["hop"], 0.05)
 
     def test_ignores_leak_and_pauses(self):
-        f0 = [440.0] * 100  # 5 s de "voz" o tempo todo, como o detector enxerga o vazamento
-        energy = [1.0] * 40 + [0.01] * 20 + [1.0] * 40  # 2 s a 3 s: só vazamento (muito baixo)
-        out = melody_from_f0(f0, energy, [(0.0, 1.0), (3.0, 5.0)])  # a letra só canta de 0 a 1 s e de 3 s em diante
+        f0 = [440.0] * 100  # 5 s of "voice" the whole time, the way the detector sees the leakage
+        energy = [1.0] * 40 + [0.01] * 20 + [1.0] * 40  # 2 s to 3 s: leakage only (very low)
+        out = melody_from_f0(f0, energy, [(0.0, 1.0), (3.0, 5.0)])  # the lyrics only sing from 0 to 1 s and from 3 s on
         voiced = [i for i, m in enumerate(out["midi"]) if m >= 0]
         self.assertEqual(voiced[0], 0)
-        self.assertTrue(all(i <= 20 or i >= 60 for i in voiced))  # nada entre 1 s e 3 s
+        self.assertTrue(all(i <= 20 or i >= 60 for i in voiced))  # nothing between 1 s and 3 s
         self.assertEqual(out["midi"][25], -1)
         self.assertEqual(out["midi"][70], 69)
 
@@ -187,44 +187,44 @@ class PipelineTests(unittest.TestCase):
     def test_manual_subtitle_langs(self):
         available = {"en-US": [], "pt-BR": [], "live_chat": [], "fr": []}
         self.assertEqual(manual_subtitle_langs(available, ["pt", "en"]), ["pt-BR", "en-US"])
-        self.assertEqual(manual_subtitle_langs({}, ["pt", "en"]), [])  # sem legenda manual: nem tenta baixar
+        self.assertEqual(manual_subtitle_langs({}, ["pt", "en"]), [])  # no manual subtitles: does not even try to download
         self.assertEqual(manual_subtitle_langs({"live_chat": []}, ["pt", "en"]), [])
 
-    def test_auto_usa_legenda_do_video(self):
+    def test_auto_uses_the_video_subtitles(self):
         cues, source = resolve_lyrics("auto", self.info(subtitle_text=self.SUBS), None)
         self.assertEqual((source, [c["text"] for c in cues]), ("video", ["Um", "Dois"]))
 
-    def test_auto_sem_legenda_pede_letra(self):
+    def test_auto_without_subtitles_asks_for_lyrics(self):
         with self.assertRaises(NeedsLyrics):
             resolve_lyrics("auto", self.info(), None)
 
-    def test_legenda_com_erro_de_download_tem_mensagem_propria(self):
+    def test_subtitles_with_a_download_error_have_their_own_message(self):
         with self.assertRaisesRegex(NeedsLyrics, "bloqueou o download"):
             resolve_lyrics("auto", self.info(subtitle_error="HTTP Error 429"), None)
 
-    def test_sem_letra_e_sempre_possivel(self):
+    def test_no_lyrics_is_always_possible(self):
         self.assertEqual(resolve_lyrics("none", self.info(), None), ([], "none"))
 
-    def test_pick_candidate_respeita_a_duracao(self):
+    def test_pick_candidate_respects_the_duration(self):
         cands = [{"duration": 194.0, "name": "a", "syncedLyrics": "x"}, {"duration": 180.0, "name": "b", "syncedLyrics": "x"}]
-        self.assertEqual(pick_candidate(cands, 195, loose=False)[0]["name"], "a")  # dentro de ±5 s
-        chosen, closest = pick_candidate(cands, 265, loose=False)  # cover bem mais longo
+        self.assertEqual(pick_candidate(cands, 195, loose=False)[0]["name"], "a")  # within ±5 s
+        chosen, closest = pick_candidate(cands, 265, loose=False)  # a much longer cover
         self.assertIsNone(chosen)
-        self.assertEqual(closest["name"], "a")  # serve para explicar a recusa
-        self.assertEqual(pick_candidate(cands, 265, loose=True)[0]["name"], "a")  # aceito mesmo assim
+        self.assertEqual(closest["name"], "a")  # it explains the refusal
+        self.assertEqual(pick_candidate(cands, 265, loose=True)[0]["name"], "a")  # accepted anyway
         self.assertEqual(pick_candidate([], 265), (None, None))
-        self.assertIsNotNone(pick_candidate(cands, None)[0])  # sem duração conhecida, não há como recusar
+        self.assertIsNotNone(pick_candidate(cands, None)[0])  # no known duration: there is no way to refuse
 
-    def test_video_sem_legenda(self):
+    def test_video_without_subtitles(self):
         with self.assertRaises(NeedsLyrics):
             resolve_lyrics("video", self.info(), None)
 
-    def test_text_usa_tempos_da_legenda_do_video(self):
+    def test_text_uses_the_video_subtitle_timings(self):
         cues, source = resolve_lyrics("text", self.info(subtitle_text=self.SUBS), "Eu\nTu")
         self.assertEqual(source, "text+video")
         self.assertEqual([(c["start"], c["text"]) for c in cues], [(1.0, "Eu"), (3.0, "Tu")])
 
-    def test_servico_de_letras_fora_do_ar_nao_vira_falha(self):
+    def test_the_lyrics_service_being_down_is_not_a_failure(self):
         from unittest import mock
 
         from singalong_worker import lyrics as lyr
@@ -234,7 +234,7 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaisesRegex(NeedsLyrics, "não respondeu"):
                 resolve_lyrics("lrclib", info, None)
 
-    def test_fetch_json_repete_em_5xx_mas_nao_em_4xx(self):
+    def test_fetch_json_retries_on_5xx_but_not_on_4xx(self):
         import io
         import urllib.error
         from unittest import mock
@@ -252,26 +252,26 @@ class PipelineTests(unittest.TestCase):
         with mock.patch("urllib.request.urlopen", side_effect=[http_error(404)]) as m:
             with self.assertRaises(lyr.LyricsServiceError):
                 lyr._fetch_json("req", pause=0)
-            self.assertEqual(m.call_count, 1)  # 4xx: não adianta repetir
+            self.assertEqual(m.call_count, 1)  # 4xx: repeating is useless
 
-    def test_text_sem_referencia_de_tempo_vai_para_a_ia(self):
-        # letra colada, sem legenda no vídeo e sem artista/título para buscar online: a IA sincroniza
+    def test_text_without_a_timing_reference_goes_to_the_ai(self):
+        # pasted lyrics, no subtitles in the video and no artist/title to search online: the AI syncs them
         with self.assertRaises(NeedsAlignment) as ctx:
             resolve_lyrics("text", self.info(), "uma linha\noutra linha")
         self.assertEqual((ctx.exception.text, ctx.exception.origin), ("uma linha\noutra linha", "text"))
 
-    def test_text_com_numero_de_linhas_diferente_vai_para_a_ia(self):
+    def test_text_with_a_different_line_count_goes_to_the_ai(self):
         with self.assertRaises(NeedsAlignment):
             resolve_lyrics("text", self.info(subtitle_text=self.SUBS), "só uma")
 
-    def test_align_sempre_pede_alinhamento_e_exige_texto(self):
+    def test_align_always_asks_for_alignment_and_requires_text(self):
         with self.assertRaises(NeedsAlignment) as ctx:
             resolve_lyrics("align", self.info(), "a\nb")
         self.assertEqual(ctx.exception.origin, "align")
         with self.assertRaises(ValueError):
             resolve_lyrics("align", self.info(), "  ")
 
-    def test_busca_online_usa_os_tempos_quando_a_duracao_bate(self):
+    def test_online_search_uses_the_timings_when_the_duration_matches(self):
         from unittest import mock
 
         from singalong_worker import lyrics as lyr
@@ -281,22 +281,22 @@ class PipelineTests(unittest.TestCase):
             cues, source = resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=206), None)
         self.assertEqual((source, [c["text"] for c in cues]), ("lrclib", ["um", "dois"]))
 
-    def test_busca_online_com_duracao_diferente_entrega_o_texto_para_a_ia(self):
+    def test_online_search_with_a_different_duration_hands_the_text_to_the_ai(self):
         from unittest import mock
 
         from singalong_worker import lyrics as lyr
 
         cands = [{"duration": 194, "syncedLyrics": "[00:01.00]um\n[00:03.00]dois", "plainLyrics": "um\ndois"}]
         with mock.patch.object(lyr, "search_lrclib", return_value=cands):
-            with self.assertRaises(NeedsAlignment) as ctx:  # cover de 265 s: os tempos de 194 s não servem
+            with self.assertRaises(NeedsAlignment) as ctx:  # a 265 s cover: the 194 s timings do not fit
                 resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=265), None)
         self.assertEqual((ctx.exception.text, ctx.exception.origin), ("um\ndois", "lrclib"))
-        # com 'loose' usa os tempos dela mesmo assim, sem IA
+        # with 'loose' it uses their timings anyway, without AI
         with mock.patch.object(lyr, "search_lrclib", return_value=cands):
             cues, source = resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=265), None, loose=True)
         self.assertEqual(source, "lrclib")
 
-    def test_busca_online_so_com_texto_vai_para_a_ia(self):
+    def test_online_search_with_text_only_goes_to_the_ai(self):
         from unittest import mock
 
         from singalong_worker import lyrics as lyr
@@ -307,7 +307,7 @@ class PipelineTests(unittest.TestCase):
                 resolve_lyrics("lrclib", self.info(artist="A", title="B", duration=200), None)
         self.assertEqual(ctx.exception.text, "linha a\nlinha b")
 
-    def test_busca_online_sem_resultados_pede_outra_opcao(self):
+    def test_online_search_without_results_asks_for_another_option(self):
         from unittest import mock
 
         from singalong_worker import lyrics as lyr
@@ -323,16 +323,16 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(candidate_text({"syncedLyrics": "[00:01.00]a\n[00:02.50] \n[01:03.4]b"}), "a\nb")
         self.assertEqual(candidate_text({}), "")
         cands = [{"duration": 180, "plainLyrics": "x"}, {"duration": 196, "plainLyrics": "y"}, {"duration": 195}]
-        self.assertEqual(best_text_candidate(cands, 197)["plainLyrics"], "y")  # o mais próximo que TEM texto
+        self.assertEqual(best_text_candidate(cands, 197)["plainLyrics"], "y")  # the closest one that HAS text
         self.assertIsNone(best_text_candidate([{"duration": 1}], 1))
 
-    def test_file_com_tempos_e_sem_conteudo(self):
+    def test_file_with_timings_and_without_content(self):
         cues, source = resolve_lyrics("file", self.info(), "[00:01.00]a\n[00:03.00]b")
         self.assertEqual((source, len(cues)), ("file", 2))
         with self.assertRaises(ValueError):
             resolve_lyrics("file", self.info(), None)
 
-    def test_lrclib_sem_artista_e_titulo(self):
+    def test_lrclib_without_artist_and_title(self):
         with self.assertRaises(NeedsLyrics):
             resolve_lyrics("lrclib", self.info(), None)
 
@@ -344,10 +344,10 @@ class AlignTests(unittest.TestCase):
 
     def test_clean_lines(self):
         self.assertEqual(clean_lines("  a \n\n b\n   \nc"), ["a", "b", "c"])
-        # indicações de seção não são cantadas; "(whoa, oh)" é cantado e fica
+        # section markers are not sung; "(whoa, oh)" is sung and stays
         self.assertEqual(clean_lines("[Chorus]\nline one\n[Verse 2]\n(whoa, oh)\n[x] texto"), ["line one", "(whoa, oh)", "[x] texto"])
 
-    def test_group_words_por_contagem_de_palavras(self):
+    def test_group_words_by_word_count(self):
         words = [self.W(1.0, 1.4), self.W(1.5, 2.0), self.W(2.1, 2.5), self.W(5.0, 5.5)]
         cues = group_words(["Lock me", "up", "again"], words)
         self.assertEqual(
@@ -359,22 +359,22 @@ class AlignTests(unittest.TestCase):
             ],
         )
 
-    def test_group_words_nunca_volta_no_tempo_e_da_duracao_minima(self):
-        words = [self.W(10.0, 10.0), self.W(4.0, 4.0)]  # palavra não alinhada com tempo anterior ao da linha passada
+    def test_group_words_never_goes_back_in_time_and_gives_a_minimum_duration(self):
+        words = [self.W(10.0, 10.0), self.W(4.0, 4.0)]  # an unaligned word, timed before the last line
         cues = group_words(["a", "b"], words)
         self.assertEqual(cues[1]["start"], 10.0)
         self.assertTrue(all(c["end"] - c["start"] >= 0.3 for c in cues))
 
-    def test_tempos_por_palavra_ficam_dentro_da_linha_e_em_ordem(self):
-        words = [self.W(1.0, 3.0), self.W(2.0, 2.2), self.W(2.5, 9.0)]  # 2ª sobrepõe a 1ª; 3ª estoura o fim
+    def test_word_timings_stay_inside_the_line_and_in_order(self):
+        words = [self.W(1.0, 3.0), self.W(2.0, 2.2), self.W(2.5, 9.0)]  # the 2nd overlaps the 1st; the 3rd runs past the end
         (cue,) = group_words(["a b c"], words)
         times = cue["words"]
         self.assertEqual(len(times), 3)
         flat = [t for pair in times for t in pair]
-        self.assertEqual(flat, sorted(flat))  # nunca volta no tempo
+        self.assertEqual(flat, sorted(flat))  # never goes back in time
         self.assertTrue(all(cue["start"] <= s <= e <= cue["end"] for s, e in times))
 
-    def test_attach_words_mantem_as_linhas_e_ignora_o_que_discorda(self):
+    def test_attach_words_keeps_the_lines_and_ignores_what_disagrees(self):
         cues = [
             {"start": 10.0, "end": 12.0, "text": "Lock me"},
             {"start": 20.0, "end": 22.0, "text": "up"},
@@ -382,22 +382,22 @@ class AlignTests(unittest.TestCase):
         ]
         aligned = [
             {"start": 10.3, "end": 12.1, "text": "Lock me", "words": [[10.3, 11.0], [11.2, 12.1]]},
-            {"start": 27.0, "end": 28.0, "text": "up", "words": [[27.0, 28.0]]},  # IA discorda em 7 s: fica sem palavras
-            {"start": 30.0, "end": 32.0, "text": "again now", "words": [[30.0, 31.0]]},  # contagem não bate
+            {"start": 27.0, "end": 28.0, "text": "up", "words": [[27.0, 28.0]]},  # the AI disagrees by 7 s: no words
+            {"start": 30.0, "end": 32.0, "text": "again now", "words": [[30.0, 31.0]]},  # the count does not match
         ]
         out, done = attach_words(cues, aligned)
         self.assertEqual(done, 1)
-        self.assertEqual([(c["start"], c["end"]) for c in out], [(10.0, 12.0), (20.0, 22.0), (30.0, 32.0)])  # linhas intactas
-        self.assertEqual(out[0]["words"], [[10.3, 11.0], [11.2, 12.0]])  # preso ao fim da linha original
+        self.assertEqual([(c["start"], c["end"]) for c in out], [(10.0, 12.0), (20.0, 22.0), (30.0, 32.0)])  # lines intact
+        self.assertEqual(out[0]["words"], [[10.3, 11.0], [11.2, 12.0]])  # held to the original line's end
         self.assertNotIn("words", out[1])
         self.assertNotIn("words", out[2])
-        self.assertEqual(attach_words(cues, aligned[:2]), (cues, 0))  # IA devolveu outro número de linhas: não mexe
+        self.assertEqual(attach_words(cues, aligned[:2]), (cues, 0))  # the AI returned a different number of lines: nothing changes
 
-    def test_group_words_recusa_quando_a_contagem_nao_bate(self):
+    def test_group_words_refuses_when_the_count_does_not_match(self):
         with self.assertRaisesRegex(ValueError, "Não consegui sincronizar"):
             group_words(["duas palavras", "mais uma"], [self.W(0, 1)] * 2)
 
-    def test_align_exige_letra(self):
+    def test_align_requires_lyrics(self):
         from singalong_worker.align import align_lyrics
 
         with self.assertRaises(ValueError):
@@ -407,43 +407,43 @@ class AlignTests(unittest.TestCase):
 class KeyTests(unittest.TestCase):
     @staticmethod
     def rotate(profile, tonic):
-        """Perfil de uma tonalidade com a tônica em `tonic` (o inverso da rotação que best_key faz)."""
+        """A key's profile with the tonic at `tonic` (the inverse of the rotation best_key does)."""
         return profile[-tonic:] + profile[:-tonic] if tonic else list(profile)
 
-    def test_reconhece_as_24_tonalidades_a_partir_dos_proprios_perfis(self):
+    def test_recognizes_the_24_keys_from_their_own_profiles(self):
         for tonic in range(12):
             major = best_key(self.rotate(MAJOR_PROFILE, tonic))
             self.assertEqual((major["tonic"], major["mode"]), (tonic, "major"), f"maior {tonic}")
             minor = best_key(self.rotate(MINOR_PROFILE, tonic))
             self.assertEqual((minor["tonic"], minor["mode"]), (tonic, "minor"), f"menor {tonic}")
 
-    def test_transpor_o_perfil_move_o_tom_na_mesma_medida(self):
-        base = [5, 0, 3, 0, 4, 3, 0, 5, 0, 3, 0, 2]  # tríade e escala de Dó maior, grosseiramente
+    def test_transposing_the_profile_moves_the_key_by_the_same_amount(self):
+        base = [5, 0, 3, 0, 4, 3, 0, 5, 0, 3, 0, 2]  # C major's triad and scale, roughly
         for shift in (1, 2, 5, 7, 11):
             moved = base[-shift:] + base[:-shift]
             self.assertEqual(best_key(moved)["tonic"], (best_key(base)["tonic"] + shift) % 12)
             self.assertEqual(best_key(moved)["mode"], best_key(base)["mode"])
 
-    def test_resultado_tem_nome_confianca_e_alternativa(self):
-        key = best_key(self.rotate(MINOR_PROFILE, 9))  # Lá menor
+    def test_the_result_has_a_name_a_confidence_and_an_alternative(self):
+        key = best_key(self.rotate(MINOR_PROFILE, 9))  # A minor
         self.assertEqual((key["name"], key["mode"]), ("A", "minor"))
         self.assertGreater(key["score"], 0.99)
         self.assertGreater(key["margin"], 0)
         self.assertIn(key["alt"]["mode"], ("major", "minor"))
         self.assertIn(key["alt"]["name"], NOTES)
 
-    def test_perfil_ambiguo_tem_margem_pequena(self):
-        # as notas de Dó maior e de Lá menor são as mesmas: um perfil "chato" deixa as duas próximas
+    def test_an_ambiguous_profile_has_a_small_margin(self):
+        # C major and A minor have the same notes: a "flat" profile leaves the two close
         flat = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1]
         self.assertLess(best_key(flat)["margin"], 0.1)
 
-    def test_entradas_invalidas(self):
+    def test_invalid_inputs(self):
         with self.assertRaises(ValueError):
-            best_key([0.0] * 12)  # silêncio
+            best_key([0.0] * 12)  # silence
         with self.assertRaises(ValueError):
             best_key([1.0] * 11)
 
-    def test_music_key_reaproveita_o_calculado_e_nunca_derruba_o_job(self):
+    def test_music_key_reuses_the_computed_key_and_never_brings_the_job_down(self):
         import json
         import tempfile
         from unittest import mock
@@ -459,7 +459,7 @@ class KeyTests(unittest.TestCase):
             with mock.patch.object(pipeline, "detect_key", side_effect=AssertionError("não deveria recalcular")):
                 self.assertEqual(pipeline.music_key(storage, k, Path(work), None)["tonic"], 9)
 
-            storage.delete("cache")  # sem meta anterior e sem instrumental: a análise falha, o job segue sem tom
+            storage.delete("cache")  # no earlier meta and no instrumental: the analysis fails, the job goes on without a key
             self.assertIsNone(pipeline.music_key(storage, k, Path(work), None))
 
             audio = Path(work) / "instrumental.mp3"
@@ -473,7 +473,7 @@ class SearchTests(unittest.TestCase):
     def test_parse_entries(self):
         entries = [
             {"id": "TLvtw4nXou0", "title": "Jack's Lament", "channel": "Geoff", "duration": 265},
-            {"id": "PLxxxxxxxxxxxxxxxxxx", "title": "playlist"},  # não é vídeo (ID longo)
+            {"id": "PLxxxxxxxxxxxxxxxxxx", "title": "playlist"},  # not a video (long ID)
             None,
             {"id": "dQw4w9WgXcQ", "uploader": "Rick"},
         ]
@@ -488,13 +488,13 @@ class BackingTests(unittest.TestCase):
         import numpy as np
 
         t = np.arange(22050 * 20) / 22050
-        lead = 0.3 * np.sin(2 * np.pi * 220 * t)  # voz principal cantando o tempo todo
-        silent = np.zeros_like(lead)  # uma voz só: o apoio é (quase) silêncio
-        harmony = np.where((t % 10) < 4, 0.2, 0.005) * np.sin(2 * np.pi * 330 * t)  # apoio forte em 40% do tempo
+        lead = 0.3 * np.sin(2 * np.pi * 220 * t)  # lead vocals singing the whole time
+        silent = np.zeros_like(lead)  # a single voice: the backing is (almost) silence
+        harmony = np.where((t % 10) < 4, 0.2, 0.005) * np.sin(2 * np.pi * 330 * t)  # strong backing 40% of the time
         self.assertLess(backing_share(lead, silent), 0.01)
         self.assertGreater(backing_share(lead, harmony), 0.3)
-        self.assertEqual(backing_share(silent, harmony), 0.0)  # sem voz principal não há o que comparar
-        self.assertEqual(backing_share(np.zeros(100), np.zeros(100)), 0.0)  # áudio curto demais
+        self.assertEqual(backing_share(silent, harmony), 0.0)  # without lead vocals there is nothing to compare
+        self.assertEqual(backing_share(np.zeros(100), np.zeros(100)), 0.0)  # audio too short
 
     def test_usable_threshold(self):
         self.assertFalse(is_usable(0.0))
@@ -507,10 +507,10 @@ class BackingTests(unittest.TestCase):
             storage = LocalStorage(d)
             root = Path(d) / "cache"
             for vid, meta, has_vocals in [
-                ("aaaaaaaaaaa", {"title": "sem análise"}, True),  # falta analisar
+                ("aaaaaaaaaaa", {"title": "sem análise"}, True),  # not analyzed yet
                 ("bbbbbbbbbbb", {"title": "feita", "backing": {"status": "ready", "share": 0.3}}, True),
                 ("ccccccccccc", {"title": "sem apoio", "backing": {"status": "none", "share": 0.0}}, True),
-                ("ddddddddddd", {"title": "sem a voz isolada"}, False),  # cache antigo: não dá para separar
+                ("ddddddddddd", {"title": "sem a voz isolada"}, False),  # an old cache: cannot separate
             ]:
                 (root / vid).mkdir(parents=True)
                 (root / vid / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
@@ -539,7 +539,7 @@ class MetaStoreTests(unittest.TestCase):
                 th.join()
             final = json.loads((Path(d) / "cache" / "aaaaaaaaaaa" / "meta.json").read_text(encoding="utf-8"))
             self.assertEqual(final["title"], "T")
-            self.assertEqual({k for k in final if k.startswith("campo")}, {f"campo{i}" for i in range(30)})  # nenhuma mudança se perdeu
+            self.assertEqual({k for k in final if k.startswith("campo")}, {f"campo{i}" for i in range(30)})  # no change was lost
 
 
 class TitlesBackfillTests(unittest.TestCase):
@@ -549,9 +549,9 @@ class TitlesBackfillTests(unittest.TestCase):
             root = Path(d) / "cache"
             for vid, meta, source in [
                 ("aaaaaaaaaaa", {"title": "Unethical", "artist": "Faouzia"}, {"video_title": "Faouzia - Unethical (MAPHRA Vocal Cover)"}),
-                ("bbbbbbbbbbb", {"title": "X", "video_title": "já tem"}, {"video_title": "outro"}),  # não sobrescreve
-                ("ccccccccccc", {"title": "Y"}, None),  # sem source.json: pula
-                ("ddddddddddd", {"title": "Z"}, {"video_title": None}),  # source sem título: pula
+                ("bbbbbbbbbbb", {"title": "X", "video_title": "já tem"}, {"video_title": "outro"}),  # does not overwrite
+                ("ccccccccccc", {"title": "Y"}, None),  # no source.json: skips
+                ("ddddddddddd", {"title": "Z"}, {"video_title": None}),  # a source without a title: skips
             ]:
                 (root / vid).mkdir(parents=True)
                 (root / vid / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
@@ -562,7 +562,7 @@ class TitlesBackfillTests(unittest.TestCase):
             self.assertEqual(read("aaaaaaaaaaa"), {"title": "Unethical", "artist": "Faouzia", "video_title": "Faouzia - Unethical (MAPHRA Vocal Cover)"})
             self.assertEqual(read("bbbbbbbbbbb")["video_title"], "já tem")
             self.assertNotIn("video_title", read("ccccccccccc"))
-            self.assertEqual(titles_backfill(storage), 0)  # idempotente
+            self.assertEqual(titles_backfill(storage), 0)  # idempotent
 
 
 class StorageTests(unittest.TestCase):

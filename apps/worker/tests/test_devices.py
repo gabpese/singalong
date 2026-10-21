@@ -1,4 +1,4 @@
-"""Qual dispositivo cada etapa usa conforme o motor instalado: a GPU da Apple separa a voz, mas o alinhamento da letra fica na CPU."""
+"""Which device each stage uses for the installed engine: Apple's GPU separates the vocals, but lyrics alignment stays on the CPU."""
 import subprocess
 import unittest
 from pathlib import Path
@@ -11,8 +11,8 @@ class EngineDeviceTests(unittest.TestCase):
     def test_only_the_apple_engine_asks_for_a_device(self):
         self.assertEqual(devices.engine_device({"SINGALONG_ENGINE": "mps"}), "mps")
         for engine in ("cu121", "rocm6.2", "cpu", ""):
-            self.assertIsNone(devices.engine_device({"SINGALONG_ENGINE": engine}), engine)  # o Demucs escolhe (no ROCm a placa AMD é "cuda")
-        self.assertIsNone(devices.engine_device({}))  # Docker e quem roda o worker à mão: nada muda
+            self.assertIsNone(devices.engine_device({"SINGALONG_ENGINE": engine}), engine)  # Demucs chooses (on ROCm the AMD card is "cuda")
+        self.assertIsNone(devices.engine_device({}))  # Docker, and whoever runs the worker by hand: nothing changes
 
     def test_the_lyrics_alignment_never_goes_to_the_apple_gpu(self):
         self.assertEqual(devices.align_device("mps"), "cpu")

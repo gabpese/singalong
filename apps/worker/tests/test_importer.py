@@ -1,4 +1,4 @@
-"""Importar músicas sem passar pelo YouTube: arquivo do usuário e fontes abertas. Sem ffmpeg, sem rede e sem Demucs (dublês)."""
+"""Importing songs without YouTube: the user's file and open sources. No ffmpeg, no network and no Demucs (test doubles)."""
 import hashlib
 import io
 import json
@@ -19,7 +19,7 @@ from singalong_worker.storage import LocalStorage
 
 try:
     import yt_dlp
-except ImportError:  # a CI instala; numa máquina sem ele o teste é pulado
+except ImportError:  # CI installs it; on a machine without it the test is skipped
     yt_dlp = None
 
 LIMITS = Limits(max_duration=900.0, min_free_gb=0, separate_timeout=None)
@@ -43,7 +43,7 @@ def probe_json(duration="200.5", tags=None, streams=None):
 
 
 def fake_run(probe=None, probe_code=0, decode_ok=True):
-    """Um subprocess.run falso: ffprobe devolve `probe`; ffmpeg cria o wav de destino (último argumento)."""
+    """A fake subprocess.run: ffprobe returns `probe`; ffmpeg creates the target wav (the last argument)."""
     calls = []
 
     def run(cmd, **kwargs):
@@ -59,7 +59,7 @@ def fake_run(probe=None, probe_code=0, decode_ok=True):
 
 
 class FileIdTests(TempDirCase):
-    def test_o_id_vem_do_conteudo_nao_do_nome(self):
+    def test_the_id_comes_from_the_content_not_the_name(self):
         a = self.audio_file("a.mp3", b"mesmo som")
         b = self.audio_file("outro nome.flac", b"mesmo som")
         c = self.audio_file("c.mp3", b"som diferente")
@@ -68,25 +68,25 @@ class FileIdTests(TempDirCase):
         self.assertRegex(importer.file_id(a), importer.ID_RE.pattern)
         self.assertEqual(importer.file_id(a), "f-" + hashlib.sha256(b"mesmo som").hexdigest()[:12])
 
-    def test_le_o_arquivo_em_pedacos(self):
+    def test_reads_the_file_in_chunks(self):
         big = self.audio_file("grande.wav", b"x" * (3 * importer.HASH_CHUNK + 17))
         self.assertEqual(importer.file_id(big), "f-" + hashlib.sha256(b"x" * (3 * importer.HASH_CHUNK + 17)).hexdigest()[:12])
 
 
 class ProbeTests(TempDirCase):
-    def test_duracao_e_etiquetas_de_qualquer_caixa(self):
+    def test_duration_and_tags_in_any_case(self):
         info = importer.probe_audio(self.audio_file(), fake_run(probe_json("215.3", {"TITLE": "Tempo Perdido", "ARTIST": "Legião Urbana"})))
         self.assertEqual((info["duration"], info["title"], info["artist"], info["codec"]), (215.3, "Tempo Perdido", "Legião Urbana", "mp3"))
 
-    def test_artista_do_album_quando_falta_o_artista_e_etiquetas_vazias_viram_none(self):
+    def test_the_album_artist_when_the_artist_is_missing_and_empty_tags_become_none(self):
         info = importer.probe_audio(self.audio_file(), fake_run(probe_json(tags={"album_artist": "  Banda  ", "title": "   "})))
         self.assertEqual((info["artist"], info["title"]), ("Banda", None))
 
-    def test_recusa_o_que_nao_e_audio_legivel(self):
+    def test_refuses_what_is_not_readable_audio(self):
         for run in (
-            fake_run(probe_code=1),  # o ffprobe falhou
+            fake_run(probe_code=1),  # ffprobe failed
             fake_run("não é json"),
-            fake_run(probe_json(streams=[{"codec_type": "video"}])),  # só vídeo
+            fake_run(probe_json(streams=[{"codec_type": "video"}])),  # video only
             fake_run(probe_json(streams=[])),
             fake_run(probe_json(duration="0")),
             fake_run(probe_json(duration="N/A")),
@@ -95,7 +95,7 @@ class ProbeTests(TempDirCase):
                 importer.probe_audio(self.audio_file(), run)
             self.assertEqual(ctx.exception.code, "bad_audio")
 
-    def test_ffmpeg_ausente_e_tempo_esgotado(self):
+    def test_missing_ffmpeg_and_timeout(self):
         def missing(cmd, **kw):
             raise FileNotFoundError("ffprobe")
 
@@ -114,18 +114,18 @@ class PrepareFileTests(TempDirCase):
         work.mkdir(exist_ok=True)
         return importer.prepare_file(path, work, kw.pop("max_duration", 900.0), kw.pop("max_size", 10_000_000), run or fake_run(), **kw)
 
-    def test_arquivo_valido_vira_uma_musica_com_o_audio_decodificado(self):
+    def test_a_valid_file_becomes_a_song_with_the_decoded_audio(self):
         path = self.audio_file("Legião Urbana - Tempo Perdido.MP3", b"abc")
         song = self.prepare(path, fake_run(probe_json("240", {"artist": "Legião Urbana"})))
         self.assertEqual(song.video_id, importer.file_id(path))
         self.assertTrue(song.audio.exists())
         self.assertEqual(song.audio.name, "source.wav")
-        self.assertEqual(song.info["video_title"], "Legião Urbana - Tempo Perdido")  # o nome do arquivo, sem a extensão
+        self.assertEqual(song.info["video_title"], "Legião Urbana - Tempo Perdido")  # the file's name, without the extension
         self.assertEqual((song.info["artist"], song.info["track"], song.info["duration"], song.info["origin"]), ("Legião Urbana", None, 240.0, "file"))
         self.assertIsNone(song.info["subtitle_text"])
-        self.assertTrue(path.exists())  # o arquivo original nunca é movido nem apagado
+        self.assertTrue(path.exists())  # the original file is never moved or deleted
 
-    def test_recusas_antes_de_gastar_tempo(self):
+    def test_refusals_before_spending_time(self):
         for name, kwargs, code in (
             ("nao-existe.mp3", {}, "bad_audio"),
         ):
@@ -137,14 +137,14 @@ class PrepareFileTests(TempDirCase):
                 self.prepare(self.audio_file(bad))
             self.assertEqual(ctx.exception.code, "bad_audio")
         with self.assertRaises(JobError) as ctx:
-            self.prepare(self.dir)  # uma pasta
+            self.prepare(self.dir)  # a folder
         self.assertEqual(ctx.exception.code, "bad_audio")
 
-    def test_todas_as_extensoes_da_lista_valem(self):
+    def test_every_listed_extension_is_accepted(self):
         for ext in importer.AUDIO_EXTENSIONS:
             self.assertTrue(self.prepare(self.audio_file(f"a{ext}", ext.encode())).audio.exists(), ext)
 
-    def test_tamanho_e_duracao_tem_limite(self):
+    def test_size_and_duration_have_limits(self):
         big = self.audio_file("grande.wav", b"x" * 2000)
         with self.assertRaises(JobError) as ctx:
             self.prepare(big, max_size=1000)
@@ -153,21 +153,21 @@ class PrepareFileTests(TempDirCase):
             self.prepare(self.audio_file("longa.mp3"), fake_run(probe_json("7200")), max_duration=900.0)
         self.assertEqual(ctx.exception.code, "too_long")
         self.assertIn("2 h", ctx.exception.message)
-        self.prepare(self.audio_file("sem-limite.mp3"), fake_run(probe_json("7200")), max_duration=None)  # 0 desliga o limite
+        self.prepare(self.audio_file("sem-limite.mp3"), fake_run(probe_json("7200")), max_duration=None)  # 0 turns the limit off
 
-    def test_arquivo_que_nao_decodifica(self):
+    def test_a_file_that_does_not_decode(self):
         with self.assertRaises(JobError) as ctx:
             self.prepare(self.audio_file("quebrado.mp3"), fake_run(decode_ok=False))
         self.assertEqual(ctx.exception.code, "bad_audio")
 
-    def test_o_limite_de_tamanho_vem_do_ambiente(self):
+    def test_the_size_limit_comes_from_the_environment(self):
         self.assertEqual(importer.max_bytes({}), 200 * 1024 * 1024)
         self.assertEqual(importer.max_bytes({"IMPORT_MAX_MB": "10"}), 10 * 1024 * 1024)
         self.assertEqual(importer.max_bytes({"IMPORT_MAX_MB": "lixo"}), 200 * 1024 * 1024)
 
 
 class HostAllowedTests(unittest.TestCase):
-    def test_so_os_sites_da_lista_e_os_subdominios_deles(self):
+    def test_only_the_listed_sites_and_their_subdomains(self):
         for url in (
             "https://soundcloud.com/artista/musica", "https://m.soundcloud.com/x", "http://soundcloud.com/a/b",
             "https://artista.bandcamp.com/track/musica", "https://bandcamp.com/x", "https://archive.org/details/item",
@@ -176,7 +176,7 @@ class HostAllowedTests(unittest.TestCase):
             self.assertIsNotNone(importer.host_allowed(url), url)
         self.assertEqual(importer.host_allowed("https://x.bandcamp.com/track/y"), "bandcamp.com")
 
-    def test_nomes_que_so_terminam_igual_e_outras_formas_nao_valem(self):
+    def test_names_that_only_end_the_same_and_other_forms_are_refused(self):
         for url in (
             "https://notsoundcloud.com/x", "https://evilbandcamp.com/x", "https://soundcloud.com.evil.example/x", "https://evil.example/soundcloud.com",
             "https://evil.example/?u=https://soundcloud.com/x", "https://soundcloud.com@evil.example/x", "https://user:pw@soundcloud.com/x",
@@ -186,7 +186,7 @@ class HostAllowedTests(unittest.TestCase):
         ):
             self.assertIsNone(importer.host_allowed(url), url)
 
-    def test_so_os_extratores_de_faixa_unica(self):
+    def test_only_the_single_track_extractors(self):
         def allowed(name):
             return any(re.search(pattern, name) for pattern in importer.OPEN_EXTRACTORS)
 
@@ -197,8 +197,8 @@ class HostAllowedTests(unittest.TestCase):
             self.assertFalse(allowed(name), name)
 
     @unittest.skipIf(yt_dlp is None, "precisa do yt-dlp instalado")
-    def test_contra_o_yt_dlp_de_verdade_so_estes_tres_extratores_casam(self):
-        # o filtro do yt-dlp casa com o NOME do extrator: este teste confere com a lista real dele (e pega um renomeio futuro)
+    def test_against_the_real_yt_dlp_only_these_three_extractors_match(self):
+        # yt-dlp's filter matches the extractor's NAME: this test checks it against yt-dlp's real list (and catches a future rename)
         from yt_dlp.extractor import gen_extractor_classes
 
         matched = sorted({ie.IE_NAME for ie in gen_extractor_classes() if any(re.search(p, ie.IE_NAME) for p in importer.OPEN_EXTRACTORS)})
@@ -206,7 +206,7 @@ class HostAllowedTests(unittest.TestCase):
 
 
 class FakeYoutubeDL:
-    """Um yt-dlp falso: guarda as opções e produz o source.wav como o pós-processador faria."""
+    """A fake yt-dlp: keeps the options and produces source.wav as the postprocessor would."""
 
     instances = []
 
@@ -239,24 +239,24 @@ class PrepareUrlTests(TempDirCase):
         work.mkdir(exist_ok=True)
         return importer.prepare_url(url, work, max_duration, lambda opts: FakeYoutubeDL(opts, info, fail))
 
-    def test_baixa_sem_cookies_e_so_com_os_extratores_de_faixa_unica(self):
+    def test_downloads_without_cookies_and_only_with_the_single_track_extractors(self):
         song = self.prepare()
         opts = FakeYoutubeDL.instances[0].opts
         self.assertEqual(opts["allowed_extractors"], list(importer.OPEN_EXTRACTORS))
         self.assertTrue(opts["noplaylist"])
         for forbidden in ("cookiefile", "cookiesfrombrowser", "cookies"):
-            self.assertNotIn(forbidden, opts)  # estes sites não precisam da conta de ninguém
+            self.assertNotIn(forbidden, opts)  # these sites need nobody's account
         self.assertEqual(opts["format"], "bestaudio/best")
-        self.assertEqual(song.video_id, importer.file_id(song.audio))  # o id vem do CONTEÚDO baixado
+        self.assertEqual(song.video_id, importer.file_id(song.audio))  # the id comes from the downloaded CONTENT
         self.assertEqual((song.info["video_title"], song.info["artist"], song.info["track"], song.info["origin"]),
                          ("Faixa Livre", "Banda Livre", "Faixa Livre", "url:bandcamp.com"))
 
-    def test_o_artista_cai_para_o_criador_e_depois_para_quem_publicou(self):
+    def test_the_artist_falls_back_to_the_creator_and_then_to_the_uploader(self):
         self.assertEqual(self.prepare(info={"title": "T", "creator": "Criador", "uploader": "Canal", "duration": 10}).info["artist"], "Criador")
         self.assertEqual(self.prepare(info={"title": "T", "uploader": "Canal", "duration": 10}).info["artist"], "Canal")
         self.assertEqual(self.prepare(info={"title": "T", "track": "Faixa", "artist": "A", "duration": 10}).info["track"], "Faixa")
 
-    def test_link_fora_da_lista_nem_chama_o_yt_dlp(self):
+    def test_an_unlisted_link_does_not_even_call_yt_dlp(self):
         FakeYoutubeDL.instances.clear()
         for url in ("https://www.youtube.com/watch?v=abcdefghijk", "https://notsoundcloud.com/x", "https://example.com/musica.mp3", ""):
             with self.assertRaises(JobError) as ctx:
@@ -264,7 +264,7 @@ class PrepareUrlTests(TempDirCase):
             self.assertEqual(ctx.exception.code, "not_open_source", url)
         self.assertEqual(FakeYoutubeDL.instances, [])
 
-    def test_album_lista_ao_vivo_e_longo_demais(self):
+    def test_album_playlist_live_and_too_long(self):
         for info, code in (
             ({"_type": "playlist", "entries": [{}]}, "not_open_source"),
             ({"entries": [{"id": "a"}], "title": "Álbum"}, "not_open_source"),
@@ -275,7 +275,7 @@ class PrepareUrlTests(TempDirCase):
                 self.prepare(info=info)
             self.assertEqual(ctx.exception.code, code)
 
-    def test_erros_do_yt_dlp_viram_mensagens_claras(self):
+    def test_yt_dlp_errors_become_clear_messages(self):
         for text, code in (
             ("ERROR: No suitable extractor found for URL https://x", "not_open_source"),
             ("ERROR: Unsupported URL: https://x", "not_open_source"),
@@ -289,7 +289,7 @@ class PrepareUrlTests(TempDirCase):
                 self.prepare(fail=RuntimeError(text))
             self.assertEqual(ctx.exception.code, code, text)
 
-    def test_download_que_termina_sem_o_arquivo(self):
+    def test_a_download_that_ends_without_the_file(self):
         class NoFile(FakeYoutubeDL):
             def process_ie_result(self, info, download=True):
                 return info
@@ -302,17 +302,17 @@ class PrepareUrlTests(TempDirCase):
 
 
 class ResolveNamesTests(unittest.TestCase):
-    def test_prioridade_informado_etiqueta_palpite_do_nome(self):
+    def test_priority_given_then_tag_then_guess_from_the_name(self):
         info = {"video_title": "Legião Urbana - Tempo Perdido (ao vivo)", "artist": "Etiqueta A", "track": "Etiqueta T"}
         self.assertEqual(importer.resolve_names(info, "Informado", "Informada"), ("Informado", "Informada"))
         self.assertEqual(importer.resolve_names(info, None, None), ("Etiqueta A", "Etiqueta T"))
         self.assertEqual(importer.resolve_names({"video_title": "Legião Urbana - Tempo Perdido (ao vivo)"}, None, None), ("Legião Urbana", "Tempo Perdido"))
-        self.assertEqual(importer.resolve_names({"video_title": "faixa01"}, None, None), (None, "faixa01"))  # sem artista: o chamador exige
+        self.assertEqual(importer.resolve_names({"video_title": "faixa01"}, None, None), (None, "faixa01"))  # no artist: the caller requires one
         self.assertEqual(importer.resolve_names({}, "  ", None), (None, None))
 
 
 class ImportSongTests(TempDirCase):
-    """O caminho todo, com a separação, a melodia e o tom simulados (o Demucs é testado à parte, no Docker)."""
+    """The whole path, with the separation, the melody and the key faked (Demucs is tested apart, in Docker)."""
 
     def setUp(self):
         super().setUp()
@@ -347,7 +347,7 @@ class ImportSongTests(TempDirCase):
         return ImportedSong(importer.file_id(path), wav, {"video_title": path.stem, "track": None, "artist": None, "duration": 215.0,
                                                            "subtitle_text": None, "subtitle_error": None, "origin": "file"})
 
-    def test_importa_e_deixa_pronta_na_biblioteca(self):
+    def test_imports_and_leaves_it_ready_in_the_library(self):
         meta = self.run_import()
         vid = meta["video_id"]
         self.assertRegex(vid, r"^f-[0-9a-f]{12}$")
@@ -359,55 +359,55 @@ class ImportSongTests(TempDirCase):
         self.assertEqual(json.loads(self.storage.read(f"cache/{vid}/lyrics.json")), [])
         self.assertTrue(pipeline.is_ready(self.storage, vid))
 
-    def test_artista_e_titulo_informados_valem_mais_que_o_nome_do_arquivo(self):
+    def test_the_given_artist_and_title_beat_the_file_name(self):
         meta = self.run_import(artist="Outro Artista", title="Outra Música")
         self.assertEqual((meta["artist"], meta["title"]), ("Outro Artista", "Outra Música"))
 
-    def test_sem_artista_e_titulo_pede_os_dois(self):
+    def test_without_artist_and_title_asks_for_both(self):
         with self.assertRaises(JobError) as ctx:
             self.run_import(file=self.audio_file("faixa01.mp3", b"outro conteudo"))
         self.assertEqual(ctx.exception.code, "artist_title_required")
         self.assertIn("--artist", ctx.exception.message)
-        self.assertEqual(self.separated, 0)  # nem começa a separar
+        self.assertEqual(self.separated, 0)  # does not even start separating
 
-    def test_reimportar_o_mesmo_conteudo_devolve_a_que_ja_existe(self):
+    def test_importing_the_same_content_again_returns_the_existing_song(self):
         first = self.run_import()
         again = self.run_import(file=self.audio_file("copia com outro nome.mp3", self.dir.joinpath("Legião Urbana - Tempo Perdido.mp3").read_bytes()))
         self.assertEqual(again["video_id"], first["video_id"])
-        self.assertEqual(self.separated, 1)  # a segunda não separou de novo
+        self.assertEqual(self.separated, 1)  # the second one did not separate again
 
-    def test_force_refaz(self):
+    def test_force_redoes_it(self):
         self.run_import()
         self.run_import(force=True)
         self.assertEqual(self.separated, 2)
 
-    def test_letra_explicita_refaz_so_a_letra(self):
+    def test_explicit_lyrics_redo_only_the_lyrics(self):
         first = self.run_import()
         meta = self.run_import(lyrics_source="file", lyrics_text="[00:01.00]Olá\n[00:03.00]Mundo")
         self.assertEqual(meta["video_id"], first["video_id"])
         self.assertEqual(meta["lyrics_source"], "file")
-        self.assertEqual(self.separated, 1)  # o instrumental continua no cache
+        self.assertEqual(self.separated, 1)  # the instrumental stays in the cache
         self.assertEqual(len(json.loads(self.storage.read(f"cache/{first['video_id']}/lyrics.json"))), 2)
 
-    def test_precisa_de_letra_nao_e_falha(self):
+    def test_needs_lyrics_is_not_a_failure(self):
         with self.assertRaises(NeedsLyrics):
-            self.run_import(lyrics_source="video")  # um arquivo não tem legenda de vídeo
+            self.run_import(lyrics_source="video")  # a file has no video subtitles
 
-    def test_sem_a_voz_isolada_nao_tenta_baixar_de_novo(self):
+    def test_without_the_isolated_vocals_does_not_try_to_download_again(self):
         first = self.run_import()
         self.storage.delete(f"cache/{first['video_id']}/vocals.mp3")
         self.storage.delete(f"cache/{first['video_id']}/melody.json")
         with self.assertRaises(JobError) as ctx:
-            self.run_import(lyrics_source="align", lyrics_text="Olá mundo")  # a IA precisaria da voz
+            self.run_import(lyrics_source="align", lyrics_text="Olá mundo")  # the AI would need the vocals
         self.assertEqual(ctx.exception.code, "no_vocals")
 
-    def test_arquivo_ou_link_mas_nao_os_dois_nem_nenhum(self):
+    def test_a_file_or_a_link_but_not_both_or_neither(self):
         with self.assertRaises(ValueError):
             importer.import_song(self.storage, limits=LIMITS)
         with self.assertRaises(ValueError):
             importer.import_song(self.storage, file="a.mp3", url="https://archive.org/details/x", limits=LIMITS)
 
-    def test_link_de_fonte_aberta_segue_o_mesmo_caminho(self):
+    def test_an_open_source_link_follows_the_same_path(self):
         def fake_prepare_url(url, work, max_duration, *a, **k):
             wav = work / "source.wav"
             wav.write_bytes(b"RIFFbaixado")
@@ -419,7 +419,7 @@ class ImportSongTests(TempDirCase):
         self.assertEqual((meta["artist"], meta["title"], meta["origin"]), ("Banda Livre", "Faixa Livre", "url:archive.org"))
         self.assertTrue(pipeline.is_ready(self.storage, meta["video_id"]))
 
-    def test_estagios_informados(self):
+    def test_reported_stages(self):
         stages = []
         self.run_import(on_stage=stages.append)
         self.assertEqual(stages[0], "importing")
@@ -427,9 +427,9 @@ class ImportSongTests(TempDirCase):
 
 
 class YouTubePathStillWorksTests(TempDirCase):
-    """Regressão: a mudança no process() para aceitar músicas importadas não pode alterar o caminho do YouTube."""
+    """Regression: the change in process() that accepts imported songs must not change the YouTube path."""
 
-    def test_baixa_separa_e_grava_como_antes(self):
+    def test_downloads_separates_and_writes_as_before(self):
         storage = LocalStorage(self.dir / "storage")
 
         def download(url, work, langs, cookies, max_duration):
@@ -448,11 +448,11 @@ class YouTubePathStillWorksTests(TempDirCase):
             meta = pipeline.process("https://www.youtube.com/watch?v=abcdefghijk", storage, lyrics_source="none", limits=LIMITS)
         self.assertEqual(dl.call_count, 1)
         self.assertEqual((meta["video_id"], meta["artist"], meta["title"]), ("abcdefghijk", "Legião Urbana", "Tempo Perdido"))
-        self.assertNotIn("origin", meta)  # só as importadas têm origem
+        self.assertNotIn("origin", meta)  # only imported songs have an origin
         for name in ("instrumental.mp3", "vocals.mp3", "lyrics.json", "meta.json", "source.json", "melody.json"):
             self.assertTrue(storage.exists(f"cache/abcdefghijk/{name}"), name)
         with self.assertRaises(ValueError):
-            pipeline.process("https://example.com/x", storage, limits=LIMITS)  # continua exigindo um link do YouTube
+            pipeline.process("https://example.com/x", storage, limits=LIMITS)  # still requires a YouTube link
 
 
 class CliImportTests(TempDirCase):
@@ -475,7 +475,7 @@ class CliImportTests(TempDirCase):
 
     META = {"video_id": "f-0123456789ab", "artist": "A", "title": "B", "lyrics_source": "none"}
 
-    def test_sucesso_sem_agente_configurado(self):
+    def test_success_without_a_configured_agent(self):
         with mock.patch.dict("os.environ", {}, clear=False):
             for name in ("AGENT_URL", "AGENT_TOKEN"):
                 import os
@@ -485,7 +485,7 @@ class CliImportTests(TempDirCase):
         self.assertIn("Pronto: A - B", out)
         self.assertIn("só na biblioteca local", out)
 
-    def test_com_o_agente_configurado_publica_no_catalogo(self):
+    def test_with_the_agent_configured_publishes_to_the_catalog(self):
         published = []
 
         class FakeBackend:
@@ -503,7 +503,7 @@ class CliImportTests(TempDirCase):
         self.assertEqual((code, published), (0, [("f-0123456789ab", True)]))
         self.assertIn("Publicada no catálogo", out)
 
-    def test_codigos_de_saida_e_mensagens(self):
+    def test_exit_codes_and_messages(self):
         cases = (
             (ValueError("Informe um arquivo OU um link"), 2, "erro:"),
             (NeedsLyrics("Este vídeo não tem legenda"), 3, "needs_lyrics:"),
@@ -515,7 +515,7 @@ class CliImportTests(TempDirCase):
             self.assertEqual(code, expected, str(error))
             self.assertIn(text, out)
 
-    def test_nao_aceita_arquivo_e_link_juntos(self):
+    def test_does_not_accept_a_file_and_a_link_together(self):
         code, out = self.run_cli(["--import", str(self.audio_file()), "--import-url", "https://archive.org/details/x"])
         self.assertEqual(code, 2)
         self.assertIn("OU", out)

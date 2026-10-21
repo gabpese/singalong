@@ -1,18 +1,18 @@
-"""Melodia da voz original (nota MIDI a cada 50 ms), para a pontuação pelo microfone."""
+"""The original voice's melody (a MIDI note every 50 ms), for scoring through the microphone."""
 import math
 from pathlib import Path
 
 HOP_SECONDS = 0.05
 SAMPLE_RATE = 16000
-MIN_RUN = 2  # trechos "cantados" mais curtos que isso (2 quadros = 100 ms) são ruído do detector
+MIN_RUN = 2  # "sung" stretches shorter than this (2 frames = 100 ms) are the detector's noise
 
 
-ENERGY_FLOOR = 0.12  # quadros com menos de 12% da energia dos trechos mais fortes são vazamento do Demucs, não canto
-SPAN_MARGIN = 0.25  # folga (s) ao redor de cada linha da letra
+ENERGY_FLOOR = 0.12  # frames with less than 12% of the energy of the loudest stretches are Demucs leakage, not singing
+SPAN_MARGIN = 0.25  # slack (s) around each lyrics line
 
 
 def lyric_spans(cues: list[dict] | None) -> list[tuple[float, float]] | None:
-    """Intervalos em que alguém canta, segundo a letra sincronizada (None = sem letra: não dá para filtrar por ela)."""
+    """The intervals in which someone sings, from the synced lyrics (None = no lyrics: they cannot filter anything)."""
     if not cues:
         return None
     return [(float(c["start"]) - SPAN_MARGIN, float(c["end"]) + SPAN_MARGIN) for c in cues]
@@ -23,10 +23,10 @@ def melody_from_f0(
     energy: list[float] | None = None,
     spans: list[tuple[float, float]] | None = None,
 ) -> dict:
-    """{hop, midi}: nota MIDI inteira de cada quadro, ou -1 quando não há voz.
+    """{hop, midi}: the integer MIDI note of each frame, or -1 when there is no voice.
 
-    Sem voz = f0 ausente/NaN/<=0, energia baixa (`energy`, vazamento do instrumental na voz isolada) ou fora das linhas
-    da letra (`spans`): nessas pausas ninguém canta, então o cantor não pode ser cobrado.
+    No voice = f0 missing/NaN/<=0, low energy (`energy`, the instrumental leaking into the isolated vocals) or outside the
+    lyrics' lines (`spans`): nobody sings in those pauses, so the singer cannot be scored on them.
     """
     midi = []
     loud = None
@@ -42,7 +42,7 @@ def melody_from_f0(
             silent = True
         midi.append(-1 if silent else round(69 + 12 * math.log2(f / 440.0)))
     i = 0
-    while i < len(midi):  # descarta trechos de voz curtos demais
+    while i < len(midi):  # drops voice stretches that are too short
         if midi[i] == -1:
             i += 1
             continue
@@ -56,8 +56,8 @@ def melody_from_f0(
 
 
 def extract_melody(vocals: Path, cues: list[dict] | None = None) -> dict:
-    """Estima o tom da voz isolada (pYIN), descartando vazamento e trechos fora da letra. Um valor por 50 ms."""
-    import librosa  # importado aqui: é pesado e só o worker precisa
+    """Estimates the isolated vocals' pitch (pYIN), dropping leakage and stretches outside the lyrics. One value per 50 ms."""
+    import librosa  # imported here: it is heavy and only the worker needs it
 
     y, sr = librosa.load(str(vocals), sr=SAMPLE_RATE, mono=True)
     hop = int(sr * HOP_SECONDS)

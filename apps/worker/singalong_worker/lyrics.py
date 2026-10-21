@@ -1,4 +1,4 @@
-"""Parsers de SRT/VTT/LRC e busca no LRCLIB. Saída normalizada: [{start, end, text}] em segundos."""
+"""SRT/VTT/LRC parsers and the LRCLIB search. Normalized output: [{start, end, text}] in seconds."""
 import json
 import re
 import time
@@ -20,7 +20,7 @@ def _secs(h, m, s, frac) -> float:
 
 
 def parse_cues(text: str) -> list[dict]:
-    """Parser comum para SRT e VTT."""
+    """A parser shared by SRT and VTT."""
     cues = []
     for block in re.split(r"\n\s*\n", text.replace("\r\n", "\n").strip()):
         lines = block.split("\n")
@@ -36,7 +36,7 @@ def parse_cues(text: str) -> list[dict]:
 
 
 def _dedupe(cues: list[dict]) -> list[dict]:
-    """Une repetições consecutivas (comuns em VTT rolante do YouTube)."""
+    """Merges consecutive repeats (common in YouTube's rolling VTT)."""
     out: list[dict] = []
     for cue in sorted(cues, key=lambda c: c["start"]):
         if out and out[-1]["text"] == cue["text"] and cue["start"] <= out[-1]["end"] + 0.05:
@@ -67,7 +67,7 @@ def parse_lrc(text: str) -> list[dict]:
 
 
 def parse_lyrics_file(text: str) -> list[dict]:
-    """Detecta o formato (SRT/VTT ou LRC) pelo conteúdo."""
+    """Detects the format (SRT/VTT or LRC) from the content."""
     if _CUE_RE.search(text):
         return parse_cues(text)
     cues = parse_lrc(text)
@@ -77,11 +77,11 @@ def parse_lyrics_file(text: str) -> list[dict]:
 
 
 class LyricsServiceError(Exception):
-    """O serviço de letras na internet não respondeu (fora do ar, lento ou resposta inválida)."""
+    """The online lyrics service did not answer (down, slow or an invalid answer)."""
 
 
 def _fetch_json(req, attempts: int = 3, pause: float = 1.0):
-    """GET com novas tentativas em falhas transitórias (5xx, rede, timeout); 4xx não adianta repetir."""
+    """A GET with retries on transient failures (5xx, network, timeout); repeating a 4xx is useless."""
     last: Exception | None = None
     for attempt in range(attempts):
         try:
@@ -99,13 +99,13 @@ def _fetch_json(req, attempts: int = 3, pause: float = 1.0):
 
 
 def search_lrclib(artist: str, title: str, duration: float | None = None) -> list[dict]:
-    """Candidatos com letra sincronizada; com `duration`, os de duração mais próxima primeiro."""
+    """Candidates with synced lyrics; with `duration`, the closest durations first."""
     params = {"track_name": title, "artist_name": artist}
     req = urllib.request.Request(
         f"{LRCLIB_URL}/search?{urllib.parse.urlencode(params)}", headers={"User-Agent": USER_AGENT}
     )
     results = _fetch_json(req)
-    # qualquer candidato com letra (com tempos OU só texto): o texto serve ao alinhamento por IA
+    # any candidate with lyrics (with timings OR text only): the text serves the AI alignment
     found = [r for r in results if (r.get("syncedLyrics") or r.get("plainLyrics")) and r.get("duration")]
     if duration:
         found.sort(key=lambda r: abs(r["duration"] - duration))
@@ -113,10 +113,10 @@ def search_lrclib(artist: str, title: str, duration: float | None = None) -> lis
 
 
 def pick_candidate(candidates: list[dict], duration: float | None, tolerance: float = 5.0, loose: bool = False):
-    """Escolhe, entre os candidatos COM TEMPOS, o que tem a duração do vídeo (±tolerance s).
+    """Picks, among the candidates WITH TIMINGS, the one with the video's duration (±tolerance s).
 
-    Com `loose`, aceita o mais próximo mesmo fora da tolerância (a letra pode ficar fora do tempo).
-    Devolve (candidato | None, mais_proximo | None); o segundo serve para explicar a recusa.
+    With `loose`, it accepts the closest one even outside the tolerance (the lyrics may be off time).
+    Returns (candidate | None, closest | None); the second one explains the refusal.
     """
     synced = [c for c in candidates if c.get("syncedLyrics")]
     if not synced:
@@ -131,7 +131,7 @@ _LRC_STAMP = re.compile(r"\[\d+:\d{2}(?:[.:]\d{1,3})?\]")
 
 
 def candidate_text(candidate: dict) -> str:
-    """Só o texto da letra de um candidato (sem tempos), uma linha por verso."""
+    """Only a candidate's lyrics text (no timings), one line per verse."""
     plain = (candidate.get("plainLyrics") or "").strip()
     if plain:
         return plain
@@ -140,7 +140,7 @@ def candidate_text(candidate: dict) -> str:
 
 
 def best_text_candidate(candidates: list[dict], duration: float | None) -> dict | None:
-    """O candidato com texto de duração mais próxima da do vídeo (a letra é a mesma; só os tempos diferem)."""
+    """The candidate with text whose duration is closest to the video's (the lyrics are the same; only the timings differ)."""
     with_text = [c for c in candidates if candidate_text(c)]
     if not with_text:
         return None
@@ -148,10 +148,10 @@ def best_text_candidate(candidates: list[dict], duration: float | None) -> dict 
 
 
 def apply_text(text: str, timed: list[dict]) -> list[dict]:
-    """Usa o texto do usuário (uma linha por verso, sem tempos) com os tempos de uma letra sincronizada.
+    """Uses the user's text (one line per verse, no timings) with the timings of synced lyrics.
 
-    Exige o mesmo número de linhas: sem isso o casamento linha a linha seria um chute.
-    """
+    Requires the same number of lines: without that, matching line by line would be a guess.
+"""
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if len(lines) != len(timed):
         raise ValueError(

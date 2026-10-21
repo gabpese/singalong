@@ -6,7 +6,7 @@ _YT_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.c
 
 
 def extract_video_id(url: str) -> str | None:
-    """Extrai o ID de 11 caracteres de links do YouTube; aceita também o ID puro."""
+    """Extracts the 11-character ID from YouTube links; also accepts the bare ID."""
     url = url.strip()
     if _ID_RE.match(url):
         return url

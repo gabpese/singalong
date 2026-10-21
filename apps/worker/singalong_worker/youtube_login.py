@@ -1,16 +1,16 @@
-"""Login do YouTube do agente, pelo navegador que o usuário já tem (Chrome ou Edge), sem janela embutida no app.
+"""The agent's YouTube login, through the browser the user already has (Chrome or Edge), with no window embedded in the app.
 
-Por que assim (TRD, seção 8): o Google bloqueia o login em navegadores embutidos (Electron etc.), e no Windows o Chrome e o Edge
-criptografam os cookies de um jeito que o recurso `--cookies-from-browser` do yt-dlp costuma não conseguir ler. Em vez disso:
+Why this way (TRD, section 8): Google blocks logins in embedded browsers (Electron etc.), and on Windows Chrome and Edge
+encrypt cookies in a way yt-dlp's `--cookies-from-browser` feature often cannot read. Instead:
 
-  1. abre o navegador do usuário com um PERFIL DEDICADO do agente (pasta própria, a conta pessoal do usuário não é tocada);
-  2. o usuário entra na conta do YouTube nessa janela (a recomendação é uma conta secundária, só para isso);
-  3. o agente pede os cookies ao PRÓPRIO navegador pelo protocolo de depuração (CDP), que já os entrega descriptografados;
-  4. grava um cookies.txt (só do usuário, nunca enviado a ninguém) e fecha o navegador: sem a janela aberta, o YouTube não gira
-     os cookies, e a sessão exportada continua valendo.
+  1. it opens the user's browser with a DEDICATED agent PROFILE (its own folder; the user's personal account is not touched);
+  2. the user signs in to YouTube in that window (the advice is a secondary account, just for this);
+  3. the agent asks the browser ITSELF for the cookies through the debugging protocol (CDP), which hands them over decrypted;
+  4. it writes a cookies.txt (readable only by the user, never sent to anyone) and closes the browser: with the window closed,
+     YouTube does not rotate the cookies, and the exported session stays valid.
 
-A validação (`check_login`) faz um pedido que só funciona logado (a playlist "Assistir mais tarde"). Os cookies nunca saem do
-computador.
+The check (`check_login`) makes a request that only works when logged in (the "Watch later" playlist). The cookies never
+leave the computer.
 """
 import json
 import logging
@@ -26,7 +26,7 @@ from .cookies import CookieSource, data_dir, ytdlp_options, write_netscape
 
 log = logging.getLogger("worker.login")
 
-LOGIN_COOKIE_NAMES = ("SID", "__Secure-3PSID", "__Secure-1PSID")  # basta um deles: a conta está logada
+LOGIN_COOKIE_NAMES = ("SID", "__Secure-3PSID", "__Secure-1PSID")  # one of them is enough: the account is logged in
 KEEP_DOMAINS = ("youtube.com", "google.com")
 START_URL = "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2F"
 WATCH_LATER = "https://www.youtube.com/playlist?list=WL"
@@ -34,17 +34,17 @@ PROFILE_DIR_NAME = "browser-profile"
 
 
 class LoginError(Exception):
-    """O login não pôde ser concluído; a mensagem diz o que fazer."""
+    """The login could not be completed; the message says what to do."""
 
 
 def _env(env, name: str) -> str | None:
-    """Uma variável de ambiente; no Windows os nomes não diferenciam maiúsculas (e uma cópia de os.environ perde isso)."""
+    """An environment variable; on Windows the names are case-insensitive (and a copy of os.environ loses that)."""
     return env.get(name) or next((value for key, value in env.items() if key.upper() == name.upper() and value), None)
 
 
 def find_browser(preferred: str | None = None, env=os.environ, search_system: bool = True) -> tuple[str, Path] | None:
-    """O Chrome ou o Edge instalados: (nome, caminho). `AGENT_BROWSER_PATH` aponta um executável específico.
-    `search_system=False` ignora os caminhos fixos do macOS e do Linux (os testes não podem depender do que a máquina tem)."""
+    """The installed Chrome or Edge: (name, path). `AGENT_BROWSER_PATH` points to a specific executable.
+    `search_system=False` skips the fixed macOS and Linux paths (the tests cannot depend on what the machine has)."""
     explicit = _env(env, "AGENT_BROWSER_PATH")
     if explicit and Path(explicit).is_file():
         return "navegador", Path(explicit)
@@ -52,7 +52,7 @@ def find_browser(preferred: str | None = None, env=os.environ, search_system: bo
         "chrome": [
             Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
             Path("/usr/bin/google-chrome"), Path("/usr/bin/google-chrome-stable"), Path("/opt/google/chrome/chrome"),
-            Path("/usr/bin/chromium"), Path("/usr/bin/chromium-browser"),  # o Chromium do snap não serve: o perfil do agente fica numa pasta oculta que ele não lê
+            Path("/usr/bin/chromium"), Path("/usr/bin/chromium-browser"),  # the snap Chromium does not work: the agent's profile is in a hidden folder it does not read
         ],
         "edge": [
             Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
@@ -81,7 +81,7 @@ def free_port() -> int:
 
 
 def discover_ws_url(port: int, timeout: float = 20.0) -> str:
-    """O endereço WebSocket do navegador (o protocolo de depuração sobe alguns instantes depois de ele abrir)."""
+    """The browser's WebSocket address (the debugging protocol comes up a few moments after the browser opens)."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -93,7 +93,7 @@ def discover_ws_url(port: int, timeout: float = 20.0) -> str:
 
 
 def _is_google_or_youtube(domain: str) -> bool:
-    """O domínio é o do YouTube/Google ou um subdomínio dele (e não um nome que só TERMINA igual, como "notyoutube.com")."""
+    """The domain is YouTube's or Google's, or a subdomain of it (and not a name that only ENDS the same, like "notyoutube.com")."""
     host = domain.lstrip(".").lower()
     return any(host == d or host.endswith("." + d) for d in KEEP_DOMAINS)
 
@@ -103,16 +103,16 @@ def is_logged_in(cookies: list[dict]) -> bool:
 
 
 def relevant(cookies: list[dict]) -> list[dict]:
-    """Só os cookies do YouTube e do Google (o resto do navegador não interessa e não é guardado)."""
+    """Only the YouTube and Google cookies (the rest of the browser does not matter and is not kept)."""
     return [c for c in cookies if _is_google_or_youtube(c["domain"])]
 
 
 class Cdp:
-    """Um cliente mínimo do protocolo de depuração do Chrome/Edge sobre WebSocket (síncrono)."""
+    """A minimal client of the Chrome/Edge debugging protocol over WebSocket (synchronous)."""
 
     def __init__(self, ws_url: str, connect: Callable | None = None):
         if connect is None:
-            from websockets.sync.client import connect  # import tardio: só o login precisa da biblioteca
+            from websockets.sync.client import connect  # a late import: only the login needs the library
         self.ws = connect(ws_url, open_timeout=10, max_size=32 * 1024 * 1024)
         self._id = 0
 
@@ -152,7 +152,7 @@ def login(
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], float] = time.monotonic,
 ) -> Path:
-    """Abre o navegador com o perfil do agente, espera o usuário entrar no YouTube e grava o cookies.txt. Devolve o caminho."""
+    """Opens the browser with the agent's profile, waits for the user to sign in to YouTube and writes the cookies.txt. Returns the path."""
     found = find_browser(browser, env)
     if not found:
         raise LoginError(
@@ -182,7 +182,7 @@ def login(
             except Exception as exc:  # noqa: BLE001 - a janela foi fechada antes de o login terminar
                 raise LoginError("A janela do navegador foi fechada antes de o login terminar. Rode o comando de novo.") from exc
             if is_logged_in(cookies):
-                # espera um instante: logo depois do login o YouTube ainda grava os últimos cookies da sessão
+                # waits a moment: right after the login YouTube still writes the session's last cookies
                 seen_since = seen_since if seen_since is not None else now()
                 if now() - seen_since >= poll:
                     count = write_netscape(out_file, relevant(cookies))
@@ -204,7 +204,7 @@ def login(
 
 
 class _Silent:
-    """Logger do yt-dlp que não imprime nada: a validação devolve o resultado em vez de poluir o terminal com "ERROR:"."""
+    """A yt-dlp logger that prints nothing: the check returns the result instead of cluttering the terminal with "ERROR:"."""
 
     def debug(self, message):  # noqa: D102
         pass
@@ -213,9 +213,9 @@ class _Silent:
 
 
 def check_login(source: CookieSource | None, workdir: Path | None = None, extract: Callable | None = None) -> tuple[str, str]:
-    """Confere se a conta está logada: ("connected" | "not-logged" | "no-source" | "error", detalhe).
+    """Checks whether the account is logged in: ("connected" | "not-logged" | "no-source" | "error", detail).
 
-    Faz UM pedido que só funciona logado (a playlist "Assistir mais tarde"); sem login o YouTube responde que ela não existe.
+    Makes ONE request that only works when logged in (the "Watch later" playlist); without a login YouTube answers that it does not exist.
     """
     if source is None:
         return "no-source", "nenhum login configurado"
@@ -242,7 +242,7 @@ def check_login(source: CookieSource | None, workdir: Path | None = None, extrac
 
 
 def main_status(source: CookieSource | None, say: Callable[[str], None] = print) -> int:
-    """Comando --youtube-status: 0 se conectado."""
+    """The --youtube-status command: 0 if connected."""
     state, detail = check_login(source)
     messages = {
         "connected": f"Conectado ({detail}).",

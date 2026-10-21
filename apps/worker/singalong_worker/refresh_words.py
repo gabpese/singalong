@@ -1,7 +1,7 @@
-"""Completa as músicas já no cache (sem refazer download nem separação): tempo de cada palavra e melodia (pontuação).
+"""Fills in the cached songs without downloading or separating them again: each word's timing and the melody (for the Score).
 
-Uso: python -m singalong_worker.refresh_words [--device cuda] [ID ...]
-Os tempos das linhas não mudam; só ganham `words` e `melody.json`. Músicas sem vocals.mp3 são puladas.
+Usage: python -m singalong_worker.refresh_words [--device cuda] [ID ...]
+The lines' timings do not change; they only gain `words` and `melody.json`. Songs without vocals.mp3 are skipped.
 """
 import argparse
 import json

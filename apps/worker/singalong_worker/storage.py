@@ -1,6 +1,6 @@
-"""Driver de storage local. Contrato: exists/put/get_url/read/delete/list (docs/PLAN.md, seção 14).
+"""Local storage driver. Contract: exists/put/get_url/read/delete/list (docs/PLAN.md, section 14).
 
-O restante do código só conhece chaves lógicas ("cache/<video_id>/instrumental.mp3").
+The rest of the code only knows logical keys ("cache/<video_id>/instrumental.mp3").
 """
 import os
 import shutil
@@ -26,10 +26,10 @@ class LocalStorage:
         dest.parent.mkdir(parents=True, exist_ok=True)
         tmp = dest.with_name(dest.name + ".tmp")
         shutil.copyfile(local_path, tmp)
-        os.replace(tmp, dest)  # atômico: nunca existe artefato pela metade
+        os.replace(tmp, dest)  # atomic: a half-written artifact never exists
 
     def get_url(self, key: str, ttl: int = 3600) -> str:
-        self._path(key)  # valida a chave
+        self._path(key)  # validates the key
         return f"{self.public_base_url}/{key}"
 
     def read(self, key: str) -> bytes:

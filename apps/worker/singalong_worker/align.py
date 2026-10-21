@@ -1,28 +1,28 @@
-"""Alinhamento forçado: descobre QUANDO cada linha da letra do usuário é cantada, a partir da voz isolada.
+"""Forced alignment: finds WHEN each line of the user's lyrics is sung, from the isolated vocals.
 
-Não transcreve nem gera letra: o texto vem do usuário e o modelo (Whisper, via stable-ts) só marca os tempos.
+It transcribes nothing and writes no lyrics: the user gives the text, and the model (Whisper, via stable-ts) only times it.
 """
 import os
 from pathlib import Path
 
-DEFAULT_MODEL = "small"  # equilíbrio entre precisão e tamanho (~460 MB); ALIGN_MODEL=base|small|medium
+DEFAULT_MODEL = "small"  # a balance between accuracy and size (~460 MB); ALIGN_MODEL=base|small|medium
 MIN_LINE_SECONDS = 0.3
 
 _models: dict = {}
 
 
 def clean_lines(text: str) -> list[str]:
-    """Uma entrada por verso. Ignora linhas em branco e indicações de seção como "[Chorus]" (não são cantadas)."""
+    """One entry per verse. Skips blank lines and section markers such as "[Chorus]" (they are not sung)."""
     lines = (line.strip() for line in text.splitlines())
     return [line for line in lines if line and not (line.startswith("[") and line.endswith("]"))]
 
 
 def detect_language(text: str, default: str = "en") -> str:
-    """Idioma da LETRA (não do áudio), no código de 2 letras que o Whisper usa."""
+    """The LYRICS' language (not the audio's), as the 2-letter code Whisper uses."""
     try:
         from langdetect import DetectorFactory, detect
 
-        DetectorFactory.seed = 0  # resultado determinístico
+        DetectorFactory.seed = 0  # a deterministic result
         code = detect(text)
     except Exception:  # noqa: BLE001 - texto curto/sem letras: cai no padrão
         return default
@@ -30,7 +30,7 @@ def detect_language(text: str, default: str = "en") -> str:
 
 
 def _word_times(chunk: list, line_start: float, line_end: float) -> list[list[float]]:
-    """[[início, fim], ...] de cada palavra da linha, sem sair da linha, sem voltar no tempo e sem buracos negativos."""
+    """[[start, end], ...] of each word of the line, without leaving the line, going back in time or leaving negative gaps."""
     out, prev_end = [], line_start
     for w in chunk:
         s = min(max(float(w.start), prev_end), line_end)
@@ -41,10 +41,10 @@ def _word_times(chunk: list, line_start: float, line_end: float) -> list[list[fl
 
 
 def group_words(lines: list[str], words: list) -> list[dict]:
-    """Agrupa as palavras alinhadas (com .start/.end) nas linhas, pela contagem de palavras de cada linha.
+    """Groups the aligned words (with .start/.end) into the lines, by each line's word count.
 
-    O alinhamento é feito sobre o texto do usuário, então a contagem de palavras bate; se não bater, o
-    resultado seria um chute e preferimos falhar.
+    The alignment runs on the user's text, so the word count matches; if it does not, the
+    result would be a guess and we would rather fail.
     """
     counts = [len(line.split()) for line in lines]
     if sum(counts) != len(words):
@@ -56,7 +56,7 @@ def group_words(lines: list[str], words: list) -> list[dict]:
     for line, n in zip(lines, counts):
         chunk = words[i : i + n]
         i += n
-        start = max(float(chunk[0].start), last_start)  # nunca volta no tempo
+        start = max(float(chunk[0].start), last_start)  # never goes back in time
         end = max(float(chunk[-1].end), start + MIN_LINE_SECONDS)
         cues.append({"start": round(start, 2), "end": round(end, 2), "text": line, "words": _word_times(chunk, start, end)})
         last_start = start
@@ -64,10 +64,10 @@ def group_words(lines: list[str], words: list) -> list[dict]:
 
 
 def attach_words(cues: list[dict], aligned: list[dict], tolerance: float = 2.5) -> tuple[list[dict], int]:
-    """Copia os tempos por palavra de `aligned` para `cues` (letra já sincronizada por linha, ex.: LRCLIB).
+    """Copies the per-word timings from `aligned` into `cues` (lyrics already synced by line, e.g. LRCLIB).
 
-    Os tempos das LINHAS não mudam. Linhas em que a IA discorda do original por mais de `tolerance` segundos
-    (ou com número de palavras diferente) ficam sem `words`: o player estima o preenchimento. Devolve (cues, linhas com palavras).
+    The LINES' timings do not change. Lines where the AI disagrees with the original by more than `tolerance` seconds
+    (or with a different word count) get no `words`: the player estimates the fill. Returns (cues, lines with words).
     """
     if len(cues) != len(aligned):
         return cues, 0
@@ -95,7 +95,7 @@ def _load_model(name: str, device: str | None):
 
 
 def align_lyrics(audio: Path, text: str, language: str | None = None, device: str | None = None) -> list[dict]:
-    """[{start, end, text}] por linha, alinhando `text` ao áudio (de preferência só a voz)."""
+    """[{start, end, text}] per line, aligning `text` to the audio (preferably the vocals alone)."""
     lines = clean_lines(text)
     if not lines:
         raise ValueError("Cole a letra no campo de texto.")

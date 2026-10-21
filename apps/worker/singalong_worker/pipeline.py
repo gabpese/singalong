@@ -1,4 +1,4 @@
-"""Pipeline idempotente: cada etapa só roda se o artefato ainda não existe no storage."""
+"""An idempotent pipeline: each stage runs only if its artifact does not exist in storage yet."""
 import json
 import logging
 import os
@@ -27,7 +27,7 @@ PIPELINE_VERSION = 1
 
 log = logging.getLogger("worker.pipeline")
 
-# limites padrão (o worker os lê do ambiente: MAX_DURATION_SECONDS, MIN_FREE_GB, SEPARATE_TIMEOUT_SECONDS)
+# the default limits (the worker reads them from the environment: MAX_DURATION_SECONDS, MIN_FREE_GB, SEPARATE_TIMEOUT_SECONDS)
 DEFAULT_MAX_DURATION = 15 * 60
 DEFAULT_MIN_FREE_GB = 2.0
 DEFAULT_SEPARATE_TIMEOUT = 15 * 60
@@ -36,11 +36,11 @@ _TITLE_NOISE = re.compile(r"\s*[\(\[][^\)\]]*\)?[\]\)]?\s*$")
 
 
 def guess_artist_title(video_title: str) -> tuple[str | None, str | None]:
-    """'Artista - Música (Cover/Official...)' -> (Artista, Música). Sem ' - ' no título, não chuta."""
+    """'Artist - Song (Cover/Official...)' -> (Artist, Song). Without ' - ' in the title, it does not guess."""
     if " - " not in video_title:
         return None, None
     artist, title = video_title.split(" - ", 1)
-    while True:  # remove sufixos entre () e [] repetidos
+    while True:  # removes repeated () and [] suffixes
         cleaned = _TITLE_NOISE.sub("", title)
         if cleaned == title or not cleaned:
             break
@@ -49,18 +49,18 @@ def guess_artist_title(video_title: str) -> tuple[str | None, str | None]:
 
 
 class NeedsLyrics(Exception):
-    """Vídeo sem legenda manual e nenhuma fonte de letra utilizável."""
+    """A video without manual subtitles and no usable lyrics source."""
 
 
 def keys(video_id: str) -> dict[str, str]:
     base = f"cache/{video_id}"
     return {
         "instrumental": f"{base}/instrumental.mp3",
-        "vocals": f"{base}/vocals.mp3",  # só a voz: usada para alinhar a letra colada pelo usuário
+        "vocals": f"{base}/vocals.mp3",  # the vocals alone: used to align the lyrics the user pasted
         "lyrics": f"{base}/lyrics.json",
-        "melody": f"{base}/melody.json",  # opcional: a melodia da voz original, para a pontuação
+        "melody": f"{base}/melody.json",  # optional: the original voice's melody, for the Score
         "meta": f"{base}/meta.json",
-        "source": f"{base}/source.json",  # metadados do vídeo: evita baixar de novo só para trocar a letra
+        "source": f"{base}/source.json",  # the video's metadata: avoids downloading again just to change the lyrics
     }
 
 
@@ -73,15 +73,15 @@ def is_ready(storage: LocalStorage, video_id: str) -> bool:
 
 @dataclass(frozen=True)
 class Limits:
-    """Limites que protegem a máquina de vídeos enormes, disco cheio e travamentos."""
+    """Limits that protect the machine from huge videos, a full disk and hangs."""
 
-    max_duration: float | None = DEFAULT_MAX_DURATION  # segundos; None = sem limite
+    max_duration: float | None = DEFAULT_MAX_DURATION  # seconds; None = no limit
     min_free_gb: float = DEFAULT_MIN_FREE_GB
     separate_timeout: float | None = DEFAULT_SEPARATE_TIMEOUT
 
     @classmethod
     def from_env(cls) -> "Limits":
-        """MAX_DURATION_SECONDS, MIN_FREE_GB e SEPARATE_TIMEOUT_SECONDS (0 desliga cada limite)."""
+        """MAX_DURATION_SECONDS, MIN_FREE_GB and SEPARATE_TIMEOUT_SECONDS (0 turns each limit off)."""
 
         def number(name: str, default: float) -> float:
             try:
@@ -97,7 +97,7 @@ class Limits:
 
 
 def validate_video_info(info: dict, max_duration: float | None) -> None:
-    """Recusa cedo (antes de baixar) o que não dá certo ou não vale o custo: ao vivo, privado e longo demais."""
+    """Refuses early (before downloading) what will not work or is not worth the cost: live, private and too long."""
     if info.get("is_live") or info.get("live_status") in ("is_live", "is_upcoming"):
         raise JobError("live", "Este vídeo é uma transmissão ao vivo (ou uma estreia agendada) e ainda não pode ser baixado.", NEVER)
     availability = info.get("availability")
@@ -116,9 +116,9 @@ def validate_video_info(info: dict, max_duration: float | None) -> None:
 
 
 def check_disk(path, min_free_gb: float) -> None:
-    """Não começa um processamento sem espaço: separar a voz gera centenas de MB de arquivos temporários.
+    """Does not start processing without space: separating the vocals makes hundreds of MB of temporary files.
 
-    A pasta da biblioteca pode ainda não existir (primeira execução de uma instalação nova): mede a pasta existente mais próxima.
+    The library folder may not exist yet (the first run of a new install): it measures the closest existing folder.
     """
     probe = Path(path)
     while not probe.exists() and probe.parent != probe:
@@ -131,16 +131,16 @@ def check_disk(path, min_free_gb: float) -> None:
 def download(
     url: str, workdir: Path, langs: list[str], cookies: "CookiePolicy | Path | None" = None, max_duration: float | None = None
 ) -> dict:
-    """Baixa o áudio e as legendas MANUAIS (auto-legendas ficam de fora de propósito).
+    """Downloads the audio and the MANUAL subtitles (auto-subtitles are left out on purpose).
 
-    `cookies`: a política de cookies (cookies.py): sem cookie primeiro e, se o YouTube pedir login, com a conta. Um caminho de
-    cookies.txt vale como "sempre"; None, como "nunca".
+    `cookies`: the cookie policy (cookies.py): no cookie first and, if YouTube asks for a login, with the account. A cookies.txt
+    path counts as "always"; None, as "never".
     """
     return run_with_policy(as_policy(cookies), lambda opts: _download(url, workdir, langs, opts, max_duration), workdir)
 
 
 def _download(url: str, workdir: Path, langs: list[str], cookie_opts: dict, max_duration: float | None) -> dict:
-    import yt_dlp  # import tardio: só quem baixa precisa dele (testes e consumo do cache não)
+    import yt_dlp  # a late import: only whoever downloads needs it (the tests and reading the cache do not)
 
     base = {
         "outtmpl": str(workdir / "source.%(ext)s"),
@@ -151,15 +151,15 @@ def _download(url: str, workdir: Path, langs: list[str], cookie_opts: dict, max_
         **cookie_opts,
     }
 
-    # 1) o áudio é essencial: se falhar, o job falha
+    # 1) the audio is essential: if it fails, the job fails
     audio_opts = {**base, "format": "bestaudio/best", "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}]}
     with yt_dlp.YoutubeDL(audio_opts) as ydl:
-        info = ydl.extract_info(url, download=False)  # só os dados: dá para recusar antes de gastar banda
+        info = ydl.extract_info(url, download=False)  # the data only: it can refuse before spending bandwidth
         validate_video_info(info, max_duration)
-        info = ydl.process_ie_result(info, download=True)  # baixa sem extrair de novo
+        info = ydl.process_ie_result(info, download=True)  # downloads without extracting again
 
-    # 2) a legenda é opcional (há outras fontes de letra): só tenta se o vídeo TEM legenda manual e
-    #    nunca derruba o job (o YouTube responde 429 ao endpoint de legendas com frequência)
+    # 2) the subtitles are optional (there are other lyrics sources): only tries if the video HAS manual subtitles, and
+    #    never brings the job down (YouTube often answers 429 to the subtitles endpoint)
     subtitle_text = None
     subtitle_error = None
     wanted =manual_subtitle_langs(info.get("subtitles") or {}, langs)
@@ -178,16 +178,16 @@ def _download(url: str, workdir: Path, langs: list[str], cookie_opts: dict, max_
     return {
         "video_title": info.get("title"),
         "track": info.get("track"),
-        "artist": info.get("artist") or info.get("creator"),  # sem fallback para o canal: costuma errar em covers
+        "artist": info.get("artist") or info.get("creator"),  # no fallback to the channel: it is often wrong for covers
         "duration": info.get("duration"),
         "subtitle_text": subtitle_text,
-        "subtitle_error": subtitle_error,  # o vídeo TEM legenda manual, mas o download falhou (ex.: 429)
+        "subtitle_error": subtitle_error,  # the video HAS manual subtitles, but the download failed (e.g. 429)
         "audio": workdir / "source.wav",
     }
 
 
 def manual_subtitle_langs(available: dict, langs: list[str]) -> list[str]:
-    """Idiomas de legenda MANUAL disponíveis que casam com os pedidos ('en' casa com 'en' e 'en-US'), na ordem pedida."""
+    """The available MANUAL subtitle languages that match the requested ones ('en' matches 'en' and 'en-US'), in the requested order."""
     chosen: list[str] = []
     for want in langs:
         for lang in available:
@@ -197,12 +197,12 @@ def manual_subtitle_langs(available: dict, langs: list[str]) -> list[str]:
 
 
 def separate(audio: Path, workdir: Path, device: str | None, timeout: float | None = None) -> tuple[Path, Path]:
-    """Demucs (htdemucs, 2 stems) -> (instrumental.mp3, vocals.mp3). A voz fica no cache: serve ao alinhamento da letra."""
+    """Demucs (htdemucs, 2 stems) -> (instrumental.mp3, vocals.mp3). The vocals stay in the cache: they serve the lyrics alignment."""
     out = workdir / "demucs"
     cmd = [sys.executable, "-m", "demucs", "--two-stems=vocals", "-n", "htdemucs", "-o", str(out), str(audio)]
     if device:
         cmd += ["-d", device]
-    subprocess.run(cmd, check=True, timeout=timeout)  # TimeoutExpired vira "demorou demais"
+    subprocess.run(cmd, check=True, timeout=timeout)  # TimeoutExpired becomes "took too long"
     paths = []
     for stem, name in (("no_vocals.wav", "instrumental.mp3"), ("vocals.wav", "vocals.mp3")):
         mp3 = workdir / name
@@ -215,9 +215,9 @@ def separate(audio: Path, workdir: Path, device: str | None, timeout: float | No
 
 
 class NeedsAlignment(Exception):
-    """Há o TEXTO da letra mas não os tempos: a IA precisa sincronizá-lo com a voz.
+    """There is the lyrics' TEXT but not the timings: the AI must sync it with the vocals.
 
-    origin: 'align' (o usuário pediu), 'text' (o usuário colou, sem referência de tempo) ou 'lrclib' (texto achado online).
+    origin: 'align' (the user asked for it), 'text' (the user pasted it, with no timing reference) or 'lrclib' (text found online).
     """
 
     def __init__(self, text: str, origin: str):
@@ -232,12 +232,12 @@ def _search_online(info: dict) -> list[dict]:
     try:
         return lyr.search_lrclib(info["artist"], info["title"], info["duration"])
     except lyr.LyricsServiceError as exc:
-        # serviço externo fora do ar não é falha do job: o usuário pode tentar de novo ou escolher outra opção
+        # an outside service being down is not the job's failure: the user can try again or pick another option
         raise NeedsLyrics("O serviço de busca de letras na internet não respondeu agora. Tente de novo em instantes.") from exc
 
 
 def timing_donor(info: dict, loose: bool = False) -> tuple[list[dict], str]:
-    """Letra com tempos para servir de base: legenda do vídeo, senão a versão online de mesma duração."""
+    """Lyrics with timings to serve as a base: the video's subtitles, otherwise the online version with the same duration."""
     if info.get("subtitle_text"):
         return lyr.parse_cues(info["subtitle_text"]), "video"
     chosen, _closest = lyr.pick_candidate(_search_online(info), info["duration"], loose=loose)
@@ -247,7 +247,7 @@ def timing_donor(info: dict, loose: bool = False) -> tuple[list[dict], str]:
 
 
 def online_lyrics(info: dict, loose: bool = False) -> tuple[list[dict], str]:
-    """Busca na internet: usa os tempos prontos quando a duração bate; senão devolve o TEXTO para a IA sincronizar."""
+    """Searches online: uses the ready timings when the duration matches; otherwise returns the TEXT for the AI to sync."""
     candidates = _search_online(info)
     chosen, _closest = lyr.pick_candidate(candidates, info["duration"], loose=loose)
     if chosen:
@@ -261,11 +261,11 @@ def online_lyrics(info: dict, loose: bool = False) -> tuple[list[dict], str]:
 def resolve_lyrics(
     source: str, info: dict, lyrics_text: str | None, loose: bool = False
 ) -> tuple[list[dict], str]:
-    """source: auto | video | lrclib | file | text | align | none. Devolve (cues, fonte_usada).
+    """source: auto | video | lrclib | file | text | align | none. Returns (cues, source_used).
 
-    Levanta NeedsAlignment quando só há o texto (a IA sincroniza depois) e NeedsLyrics quando falta uma decisão do usuário.
-    lyrics_text: com 'file', letra COM tempos (LRC/SRT/VTT); com 'text'/'align', letra pura.
-    loose: usa letra online de versão com duração diferente, com os tempos dela (sem IA).
+    Raises NeedsAlignment when there is only the text (the AI syncs it later) and NeedsLyrics when a user's decision is missing.
+    lyrics_text: with 'file', lyrics WITH timings (LRC/SRT/VTT); with 'text'/'align', plain lyrics.
+    loose: uses online lyrics of a version with a different duration, with their timings (no AI).
     """
     if source == "none":
         return [], "none"
@@ -280,7 +280,7 @@ def resolve_lyrics(
     if source == "align":
         raise NeedsAlignment(lyrics_text, "align")
     if source == "text":
-        # tenta os tempos de outra fonte; sem referência (ou com número de linhas diferente), a IA sincroniza
+        # tries another source's timings; with no reference (or a different number of lines), the AI syncs
         try:
             timed, donor = timing_donor(info, loose)
             return lyr.apply_text(lyrics_text, timed), f"text+{donor}"
@@ -297,9 +297,9 @@ def resolve_lyrics(
 
 
 def music_key(storage: LocalStorage, k: dict[str, str], work: Path, instrumental: Path | None) -> dict | None:
-    """Tom da música: reaproveita o já calculado; senão estima a partir do instrumental.
+    """The song's key: reuses the one already computed; otherwise estimates it from the instrumental.
 
-    É um extra: qualquer falha na análise vira "sem tom" e nunca derruba o job.
+    It is an extra: any failure in the analysis becomes "no key" and never brings the job down.
     """
     try:
         if storage.exists(k["meta"]):
@@ -337,11 +337,11 @@ def process(
     limits: Limits | None = None,
     imported: "ImportedSong | None" = None,
 ) -> dict:
-    """Etapas informadas em on_stage: downloading, separating, lyrics, aligning.
+    """Stages reported through on_stage: downloading, separating, lyrics, aligning.
 
-    lyrics_source: auto | video | lrclib | file | text | align | none ('align' sincroniza `lyrics_text` com a voz, por IA).
-    imported: uma música que NÃO vem do YouTube (arquivo do usuário ou fonte aberta; importer.py): o áudio já está pronto, então
-    não há download e `url` é ignorada. O resto do caminho é o mesmo.
+    lyrics_source: auto | video | lrclib | file | text | align | none ('align' syncs `lyrics_text` with the vocals, through AI).
+    imported: a song that does NOT come from YouTube (the user's file or an open source; importer.py): the audio is already ready,
+    so there is no download and `url` is ignored. The rest of the path is the same.
     """
     notify = on_stage or (lambda stage: None)
     limits = limits or Limits.from_env()
@@ -351,7 +351,7 @@ def process(
     k = keys(video_id)
     if force:
         storage.delete(f"cache/{video_id}")
-    # fonte de letra explícita refaz só a letra (o instrumental continua no cache)
+    # an explicit lyrics source redoes only the lyrics (the instrumental stays in the cache)
     if lyrics_source == "auto" and is_ready(storage, video_id):
         log.info("%s já está pronto (cache)", video_id)
         return json.loads(storage.read(k["meta"]))
@@ -365,13 +365,13 @@ def process(
         instrumental_file: Path | None = None
         vocals_file: Path | None = None
 
-        need_separation = not storage.exists(k["instrumental"])  # a voz, se faltar, é obtida só quando a IA precisar
+        need_separation = not storage.exists(k["instrumental"])  # the vocals, if missing, are fetched only when the AI needs them
 
         if storage.exists(k["source"]) and not need_separation:
             log.info("%s: metadados do vídeo no cache, sem baixar", video_id)
             info = json.loads(storage.read(k["source"]))
         elif imported:
-            info = dict(imported.info)  # o áudio já veio de fora (arquivo ou fonte aberta): não há o que baixar
+            info = dict(imported.info)  # the audio already came from outside (a file or an open source): nothing to download
             audio = imported.audio
         else:
             notify("downloading")
@@ -381,7 +381,7 @@ def process(
             audio = info.pop("audio")
             timings["download"] = round(time.monotonic() - t, 1)
 
-        # prioridade: artista/título informados > metadados do YouTube > "Artista - Música" do título do vídeo
+        # priority: the given artist/title > YouTube's metadata > the video title's "Artist - Song"
         info["artist_override"] = artist or info.get("artist_override")
         info["title_override"] = title or info.get("title_override")
         _write_json(work / "source.json", info)
@@ -402,7 +402,7 @@ def process(
             log.info("%s: instrumental já existe, pulando a separação", video_id)
 
         def get_vocals() -> Path:
-            """A voz isolada: do cache, ou (músicas antigas, sem vocals.mp3) baixa e separa de novo."""
+            """The isolated vocals: from the cache or (old songs, without vocals.mp3) downloaded and separated again."""
             nonlocal vocals_file
             if vocals_file is not None:
                 return vocals_file
@@ -410,7 +410,7 @@ def process(
                 vocals_file = work / "vocals.mp3"
                 vocals_file.write_bytes(storage.read(k["vocals"]))
                 return vocals_file
-            if imported:  # o áudio de origem não está mais aqui para separar de novo: importe o arquivo outra vez
+            if imported:  # the source audio is no longer here to separate again: import the file again
                 raise JobError("no_vocals", "A voz isolada desta música não está na biblioteca. Importe o arquivo de novo (com --force).", MANUAL)
             notify("downloading")
             fresh = download(f"https://www.youtube.com/watch?v={video_id}", work, langs or ["pt", "en"], cookies, limits.max_duration)
@@ -426,7 +426,7 @@ def process(
         try:
             cues, source = resolve_lyrics(lyrics_source, info, lyrics_text, lyrics_loose)
         except NeedsAlignment as need:
-            # há o texto, faltam os tempos: a IA descobre quando cada linha é cantada, ouvindo a voz
+            # there is the text but not the timings: the AI finds out when each line is sung by listening to the vocals
             if not need.text.strip():
                 raise ValueError("Cole a letra no campo de texto.") from None
             vocals = get_vocals()
@@ -438,7 +438,7 @@ def process(
             timings["align"] = round(time.monotonic() - t, 1)
         words_lines = sum(1 for c in cues if c.get("words"))
         if cues and not words_lines and os.environ.get("WORD_TIMING", "on").lower() not in ("off", "0", "false"):
-            # letra com tempos só por linha (legenda, LRCLIB, arquivo): a IA ouve a voz e descobre o tempo de cada palavra
+            # lyrics timed only by line (subtitles, LRCLIB, a file): the AI listens to the vocals and finds each word's timing
             try:
                 vocals = get_vocals()
                 notify("aligning")
@@ -452,7 +452,7 @@ def process(
         storage.put(k["lyrics"], _write_json(work / "lyrics.json", cues))
 
         if not storage.exists(k["melody"]) and (vocals_file is not None or storage.exists(k["vocals"])):
-            # músicas sem a voz isolada (cache antigo) ficam sem pontuação: não vale baixar e separar de novo só para isso
+            # songs without isolated vocals (an old cache) get no Score: not worth downloading and separating again just for that
             try:
                 t = time.monotonic()
                 log.info("%s: extraindo a melodia da voz", video_id)
@@ -471,16 +471,16 @@ def process(
             "video_id": video_id,
             "title": info["title"],
             "artist": info["artist"],
-            "video_title": info.get("video_title"),  # o Jukebox também procura por ele
+            "video_title": info.get("video_title"),  # the Jukebox also searches by it
             "duration": info["duration"],
-            **({"origin": info["origin"]} if info.get("origin") else {}),  # file | url:<site>: música que não veio do YouTube
+            **({"origin": info["origin"]} if info.get("origin") else {}),  # file | url:<site>: a song that did not come from YouTube
             "lyrics_source": source,
             "lyrics_lines": len(cues),
             "lyrics_word_timing": words_lines > 0,
             **({"key": key} if key else {}),
-            **({"backing": previous["backing"]} if "backing" in previous else {}),  # a voz isolada não mudou: o apoio continua valendo
+            **({"backing": previous["backing"]} if "backing" in previous else {}),  # the isolated vocals did not change: the backing still holds
             "pipeline_version": PIPELINE_VERSION,
             "timings_s": timings,
         }
-        storage.put(k["meta"], _write_json(work / "meta.json", meta, indent=2))  # por último: marca como "pronto"
+        storage.put(k["meta"], _write_json(work / "meta.json", meta, indent=2))  # last: marks it "ready"
     return meta

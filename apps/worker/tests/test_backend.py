@@ -1,4 +1,4 @@
-"""Os dois transportes do worker: Redis (clássico) e HTTP (agente local). Sem rede e sem Redis: tudo com dublês."""
+"""The worker's two transports: Redis (classic) and HTTP (local agent). No network and no Redis: everything uses test doubles."""
 import io
 import json
 import tempfile
@@ -19,7 +19,7 @@ from singalong_worker.backend import (
 # Redis
 # ---------------------------------------------------------------------------------------------------------------------
 class FakeRedisClient:
-    """Só o que o RedisBackend usa, guardando as chamadas."""
+    """Only what RedisBackend uses, recording the calls."""
 
     def __init__(self):
         self.calls, self.hashes, self.expires, self.acked = [], {}, {}, []
@@ -80,13 +80,13 @@ class RedisBackendTests(unittest.TestCase):
         self.client = FakeRedisClient()
         self.b = RedisBackend("redis://x", "worker-1", client=self.client)
 
-    def test_connect_cria_o_grupo_e_aceita_que_ele_ja_exista(self):
+    def test_connect_creates_the_group_and_accepts_that_it_already_exists(self):
         self.b.connect()
         self.assertIn(("xgroup_create", STREAM, GROUP, "0", True), self.client.calls)
         self.client.raise_on = "busy"
-        self.b.connect()  # BUSYGROUP é o caso normal
+        self.b.connect()  # BUSYGROUP is the normal case
 
-    def test_pending_e_next_job_viram_job_com_o_id_da_mensagem(self):
+    def test_pending_and_next_job_become_a_job_with_the_message_id(self):
         self.client.pending_entries = [entry("1-0")]
         self.client.new_entries = [entry("2-0", "lmnopqrstuv", artist="X")]
         (first,) = self.b.pending()
@@ -95,20 +95,20 @@ class RedisBackendTests(unittest.TestCase):
         self.assertEqual((job.video_id, job.ref, job.payload["artist"]), ("lmnopqrstuv", "2-0", "X"))
         self.assertIn(("xreadgroup", GROUP, "worker-1", {STREAM: ">"}, 1, 5000), self.client.calls)
 
-    def test_sem_nada_novo_next_job_devolve_none(self):
+    def test_with_nothing_new_next_job_returns_none(self):
         self.assertIsNone(self.b.next_job(5))
 
-    def test_reclaim_pede_os_jobs_parados_ha_mais_de_n_segundos(self):
+    def test_reclaim_asks_for_the_jobs_idle_for_more_than_n_seconds(self):
         self.client.claimed = [entry("3-0")]
         (job,) = self.b.reclaim(1800)
         self.assertEqual(job.ref, "3-0")
         self.assertIn(("xautoclaim", STREAM, GROUP, "worker-1", 1_800_000, "0-0", 10), self.client.calls)
 
-    def test_begin_conta_os_inicios(self):
+    def test_begin_counts_the_starts(self):
         job = Job("abcdefghijk", {}, ref="1-0")
         self.assertEqual([self.b.begin(job), self.b.begin(job)], [1, 2])
 
-    def test_set_state_grava_o_estado_e_expira_so_os_finais(self):
+    def test_set_state_writes_the_state_and_expires_only_the_final_ones(self):
         job = Job("abcdefghijk", {}, ref="1-0")
         self.b.set_state(job, status="processing", stage="separando", error=None)
         state = self.client.hashes["job:abcdefghijk"]
@@ -122,11 +122,11 @@ class RedisBackendTests(unittest.TestCase):
         self.b.set_state(job, status="needs_lyrics")
         self.assertEqual(self.client.expires["job:abcdefghijk"], FAILED_TTL)
 
-    def test_finish_da_ack_na_mensagem(self):
+    def test_finish_acks_the_message(self):
         self.b.finish(Job("abcdefghijk", {}, ref="1-0"))
         self.assertEqual(self.client.acked, [(STREAM, GROUP, "1-0")])
 
-    def test_fila_das_vozes_de_apoio_e_as_de_busca_e_exportacao(self):
+    def test_the_backing_vocals_queue_and_the_search_and_export_ones(self):
         self.b.request_backing("abcdefghijk")
         self.assertEqual(self.b.next_backing(2), "abcdefghijk")
         self.assertIsNone(self.b.next_backing(2))
@@ -142,14 +142,14 @@ class RedisBackendTests(unittest.TestCase):
         self.assertEqual(self.client.expires["export:abcdefghijk:2"], 3600)
         self.assertEqual(BACKING_KEY, "backing:req")
 
-    def test_falha_de_conexao_vira_backend_unavailable(self):
+    def test_a_connection_failure_becomes_backend_unavailable(self):
         self.client.raise_on = ConnectionError("recusada")
         with self.assertRaises(BackendUnavailable):
             self.b.next_job(1)
         with self.assertRaises(BackendUnavailable):
             self.b.connect()
 
-    def test_clone_usa_outra_conexao(self):
+    def test_clone_uses_another_connection(self):
         other = self.b.clone()
         self.assertIsNot(other, self.b)
         self.assertEqual((other.url, other.consumer), ("redis://x", "worker-1"))
@@ -173,7 +173,7 @@ class FakeResponse:
 
 
 class FakeServer:
-    """Um `urlopen` falso: guarda as requisições e responde na ordem (ou pelo caminho)."""
+    """A fake `urlopen`: records the requests and answers in order (or by path)."""
 
     def __init__(self):
         self.requests, self.queue, self.by_path = [], [], {}
@@ -204,53 +204,53 @@ class HttpBackendTests(unittest.TestCase):
     def sent(self, path):
         return [r for r in self.server.requests if r["path"] == path]
 
-    def test_next_job_manda_o_token_e_a_espera_e_devolve_o_job_com_a_tentativa(self):
+    def test_next_job_sends_the_token_and_the_wait_and_returns_the_job_with_the_attempt(self):
         self.server.reply({"job": {"id": "abcdefghijk", "payload": {"url": "u", "lyrics_source": "lrclib"}, "attempt": 2}})
         job = self.b.next_job(5)
         self.assertEqual((job.video_id, job.payload["lyrics_source"], job.attempt), ("abcdefghijk", "lrclib", 2))
         (req,) = self.sent("/jobs/claim")
         self.assertEqual((req["method"], req["auth"], req["body"]), ("POST", "Bearer sga_token", {"wait_ms": 5000}))
-        self.assertGreater(req["timeout"], 5)  # a espera do servidor cabe no tempo limite da conexão
+        self.assertGreater(req["timeout"], 5)  # the server's wait fits within the connection's timeout
 
-    def test_sem_trabalho_o_servidor_responde_204_e_next_job_devolve_none(self):
+    def test_with_no_work_the_server_answers_204_and_next_job_returns_none(self):
         self.assertIsNone(self.b.next_job(5))
         self.assertIsNone(self.b.next_job(0.5))
         self.assertEqual(self.sent("/jobs/claim")[1]["body"], {"wait_ms": 500})
 
-    def test_begin_usa_a_contagem_do_servidor(self):
+    def test_begin_uses_the_server_count(self):
         self.assertEqual(self.b.begin(self.job), 2)
         self.assertEqual(self.b.begin(Job("x" * 11, {})), 1)
 
-    def test_set_state_andamento_vai_para_progress_sem_o_status(self):
+    def test_set_state_progress_goes_to_progress_without_the_status(self):
         self.b.set_state(self.job, status="processing", stage="separando", error="", error_code=None, retry="")
         (req,) = self.sent("/jobs/abcdefghijk/progress")
         self.assertEqual(req["body"], {"stage": "separando", "error": "", "error_code": "", "retry": ""})
         self.assertEqual(self.sent("/jobs/abcdefghijk/complete"), [])
 
-    def test_set_state_final_vai_para_complete_com_o_status(self):
+    def test_set_state_final_goes_to_complete_with_the_status(self):
         self.b.set_state(self.job, status="failed", stage="", error="Este vídeo é privado.", error_code="private", retry="never")
         (req,) = self.sent("/jobs/abcdefghijk/complete")
         self.assertEqual(req["body"], {"status": "failed", "stage": "", "error": "Este vídeo é privado.", "error_code": "private", "retry": "never"})
         self.b.set_state(self.job, status="needs_lyrics", error="sem legenda")
         self.assertEqual(self.sent("/jobs/abcdefghijk/complete")[1]["body"]["status"], "needs_lyrics")
 
-    def test_textos_longos_sao_cortados_no_limite_do_servidor(self):
+    def test_long_texts_are_cut_at_the_server_limit(self):
         self.b.set_state(self.job, status="processing", error="x" * 900)
         self.assertEqual(len(self.sent("/jobs/abcdefghijk/progress")[0]["body"]["error"]), 500)
 
-    def test_o_final_do_job_e_repetido_em_falha_de_conexao_mas_o_andamento_nao_derruba_nada(self):
+    def test_the_job_end_is_retried_on_connection_failure_but_progress_brings_nothing_down(self):
         self.server.reply(urllib.error.URLError("sem rede"), path="/jobs/abcdefghijk/complete")
         self.server.reply(urllib.error.URLError("sem rede"), path="/jobs/abcdefghijk/complete")
         self.b.set_state(self.job, status="ready")
-        self.assertEqual(len(self.sent("/jobs/abcdefghijk/complete")), 3)  # duas falhas + a que passou
+        self.assertEqual(len(self.sent("/jobs/abcdefghijk/complete")), 3)  # two failures + the one that went through
         self.server.reply(urllib.error.URLError("sem rede"), path="/jobs/abcdefghijk/progress")
-        self.b.set_state(self.job, status="processing", stage="x")  # só registra no log
+        self.b.set_state(self.job, status="processing", stage="x")  # only logs it
 
-    def test_servidor_recusando_o_estado_nao_derruba_o_worker(self):
+    def test_the_server_refusing_the_state_does_not_bring_the_worker_down(self):
         self.server.reply({"error": "not_your_job"}, status=409, path="/jobs/abcdefghijk/complete")
-        self.b.set_state(self.job, status="ready")  # outro agente ficou com o job: só registra
+        self.b.set_state(self.job, status="ready")  # another agent took the job: only logs it
 
-    def test_erros_http(self):
+    def test_http_errors(self):
         self.server.reply({"message": "token inválido"}, status=401)
         with self.assertRaises(AuthError):
             self.b.next_job(1)
@@ -269,7 +269,7 @@ class HttpBackendTests(unittest.TestCase):
             self.b.next_job(1)
         self.assertEqual((ctx.exception.status, ctx.exception.code), (403, "forbidden"))
 
-    def test_connect_retoma_a_sessao_ativa_ou_inicia_uma(self):
+    def test_connect_resumes_the_active_session_or_starts_one(self):
         self.server.reply({"device": {"id": "d"}, "session": {"id": "velha", "display_name": "x"}}, path="/me")
         self.server.reply({"id": "velha", "display_name": "Gabriel"}, path="/sessions")
         self.b.connect()
@@ -281,27 +281,27 @@ class HttpBackendTests(unittest.TestCase):
         self.assertEqual(self.b.session_id, "nova")
         self.assertEqual(self.sent("/sessions")[1]["body"], {"display_name": "Gabriel"})
 
-    def test_connect_com_keep_name_nao_renomeia_a_sessao_retomada(self):
-        # outro comando (--create-room) retoma a sessão do agente em execução sem trocar o apelido que o dono escolheu
+    def test_connect_with_keep_name_does_not_rename_the_resumed_session(self):
+        # another command (--create-room) resumes the running agent's session without changing the nickname the owner chose
         self.server.reply({"device": {"id": "d"}, "session": {"id": "viva", "display_name": "Gabriel"}}, path="/me")
         self.server.reply({"id": "viva", "display_name": "Gabriel"}, path="/sessions")
         other = HttpBackend("https://sing.example.org", "sga_token", "Meu computador", opener=self.server)
         other.connect(keep_name=True)
         self.assertEqual(self.sent("/sessions")[0]["body"], {"display_name": "Gabriel", "resume_id": "viva"})
-        # sem sessão ativa, usa o nome pedido (mesmo com keep_name)
+        # with no active session, uses the requested name (even with keep_name)
         self.server.reply({"device": {"id": "d"}, "session": None}, path="/me")
         self.server.reply({"id": "nova", "display_name": "Meu computador"}, path="/sessions")
         other.connect(keep_name=True)
         self.assertEqual(self.sent("/sessions")[1]["body"], {"display_name": "Meu computador"})
 
-    def test_sem_sessao_ativa_o_claim_inicia_outra_e_tenta_depois(self):
+    def test_without_an_active_session_the_claim_starts_another_and_tries_again(self):
         self.server.reply({"error": "no_active_session"}, status=409, path="/jobs/claim")
         self.server.reply({"device": {"id": "d"}, "session": None}, path="/me")
         self.server.reply({"id": "nova", "display_name": "Gabriel"}, path="/sessions")
         self.assertIsNone(self.b.next_job(1))
         self.assertEqual(self.b.session_id, "nova")
 
-    def test_heartbeat_reconecta_se_o_servidor_encerrou_a_sessao(self):
+    def test_heartbeat_reconnects_if_the_server_ended_the_session(self):
         self.server.reply({"ok": True, "session_id": "sess-1"}, path="/heartbeat")
         self.b.heartbeat()
         self.assertEqual(self.sent("/me"), [])
@@ -311,7 +311,7 @@ class HttpBackendTests(unittest.TestCase):
         self.b.heartbeat()
         self.assertEqual(self.b.session_id, "outra")
 
-    def test_busca(self):
+    def test_search(self):
         self.server.reply({"request": {"id": "r1", "q": "legiao"}}, path="/search/claim")
         self.assertEqual(self.b.next_search(2), {"id": "r1", "q": "legiao"})
         self.assertIsNone(self.b.next_search(2))
@@ -320,9 +320,9 @@ class HttpBackendTests(unittest.TestCase):
         self.b.reply_search("r2", {"error": "YouTube bloqueou"})
         self.assertEqual(self.sent("/search/r2/result")[0]["body"], {"error": "YouTube bloqueou"})
         self.server.reply({"error": "unknown_search"}, status=409, path="/search/r3/result")
-        self.b.reply_search("r3", {"results": []})  # já venceu: não derruba a thread
+        self.b.reply_search("r3", {"results": []})  # already expired: does not bring the thread down
 
-    def test_exportacao(self):
+    def test_export(self):
         self.server.reply({"request": {"video_id": "abcdefghijk", "pitch": -2}}, path="/exports/claim")
         self.assertEqual(self.b.next_export(2), {"video_id": "abcdefghijk", "pitch": -2})
         self.b.set_export_state("abcdefghijk", -2, "processing")
@@ -330,18 +330,18 @@ class HttpBackendTests(unittest.TestCase):
         sent = self.sent("/exports/abcdefghijk/-2/state")
         self.assertEqual([s["body"] for s in sent], [{"status": "processing"}, {"status": "failed", "error": "ffmpeg falhou"}])
 
-    def test_vozes_de_apoio_usam_uma_fila_interna_compartilhada_entre_as_copias(self):
+    def test_backing_vocals_use_an_internal_queue_shared_by_the_copies(self):
         other = self.b.clone()
         self.b.request_backing("abcdefghijk")
         self.assertEqual(other.next_backing(0.1), "abcdefghijk")
         self.assertIsNone(other.next_backing(0.1))
-        self.assertEqual(self.server.requests, [])  # nada disso passa pelo servidor
-        self.assertEqual(other.session_id, "sess-1")  # a sessão também é compartilhada
+        self.assertEqual(self.server.requests, [])  # none of this goes through the server
+        self.assertEqual(other.session_id, "sess-1")  # the session is shared too
 
-    def test_pending_e_reclaim_ficam_com_o_servidor(self):
+    def test_pending_and_reclaim_are_left_to_the_server(self):
         self.assertEqual((self.b.pending(), self.b.reclaim(1800)), ([], []))
 
-    def test_create_room_usa_a_sessao_ativa(self):
+    def test_create_room_uses_the_active_session(self):
         self.server.reply({"code": "ABCD", "host_token": "tok", "session_id": "sess-1"}, path="/sessions/sess-1/rooms")
         self.assertEqual(self.b.create_room()["code"], "ABCD")
 
@@ -352,7 +352,7 @@ class HttpBackendTests(unittest.TestCase):
 
 
 class FactoryAndPairTests(unittest.TestCase):
-    def test_make_backend_escolhe_pelo_ambiente(self):
+    def test_make_backend_chooses_by_the_environment(self):
         self.assertIsInstance(make_backend("redis://x", "w", None, None, "n"), RedisBackend)
         http = make_backend("redis://x", "w", "https://s.example.org", "sga_t", "Gabriel")
         self.assertIsInstance(http, HttpBackend)
@@ -371,9 +371,9 @@ class FactoryAndPairTests(unittest.TestCase):
         self.assertEqual(result["token"], "sga_abc")
         self.assertEqual(seen["url"], "https://s.example.org/agent/v1/pair/complete")
         self.assertEqual(seen["body"], {"code": "ABCD2345", "name": "Notebook"})
-        self.assertIsNone(seen["auth"])  # o código é o segredo: nenhum token ainda
+        self.assertIsNone(seen["auth"])  # the code is the secret: no token yet
 
-    def test_pair_com_codigo_invalido_e_servidor_fora(self):
+    def test_pair_with_an_invalid_code_and_the_server_down(self):
         def rejecting(request, timeout=None):
             raise urllib.error.HTTPError(request.full_url, 400, "x", {}, io.BytesIO(json.dumps({"error": "invalid_pair_code", "message": "vencido"}).encode()))
 
@@ -389,7 +389,7 @@ class FactoryAndPairTests(unittest.TestCase):
 
 
 class HttpCatalogTests(unittest.TestCase):
-    """Armazenamento local: o agente publica o catálogo e diz à nuvem onde o navegador busca a mídia."""
+    """Local storage: the agent publishes the catalog and tells the cloud where the browser fetches the media."""
 
     BASE = "http://127.0.0.1:8765/tok123"
 
@@ -413,13 +413,13 @@ class HttpCatalogTests(unittest.TestCase):
     def sent(self, path):
         return [r for r in self.server.requests if r["path"] == path]
 
-    def test_connect_e_batida_de_coracao_enviam_o_endereco_da_midia(self):
+    def test_connect_and_heartbeat_send_the_media_address(self):
         self.server.reply({"device": {"id": "d"}, "session": None}, path="/me")
         self.server.reply({"id": "s", "display_name": "Gabriel"}, path="/sessions")
         self.b.connect()
-        self.assertNotIn("media_base", self.sent("/sessions")[0]["body"])  # sem servidor local: a nuvem usa o armazenamento dela
+        self.assertNotIn("media_base", self.sent("/sessions")[0]["body"])  # no local server: the cloud uses its own storage
         self.b.media_base = self.BASE
-        self.assertEqual(self.b.clone().media_base, self.BASE)  # as cópias (threads) compartilham
+        self.assertEqual(self.b.clone().media_base, self.BASE)  # the copies (threads) share it
         self.server.reply({"device": {"id": "d"}, "session": {"id": "s", "display_name": "Gabriel"}}, path="/me")
         self.server.reply({"id": "s", "display_name": "Gabriel"}, path="/sessions")
         self.b.connect(keep_name=True)
@@ -428,7 +428,7 @@ class HttpCatalogTests(unittest.TestCase):
         self.b.heartbeat()
         self.assertEqual(self.sent("/heartbeat")[0]["body"]["media_base"], self.BASE)
 
-    def test_publica_a_musica_pronta_com_o_meta_e_os_arquivos(self):
+    def test_publishes_the_ready_song_with_the_meta_and_the_files(self):
         self.b.media_base = self.BASE
         self.song()
         self.b.publish_song("abcdefghijk")
@@ -438,21 +438,21 @@ class HttpCatalogTests(unittest.TestCase):
         self.assertEqual((entry["id"], entry["meta"]["title"]), ("abcdefghijk", "T"))
         self.assertEqual(entry["files"], {"instrumental": True, "lyrics": True, "melody": False, "backing": False, "vocals": False, "exports": []})
 
-    def test_sem_servidor_local_ou_musica_incompleta_nao_publica_nada(self):
+    def test_without_a_local_server_or_with_an_incomplete_song_publishes_nothing(self):
         self.song()
-        self.b.publish_song("abcdefghijk")  # sem media_base
+        self.b.publish_song("abcdefghijk")  # no media_base
         self.b.media_base = self.BASE
         self.song("bbbbbbbbbbb", ready=False)
-        self.b.publish_song("bbbbbbbbbbb")  # incompleta
+        self.b.publish_song("bbbbbbbbbbb")  # incomplete
         self.b.publish_song("inexistente0")
         self.assertEqual(self.sent("/library"), [])
 
-    def test_falha_de_rede_nao_derruba_o_job_e_a_proxima_batida_tenta_de_novo(self):
+    def test_a_network_failure_does_not_bring_the_job_down_and_the_next_heartbeat_tries_again(self):
         self.b.media_base = self.BASE
         self.song()
         for _ in range(3):
             self.server.reply(urllib.error.URLError("sem rede"), path="/library")
-        self.b.publish_song("abcdefghijk")  # nenhuma exceção
+        self.b.publish_song("abcdefghijk")  # no exception
         self.assertEqual(len(self.sent("/library")), 3)
         self.assertEqual(self.b._shared.unpublished, {"abcdefghijk"})
         self.server.reply({"count": 1}, path="/library")
@@ -461,7 +461,7 @@ class HttpCatalogTests(unittest.TestCase):
         self.assertEqual(len(self.sent("/library")), 4)
         self.assertEqual(self.b._shared.unpublished, set())
 
-    def test_servidor_recusando_o_catalogo_ou_token_revogado_tambem_nao_derrubam(self):
+    def test_the_server_refusing_the_catalog_or_a_revoked_token_brings_nothing_down_either(self):
         self.b.media_base = self.BASE
         self.song()
         self.server.reply({"error": "invalid_library_entry"}, status=400, path="/library")
@@ -470,20 +470,20 @@ class HttpCatalogTests(unittest.TestCase):
         self.b.publish_song("abcdefghijk")
         self.assertEqual(self.b._shared.unpublished, {"abcdefghijk"})
 
-    def test_publish_all_envia_em_lotes_de_50(self):
+    def test_publish_all_sends_in_batches_of_50(self):
         self.b.media_base = self.BASE
         for i in range(120):
             self.song(f"m{i:010d}")
         self.assertEqual(self.b.publish_all(), 120)
         self.assertEqual([len(r["body"]["songs"]) for r in self.sent("/library")], [50, 50, 20])
 
-    def test_publish_all_sem_servidor_local_ou_sem_musicas(self):
+    def test_publish_all_without_a_local_server_or_without_songs(self):
         self.assertEqual(self.b.publish_all(), 0)
         self.b.media_base = self.BASE
         self.assertEqual(self.b.publish_all(), 0)
         self.assertEqual(self.sent("/library"), [])
 
-    def test_o_worker_classico_nao_tem_catalogo(self):
+    def test_the_classic_worker_has_no_catalog(self):
         redis_backend = RedisBackend("redis://x", "w", client=FakeRedisClient())
         self.assertIsNone(redis_backend.attach_storage(object()))
         self.assertIsNone(redis_backend.publish_song("abcdefghijk"))

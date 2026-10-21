@@ -1,4 +1,4 @@
-"""Verificação do hardware: escolhe o motor pelas especificações e nunca quebra quando falta nvidia-smi ou torch."""
+"""The hardware check: picks the engine from the specs and never breaks when nvidia-smi or torch is missing."""
 import subprocess
 import unittest
 from unittest import mock
@@ -30,7 +30,7 @@ def write(path, text):
 
 
 def fake_sysfs(root, cards, archs=(), extra_cpu_node=True):
-    """Um /sys de mentira: placas em class/drm e os nós do kfd (o nó 0 é o processador, com gfx_target_version 0)."""
+    """A fake /sys: cards in class/drm and the kfd nodes (node 0 is the processor, with gfx_target_version 0)."""
     for i, (vendor, name, vram) in enumerate(cards):
         device = root / "class" / "drm" / f"card{i}" / "device"
         write(device / "vendor", vendor + "\n")
@@ -38,7 +38,7 @@ def fake_sysfs(root, cards, archs=(), extra_cpu_node=True):
             write(device / "product_name", name + "\n")
         if vram is not None:
             write(device / "mem_info_vram_total", f"{vram}\n")
-    write(root / "class" / "drm" / "card0-HDMI-A-1" / "status", "connected\n")  # entrada que não é uma placa: tem de ser ignorada
+    write(root / "class" / "drm" / "card0-HDMI-A-1" / "status", "connected\n")  # an entry that is not a card: must be ignored
     nodes = root / "class" / "kfd" / "kfd" / "topology" / "nodes"
     index = 0
     if extra_cpu_node:
@@ -64,7 +64,7 @@ class ChooseEngineTests(unittest.TestCase):
         self.assertEqual(decision["engine"], "cpu")
         self.assertIn("Mac Intel", decision["reason"])
         with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="arm64"):
-            apple = hardware.choose_engine([])  # o chip da Apple sem a opção da GPU: a CPU, e o motivo diz que o Metal falha com o Demucs
+            apple = hardware.choose_engine([])  # Apple's chip without the GPU option: the CPU, and the reason says Metal fails with Demucs
         self.assertEqual(apple["engine"], "cpu")
         self.assertIn("falha no Metal", apple["reason"])
         with mock.patch.object(hardware.platform, "system", return_value="Linux"):
@@ -72,9 +72,9 @@ class ChooseEngineTests(unittest.TestCase):
 
     def test_the_apple_gpu_is_never_chosen_by_itself_but_stays_in_the_options(self):
         decision = hardware.choose_engine([APPLE])
-        self.assertEqual(decision["engine"], "cpu")  # o automático no Mac é a CPU: a GPU da Apple ainda não foi medida
+        self.assertEqual(decision["engine"], "cpu")  # the automatic choice on a Mac is the CPU: Apple's GPU has not been measured yet
         self.assertIn("beta", decision["reason"])
-        self.assertEqual(decision["gpu"]["engine"], "mps")  # a tela de configurações oferece a opção
+        self.assertEqual(decision["gpu"]["engine"], "mps")  # the settings screen offers the option
 
     def test_supported_amd_card_gets_rocm(self):
         decision = hardware.choose_engine([amd()])
@@ -94,7 +94,7 @@ class ChooseEngineTests(unittest.TestCase):
         self.assertIn("grupos render e video", no_access["reason"])
 
     def test_nvidia_wins_when_there_is_also_another_card(self):
-        self.assertEqual(hardware.choose_engine([amd(), gpu()])["engine"], "cu121")  # notebook com a placa da AMD integrada e uma NVIDIA
+        self.assertEqual(hardware.choose_engine([amd(), gpu()])["engine"], "cu121")  # a laptop with an integrated AMD card and an NVIDIA one
 
     def test_force_cpu_beats_amd_and_apple(self):
         self.assertEqual(hardware.choose_engine([amd()], force_cpu=True)["engine"], "cpu")
@@ -173,7 +173,7 @@ class AmdAndAppleDetectionTests(unittest.TestCase):
         self.assertEqual(hardware._gfx_id(100300), "gfx1030")  # RX 6800
         self.assertEqual(hardware._gfx_id(90010), "gfx90a")  # Instinct MI210
         self.assertEqual(hardware._gfx_id(90402), "gfx942")  # MI300
-        self.assertIsNone(hardware._gfx_id(0))  # o nó do processador
+        self.assertIsNone(hardware._gfx_id(0))  # the processor's node
 
     def test_reads_the_amd_card_from_sysfs(self):
         fake_sysfs(self.root, [("0x1002", "AMD Radeon RX 7900 XTX", 25753026560)], archs=[110000])
@@ -187,9 +187,9 @@ class AmdAndAppleDetectionTests(unittest.TestCase):
         fake_sysfs(self.root, [("0x10de", "NVIDIA", 8589934592), ("0x8086", None, None)], archs=[])
         with mock.patch.object(hardware.platform, "system", return_value="Linux"):
             self.assertEqual(hardware.amd_gpus(self.root, self.root / "nao-existe"), [])
-            self.assertEqual(hardware.amd_gpus(self.root / "vazio", self.root / "nao-existe"), [])  # sem o /sys do amdgpu
+            self.assertEqual(hardware.amd_gpus(self.root / "vazio", self.root / "nao-existe"), [])  # without amdgpu's /sys
         with mock.patch.object(hardware.platform, "system", return_value="Windows"):
-            self.assertEqual(hardware.amd_gpus(self.root), [])  # só existe no Linux
+            self.assertEqual(hardware.amd_gpus(self.root), [])  # only exists on Linux
 
     def test_without_the_kfd_device_the_card_is_seen_but_has_no_access(self):
         fake_sysfs(self.root, [("0x1002", "AMD Radeon RX 7800 XT", 17163091968)], archs=[110100])
@@ -199,7 +199,7 @@ class AmdAndAppleDetectionTests(unittest.TestCase):
         self.assertEqual(hardware.choose_engine([card])["engine"], "cpu")
 
     def test_apple_gpu_is_off_by_default_because_demucs_fails_on_metal(self):
-        # medido no macOS do CI: "Output channels > 65536 not supported at the MPS device" ao separar uma música
+        # measured on the CI's macOS: "Output channels > 65536 not supported at the MPS device" when separating a song
         with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="arm64"):
             self.assertEqual(hardware.apple_gpus(smi("Apple M2"), env={}), [])
             self.assertEqual(hardware.apple_gpus(smi("Apple M2"), env={"SINGALONG_APPLE_GPU": "0"}), [])
@@ -211,7 +211,7 @@ class AmdAndAppleDetectionTests(unittest.TestCase):
                 (chip,) = hardware.apple_gpus(smi("Apple M2"), env=on)
         self.assertEqual((chip["name"], chip["engine"], chip["vram_mb"]), ("Apple M2", "mps", 16384))
         with mock.patch.object(hardware.platform, "system", return_value="Darwin"), mock.patch.object(hardware.platform, "machine", return_value="x86_64"):
-            self.assertEqual(hardware.apple_gpus(smi("Intel"), env=on), [])  # Mac Intel
+            self.assertEqual(hardware.apple_gpus(smi("Intel"), env=on), [])  # an Intel Mac
         with mock.patch.object(hardware.platform, "system", return_value="Linux"):
             self.assertEqual(hardware.apple_gpus(smi("x"), env=on), [])
 
@@ -220,7 +220,7 @@ class SelftestTests(unittest.TestCase):
     def test_rocm_needs_the_rocm_build_of_torch_and_skips_the_cuda_architecture_check(self):
         fake = mock.Mock()
         fake.cuda.is_available.return_value = True
-        fake.version.hip = None  # um torch de CUDA
+        fake.version.hip = None  # a CUDA build of torch
         with mock.patch.dict("sys.modules", {"torch": fake}):
             self.assertIn("não é o do ROCm", hardware.gpu_selftest("rocm6.2")["detail"])
         fake.version.hip = "6.2.41133"
@@ -228,8 +228,8 @@ class SelftestTests(unittest.TestCase):
         fake.isfinite.return_value.all.return_value = True
         with mock.patch.dict("sys.modules", {"torch": fake}):
             result = hardware.gpu_selftest("rocm6.2")
-        self.assertEqual((result["ok"], result["device"]), (True, "cuda"))  # no torch a placa AMD também se chama "cuda"
-        fake.cuda.get_device_capability.assert_not_called()  # sem o sm_XX do CUDA
+        self.assertEqual((result["ok"], result["device"]), (True, "cuda"))  # in torch the AMD card is also called "cuda"
+        fake.cuda.get_device_capability.assert_not_called()  # without CUDA's sm_XX
 
     def test_rocm_without_a_visible_gpu_says_so(self):
         fake = mock.Mock()
@@ -250,7 +250,7 @@ class SelftestTests(unittest.TestCase):
         with mock.patch.dict("sys.modules", {"torch": fake}):
             ok = hardware.gpu_selftest("mps")
         self.assertEqual((ok["ok"], ok["device"]), (True, "mps"))
-        fake.stft.assert_called_once()  # o Demucs usa a FFT com números complexos: é ela que costuma faltar no Metal
+        fake.stft.assert_called_once()  # Demucs uses the FFT with complex numbers: that is what Metal usually lacks
 
     def test_an_mps_error_falls_back_to_the_cpu(self):
         fake = mock.MagicMock()

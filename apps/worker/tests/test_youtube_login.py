@@ -1,4 +1,4 @@
-"""Login do YouTube pelo navegador do usuário (perfil dedicado + protocolo de depuração). Sem navegador real e sem rede."""
+"""YouTube login through the user's browser (a dedicated profile + the debugging protocol). No real browser and no network."""
 import json
 import tempfile
 import threading
@@ -11,7 +11,7 @@ from singalong_worker.cookies import CookieSource
 
 try:
     from websockets.sync.server import serve as ws_serve
-except ImportError:  # a biblioteca só é exigida por quem usa o login
+except ImportError:  # the library is required only by whoever uses the login
     ws_serve = None
 
 SID = {"name": "SID", "value": "segredo", "domain": ".google.com", "path": "/", "secure": True, "httpOnly": True, "expires": 2_000_000_000}
@@ -35,36 +35,36 @@ class TempDirCase(unittest.TestCase):
 
 
 class FindBrowserTests(TempDirCase):
-    def test_o_caminho_explicito_vale_primeiro(self):
+    def test_the_explicit_path_comes_first(self):
         exe = self.fake_exe("meu", "navegador.exe")
         self.assertEqual(yl.find_browser(env={"AGENT_BROWSER_PATH": str(exe)}), ("navegador", exe))
 
-    def test_acha_o_chrome_e_o_edge_nas_pastas_do_windows_e_respeita_a_preferencia(self):
+    def test_finds_chrome_and_edge_in_the_windows_folders_and_respects_the_preference(self):
         chrome = self.fake_exe("PF", "Google", "Chrome", "Application", "chrome.exe")
         edge = self.fake_exe("PFx86", "Microsoft", "Edge", "Application", "msedge.exe")
         env = {"ProgramFiles": str(self.dir / "PF"), "ProgramFiles(x86)": str(self.dir / "PFx86")}
         find = lambda preferred, env: yl.find_browser(preferred, env, search_system=False)  # noqa: E731 - independe do que a máquina tem
-        self.assertEqual(find(None, env), ("chrome", chrome))  # sem preferência: o Chrome primeiro
+        self.assertEqual(find(None, env), ("chrome", chrome))  # no preference: Chrome first
         self.assertEqual(find("edge", env), ("edge", edge))
         self.assertEqual(find("chrome", env), ("chrome", chrome))
         only_edge = {"ProgramFiles(x86)": str(self.dir / "PFx86")}
-        self.assertEqual(find("chrome", only_edge), ("edge", edge))  # o preferido não existe: cai no outro
+        self.assertEqual(find("chrome", only_edge), ("edge", edge))  # the preferred one does not exist: falls back to the other
 
-    def test_nenhum_instalado(self):
+    def test_none_installed(self):
         self.assertIsNone(yl.find_browser(env={"ProgramFiles": str(self.dir / "vazio")}, search_system=False))
 
 
 class CookieFilterTests(unittest.TestCase):
-    def test_login_detectado_por_cookies_da_conta_do_google_ou_do_youtube(self):
+    def test_login_detected_by_google_or_youtube_account_cookies(self):
         self.assertTrue(yl.is_logged_in([SID]))
         self.assertTrue(yl.is_logged_in([PREF, PSID]))
-        self.assertFalse(yl.is_logged_in([PREF]))  # só preferências: não logado
-        self.assertFalse(yl.is_logged_in([{**SID, "domain": ".banco.example"}]))  # SID de outro site não conta
-        self.assertFalse(yl.is_logged_in([{**SID, "domain": ".evilgoogle.com"}]))  # nome que só TERMINA igual não é do Google
+        self.assertFalse(yl.is_logged_in([PREF]))  # only preferences: not logged in
+        self.assertFalse(yl.is_logged_in([{**SID, "domain": ".banco.example"}]))  # a SID from another site does not count
+        self.assertFalse(yl.is_logged_in([{**SID, "domain": ".evilgoogle.com"}]))  # a name that only ENDS the same is not Google's
         self.assertFalse(yl.is_logged_in([{**PSID, "domain": "youtube.com.evil.example"}]))
         self.assertFalse(yl.is_logged_in([]))
 
-    def test_so_guarda_o_que_e_do_youtube_e_do_google(self):
+    def test_keeps_only_youtube_and_google_cookies(self):
         kept = yl.relevant([SID, PSID, PREF, BANK, {**PREF, "domain": "accounts.google.com"}, {**PREF, "domain": "notyoutube.com"}])
         self.assertEqual({c["domain"] for c in kept}, {".google.com", ".youtube.com", "accounts.google.com"})
         self.assertNotIn(BANK, kept)
@@ -82,7 +82,7 @@ class FakeProc:
 
 
 class FakeWs:
-    """Responde ao protocolo de depuração: `steps` são as respostas sucessivas de Storage.getCookies (ou uma exceção)."""
+    """Answers the debugging protocol: `steps` are the successive answers of Storage.getCookies (or an exception)."""
 
     def __init__(self, steps):
         self.steps, self.sent, self.closed = list(steps), [], False
@@ -132,19 +132,19 @@ class LoginFlowTests(TempDirCase):
         return yl.login(env=self.env, say=self.said.append, launcher=launcher, discover=lambda port: f"ws://127.0.0.1:{port}/devtools/browser/x",
                         connect=lambda url, **kwargs: self.ws, sleep=sleep, now=now, poll=kw.get("poll", 2.0), timeout=kw.get("timeout", 600.0))
 
-    def test_espera_o_login_grava_so_os_cookies_do_youtube_e_do_google_e_fecha_o_navegador(self):
+    def test_waits_for_the_login_writes_only_youtube_and_google_cookies_and_closes_the_browser(self):
         out = self.run_login([[PREF], [PREF], [SID, PSID, PREF, BANK], [SID, PSID, PREF, BANK]])
         self.assertEqual(out, self.dir / "dados" / "youtube_cookies.txt")
         text = out.read_text(encoding="utf-8")
         self.assertIn("SID", text)
         self.assertIn("__Secure-3PSID", text)
-        self.assertNotIn("nao-guardar", text)  # cookie de outro site nunca é guardado
+        self.assertNotIn("nao-guardar", text)  # a cookie from another site is never kept
         self.assertIn("Browser.close", self.ws.sent)
         self.assertTrue(self.ws.closed)
         self.assertTrue(self.proc.waited)
         self.assertTrue(any("Login detectado" in line for line in self.said))
 
-    def test_abre_o_navegador_com_o_perfil_dedicado_e_a_porta_de_depuracao(self):
+    def test_opens_the_browser_with_the_dedicated_profile_and_the_debugging_port(self):
         self.run_login([[SID, PSID], [SID, PSID]])
         (cmd,) = self.launched
         self.assertIn(f"--user-data-dir={self.dir / 'dados' / 'browser-profile'}", cmd)
@@ -153,25 +153,25 @@ class LoginFlowTests(TempDirCase):
         self.assertEqual(cmd[-1], yl.START_URL)
         self.assertTrue((self.dir / "dados" / "browser-profile").is_dir())
 
-    def test_o_login_precisa_se_manter_por_um_instante_antes_de_gravar(self):
-        # logo depois do login o YouTube ainda grava os últimos cookies: um cookie que some de novo reinicia a espera
+    def test_the_login_must_hold_for_a_moment_before_writing(self):
+        # right after the login YouTube still writes its last cookies: a cookie that disappears again restarts the wait
         out = self.run_login([[SID], [PREF], [SID], [SID, PSID], [SID, PSID]])
         self.assertIn("__Secure-3PSID", out.read_text(encoding="utf-8"))
 
-    def test_janela_fechada_antes_do_login(self):
+    def test_window_closed_before_the_login(self):
         with self.assertRaises(yl.LoginError) as ctx:
             self.run_login([[PREF], ConnectionError("fechou")])
         self.assertIn("fechada", str(ctx.exception))
-        self.assertTrue(self.proc.waited)  # mesmo assim limpa o processo
+        self.assertTrue(self.proc.waited)  # still cleans up the process
 
-    def test_tempo_esgotado(self):
+    def test_timeout(self):
         with self.assertRaises(yl.LoginError) as ctx:
             self.run_login([[PREF]], timeout=10.0)
         self.assertIn("tempo", str(ctx.exception))
 
-    def test_sem_navegador_instalado(self):
+    def test_no_browser_installed(self):
         original = yl.find_browser
-        yl.find_browser = lambda *a, **k: None  # nenhum navegador, qualquer que seja a máquina
+        yl.find_browser = lambda *a, **k: None  # no browser, whatever the machine
         try:
             with self.assertRaises(yl.LoginError) as ctx:
                 yl.login(env={"AGENT_DATA_DIR": str(self.dir)}, say=lambda line: None, launcher=lambda *a, **k: self.fail("não devia abrir nada"))
@@ -179,9 +179,9 @@ class LoginFlowTests(TempDirCase):
             yl.find_browser = original
         text = str(ctx.exception)
         self.assertIn("Não encontrei", text)
-        self.assertIn("firefox", text)  # a mensagem aponta as alternativas
+        self.assertIn("firefox", text)  # the message points to the alternatives
 
-    def test_erro_do_protocolo_vira_login_error(self):
+    def test_a_protocol_error_becomes_login_error(self):
         cdp = yl.Cdp("ws://x", connect=lambda url, **kw: FakeWs([[]]))
         with self.assertRaises(yl.LoginError):
             cdp.call("Metodo.inexistente")
@@ -193,20 +193,20 @@ class CheckLoginTests(TempDirCase):
         path.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
         return CookieSource(file=path)
 
-    def test_conectado_quando_o_pedido_so_logado_funciona(self):
+    def test_connected_when_the_logged_in_only_request_works(self):
         seen = []
         state, detail = yl.check_login(self.source(), extract=lambda opts: seen.append(opts) or {"entries": []})
         self.assertEqual(state, "connected")
         self.assertIn("cookiefile", seen[0])
-        self.assertEqual((seen[0]["extract_flat"], seen[0]["playlistend"]), ("in_playlist", 1))  # um pedido pequeno
+        self.assertEqual((seen[0]["extract_flat"], seen[0]["playlistend"]), ("in_playlist", 1))  # a small request
 
-    def test_sem_login_valido(self):
+    def test_no_valid_login(self):
         def fail(opts):
             raise RuntimeError("ERROR: [youtube:tab] WL: YouTube said: The playlist does not exist.")
 
         self.assertEqual(yl.check_login(self.source(), extract=fail)[0], "not-logged")
 
-    def test_falha_de_rede_nao_vira_sem_login(self):
+    def test_a_network_failure_does_not_become_not_logged_in(self):
         def fail(opts):
             raise OSError("Temporary failure in name resolution")
 
@@ -214,10 +214,10 @@ class CheckLoginTests(TempDirCase):
         self.assertEqual(state, "error")
         self.assertIn("name resolution", detail)
 
-    def test_sem_fonte(self):
+    def test_no_source(self):
         self.assertEqual(yl.check_login(None)[0], "no-source")
 
-    def test_comando_status(self):
+    def test_status_command(self):
         said = []
         self.assertEqual(yl.main_status(None, said.append), 1)
         self.assertIn("--youtube-login", said[0])
@@ -233,7 +233,7 @@ class CheckLoginTests(TempDirCase):
 
 
 class DiscoverTests(unittest.TestCase):
-    def test_descobre_o_endereco_websocket_pelo_json_version(self):
+    def test_discovers_the_websocket_address_through_json_version(self):
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):  # noqa: N802
                 body = json.dumps({"Browser": "Chrome/155", "webSocketDebuggerUrl": "ws://127.0.0.1:1/devtools/browser/abc"}).encode()
@@ -251,16 +251,16 @@ class DiscoverTests(unittest.TestCase):
         self.addCleanup(server.shutdown)
         self.assertEqual(yl.discover_ws_url(server.server_address[1], timeout=5), "ws://127.0.0.1:1/devtools/browser/abc")
 
-    def test_navegador_que_nao_responde(self):
+    def test_a_browser_that_does_not_answer(self):
         with self.assertRaises(yl.LoginError):
-            yl.discover_ws_url(yl.free_port(), timeout=0.5)  # ninguém escuta nessa porta
+            yl.discover_ws_url(yl.free_port(), timeout=0.5)  # nobody listens on that port
 
 
 @unittest.skipIf(ws_serve is None, "precisa da biblioteca websockets (pip install websockets)")
 class RealWebSocketTests(unittest.TestCase):
-    """O cliente do protocolo de depuração contra um servidor WebSocket de verdade."""
+    """The debugging protocol's client against a real WebSocket server."""
 
-    def test_le_os_cookies_e_fecha_o_navegador(self):
+    def test_reads_the_cookies_and_closes_the_browser(self):
         received = []
 
         def handler(ws):

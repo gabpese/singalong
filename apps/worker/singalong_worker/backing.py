@@ -1,14 +1,14 @@
-"""Vozes de apoio (backing vocals) separadas da voz principal, para o controle de nível das vozes de apoio.
+"""Backing vocals separated from the lead vocals, for the backing vocals' level control.
 
-O Demucs entrega só "voz" e "instrumental", e a voz mistura a principal com as de apoio. Um segundo passo, com um modelo de
-"karaokê" do UVR (MDX-Net), separa a voz isolada em principal e apoio; o apoio vira `cache/<id>/backing.mp3`. A TV toca
-instrumental + apoio com o volume que quem escolheu a música definir.
+Demucs delivers only "vocals" and "instrumental", and the vocals mix the lead with the backing. A second pass, with a UVR
+"karaoke" model (MDX-Net), splits the isolated vocals into lead and backing; the backing becomes `cache/<id>/backing.mp3`.
+The TV plays instrumental + backing at the volume set by whoever picked the song.
 
-Não bloqueia a música: ela fica pronta sem o apoio e uma thread própria o gera depois (leva minutos em CPU). Músicas sem
-apoio de verdade (uma voz só) ficam marcadas `backing.status = "none"` e não ganham o arquivo.
+It does not hold the song back: the song becomes ready without the backing, and a thread of its own makes it later (it
+takes minutes on a CPU). Songs without real backing (a single voice) are marked `backing.status = "none"` and get no file.
 
-O pedido (o video_id de uma música que acabou de ficar pronta) vem do próprio worker, pelo backend (backend.py): uma lista no
-Redis no worker clássico, uma fila em memória no agente local.
+The request (the video_id of a song that just became ready) comes from the worker itself, through the backend (backend.py):
+a Redis list in the classic worker, an in-memory queue in the local agent.
 meta.json: `backing: {"status": "ready" | "none", "share": 0..1}`.
 """
 import json
@@ -28,13 +28,13 @@ MODEL ="UVR_MDXNET_KARA_2.onnx"
 MODEL_DIR = os.environ.get("BACKING_MODEL_DIR", "/models/audio-separator")
 SAMPLE_RATE = 22050
 FRAME = 2048
-# o apoio conta se, em pelo menos 5% dos trechos com voz principal, chega a -15 dB dela (0,178 em amplitude)
+# the backing counts if, in at least 5% of the stretches with lead vocals, it comes within -15 dB of them (0.178 in amplitude)
 CLOSE_RATIO = 0.178
 MIN_SHARE = 0.05
 BITRATE = "128k"
 FFMPEG_TIMEOUT = 300
 
-_separator = None  # o modelo carrega uma vez só (leva alguns segundos e baixa na primeira vez)
+_separator = None  # the model loads only once (it takes a few seconds and downloads the first time)
 
 
 def backing_key(video_id: str) -> str:
@@ -42,7 +42,7 @@ def backing_key(video_id: str) -> str:
 
 
 def backing_share(lead, back) -> float:
-    """Fração dos trechos com voz principal em que o apoio chega perto dela (≥ -15 dB). 0 = uma voz só."""
+    """The share of the lead vocals' stretches where the backing comes close to them (≥ -15 dB). 0 = a single voice."""
     import numpy as np
 
     def rms(y):
@@ -54,7 +54,7 @@ def backing_share(lead, back) -> float:
     lead_rms, back_rms = lead_rms[:n], back_rms[:n]
     if not n:
         return 0.0
-    active = lead_rms > np.percentile(lead_rms, 50) * 0.3  # onde a voz principal canta
+    active = lead_rms > np.percentile(lead_rms, 50) * 0.3  # where the lead vocals sing
     if not active.any():
         return 0.0
     return float(np.mean(back_rms[active] > lead_rms[active] * CLOSE_RATIO))
@@ -66,7 +66,7 @@ def is_usable(share: float) -> bool:
 
 def _load_separator(work: Path):
     global _separator
-    from audio_separator.separator import Separator  # pesado: só o worker precisa
+    from audio_separator.separator import Separator  # heavy: only the worker needs it
 
     if _separator is None:
         _separator = Separator(output_dir=str(work), output_format="WAV", model_file_dir=MODEL_DIR, log_level=30)
@@ -76,7 +76,7 @@ def _load_separator(work: Path):
 
 
 def separate_vocals(vocals: Path, work: Path) -> tuple[Path, Path]:
-    """(voz principal, vozes de apoio) em WAV. O modelo chama a principal de "Vocals" e o apoio de "Instrumental"."""
+    """(lead vocals, backing vocals) as WAV. The model calls the lead "Vocals" and the backing "Instrumental"."""
     names = _load_separator(work).separate(str(vocals))
     paths = [Path(n) if Path(n).is_absolute() else work / n for n in names]
     lead = next(p for p in paths if "(Vocals)" in p.name)
@@ -92,7 +92,7 @@ def _load_mono(path: Path):
 
 
 def process(storage, video_id: str) -> str:
-    """Separa as vozes de apoio de uma música pronta. Devolve "ready" ou "none" (e grava no meta.json)."""
+    """Separates the backing vocals of a ready song. Returns "ready" or "none" (and writes it to meta.json)."""
     vocals_key = f"cache/{video_id}/vocals.mp3"
     if not (storage.exists(meta_key(video_id)) and storage.exists(vocals_key)):
         raise FileNotFoundError("a música não está pronta ou não tem a voz isolada")
@@ -117,7 +117,7 @@ def process(storage, video_id: str) -> str:
 
 
 def find_missing(storage) -> list[str]:
-    """Músicas prontas, com a voz isolada, que ainda não foram analisadas (processadas antes deste recurso)."""
+    """Ready songs with isolated vocals that have not been analyzed yet (processed before this feature)."""
     missing = []
     for key in [k for k in storage.list("cache") if k.endswith("/meta.json")]:
         video_id = key.split("/")[1]
@@ -130,7 +130,7 @@ def find_missing(storage) -> list[str]:
 
 
 def serve(backend, storage, stop: threading.Event) -> None:
-    """Loop da thread: primeiro as músicas antigas sem análise, depois os pedidos de músicas novas, uma de cada vez."""
+    """The thread's loop: first the old songs without analysis, then the requests for new songs, one at a time."""
     pending = deque(find_missing(storage))
     if pending:
         log.info("vozes de apoio: %d música(s) do cache para analisar em segundo plano", len(pending))
@@ -144,7 +144,7 @@ def serve(backend, storage, stop: threading.Event) -> None:
             video_id = pending.popleft()
             try:
                 status = process(storage, video_id)
-                backend.publish_song(video_id)  # armazenamento local: o catálogo ganha as vozes de apoio
+                backend.publish_song(video_id)  # local storage: the catalog gains the backing vocals
                 log.info("vozes de apoio de %s: %s", video_id, status)
             except Exception as exc:  # noqa: BLE001 - sem o apoio a música continua funcionando; tenta de novo na próxima subida
                 log.warning("não consegui separar as vozes de apoio de %s: %s", video_id, exc)

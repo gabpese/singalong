@@ -1,12 +1,12 @@
-"""Transporte do worker: de onde vêm os jobs e para onde vão o estado e as respostas.
+"""The worker's transport: where the jobs come from and where the state and the answers go.
 
-O pipeline (runner.py, pipeline.py...) não sabe de Redis nem de HTTP; fala com um `Backend`:
+The pipeline (runner.py, pipeline.py...) knows nothing about Redis or HTTP; it talks to a `Backend`:
 
-  RedisBackend  o worker clássico (Docker, o PC do dono lendo o Redis direto). Contrato em apps/api/src/jobs.ts, jeito (1).
-  HttpBackend   o agente local: só HTTP de SAÍDA para /agent/v1 do servidor, sem acesso ao Redis. Jeito (2) do mesmo contrato.
+  RedisBackend  the classic worker (Docker, the owner's PC reading Redis directly). Contract in apps/api/src/jobs.ts, way 1).
+  HttpBackend   the local agent: only OUTGOING HTTP to the server's /agent/v1, no access to Redis. Way 2) of the same contract.
 
-Os dois têm os mesmos métodos, então o runner e as threads (busca, exportação, vozes de apoio) rodam iguais nos dois.
-Cada thread usa a sua própria cópia (`clone()`): conexões e o bloqueio de uma não podem atrapalhar as outras.
+Both have the same methods, so the runner and the threads (search, export, backing vocals) run the same on both.
+Each thread uses its own copy (`clone()`): one thread's connections and blocking must not get in the others' way.
 """
 import json
 import logging
@@ -31,31 +31,31 @@ SEARCH_RESULT_TTL = 60
 EXPORT_KEY = "export:req"
 EXPORT_STATE_TTL = 3600
 BACKING_KEY = "backing:req"
-DONE_TTL = 3600  # status "ready" some do Redis depois de 1 h (a verdade passa a ser o storage)
+DONE_TTL = 3600  # the "ready" status leaves Redis after 1 h (storage becomes the truth)
 FAILED_TTL = 86400
 
 TERMINAL = ("ready", "needs_lyrics", "failed")
 JOB_FIELDS = ("stage", "error", "error_code", "retry")
-CATALOG_BATCH = 50  # músicas por pedido de catálogo (o servidor aceita até 100)
-MAX_FIELD = 500  # o servidor recusa textos maiores que isso
+CATALOG_BATCH = 50  # songs per catalog request (the server accepts up to 100)
+MAX_FIELD = 500  # the server refuses texts longer than this
 AGENT_VERSION = current_version()
 
 
 class BackendUnavailable(Exception):
-    """Falha passageira de conexão (rede, servidor reiniciando): tentar de novo daqui a pouco."""
+    """A passing connection failure (network, server restarting): try again shortly."""
 
 
 class AuthError(Exception):
-    """O servidor não reconhece mais o token do agente (revogado): não adianta insistir."""
+    """The server no longer recognizes the agent's token (revoked): insisting is useless."""
 
 
 class UpdateRequired(BackendUnavailable):
-    """O servidor exige uma versão mais nova do app. Parece uma falha passageira: o agente espera e tenta de novo, e volta a
-    trabalhar sozinho assim que o app for atualizado."""
+    """The server requires a newer app version. It looks like a passing failure: the agent waits and tries again, and gets back
+    to work by itself as soon as the app is updated."""
 
 
 class Rejected(Exception):
-    """O servidor recusou o pedido (4xx, exceto 401). `code` é o código estável do erro."""
+    """The server refused the request (4xx, except 401). `code` is the error's stable code."""
 
     def __init__(self, status: int, code: str, message: str = ""):
         super().__init__(f"{status} {code}: {message}")
@@ -66,12 +66,12 @@ class Rejected(Exception):
 class Job:
     video_id: str
     payload: dict
-    ref: Any = None  # identificação interna do backend (o id da mensagem no Redis, para o ack)
-    attempt: int | None = None  # quantas vezes este pedido foi entregue (o servidor conta no jeito HTTP)
+    ref: Any = None  # the backend's internal id (the message id in Redis, for the ack)
+    attempt: int | None = None  # how many times this request was delivered (the server counts in the HTTP way)
 
 
 def _error_detail(exc: urllib.error.HTTPError) -> dict:
-    """O corpo JSON de uma resposta de erro ({ error, message }); fecha a resposta."""
+    """The JSON body of an error answer ({ error, message }); closes the answer."""
     try:
         detail = json.loads(exc.read() or b"{}")
         return detail if isinstance(detail, dict) else {}
@@ -86,7 +86,7 @@ def _text(value: Any) -> str:
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Redis (worker clássico)
+# Redis (classic worker)
 # ---------------------------------------------------------------------------------------------------------------------
 def _entries(response) -> list[tuple[str, dict]]:
     return [entry for _stream, entries in (response or []) for entry in entries]
@@ -100,9 +100,9 @@ class RedisBackend:
     @property
     def r(self):
         if self._client is None:
-            import redis  # import tardio: o resto do worker (e os testes) não precisa do cliente Redis
+            import redis  # a late import: the rest of the worker (and the tests) does not need the Redis client
 
-            # socket_timeout MAIOR que o block do XREADGROUP (5 s), senão a leitura ociosa estoura o timeout
+            # socket_timeout LONGER than XREADGROUP's block (5 s), or the idle read hits the timeout
             self._client = redis.Redis.from_url(self.url, decode_responses=True, socket_timeout=30, socket_connect_timeout=5)
         return self._client
 
@@ -111,7 +111,7 @@ class RedisBackend:
         base = (ConnectionError, TimeoutError)
         try:
             import redis
-        except ImportError:  # os testes e o modo CLI não precisam do cliente Redis
+        except ImportError:  # the tests and the CLI mode do not need the Redis client
             return base
         return base + (redis.ConnectionError, redis.TimeoutError)
 
@@ -128,7 +128,7 @@ class RedisBackend:
         def go():
             self.r.ping()
             try:
-                # id "0": jobs enfileirados antes de o grupo existir não se perdem
+                # id "0": jobs queued before the group existed are not lost
                 self.r.xgroup_create(STREAM, GROUP, id="0", mkstream=True)
             except Exception as exc:  # noqa: BLE001 - BUSYGROUP (o grupo já existe) é o caso normal
                 if "BUSYGROUP" not in str(exc):
@@ -136,10 +136,10 @@ class RedisBackend:
 
         self._guard(go)
 
-    def heartbeat(self) -> None:  # o worker clássico só toca o arquivo de saúde (consumer.py)
+    def heartbeat(self) -> None:  # the classic worker only touches the health file (consumer.py)
         return None
 
-    # armazenamento local só existe no agente: no worker clássico a música já está na pasta que a API lê
+    # local storage only exists in the agent: in the classic worker the song is already in the folder the API reads
     def attach_storage(self, storage) -> None:
         return None
 
@@ -149,7 +149,7 @@ class RedisBackend:
     def publish_all(self) -> int:
         return 0
 
-    # a nuvem só existe para o agente (o worker clássico já grava na pasta que a API lê)
+    # the cloud only exists for the agent (the classic worker already writes to the folder the API reads)
     cloud_enabled = False
 
     def cloud_sync(self, video_id: str) -> bool:
@@ -167,12 +167,12 @@ class RedisBackend:
         return Job(video_id=fields["video_id"], payload=json.loads(fields["payload"]), ref=msg_id)
 
     def pending(self) -> list[Job]:
-        """O que ficou pendente com este consumidor (o worker reiniciou no meio de um job)."""
+        """What was left pending with this consumer (the worker restarted in the middle of a job)."""
         response = self._guard(lambda: self.r.xreadgroup(GROUP, self.consumer, {STREAM: "0"}, count=50))
         return [self._job(m, f) for m, f in _entries(response) if f]
 
     def reclaim(self, min_idle_seconds: float) -> list[Job]:
-        """Jobs abandonados por outro worker que caiu (sem ack há muito tempo)."""
+        """Jobs abandoned by another worker that went down (no ack for a long time)."""
         claimed = self._guard(lambda: self.r.xautoclaim(
             STREAM, GROUP, self.consumer, min_idle_time=int(min_idle_seconds * 1000), start_id="0-0", count=10))
         return [self._job(m, f) for m, f in claimed[1] if f]
@@ -183,12 +183,12 @@ class RedisBackend:
         return self._job(*entries[0]) if entries else None
 
     def begin(self, job: Job) -> int:
-        """Conta quantas vezes ESTE pedido começou. Um job que mata o worker é entregue de novo a cada reinício; o runner
-        usa o contador para desistir. Zera quando a API enfileira o pedido de novo (o script Lua recria o hash)."""
+        """Counts how many times THIS request started. A job that kills the worker is delivered again on every restart; the runner
+        uses the counter to give up. It resets when the API queues the request again (the Lua script recreates the hash)."""
         return int(self._guard(lambda: self.r.hincrby(f"job:{job.video_id}", "starts", 1)))
 
     def set_state(self, job: Job, **fields) -> None:
-        """Atualiza o estado do job (hash job:<id>), que a API lê para mostrar o progresso."""
+        """Updates the job's state (the job:<id> hash), which the API reads to show the progress."""
         key = f"job:{job.video_id}"
         status = fields.get("status")
 
@@ -237,22 +237,22 @@ class RedisBackend:
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# HTTP (agente local)
+# HTTP (local agent)
 # ---------------------------------------------------------------------------------------------------------------------
 @dataclass
 class _Shared:
-    """O que as cópias (threads) do mesmo agente compartilham: a sessão e a fila interna das vozes de apoio."""
+    """What the copies (threads) of the same agent share: the session and the backing vocals' internal queue."""
 
     session_id: str | None = None
-    media_base: str | None = None  # o endereço do servidor local de mídia (o que o navegador usa)
-    storage: Any = None  # o armazenamento local, para publicar o catálogo
-    unpublished: set = field(default_factory=set)  # músicas que não deu para publicar (rede): tenta de novo na batida de coração
-    cloud: bool = False  # o servidor autorizou este computador a enviar as músicas para a nuvem (ENABLED_TO_SEND_TO_CLOUD)
-    cloud_queue: Any = field(default_factory=queue.Queue)  # ids de músicas esperando para subir
-    cloud_sent: dict = field(default_factory=dict)  # id → assinatura dos arquivos já enviados (não repete o que não mudou)
+    media_base: str | None = None  # the local media server's address (what the browser uses)
+    storage: Any = None  # the local storage, to publish the catalog
+    unpublished: set = field(default_factory=set)  # songs that could not be published (network): tries again on the heartbeat
+    cloud: bool = False  # the server allowed this computer to send the songs to the cloud (ENABLED_TO_SEND_TO_CLOUD)
+    cloud_queue: Any = field(default_factory=queue.Queue)  # ids of the songs waiting to go up
+    cloud_sent: dict = field(default_factory=dict)  # id → the signature of the files already sent (nothing unchanged is sent again)
     backing: "queue.Queue[str]" = field(default_factory=queue.Queue)
     lock: threading.Lock = field(default_factory=threading.Lock)
-    update: dict = field(default_factory=dict)  # o último aviso de versão do servidor (para a interface mostrar)
+    update: dict = field(default_factory=dict)  # the server's last version notice (for the interface to show)
 
 
 class HttpBackend:
@@ -266,7 +266,7 @@ class HttpBackend:
 
     @property
     def update(self) -> dict:
-        """O aviso de versão do servidor: { status: ok|update_available|update_required|unknown, latest, minimum, notes, url }."""
+        """The server's version notice: { status: ok|update_available|update_required|unknown, latest, minimum, notes, url }."""
         return self._shared.update
 
     def clone(self) -> "HttpBackend":
@@ -311,7 +311,7 @@ class HttpBackend:
             raise BackendUnavailable(str(getattr(exc, "reason", exc))) from exc
 
     def _retry(self, fn, tries: int = 5):
-        """Para o que não pode se perder (terminar um job): repete com espera crescente em falhas de conexão."""
+        """For what must not be lost (finishing a job): repeats with a growing wait on connection failures."""
         for attempt in range(1, tries + 1):
             try:
                 return fn()
@@ -320,10 +320,10 @@ class HttpBackend:
                     raise
                 time.sleep(self.retry_wait * attempt)
 
-    # --- sessão ---
+    # --- session ---
     def connect(self, keep_name: bool = False) -> None:
-        """Entra no servidor: valida o token e inicia a sessão (ou retoma a que já estava ativa, se o agente reiniciou).
-        `keep_name`: ao retomar, mantém o apelido que a sessão já tem (outro comando, como --create-room, não deve renomeá-la)."""
+        """Signs in to the server: validates the token and starts the session (or resumes the one already active, if the agent restarted).
+        `keep_name`: when resuming, keeps the session's nickname (another command, like --create-room, must not rename it)."""
         me = self._call("GET", "/me") or {}
         self._shared.cloud = bool(me.get("cloud"))
         current = me.get("session") or {}
@@ -336,7 +336,7 @@ class HttpBackend:
         log.info("sessão do agente ativa", extra={"session": self._shared.session_id, "resumed": bool(resume)})
 
     def create_room(self) -> dict:
-        """Cria uma sala da sessão: { code, host_token, session_id }."""
+        """Creates a Room in the session: { code, host_token, session_id }."""
         return self._call("POST", f"/sessions/{self._shared.session_id}/rooms") or {}
 
     def end_session(self) -> None:
@@ -350,14 +350,14 @@ class HttpBackend:
     def heartbeat(self) -> None:
         reply = self._call("POST", "/heartbeat", {"version": AGENT_VERSION, "hardware": hardware.summary(), **({"media_base": self.media_base} if self.media_base else {})}, timeout=15) or {}
         self._note_update(reply.get("update") or {})
-        if not reply.get("session_id"):  # o servidor encerrou a sessão (varredura): inicia outra
+        if not reply.get("session_id"):  # the server ended the session (a sweep): start another
             self.connect()
-            self.publish_all()  # a sessão nova começa sem saber das músicas: o catálogo é do dispositivo, mas confere
-        for video_id in list(self._shared.unpublished):  # o que não deu para publicar antes (rede caiu)
+            self.publish_all()  # the new session starts knowing nothing of the songs: the catalog belongs to the device, but check it
+        for video_id in list(self._shared.unpublished):  # what could not be published before (the network went down)
             self.publish_song(video_id)
 
     def _note_update(self, info: dict) -> None:
-        """Guarda o aviso de versão do servidor (para a interface) e registra no log só quando ele muda."""
+        """Keeps the server's version notice (for the interface) and logs it only when it changes."""
         status = info.get("status")
         if status != self._shared.update.get("status"):
             if status == "update_required":
@@ -381,13 +381,13 @@ class HttpBackend:
                 return None
             raise
 
-    # --- nuvem (modo híbrido) ---
+    # --- cloud (hybrid mode) ---
     @property
     def cloud_enabled(self) -> bool:
         return bool(self._shared.cloud and self._shared.storage is not None)
 
     def refresh_cloud(self) -> bool:
-        """Pergunta ao servidor se este computador envia para a nuvem (usado pelos comandos curtos, como --import)."""
+        """Asks the server whether this computer sends to the cloud (used by the short commands, like --import)."""
         self._shared.cloud = bool((self._call("GET", "/me") or {}).get("cloud"))
         return self._shared.cloud
 
@@ -410,8 +410,8 @@ class HttpBackend:
             raise BackendUnavailable(str(getattr(exc, "reason", exc))) from exc
 
     def cloud_sync(self, video_id: str) -> bool:
-        """Sobe os arquivos da música para a nuvem (o meta.json por último: só com ele a música conta como pronta lá).
-        Não repete o que já subiu e não mudou. True se enviou alguma coisa."""
+        """Uploads the song's files to the cloud (meta.json last: only with it does the song count as ready there).
+        Does not resend what already went up and did not change. True if it sent anything."""
         storage = self._shared.storage
         if not self.cloud_enabled or storage is None or catalog.entry_for(storage, video_id) is None:
             return False
@@ -419,7 +419,7 @@ class HttpBackend:
         names = ["instrumental.mp3", "lyrics.json", *[n for n in ("melody.json", "backing.mp3") if storage.exists(f"{base}/{n}")], "meta.json"]
         sent = self._shared.cloud_sent.setdefault(video_id, {})
         if sent.get("blocked"):
-            return False  # o administrador tirou esta música da nuvem: não insiste (até o app reiniciar)
+            return False  # the admin took this song out of the cloud: do not insist (until the app restarts)
         uploaded = False
         for name in names:
             data = storage.read(f"{base}/{name}")
@@ -441,7 +441,7 @@ class HttpBackend:
         return uploaded
 
     def cloud_backfill(self) -> int:
-        """Envia o que a nuvem ainda não tem da biblioteca deste computador. Devolve quantas músicas subiram."""
+        """Sends what the cloud does not have yet from this computer's library. Returns how many songs went up."""
         storage = self._shared.storage
         if not self.cloud_enabled or storage is None:
             return 0
@@ -463,15 +463,15 @@ class HttpBackend:
         except queue.Empty:
             return None
 
-    # --- catálogo local ---
+    # --- local catalog ---
     def publish_song(self, video_id: str, force: bool = False) -> None:
-        """Publica (ou atualiza) uma música no catálogo da nuvem. Uma falha de rede não derruba o job: fica para a próxima batida.
-        `force`: publica mesmo sem servidor local de mídia neste processo (o comando de importar roda fora do agente)."""
+        """Publishes (or updates) a song in the cloud catalog. A network failure does not bring the job down: it waits for the next heartbeat.
+        `force`: publishes even without a local media server in this process (the import command runs outside the agent)."""
         storage = self._shared.storage
         if self._shared.cloud:
-            self._shared.cloud_queue.put(video_id)  # computador autorizado: a música (ou a atualização dela) também sobe para a nuvem
+            self._shared.cloud_queue.put(video_id)  # an allowed computer: the song (or its update) also goes up to the cloud
         if storage is None or (not force and not self._shared.media_base):
-            return  # sem servidor local de mídia, a nuvem usa o armazenamento dela
+            return  # without a local media server, the cloud uses its own storage
         entry = catalog.entry_for(storage, video_id)
         if entry is None:
             return
@@ -483,7 +483,7 @@ class HttpBackend:
             log.warning("não consegui publicar a música no catálogo", extra={"job": video_id, "reason": str(exc)})
 
     def publish_all(self) -> int:
-        """Publica o catálogo inteiro (ao iniciar a sessão): em lotes, para caber no limite de cada pedido."""
+        """Publishes the whole catalog (when the session starts): in batches, to fit each request's limit."""
         storage = self._shared.storage
         if storage is None or not self._shared.media_base:
             return 0
@@ -502,10 +502,10 @@ class HttpBackend:
 
     # --- jobs ---
     def pending(self) -> list[Job]:
-        return []  # o servidor entrega primeiro o que ficou com este dispositivo (em next_job)
+        return []  # the server first delivers what was left with this device (in next_job)
 
     def reclaim(self, min_idle_seconds: float) -> list[Job]:
-        return []  # idem: o prazo "sem sinal" é do servidor
+        return []  # likewise: the "no heartbeat" deadline is the server's
 
     def next_job(self, block_seconds: float) -> Job | None:
         data = self._claim("/jobs/claim", block_seconds)
@@ -513,7 +513,7 @@ class HttpBackend:
         return Job(video_id=job["id"], payload=job["payload"], attempt=job.get("attempt")) if job else None
 
     def begin(self, job: Job) -> int:
-        return int(job.attempt or 1)  # o servidor conta cada entrega
+        return int(job.attempt or 1)  # the server counts each delivery
 
     def set_state(self, job: Job, **fields) -> None:
         status = fields.pop("status", None)
@@ -524,15 +524,15 @@ class HttpBackend:
             else:
                 self._call("POST", f"/jobs/{job.video_id}/progress", body)
         except BackendUnavailable as exc:
-            # perder um aviso de progresso não importa; perder o final importa (por isso o retry acima), mas não derruba o job
+            # losing a progress notice does not matter; losing the final one does (hence the retry above), but it does not bring the job down
             log.warning("não consegui avisar o servidor", extra={"job": job.video_id, "status": status, "reason": str(exc)})
         except Rejected as exc:
             log.warning("o servidor recusou o estado do job", extra={"job": job.video_id, "status": status, "code": exc.code})
 
     def finish(self, job: Job) -> None:
-        return None  # o "complete" já confirmou o job no servidor
+        return None  # the "complete" already acknowledged the job on the server
 
-    # --- vozes de apoio: fila interna (não passa pelo servidor) ---
+    # --- backing vocals: an internal queue (it does not go through the server) ---
     def request_backing(self, video_id: str) -> None:
         self._shared.backing.put(video_id)
 
@@ -542,7 +542,7 @@ class HttpBackend:
         except queue.Empty:
             return None
 
-    # --- busca ---
+    # --- search ---
     def next_search(self, block_seconds: float) -> dict | None:
         return (self._claim("/search/claim", block_seconds) or {}).get("request")
 
@@ -553,7 +553,7 @@ class HttpBackend:
         except (BackendUnavailable, Rejected) as exc:
             log.warning("não consegui devolver a busca", extra={"search": request_id, "reason": str(exc)})
 
-    # --- exportação ---
+    # --- export ---
     def next_export(self, block_seconds: float) -> dict | None:
         return (self._claim("/exports/claim", block_seconds) or {}).get("request")
 
@@ -565,7 +565,7 @@ class HttpBackend:
 
 
 def pair(base_url: str, code: str, name: str = "Meu computador", opener=None, timeout: float = 20) -> dict:
-    """Troca o código de pareamento por um token de dispositivo: { device_id, token }. Sem autenticação (o código é o segredo)."""
+    """Trades the pairing code for a device token: { device_id, token }. No authentication (the code is the secret)."""
     request = urllib.request.Request(
         base_url.rstrip("/") + "/agent/v1/pair/complete", method="POST",
         data=json.dumps({"code": code, "name": name}).encode(),
@@ -582,7 +582,7 @@ def pair(base_url: str, code: str, name: str = "Meu computador", opener=None, ti
 
 
 def make_backend(redis_url: str, consumer: str, agent_url: str | None, agent_token: str | None, session_name: str):
-    """O agente local (HTTP) se `AGENT_URL` está definida; senão o worker clássico (Redis)."""
+    """The local agent (HTTP) if `AGENT_URL` is set; otherwise the classic worker (Redis)."""
     if agent_url:
         if not agent_token:
             raise ValueError("AGENT_URL exige AGENT_TOKEN (o token de dispositivo gerado no pareamento)")

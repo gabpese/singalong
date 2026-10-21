@@ -1,9 +1,9 @@
-"""Atualização segura do meta.json de uma música.
+"""Safe updates to a song's meta.json.
 
-Várias tarefas em segundo plano (título do vídeo, tom, vozes de apoio) completam o meta.json de músicas já prontas. Cada
-uma LÊ, MUDA e GRAVA o arquivo inteiro; sem coordenação, uma sobrescreveria a mudança da outra. Aqui a leitura acontece
-dentro do trava (lock), então a mudança parte sempre do arquivo mais recente. O cálculo demorado (o tom, a separação)
-fica fora da trava: só o "ler, mudar e gravar" é serializado.
+Several background tasks (the video title, the key, the backing vocals) fill in the meta.json of finished songs. Each one
+READS, CHANGES and WRITES the whole file; without coordination, one would overwrite the other's change. Here the read
+happens inside the lock, so a change always starts from the latest file. The slow computation (the key, the separation)
+stays outside the lock: only the "read, change and write" is serialized.
 """
 import json
 import tempfile
@@ -19,7 +19,7 @@ def meta_key(video_id: str) -> str:
 
 
 def update_meta(storage, video_id: str, mutate: Callable[[dict], None]) -> dict:
-    """Aplica `mutate(meta)` (que altera o dicionário no lugar) ao meta.json mais recente e grava. Devolve o meta novo."""
+    """Applies `mutate(meta)` (which changes the dict in place) to the latest meta.json and writes it. Returns the new meta."""
     key = meta_key(video_id)
     with _lock:
         meta = json.loads(storage.read(key))

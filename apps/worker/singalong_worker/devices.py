@@ -1,10 +1,10 @@
-"""Qual dispositivo (GPU ou CPU) cada etapa da IA usa, conforme o motor instalado (a variável SINGALONG_ENGINE, que o app põe no ambiente
-do worker a partir do engine.json: cpu, cu121, rocm6.2 ou mps).
+"""Which device (GPU or CPU) each AI stage uses, for the installed engine (the SINGALONG_ENGINE variable, which the app sets in
+the worker's environment from engine.json: cpu, cu121, rocm6.2 or mps).
 
-- NVIDIA (cu121) e AMD (rocm6.2): o Demucs e o alinhamento escolhem sozinhos; no torch a placa AMD também se chama "cuda".
-- Apple (mps): o Demucs roda no Metal, mas o alinhamento da letra (Whisper) fica na CPU: o tempo das palavras usa operações que o Metal
-  ainda não tem. Se a separação falhar no Metal, ela é refeita na CPU.
-- `DEMUCS_DEVICE` (ou --device) sempre vence."""
+- NVIDIA (cu121) and AMD (rocm6.2): Demucs and the alignment choose by themselves; in torch the AMD card is also called "cuda".
+- Apple (mps): Demucs runs on Metal, but the lyrics alignment (Whisper) stays on the CPU: the word timings use operations Metal
+  does not have yet. If the separation fails on Metal, it runs again on the CPU.
+- `DEMUCS_DEVICE` (or --device) always wins."""
 import logging
 import subprocess
 from collections.abc import Mapping
@@ -14,17 +14,17 @@ log = logging.getLogger("worker.devices")
 
 
 def engine_device(env: Mapping[str, str]) -> str | None:
-    """O dispositivo do Demucs que o motor pede: "mps" no motor da GPU da Apple; nos outros None (o Demucs escolhe)."""
+    """The Demucs device the engine asks for: "mps" on the Apple GPU engine; None on the others (Demucs chooses)."""
     return "mps" if env.get("SINGALONG_ENGINE") == "mps" else None
 
 
 def align_device(device: str | None) -> str | None:
-    """O dispositivo do alinhamento da letra: o Metal não serve para ele, então vira CPU."""
+    """The lyrics alignment's device: Metal does not work for it, so it becomes the CPU."""
     return "cpu" if device == "mps" else device
 
 
 def separate_with_fallback(separate, audio: Path, workdir: Path, device: str | None, timeout: float | None = None):
-    """Roda `separate` (pipeline.separate) e, se a GPU da Apple falhar no meio, refaz na CPU em vez de perder a música."""
+    """Runs `separate` (pipeline.separate) and, if Apple's GPU fails midway, runs it again on the CPU instead of losing the song."""
     try:
         return separate(audio, workdir, device, timeout)
     except subprocess.CalledProcessError as exc:

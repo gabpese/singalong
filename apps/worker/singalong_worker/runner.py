@@ -1,6 +1,6 @@
-"""Tratamento de UM job: retentativas, mensagens de erro claras e proteção contra job que derruba o worker em loop.
+"""Handling ONE job: retries, clear error messages and protection against a job that keeps bringing the worker down.
 
-Não conhece Redis nem HTTP: fala com um `Backend` (backend.py), então é testável sem nenhum dos dois.
+It knows neither Redis nor HTTP: it talks to a `Backend` (backend.py), so it is testable without either.
 """
 import logging
 import os
@@ -23,24 +23,24 @@ log = logging.getLogger("worker.job")
 class Settings:
     redis_url: str
     storage_root: str
-    cookies: "CookiePolicy | Path | None"  # a política de cookies do YouTube (cookies.py); um caminho vale como "sempre"
+    cookies: "CookiePolicy | Path | None"  # the YouTube cookie policy (cookies.py); a path counts as "always"
     device: str | None
     langs: list[str]
     stale_seconds: int
     heartbeat_file: Path
-    max_attempts: int = 3  # tentativas automáticas para falhas transitórias (rede, limite do YouTube)
-    retry_wait: float = 5.0  # espera antes da 2ª tentativa; depois 4× a cada nova tentativa (5 s, 20 s...)
-    max_starts: int = 3  # quantas vezes um mesmo job pode (re)começar antes de ser dado como "derruba o worker"
+    max_attempts: int = 3  # automatic attempts for transient failures (network, YouTube's limit)
+    retry_wait: float = 5.0  # the wait before the 2nd attempt; then 4× for each new attempt (5 s, 20 s...)
+    max_starts: int = 3  # how many times the same job may (re)start before it counts as "bringing the worker down"
     limits: Limits = field(default_factory=Limits)
-    # agente local: se `agent_url` está definida, o worker fala HTTP com o servidor (/agent/v1) em vez de ler o Redis
+    # local agent: if `agent_url` is set, the worker talks HTTP to the server (/agent/v1) instead of reading Redis
     agent_url: str | None = None
     agent_token: str | None = None
-    agent_name: str = "Meu computador"  # o apelido da sessão, o que os convidados veem
-    # servidor local de mídia do agente (a TV busca as músicas daqui): AGENT_MEDIA_PORT=0 desliga e a nuvem usa o armazenamento dela
+    agent_name: str = "Meu computador"  # the session's nickname, what the guests see
+    # the agent's local media server (the TV fetches the songs from here): AGENT_MEDIA_PORT=0 turns it off and the cloud uses its own storage
     media_port: int = 8765
-    media_host: str = "127.0.0.1"  # onde escuta; em Docker, 0.0.0.0 (e publique a porta)
-    media_public: str | None = None  # o endereço que o NAVEGADOR usa, se for diferente de http://127.0.0.1:<porta> (Docker)
-    allowed_origins: tuple = ()  # origens (a da página da nuvem) que podem ler a mídia; o padrão é a de AGENT_URL
+    media_host: str = "127.0.0.1"  # where it listens; in Docker, 0.0.0.0 (and publish the port)
+    media_public: str | None = None  # the address the BROWSER uses, if it differs from http://127.0.0.1:<port> (Docker)
+    allowed_origins: tuple = ()  # origins (the cloud page's) that may read the media; the default is AGENT_URL's
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -72,7 +72,7 @@ def _fail(backend, job: Job, err: JobError) -> None:
 
 
 def _run(backend, storage: LocalStorage, settings: Settings, job: Job, sleep: Callable[[float], None]) -> None:
-    """Roda o pipeline; falhas transitórias são repetidas com espera, as demais sobem já traduzidas (JobError)."""
+    """Runs the pipeline; transient failures are repeated after a wait, the others go up already translated (JobError)."""
     payload = job.payload
     for attempt in range(1, settings.max_attempts + 1):
         try:
@@ -97,7 +97,7 @@ def _run(backend, storage: LocalStorage, settings: Settings, job: Job, sleep: Ca
             err = classify(exc)
             if err.retry != AUTO or attempt >= settings.max_attempts:
                 if err is exc:
-                    raise  # já era um JobError traduzido
+                    raise  # it already was a translated JobError
                 raise err from exc
             wait = settings.retry_wait * 4 ** (attempt - 1)
             log.warning("falha transitória, tentando de novo", extra={"job": job.video_id, "code": err.code, "attempt": attempt, "wait_s": wait})
@@ -109,9 +109,9 @@ def handle(backend, storage: LocalStorage, settings: Settings, job: Job, sleep: 
     video_id, payload = job.video_id, job.payload
     started = time.monotonic()
     try:
-        # Conta quantas vezes ESTE pedido começou. Um job que mata o worker (falta de memória, por exemplo) é entregue de
-        # novo a cada reinício; sem esse limite ele derrubaria o worker para sempre. O contador zera quando a API
-        # enfileira o pedido de novo.
+        # Counts how many times THIS request started. A job that kills the worker (out of memory, for example) is delivered
+        # again on every restart; without this limit it would bring the worker down forever. The counter resets when the API
+        # queues the request again.
         starts = backend.begin(job)
         if starts > settings.max_starts:
             log.error("job derrubou o worker várias vezes, desistindo", extra={"job": video_id, "starts": starts})
@@ -126,15 +126,15 @@ def handle(backend, storage: LocalStorage, settings: Settings, job: Job, sleep: 
         log.info("job começou", extra={"job": video_id, "url": payload.get("url"), "lyrics": payload.get("lyrics_source"), "start": starts})
         backend.set_state(job, status="processing", stage="", error="", error_code="", retry="")
         _run(backend, storage, settings, job, sleep)
-        backend.publish_song(video_id)  # armazenamento local: a nuvem passa a ver a música antes de o job terminar
+        backend.publish_song(video_id)  # local storage: the cloud sees the song before the job ends
         backend.set_state(job, status="ready", stage="", error="", error_code="", retry="")
         try:
-            backend.request_backing(video_id)  # as vozes de apoio saem depois, em segundo plano: a música já está pronta
+            backend.request_backing(video_id)  # the backing vocals come later, in the background: the song is already ready
         except Exception:  # noqa: BLE001 - é um extra; na próxima subida do worker a música é encontrada de qualquer jeito
             log.warning("não consegui pedir as vozes de apoio", extra={"job": video_id})
         log.info("job pronto", extra={"job": video_id, "elapsed_s": round(time.monotonic() - started, 1)})
     except (NeedsLyrics, ValueError) as exc:
-        # depende de uma decisão do usuário (escolher/corrigir a fonte da letra), não é falha do sistema
+        # depends on a user's decision (choosing or fixing the lyrics' source), not a system failure
         backend.set_state(job, status="needs_lyrics", stage="", error=str(exc), error_code="", retry="")
         log.info("job precisa de letra", extra={"job": video_id, "reason": str(exc)})
     except JobError as err:

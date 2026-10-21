@@ -1,10 +1,10 @@
-"""Loop principal do worker: puxa jobs do servidor e os processa. O transporte (backend.py) é um de dois:
+"""The worker's main loop: pulls jobs from the server and processes them. The transport (backend.py) is one of two:
 
-  Redis  o worker clássico (Docker): lê o stream "jobs" direto do Redis. Contrato em apps/api/src/jobs.ts.
-  HTTP   o agente local: só conexões de saída para /agent/v1 do servidor (AGENT_URL + AGENT_TOKEN), sem acesso ao Redis.
+  Redis  the classic worker (Docker): reads the "jobs" stream straight from Redis. Contract in apps/api/src/jobs.ts.
+  HTTP   the local agent: only outgoing connections to the server's /agent/v1 (AGENT_URL + AGENT_TOKEN), no access to Redis.
 
-O worker sempre PUXA trabalho (nunca é chamado pela API), então pode rodar atrás de NAT / em outra máquina.
-O tratamento de cada job (retentativas, erros, proteção contra loop) está em runner.py.
+The worker always PULLS work (the API never calls it), so it can run behind NAT / on another machine.
+Each job's handling (retries, errors, loop protection) is in runner.py.
 """
 import logging
 import os
@@ -29,13 +29,13 @@ from .titles import backfill as titles_backfill
 
 log = logging.getLogger("worker")
 
-HEARTBEAT_EVERY = 10  # segundos
-SERVER_HEARTBEAT_EVERY = 15  # o servidor considera o dono offline depois de 45 s sem sinal
+HEARTBEAT_EVERY = 10  # seconds
+SERVER_HEARTBEAT_EVERY = 15  # the server considers the owner offline after 45 s without a heartbeat
 
 
 def _heartbeat(path, backend, stop: threading.Event) -> None:
-    """Marca que o worker está vivo, mesmo durante um job de minutos: o arquivo (o healthcheck do Docker lê a data dele) e,
-    no agente local, o sinal de vida para o servidor (senão a sala mostraria "dono offline" no meio de um job)."""
+    """Marks the worker as alive, even during a job that takes minutes: the file (Docker's healthcheck reads its date) and,
+    in the local agent, the heartbeat to the server (otherwise the Room would show the owner offline in the middle of a job)."""
     last_server = 0.0
     while not stop.is_set():
         try:
@@ -52,13 +52,13 @@ def _heartbeat(path, backend, stop: threading.Event) -> None:
 
 
 def _start_media_server(settings: Settings, storage_root, backend):
-    """Sobe o servidor local de mídia e diz ao backend o endereço que o navegador deve usar. None se não se aplica."""
+    """Starts the local media server and tells the backend the address the browser must use. None if it does not apply."""
     if not isinstance(backend, HttpBackend) or settings.media_port == 0:
-        return None  # o worker clássico e o agente com AGENT_MEDIA_PORT=0 usam o armazenamento do servidor
+        return None  # the classic worker and the agent with AGENT_MEDIA_PORT=0 use the server's storage
     page = urlsplit(settings.agent_url or "")
     origins = sorted({f"{page.scheme}://{page.netloc}", *settings.allowed_origins})
     last_error = None
-    # com a porta "pública" fixa (Docker) não dá para trocar de porta; fora disso tenta as seguintes se a primeira estiver ocupada
+    # with the fixed "public" port (Docker) the port cannot change; otherwise it tries the next ones if the first is taken
     for port in ([settings.media_port] if settings.media_public else range(settings.media_port, settings.media_port + 10)):
         media = MediaServer(storage_root, origins, port, settings.media_host)
         try:
@@ -83,7 +83,7 @@ def run() -> int:
     try:
         backend = make_backend(settings.redis_url, consumer, settings.agent_url, settings.agent_token, settings.agent_name)
     except ValueError as exc:
-        # AGENT_URL sem AGENT_TOKEN: quase sempre a variável do token está vazia neste terminal (no PowerShell, $env: vale só por terminal)
+        # AGENT_URL without AGENT_TOKEN: almost always the token's variable is empty in this terminal (in PowerShell, $env: holds per terminal)
         log.error("configuração do agente incompleta: %s. Confira se AGENT_TOKEN tem valor neste terminal.", exc)
         return 2
     policy = as_policy(settings.cookies)
@@ -102,7 +102,7 @@ def run() -> int:
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    while True:  # espera o servidor ficar disponível (ordem de subida do compose / reinícios / rede)
+    while True:  # waits for the server to become available (compose start order / restarts / network)
         try:
             backend.connect()
             break
@@ -115,18 +115,18 @@ def run() -> int:
             log.error("o servidor recusou o token do agente (revogado?). Pareie de novo: %s", exc)
             return 2
 
-    backend.publish_all()  # armazenamento local: a nuvem passa a ver as músicas que já estão neste computador
+    backend.publish_all()  # local storage: the cloud starts seeing the songs already on this computer
     stop_threads = threading.Event()
-    # a busca no YouTube roda numa thread própria: não pode esperar atrás de um job longo (Demucs)
+    # the YouTube search runs on its own thread: it cannot wait behind a long job (Demucs)
     threading.Thread(target=search_serve, args=(backend.clone(), settings.cookies, stop_threads), name="search", daemon=True).start()
-    # as vozes de apoio levam minutos em CPU: thread própria, uma música de cada vez, sem segurar a próxima do karaokê
+    # the backing vocals take minutes on a CPU: their own thread, one song at a time, without holding the next karaoke song
     threading.Thread(target=backing_serve, args=(backend.clone(), storage, stop_threads), name="backing", daemon=True).start()
-    # a exportação em MP4 também tem thread própria: leva um minuto e não pode esperar atrás do Demucs
+    # the MP4 export has its own thread too: it takes a minute and cannot wait behind Demucs
     threading.Thread(target=export_serve, args=(backend.clone(), storage, stop_threads), name="export", daemon=True).start()
-    # músicas processadas antes do recurso de tom ganham o tom em segundo plano (uma vez cada)
-    # (o título do vídeo vem primeiro: é instantâneo e as duas atualizações reescrevem o mesmo meta.json, então não rodam juntas)
+    # songs processed before the key feature get their key in the background (once each)
+    # (the video title comes first: it is instant, and both updates rewrite the same meta.json, so they do not run together)
     threading.Thread(target=lambda: (titles_backfill(storage), key_backfill(storage)), name="backfill", daemon=True).start()
-    # computador autorizado pelo servidor (ENABLED_TO_SEND_TO_CLOUD): as músicas dele também sobem para a nuvem, em segundo plano
+    # a computer the server allows (ENABLED_TO_SEND_TO_CLOUD): its songs go up to the cloud too, in the background
     threading.Thread(target=cloud_serve, args=(backend.clone(), storage, stop_threads), name="cloud", daemon=True).start()
     threading.Thread(target=_heartbeat, args=(settings.heartbeat_file, backend.clone(), stop_threads), name="heartbeat", daemon=True).start()
 
@@ -136,7 +136,7 @@ def run() -> int:
 
     code = 0
     try:
-        # 1) o que ficou pendente deste consumidor (reinício no meio de um job)
+        # 1) what this consumer left pending (a restart in the middle of a job)
         for job in backend.pending():
             if not stopping:
                 handle(backend, storage, settings, job)
@@ -144,13 +144,13 @@ def run() -> int:
         last_claim = 0.0
         while not stopping:
             try:
-                # 2) jobs abandonados por outro worker que caiu (sem ack há muito tempo)
+                # 2) jobs abandoned by another worker that went down (no ack for a long time)
                 if time.monotonic() - last_claim > 60:
                     last_claim = time.monotonic()
                     for job in backend.reclaim(settings.stale_seconds):
                         if not stopping:
                             handle(backend, storage, settings, job)
-                # 3) novos jobs
+                # 3) new jobs
                 job = backend.next_job(5)
                 if job:
                     handle(backend, storage, settings, job)
@@ -166,6 +166,6 @@ def run() -> int:
             media.stop()
         close = getattr(backend, "end_session", None)
         if close and stopping:
-            close()  # saída pedida pelo dono: encerra a sessão (os pedidos pendentes viram "o dono saiu")
+            close()  # an exit the owner asked for: ends the session (the pending requests become "the owner left")
     log.info("worker encerrado")
     return code

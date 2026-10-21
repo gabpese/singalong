@@ -1,8 +1,8 @@
-"""Título do vídeo do YouTube de cada música do cache, para o Jukebox achar a música também por ele.
+"""The YouTube video title of each cached song, so the Jukebox also finds the song by it.
 
-O `meta.json` guarda o nome que a pessoa deu (artista e música); o título original do vídeo ("Faouzia - Unethical (MAPHRA
-Vocal Cover)") ajuda a achar a mesma música quando ela foi pedida com outro nome. Músicas processadas antes deste recurso
-já têm o título no `source.json`: o backfill o copia para o `meta.json`.
+`meta.json` keeps the name the person gave (artist and song); the video's original title ("Faouzia - Unethical (MAPHRA
+Vocal Cover)") helps find the same song when it was asked for under another name. Songs processed before this feature
+already have the title in `source.json`: the backfill copies it to `meta.json`.
 """
 import json
 import logging
@@ -13,7 +13,7 @@ log = logging.getLogger("worker.titles")
 
 
 def backfill(storage) -> int:
-    """Copia `video_title` do source.json para o meta.json das músicas que ainda não têm. Devolve quantas atualizou."""
+    """Copies `video_title` from source.json to the meta.json of the songs that lack it. Returns how many it updated."""
     done = 0
     for meta_key_path in [k for k in storage.list("cache") if k.endswith("/meta.json")]:
         base = meta_key_path.rsplit("/", 1)[0]
