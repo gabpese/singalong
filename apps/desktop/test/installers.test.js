@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { INSTALLERS, installerFile, installerUrl, needsNoSandbox } from '../src/installers.js';
+import { INSTALLERS, installerFile, installerUrl, needsNoSandbox } from '../src/installers.ts';
 
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 

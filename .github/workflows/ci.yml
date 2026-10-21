@@ -193,6 +193,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
+      # npm test builds first (npm run build): it type-checks the main process and compiles the window and the preloads
       - run: npm test
       # a janela de verdade (Electron) falando com a API de verdade e o worker de verdade
       - name: Garantir o binário do Electron

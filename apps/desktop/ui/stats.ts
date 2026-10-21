@@ -1,7 +1,8 @@
-// Estatísticas do dono: os números formatados e o desenho do cartão. Nenhum texto de fora entra como HTML (só textContent).
+// The owner's statistics: the formatted numbers and the card's drawing. No text from outside goes in as HTML (only textContent).
+import type { OwnerStats } from './bridge.ts';
 
-/** Bytes em "1,2 GB", "340 MB"... (base 1000, como o Windows mostra no disco). */
-export function formatBytes(bytes) {
+/** Bytes as "1,2 GB", "340 MB"... (base 1000, as Windows shows on disk). */
+export function formatBytes(bytes: unknown): string {
   const n = Number(bytes) || 0;
   if (n < 1000) return `${n} B`;
   const units = ['kB', 'MB', 'GB', 'TB'];
@@ -14,8 +15,8 @@ export function formatBytes(bytes) {
   return `${value.toFixed(value >= 100 ? 0 : 1).replace('.', ',')} ${units[unit]}`;
 }
 
-/** Segundos em "1 min 30 s", "45 s" ou "—" (sem dado). */
-export function formatSeconds(seconds) {
+/** Seconds as "1 min 30 s", "45 s" or "—" (no data). */
+export function formatSeconds(seconds: unknown): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(Number(seconds))) return '—';
   const total = Math.round(Number(seconds));
   if (total < 60) return `${total} s`;
@@ -24,21 +25,21 @@ export function formatSeconds(seconds) {
   return rest ? `${minutes} min ${rest} s` : `${minutes} min`;
 }
 
-/** Nota média ("80" ou "—"). */
-export const formatScore = (score) => (score === null || score === undefined ? '—' : String(Math.round(Number(score))));
+/** The average Score ("80" or "—"). */
+export const formatScore = (score: unknown) => (score === null || score === undefined ? '—' : String(Math.round(Number(score))));
 
-/** "Artista — Título", só o título ou "(sem nome)". */
-export function songName(song) {
+/** "Artist — Title", the title alone, or "(sem nome)". */
+export function songName(song: { title?: string | null; artist?: string | null } | null | undefined): string {
   const title = song?.title?.trim();
   const artist = song?.artist?.trim();
   if (title && artist) return `${artist} — ${title}`;
   return title || artist || '(sem nome)';
 }
 
-/** O movimento por dia dos últimos `days` dias (no máximo 14 barras), do mais antigo ao mais novo, com os dias sem música como 0. */
-export function activityBars(byDay, days, today = new Date()) {
+/** The plays per day over the last `days` days (14 bars at most), oldest first, with the days without a song as 0. */
+export function activityBars(byDay: { day: string; songs: number }[] | null | undefined, days: number, today = new Date()) {
   const counts = new Map((byDay ?? []).map((entry) => [entry.day, entry.songs]));
-  const bars = [];
+  const bars: { day: string; songs: number }[] = [];
   const shown = Math.min(days, 14);
   for (let i = shown - 1; i >= 0; i--) {
     const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
@@ -48,20 +49,20 @@ export function activityBars(byDay, days, today = new Date()) {
   return bars;
 }
 
-const make = (tag, className, text) => {
+const make = (tag: string, className?: string, text?: string) => {
   const element = document.createElement(tag);
   if (className) element.className = className;
   if (text !== undefined) element.textContent = text;
   return element;
 };
 
-function stat(label, value) {
+function stat(label: string, value: unknown) {
   const box = make('div', 'stat');
   box.append(make('strong', '', String(value)), make('span', 'muted', label));
   return box;
 }
 
-function list(title, rows, empty = 'Ainda não há dados.') {
+function list(title: string, rows: [string, string][], empty = 'Ainda não há dados.') {
   const section = make('div', 'stats-list');
   section.append(make('h3', '', title));
   if (!rows.length) {
@@ -78,8 +79,8 @@ function list(title, rows, empty = 'Ainda não há dados.') {
   return section;
 }
 
-/** Desenha as estatísticas (`{ server, library }` do controlador) dentro de `container`. */
-export function renderStats(container, data) {
+/** Draws the statistics (the controller's `{ server, library }`) inside `container`. */
+export function renderStats(container: HTMLElement, data: OwnerStats) {
   const { server, library } = data;
   const totals = server.totals;
   container.replaceChildren();

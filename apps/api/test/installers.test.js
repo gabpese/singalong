@@ -29,7 +29,7 @@ test('downloadsFor: um link por sistema, na ordem windows, macos, linux; vazio s
 });
 
 test('os nomes dos instaladores são os mesmos do app e do electron-builder', async () => {
-  const { INSTALLERS: desktop } = await import('../../desktop/src/installers.js');
+  const { INSTALLERS: desktop } = await import('../../desktop/src/installers.ts');
   const system = { win32: 'windows', darwin: 'macos', linux: 'linux' };
   const arch = { x64: 'x64', arm64: 'arm64' };
   const fromDesktop = Object.entries(desktop).map(([key, file]) => {

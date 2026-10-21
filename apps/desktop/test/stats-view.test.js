@@ -1,8 +1,8 @@
-// Os números das estatísticas do dono como aparecem na janela (a parte sem DOM do ui/stats.js).
+// Os números das estatísticas do dono como aparecem na janela (a parte sem DOM do ui/stats.ts).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { prepareSeconds } from '../src/library-stats.js';
-import { activityBars, formatBytes, formatScore, formatSeconds, songName } from '../ui/stats.js';
+import { prepareSeconds } from '../src/library-stats.ts';
+import { activityBars, formatBytes, formatScore, formatSeconds, songName } from '../ui/stats.ts';
 
 test('formatBytes: unidades de 1000, com vírgula', () => {
   assert.equal(formatBytes(0), '0 B');

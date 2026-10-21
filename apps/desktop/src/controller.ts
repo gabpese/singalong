@@ -1,29 +1,32 @@
-// O "cérebro" do app do dono, sem Electron (por isso dá para testar de ponta a ponta com processos de verdade):
-// guarda a configuração, monta o motor, pareia, inicia/para o agente (o worker em modo serviço) e roda os comandos dele
-// (criar sala, login do YouTube, importar música, hardware). A janela só mostra o `snapshot()` e chama estes métodos.
-import { execFile, spawn } from 'node:child_process';
-import { homedir } from 'node:os';
+// The "brain" of the owner's app, without Electron (so it can be tested end to end with real processes): it keeps the settings,
+// assembles the engine, pairs, starts and stops the agent (the worker as a service) and runs its commands (creating a Room, the
+// YouTube login, importing a song, the hardware). The window only shows `snapshot()` and calls these methods.
+import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { assemble, refreshWorker } from '@singalong/engine/assemble';
 import { paths, readState, workerCommand } from '@singalong/engine/engine';
 import { verifyEngine } from '@singalong/engine/verify';
-import { libraryStats } from './library-stats.js';
+import type { AgentStatus, BrowserId, Microphone, OpenRoom, OwnerStats, ServerStats, Snapshot, UpdateInfo, YoutubeStatus } from '../ui/bridge.ts';
+import { libraryStats } from './library-stats.ts';
 
-export const APP_VERSION = '1.4.2'; // tem de ser igual ao package.json e ao singalong_worker/version.py (um teste confere)
+export const APP_VERSION = '1.4.2'; // must match package.json and singalong_worker/version.py (a test checks)
 const MAX_LOGS = 300;
 const POLL_MS = 5000;
 
 export class UserError extends Error {
-  constructor(code, message) {
+  code: string;
+
+  constructor(code: string, message: string) {
     super(message);
     this.code = code;
   }
 }
 
-/** O endereço do servidor: https, ou http só no próprio computador / rede local (desenvolvimento). */
-export function normalizeServer(value) {
-  let url;
+/** The server's address: https, or http only on this computer or the local network (development). */
+export function normalizeServer(value: unknown): string {
+  let url: URL;
   try {
     url = new URL(String(value ?? '').trim().replace(/\/+$/, ''));
   } catch {
@@ -35,25 +38,31 @@ export function normalizeServer(value) {
   return url.origin;
 }
 
-/** O arquivo .desktop do navegador padrão do Linux (xdg-settings) como o nome que o app conhece. */
-const browserFromDesktopFile = (name) => (/chrom|brave|vivaldi/i.test(name) ? 'chrome' : /msedge|microsoft-edge/i.test(name) ? 'edge' : 'auto');
+/** Linux's default browser .desktop file (xdg-settings) as the name the app knows. */
+const browserFromDesktopFile = (name: string): BrowserId => (/chrom|brave|vivaldi/i.test(name) ? 'chrome' : /msedge|microsoft-edge/i.test(name) ? 'edge' : 'auto');
 
-/** O navegador padrão do sistema (o do https): "chrome", "edge" ou "auto" (outro: o worker usa o Chrome/Edge que achar). Windows: pelo registro; Linux: pelo xdg-settings; macOS: pelos handlers do LaunchServices. */
-export function detectDefaultBrowser(run = execFile, platform = process.platform) {
+type ExecCallback = (error: Error | null, stdout: string | Buffer) => void;
+type Exec = (command: string, args: string[], options: object, callback: ExecCallback) => unknown;
+
+/**
+ * The system's default browser (the https one): "chrome", "edge" or "auto" (another: the worker uses the Chrome or Edge it
+ * finds). Windows: from the registry; Linux: from xdg-settings; macOS: from LaunchServices' handlers.
+ */
+export function detectDefaultBrowser(run: Exec = execFile as unknown as Exec, platform: string = process.platform): Promise<BrowserId> {
   return new Promise((resolve) => {
     if (platform === 'linux') {
       run('xdg-settings', ['get', 'default-web-browser'], { timeout: 5000 }, (error, stdout) => resolve(error ? 'auto' : browserFromDesktopFile(String(stdout).trim())));
       return;
     }
     if (platform === 'darwin') {
-      // o navegador padrão do macOS fica nos "handlers" do LaunchServices; sem entrada é o Safari (que não serve para os cookies: automático)
+      // macOS keeps its default browser in LaunchServices' "handlers"; without an entry it is Safari (no use for the cookies: automatic)
       const plist = join(homedir(), 'Library', 'Preferences', 'com.apple.LaunchServices', 'com.apple.launchservices.secure.plist');
       run('plutil', ['-convert', 'json', '-o', '-', plist], { timeout: 5000 }, (error, stdout) => {
         let bundle = '';
         try {
-          bundle = error ? '' : (JSON.parse(String(stdout)).LSHandlers ?? []).find((h) => h.LSHandlerURLScheme === 'https')?.LSHandlerRoleAll ?? '';
+          bundle = error ? '' : (JSON.parse(String(stdout)).LSHandlers ?? []).find((h: { LSHandlerURLScheme?: string }) => h.LSHandlerURLScheme === 'https')?.LSHandlerRoleAll ?? '';
         } catch {
-          /* arquivo ilegível: automático */
+          /* an unreadable file: automatic */
         }
         resolve(/edgemac/i.test(bundle) ? 'edge' : /chrome|brave|vivaldi/i.test(bundle) ? 'chrome' : 'auto');
       });
@@ -67,26 +76,76 @@ export function detectDefaultBrowser(run = execFile, platform = process.platform
   });
 }
 
-export const DEFAULT_SERVER = 'https://singalong.duckdns.org'; // o servidor padrão (o dono pode trocar na tela de conectar)
+export const DEFAULT_SERVER = 'https://singalong.duckdns.org'; // the default server (the owner can change it on the connect screen)
 
-export const BROWSER_NAMES = { chrome: 'Google Chrome', edge: 'Microsoft Edge', auto: 'o seu navegador' };
+export const BROWSER_NAMES: Record<BrowserId, string> = { chrome: 'Google Chrome', edge: 'Microsoft Edge', auto: 'o seu navegador' };
+
+/**
+ * Where the device token is kept: `available` (it can encrypt), `protects` (the key is the system's, not a fixed one),
+ * `encrypt(text)` → base64, `decrypt(base64)` → `{ text, reEncrypt }`.
+ */
+export interface Vault {
+  available: boolean;
+  protects: boolean;
+  encrypt(text: string): Promise<string>;
+  decrypt(sealed: string): Promise<{ text: string; reEncrypt: boolean }>;
+}
 
 /**
  * Without a system vault (the tests, or a system that offers none) the device token stays in config.json as plain text, and
- * the window says it is not protected. The app passes Electron's `safeStorage` instead (see `systemVault` in main.js).
- * A vault: `available` (it can encrypt), `protects` (the key is the system's, not a fixed one), `encrypt(text)` → base64,
- * `decrypt(base64)` → `{ text, reEncrypt }`.
+ * the window says it is not protected. The app passes Electron's `safeStorage` instead (see `systemVault` in main.ts).
  */
-export const PLAIN_VAULT = {
+export const PLAIN_VAULT: Vault = {
   available: false,
   protects: false,
-  encrypt: async () => { throw new Error('no vault'); },
-  decrypt: async () => { throw new Error('no vault'); },
+  encrypt: async () => {
+    throw new Error('no vault');
+  },
+  decrypt: async () => {
+    throw new Error('no vault');
+  },
 };
+
+/** How the worker starts: [executable, arguments, options]. The tests swap in a fake worker. */
+export type Launcher = (root: string, args: string[], extraEnv: Record<string, string>) => readonly [string, readonly string[], { cwd?: string; env?: NodeJS.ProcessEnv; windowsHide?: boolean }];
+
+/** What config.json keeps (the token only encrypted, as `token_enc`, when there is a vault). */
+interface Config {
+  server: string;
+  token: string;
+  device_name: string;
+  nickname: string;
+  engine_dir: string;
+  library_dir: string;
+  microphone?: Microphone | null;
+  setup_done?: boolean;
+}
+
+export interface ControllerOptions {
+  dataDir: string;
+  /** Where the worker's code that goes into the engine is (in the installed app: the resources folder). */
+  workerSource?: string;
+  version?: string;
+  fetchImpl?: typeof fetch;
+  spawnImpl?: typeof spawn;
+  assembleImpl?: typeof assemble;
+  refreshWorkerImpl?: typeof refreshWorker;
+  verifyImpl?: typeof verifyEngine;
+  detectBrowser?: () => Promise<BrowserId>;
+  /** Called by init(): Electron's vault only works once the app is ready. */
+  openVault?: () => Promise<Vault>;
+  now?: () => number;
+  launcher?: Launcher;
+  emit?: (event: string, payload: unknown) => void;
+  pollMs?: number;
+  restartMs?: number;
+}
+
+export type Controller = ReturnType<typeof createController>;
 
 export function createController({
   dataDir,
-  workerSource, // onde está o código do worker que vai para dentro do motor (no app instalado: a pasta de recursos)
+  workerSource,
   version = APP_VERSION,
   fetchImpl = fetch,
   spawnImpl = spawn,
@@ -94,43 +153,43 @@ export function createController({
   refreshWorkerImpl = refreshWorker,
   verifyImpl = verifyEngine,
   detectBrowser = detectDefaultBrowser,
-  openVault = async () => PLAIN_VAULT, // called by init(): Electron's vault only works once the app is ready
+  openVault = async () => PLAIN_VAULT,
   now = Date.now,
-  launcher = (root, args, extraEnv) => workerCommand(root, args, extraEnv), // [exe, args, options]: os testes trocam por um worker de mentira
+  launcher = (root, args, extraEnv) => workerCommand(root, args, extraEnv),
   emit = () => {},
   pollMs = POLL_MS,
   restartMs = 3000,
-} = {}) {
+}: ControllerOptions) {
   const configFile = join(dataDir, 'config.json');
-  let config = { server: '', token: '', device_name: '', nickname: '', engine_dir: join(dataDir, 'engine'), library_dir: join(dataDir, 'library') };
+  let config: Config = { server: '', token: '', device_name: '', nickname: '', engine_dir: join(dataDir, 'engine'), library_dir: join(dataDir, 'library') };
   let vault = PLAIN_VAULT;
-  let browser = 'auto'; // o navegador padrão da máquina (detectado ao abrir)
-  const state = {
+  let browser: BrowserId = 'auto'; // the computer's default browser (detected when the app opens)
+  const state: Pick<Snapshot, 'engine' | 'agent' | 'rooms' | 'youtube' | 'update' | 'updateProgress' | 'busy' | 'logs'> = {
     engine: { status: 'unknown', progress: null, error: null, kind: null, reason: null },
     agent: { status: 'stopped', session: null, error: null },
     rooms: [],
     youtube: { status: 'unknown', detail: null },
     update: null,
-    updateProgress: null, // { percent } enquanto baixa a atualização
-    busy: null, // nome da tarefa longa em andamento (importar, login...)
+    updateProgress: null,
+    busy: null,
     logs: [],
   };
-  let agentProcess = null;
+  let agentProcess: ChildProcess | null = null;
   let stopping = false;
-  let pollTimer = null;
-  let restartTimer = null;
+  let pollTimer: NodeJS.Timeout | undefined;
+  let restartTimer: NodeJS.Timeout | undefined;
   let restarts = 0;
 
   const publish = () => emit('state', snapshot());
-  const log = (line, level = 'info') => {
+  const log = (line: unknown, level: 'info' | 'error' = 'info') => {
     state.logs.push({ ts: Date.now(), level, line: String(line).slice(0, 500) });
     if (state.logs.length > MAX_LOGS) state.logs.splice(0, state.logs.length - MAX_LOGS);
     emit('log', state.logs.at(-1));
   };
 
   // Writes run one after another: encrypting the token waits on the system, and two writes must not share the temporary file.
-  let writing = Promise.resolve();
-  function save(patch) {
+  let writing: Promise<void> = Promise.resolve();
+  function save(patch: Partial<Config>): Promise<void> {
     config = { ...config, ...patch };
     const run = writing.catch(() => {}).then(write);
     writing = run;
@@ -147,8 +206,8 @@ export function createController({
     await rename(tmp, configFile);
   }
 
-  /** Reads the encrypted token. If this computer cannot decrypt it (a copied profile, a replaced keychain), it pairs again. */
-  async function openToken(sealed) {
+  /** Reads the encrypted token. When this computer cannot decrypt it (a copied profile, a replaced keychain), it pairs again. */
+  async function openToken(sealed: string) {
     const opened = await vault.decrypt(sealed).catch(() => null);
     if (opened?.text) {
       config.token = opened.text;
@@ -160,7 +219,7 @@ export function createController({
     log('Não consegui ler o pareamento guardado neste computador. Pareie de novo; o aparelho antigo continua na lista do servidor, para ser revogado.', 'error');
   }
 
-  function snapshot() {
+  function snapshot(): Snapshot {
     return {
       version,
       defaultServer: DEFAULT_SERVER,
@@ -170,7 +229,7 @@ export function createController({
       deviceName: config.device_name,
       nickname: config.nickname,
       microphone: config.microphone ?? null,
-      setupDone: Boolean(config.setup_done), // a escolha de placa de vídeo e microfone da primeira sessão já foi feita?
+      setupDone: Boolean(config.setup_done), // the first Session's choice of video card and microphone is done?
       browser,
       browserName: BROWSER_NAMES[browser],
       engineDir: config.engine_dir,
@@ -181,69 +240,71 @@ export function createController({
     };
   }
 
-  // --- servidor ---
-  async function api(method, path, { body, token = config.token, timeout = 15000, base = config.server } = {}) {
-    let response;
+  // --- the server ---
+  async function api<T = any>(method: string, path: string, { body, token = config.token, timeout = 15000, base = config.server }: { body?: unknown; token?: string; timeout?: number; base?: string } = {}): Promise<T> {
+    let response: Response;
     try {
       response = await fetchImpl(`${base}/agent/v1${path}`, {
         method,
-        headers: { accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...(token ? { authorization: `Bearer ${token}` } : {}) }, // o Fastify recusa content-type JSON com corpo vazio
+        // Fastify refuses a JSON content-type with an empty body
+        headers: { accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...(token ? { authorization: `Bearer ${token}` } : {}) },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(timeout),
       });
     } catch (error) {
-      throw new UserError('offline', `Não consegui falar com o servidor (${error.cause?.code ?? error.message}).`);
+      const failure = error as Error & { cause?: { code?: string } };
+      throw new UserError('offline', `Não consegui falar com o servidor (${failure.cause?.code ?? failure.message}).`);
     }
     const text = await response.text();
     let data = null;
     try {
       data = text ? JSON.parse(text) : null;
     } catch {
-      /* resposta que não é JSON */
+      /* an answer that is not JSON */
     }
     if (!response.ok) throw new UserError(data?.error ?? `http_${response.status}`, data?.message ?? `O servidor respondeu ${response.status}.`);
     return data;
   }
 
-  // --- inicialização ---
+  // --- start-up ---
   async function init() {
     vault = await openVault().catch(() => PLAIN_VAULT);
-    let stored = {};
+    let stored: Partial<Config> & { token_enc?: string } = {};
     try {
       stored = JSON.parse(await readFile(configFile, 'utf8'));
     } catch {
-      /* primeira abertura */
+      /* the first time the app opens */
     }
     const { token_enc: sealed, ...rest } = stored;
     config = { ...config, ...rest };
     if (sealed) await openToken(sealed);
     else if (config.token && vault.available) await save({}).catch(() => {}); // the first run after the update: encrypt the plain token (retried on the next run if the disk refuses)
 
-    browser = await detectBrowser().catch(() => 'auto');
+    browser = await detectBrowser().catch((): BrowserId => 'auto');
     const engineState = await readState(config.engine_dir);
     if (engineState?.complete) {
-      // o app se atualizou: leva junto o código do worker (senão o computador seguiria com o worker antigo e o servidor o recusaria)
+      // the app updated itself: it brings the worker's code along (otherwise the computer would keep the old worker, and the server would refuse it)
       if (workerSource) {
         try {
           const refreshed = await refreshWorkerImpl({ root: config.engine_dir, workerSource });
           if (refreshed.updated) log(`Aplicativo do motor atualizado: ${refreshed.from ?? 'antigo'} → ${refreshed.to}.`);
         } catch (error) {
-          log(`Não consegui atualizar o aplicativo do motor: ${error.message}`, 'error');
+          log(`Não consegui atualizar o aplicativo do motor: ${(error as Error).message}`, 'error');
         }
       }
-      state.engine = { status: 'ready', progress: null, error: null, kind: engineState.engine, reason: engineState.fallback_reason ?? engineState.engine_reason };
+      state.engine = { status: 'ready', progress: null, error: null, kind: engineState.engine ?? null, reason: engineState.fallback_reason ?? engineState.engine_reason ?? null };
     } else {
       state.engine = { status: 'missing', progress: null, error: null, kind: null, reason: null };
     }
     publish();
     if (config.server) checkUpdate().catch(() => {});
-    // o app pode ficar dias aberto na bandeja: confere se saiu versão nova uma vez por dia (e quando a janela volta, se já passou um dia)
+    // the app may stay open in the tray for days: it checks for a new version once a day (and when the window comes back, if a day passed)
     setInterval(() => refreshUpdate().catch(() => {}), 60 * 60 * 1000).unref?.();
     return snapshot();
   }
 
-  // --- motor ---
-  async function buildEngine({ engine = 'auto', switchEngine = false } = {}) {
+  // --- the engine ---
+  async function buildEngine({ engine = 'auto', switchEngine = false }: { engine?: string; switchEngine?: boolean } = {}) {
     if (state.engine.status === 'building') return snapshot();
     if (switchEngine && agentProcess) throw new UserError('session_running', 'Encerre a sessão para trocar a placa de vídeo.');
     state.engine = { ...state.engine, status: 'building', error: null, progress: { label: 'Preparando…' } };
@@ -262,25 +323,25 @@ export function createController({
       });
       const report = await verifyImpl(config.engine_dir);
       if (!report.ok) throw new Error(`O motor foi montado, mas a verificação falhou: ${report.checks.filter((c) => !c.ok).map((c) => `${c.name}: ${c.detail}`).join('; ')}`);
-      state.engine = { status: 'ready', progress: null, error: null, kind: final.engine, reason: final.fallback_reason ?? final.engine_reason };
+      state.engine = { status: 'ready', progress: null, error: null, kind: final.engine ?? null, reason: final.fallback_reason ?? final.engine_reason ?? null };
       log(`Motor pronto (${final.engine}).`);
     } catch (error) {
-      state.engine = { ...state.engine, status: 'error', progress: null, error: String(error.message ?? error).slice(0, 600) };
+      state.engine = { ...state.engine, status: 'error', progress: null, error: String((error as Error).message ?? error).slice(0, 600) };
       log(state.engine.error, 'error');
     }
     publish();
     return snapshot();
   }
 
-  // --- pareamento e versão ---
-  async function pair({ server, code, name }) {
+  // --- pairing and the version ---
+  async function pair({ server, code, name }: { server: string; code: string; name?: string }) {
     const url = normalizeServer(server);
     const cleanCode = String(code ?? '').trim();
     if (cleanCode.length < 4) throw new UserError('bad_code', 'Digite o código de pareamento.');
     const deviceName = String(name || 'Meu computador').trim().slice(0, 60);
-    config.server = url; // o api() usa o servidor da configuração
+    config.server = url; // api() uses the server in the settings
     try {
-      const done = await api('POST', '/pair/complete', { body: { code: cleanCode, name: deviceName }, token: '' });
+      const done = await api<{ token: string }>('POST', '/pair/complete', { body: { code: cleanCode, name: deviceName }, token: '' });
       await save({ server: url, token: done.token, device_name: deviceName });
     } catch (error) {
       config.server = '';
@@ -293,20 +354,20 @@ export function createController({
   }
 
   /**
-   * Pergunta de novo se há versão nova, no máximo uma vez por dia (a janela volta do segundo plano, o app fica dias aberto na
-   * bandeja: só perguntar ao abrir deixaria o aviso para sempre desatualizado).
+   * Asks again whether there is a new version, at most once a day (the window comes back from the background, the app stays
+   * open in the tray for days: asking only when it opens would leave the notice out of date forever).
    */
   async function refreshUpdate() {
     if (now() - lastUpdateCheck < 24 * 60 * 60 * 1000) return state.update;
     return checkUpdate();
   }
 
-  /** Pede ao servidor que envie o código de pareamento para o e-mail (só chega se o e-mail estiver autorizado). */
-  async function requestCode({ server, email }) {
+  /** Asks the server to send the pairing code to the e-mail (it only arrives when the e-mail is authorized). */
+  async function requestCode({ server, email }: { server?: string; email: string }) {
     const url = normalizeServer(server || DEFAULT_SERVER);
     const clean = String(email ?? '').trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(clean)) throw new UserError('bad_email', 'Digite um e-mail válido.');
-    const answer = await api('POST', '/pair/request', { body: { email: clean }, token: '', base: url });
+    const answer = await api<{ message?: string } | null>('POST', '/pair/request', { body: { email: clean }, token: '', base: url });
     return { message: answer?.message ?? 'Pedido enviado.' };
   }
 
@@ -315,7 +376,7 @@ export function createController({
     try {
       await api('DELETE', '/devices/me');
     } catch {
-      /* já revogado ou sem rede: o token local é descartado de qualquer forma */
+      /* already revoked or no network: the local token goes anyway */
     }
     await save({ token: '' });
     state.rooms = [];
@@ -324,7 +385,7 @@ export function createController({
   }
 
   let lastUpdateCheck = 0;
-  async function checkUpdate() {
+  async function checkUpdate(): Promise<UpdateInfo | null> {
     if (!config.server) return null;
     lastUpdateCheck = now();
     try {
@@ -337,8 +398,8 @@ export function createController({
     return state.update;
   }
 
-  // --- comandos do worker (um processo curto por comando) ---
-  function workerEnv(extra = {}) {
+  // --- the worker's commands (one short process per command) ---
+  function workerEnv(extra: Record<string, string> = {}) {
     return {
       AGENT_URL: config.server,
       AGENT_TOKEN: config.token,
@@ -349,23 +410,23 @@ export function createController({
     };
   }
 
-  let busyChild = null; // o processo da tarefa longa em andamento (login, importação): dá para cancelar
+  let busyChild: ChildProcess | null = null; // the long task's process under way (the login, an import): it can be cancelled
   let cancelled = false;
 
-  function runWorker(args, { env = {}, onLine = () => {}, timeoutMs = 0, cancellable = false } = {}) {
+  function runWorker(args: string[], { env = {}, onLine = () => {}, timeoutMs = 0, cancellable = false }: { env?: Record<string, string>; onLine?: (line: string) => void; timeoutMs?: number; cancellable?: boolean } = {}): Promise<{ code: number | null; output: string }> {
     return new Promise((resolve, reject) => {
       const [exe, argv, options] = launcher(config.engine_dir, args, workerEnv(env));
-      const child = spawnImpl(exe, argv, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawnImpl(exe, [...argv], { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
       if (cancellable) busyChild = child;
       let output = '';
       const timer = timeoutMs ? setTimeout(() => child.kill(), timeoutMs) : null;
-      const feed = (data) => {
+      const feed = (data: Buffer) => {
         const text = data.toString();
         output += text;
         for (const line of text.split(/\r?\n/)) if (line.trim()) onLine(line.trim());
       };
-      child.stdout.on('data', feed);
-      child.stderr.on('data', feed);
+      child.stdout!.on('data', feed);
+      child.stderr!.on('data', feed);
       child.on('error', (error) => reject(new UserError('spawn', `Não consegui iniciar o motor: ${error.message}`)));
       child.on('close', (code) => {
         if (timer) clearTimeout(timer);
@@ -375,7 +436,7 @@ export function createController({
     });
   }
 
-  async function withBusy(name, fn) {
+  async function withBusy<T>(name: string, fn: () => Promise<T>): Promise<T> {
     if (state.busy) throw new UserError('busy', `Aguarde: ${state.busy}.`);
     state.busy = name;
     cancelled = false;
@@ -388,12 +449,12 @@ export function createController({
     }
   }
 
-  async function createRoom() {
+  async function createRoom(): Promise<OpenRoom> {
     requirePaired();
     const session = state.agent.session;
     if (state.agent.status !== 'online' || !session) throw new UserError('not_online', 'Inicie a sessão antes de criar uma sala.');
     return withBusy('criando sala', async () => {
-      const room = await api('POST', `/sessions/${session.id}/rooms`, { body: {}, timeout: 20000 });
+      const room = await api<{ code: string; host_token: string }>('POST', `/sessions/${session.id}/rooms`, { body: {}, timeout: 20000 });
       const entry = { code: room.code, tv: `${config.server}/tv.html?room=${room.code}`, host: `${config.server}/room.html?room=${room.code}#host=${room.host_token}` };
       state.rooms = [entry, ...state.rooms.filter((r) => r.code !== entry.code)];
       log(`Sala ${entry.code} criada.`);
@@ -401,7 +462,7 @@ export function createController({
     });
   }
 
-  async function youtubeStatus() {
+  async function youtubeStatus(): Promise<YoutubeStatus> {
     requirePaired();
     const { output } = await runWorker(['--youtube-status'], { timeoutMs: 60000 });
     const connected = /^Conectado/i.test(output.trim().split(/\r?\n/).pop() ?? '') || /Conectado ao YouTube/.test(output);
@@ -410,7 +471,7 @@ export function createController({
     return state.youtube;
   }
 
-  async function youtubeLogin() {
+  async function youtubeLogin(): Promise<YoutubeStatus> {
     requirePaired();
     return withBusy('login do YouTube', async () => {
       const args = ['--youtube-login', ...(browser && browser !== 'auto' ? [browser] : [])];
@@ -423,7 +484,7 @@ export function createController({
     });
   }
 
-  async function importFile({ file, artist, title }) {
+  async function importFile({ file, artist, title }: { file: string; artist?: string; title?: string }) {
     requirePaired();
     if (!file) throw new UserError('bad_file', 'Escolha um arquivo de áudio.');
     return withBusy('importando música', async () => {
@@ -440,7 +501,7 @@ export function createController({
     });
   }
 
-  /** Interrompe o login ou a importação em andamento ("Cancelar" na tela de espera). */
+  /** Stops the login or the import under way ("Cancelar" on the waiting screen). */
   function cancelBusy() {
     if (!busyChild) return false;
     cancelled = true;
@@ -457,13 +518,13 @@ export function createController({
     }
   }
 
-  // --- o agente (worker em modo serviço) ---
+  // --- the agent (the worker as a service) ---
   function requirePaired() {
     if (!(config.server && config.token)) throw new UserError('not_paired', 'Pareie este computador primeiro.');
     if (state.engine.status !== 'ready') throw new UserError('no_engine', 'O motor ainda não foi montado.');
   }
 
-  async function startAgent({ nickname } = {}) {
+  async function startAgent({ nickname }: { nickname?: string } = {}) {
     requirePaired();
     const name = String(nickname ?? config.nickname ?? '').trim().slice(0, 40);
     if (!name) throw new UserError('bad_nickname', 'Escolha o apelido que os convidados vão ver.');
@@ -479,13 +540,13 @@ export function createController({
     state.agent = { status: 'starting', session: null, error: null };
     publish();
     const [exe, argv, options] = launcher(config.engine_dir, ['--consume'], workerEnv({ LOG_FORMAT: 'text' }));
-    const child = spawnImpl(exe, argv, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawnImpl(exe, [...argv], { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
     agentProcess = child;
-    const feed = (data) => {
+    const feed = (data: Buffer) => {
       for (const line of data.toString().split(/\r?\n/)) if (line.trim()) log(line.trim(), /\b(ERROR|CRITICAL)\b/.test(line) ? 'error' : 'info');
     };
-    child.stdout.on('data', feed);
-    child.stderr.on('data', feed);
+    child.stdout!.on('data', feed);
+    child.stderr!.on('data', feed);
     child.on('error', (error) => {
       state.agent = { status: 'offline', session: null, error: `Não consegui iniciar o agente: ${error.message}` };
       agentProcess = null;
@@ -497,7 +558,7 @@ export function createController({
       clearInterval(pollTimer);
       if (stopping) {
         state.agent = { status: 'stopped', session: null, error: null };
-      } else if (code === 2) { // token recusado (revogado): reiniciar não adianta
+      } else if (code === 2) { // the token was refused (revoked): restarting does not help
         state.agent = { status: 'auth_error', session: null, error: 'O servidor recusou este computador (acesso revogado). Pareie de novo.' };
       } else {
         state.agent = { status: 'offline', session: null, error: `O agente parou (código ${code}). Tentando de novo…` };
@@ -514,7 +575,7 @@ export function createController({
   async function pollSession() {
     if (!agentProcess) return;
     try {
-      const me = await api('GET', '/me', { timeout: 8000 });
+      const me = await api<{ session: AgentStatus['session']; cloud?: boolean }>('GET', '/me', { timeout: 8000 });
       const wasOnline = state.agent.status === 'online';
       state.agent = me.session ? { status: 'online', session: me.session, error: null, cloud: Boolean(me.cloud) } : { status: 'starting', session: null, error: null };
       if (!wasOnline && me.session) {
@@ -522,7 +583,8 @@ export function createController({
         log(`Sessão "${me.session.display_name}" ativa.`);
       }
     } catch (error) {
-      state.agent = { status: error.code === 'unauthorized' ? 'auth_error' : 'offline', session: null, error: error.message };
+      const failure = error as UserError;
+      state.agent = { status: failure.code === 'unauthorized' ? 'auth_error' : 'offline', session: null, error: failure.message };
     }
     publish();
   }
@@ -537,15 +599,15 @@ export function createController({
       publish();
       return snapshot();
     }
-    // No Windows não existe SIGTERM "educado". Primeiro anota a sessão, depois mata o processo (se ele continuasse vivo, o
-    // sinal de vida dele abriria outra sessão assim que o servidor encerrasse esta) e só então encerra a sessão pelo servidor:
-    // os pedidos pendentes viram "o dono saiu".
+    // Windows has no "polite" SIGTERM. First note the Session, then kill the process (alive, its sign of life would open
+    // another Session as soon as the server ended this one), and only then end the Session on the server: the pending
+    // requests become "the owner left".
     let sessionId = state.agent.session?.id;
     if (!sessionId) {
       try {
-        sessionId = (await api('GET', '/me', { timeout: 4000 })).session?.id;
+        sessionId = (await api<{ session: { id: string } | null }>('GET', '/me', { timeout: 4000 })).session?.id;
       } catch {
-        /* sem rede: o servidor encerra a sessão sozinho por inatividade */
+        /* no network: the server ends the Session by itself for inactivity */
       }
     }
     await new Promise((resolve) => {
@@ -553,7 +615,7 @@ export function createController({
       child.kill();
       setTimeout(resolve, 5000);
     });
-    if (sessionId) await api('DELETE', `/sessions/${sessionId}`, { timeout: 4000 }).catch((error) => log(`Não consegui encerrar a sessão no servidor: ${error.message}`, 'error'));
+    if (sessionId) await api('DELETE', `/sessions/${sessionId}`, { timeout: 4000 }).catch((error: Error) => log(`Não consegui encerrar a sessão no servidor: ${error.message}`, 'error'));
     agentProcess = null;
     state.agent = { status: 'stopped', session: null, error: null };
     state.rooms = [];
@@ -561,10 +623,10 @@ export function createController({
     return snapshot();
   }
 
-  async function setSettings(patch) {
-    const allowed = {};
+  async function setSettings(patch: { nickname?: unknown; microphone?: { id?: unknown; label?: unknown } | null; setupDone?: unknown }) {
+    const allowed: Partial<Config> = {};
     if (patch.nickname !== undefined) allowed.nickname = String(patch.nickname).trim().slice(0, 40);
-    if (patch.microphone !== undefined) { // { id, label } escolhido nas configurações; null = o padrão do sistema
+    if (patch.microphone !== undefined) { // { id, label } chosen in the settings; null = the system's default
       const mic = patch.microphone;
       allowed.microphone = mic && typeof mic.id === 'string' && mic.id ? { id: mic.id.slice(0, 300), label: String(mic.label ?? '').slice(0, 120) } : null;
     }
@@ -574,18 +636,21 @@ export function createController({
     return snapshot();
   }
 
-  /** As estatísticas do dono: o que tocou nas salas (servidor) e o que há na biblioteca deste computador. */
-  async function stats({ days = 30 } = {}) {
+  /** The owner's statistics: what played in the Rooms (the server) and what is in this computer's library. */
+  async function stats({ days = 30 }: { days?: number } = {}): Promise<OwnerStats> {
     if (!(config.server && config.token)) throw new UserError('not_paired', 'Pareie este computador primeiro.');
     const period = [7, 30, 90, 365].includes(Number(days)) ? Number(days) : 30;
-    const [server, library] = await Promise.all([api('GET', `/stats?days=${period}`), libraryStats(config.library_dir)]);
+    const [server, library] = await Promise.all([api<ServerStats>('GET', `/stats?days=${period}`), libraryStats(config.library_dir)]);
     return { server, library };
   }
 
-  const setUpdateProgress = (progress) => { state.updateProgress = progress; publish(); };
+  const setUpdateProgress = (progress: Snapshot['updateProgress']) => {
+    state.updateProgress = progress;
+    publish();
+  };
 
-  /** A pasta onde as músicas baixadas ficam. Só muda com a sessão parada (o agente está usando a pasta atual). */
-  async function setLibraryDir(dir) {
+  /** The folder the downloaded songs go to. It changes only with the Session stopped (the agent is using the current one). */
+  async function setLibraryDir(dir: unknown) {
     if (agentProcess) throw new UserError('session_running', 'Encerre a sessão para trocar a pasta das músicas.');
     const target = String(dir ?? '').trim();
     if (!target) throw new UserError('bad_folder', 'Escolha uma pasta.');

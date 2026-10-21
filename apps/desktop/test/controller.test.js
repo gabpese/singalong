@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
-import { APP_VERSION, BROWSER_NAMES, createController, detectDefaultBrowser, normalizeServer, UserError } from '../src/controller.js';
+import { APP_VERSION, BROWSER_NAMES, createController, detectDefaultBrowser, normalizeServer, UserError } from '../src/controller.ts';
 
 const FAKE = fileURLToPath(new URL('./fake-worker.mjs', import.meta.url));
 

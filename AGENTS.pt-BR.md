@@ -13,7 +13,7 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 | `apps/api` | Salas, fila, estado por WebSocket, arquivos de mídia, a API do agente | Node 24, NestJS sobre o Fastify e MikroORM sobre o SQLite ([ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)), Redis; compilada pelo `tsc` em `dist/` |
 | `apps/web` | Página inicial, Sala (celular), TV, Palco | React + Vite, TypeScript |
 | `apps/worker` | Download, separação da voz, alinhamento da letra, exportação em MP4 | Python 3.11, PyTorch |
-| `apps/desktop` | O app instalável do dono (bandeja, páginas da TV e do anfitrião embutidas) | Electron |
+| `apps/desktop` | O app instalável do dono (bandeja, páginas da TV e do anfitrião embutidas) | Electron; o processo principal roda o próprio TypeScript direto, os preloads e a janela compilam ([ADR 0020](docs/adr/0020-desktop-main-process-runs-typescript.pt-BR.md)) |
 | `apps/engine` | Monta o ambiente do worker no computador do usuário | Node, TypeScript rodado direto; `dist/` só para o app de computador ([ADR 0019](docs/adr/0019-engine-runs-typescript-and-compiles-for-the-app.pt-BR.md)) |
 | `deploy/` | A VM na nuvem: Caddy, compose, `deploy.sh` | Docker Compose |
 | `docs/` | Arquitetura, infraestrutura, ADRs, roadmap, PRD, TRD, PLAN, marca | |
@@ -31,7 +31,7 @@ O Singalong é um karaokê colaborativo hospedado por conta própria: os celular
 - **Uma decisão de arquitetura**: leia os [docs/adr/](docs/adr/). Mudar uma delas pede um ADR novo que substitui o antigo. O trabalho de arquitetura, em ordem, está no [ROADMAP](docs/ROADMAP.pt-BR.md).
 - **O que a API envia ou recebe** (o estado da Sala, uma mensagem do WebSocket, uma resposta HTTP que as páginas leem): mude o tipo em `apps/api/src/protocol.ts`. O site o importa como tipo pelo `apps/web/src/lib/types.ts`, então o compilador dele mostra cada página que a mudança alcança.
 - **Uma ferramenta ou dependência**: o repositório mantém uma versão por linguagem: TypeScript 7, Node 24, Python 3.11. O TypeScript 7 vem sem API do compilador, então escolha ferramentas que rodem pelo `tsc` ou pelo próprio Node; o CLI do Nest, o ts-node e o ts-morph exigiriam o TypeScript 6 ao lado ([ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md)).
-- **A versão do app**: ela mora em `apps/desktop/package.json` (e no lock), `apps/desktop/src/controller.js` (`APP_VERSION`) e `apps/worker/singalong_worker/version.py`. Mude as três juntas; um teste confere.
+- **A versão do app**: ela mora em `apps/desktop/package.json` (e no lock), `apps/desktop/src/controller.ts` (`APP_VERSION`) e `apps/worker/singalong_worker/version.py`. Mude as três juntas; um teste confere.
 - **Qualquer coisa que custe dinheiro** (uma API paga, um serviço pago): pergunte ao dono antes. O projeto roda a custo zero ([ADR 0001](docs/adr/0001-zero-cost-while-non-profit.pt-BR.md)).
 
 ## Verificações
@@ -43,7 +43,7 @@ Os comandos são os `scripts` de cada `package.json`. O que eles não contam:
 | `apps/web` | `npm test`, `npm run build`, `npm run e2e` | O servidor dos testes de ponta a ponta serve o `dist/`: faça o build antes. Ele roda a API compilada, então rode antes `npm run build` em `apps/api`. As salas dele nascem com o intervalo desligado; os testes que precisam dele o ligam. Os testes unitários rodam o `src/lib` e o `src/i18n` direto no Node, então os imports ali nomeiam o arquivo `.ts`. |
 | `apps/worker` | `python -I -m unittest discover -s tests -t .` | Precisa só de `numpy langdetect websockets yt-dlp` (sem PyTorch). |
 | `apps/api` | `npm test` | Ele gera o `dist/` antes: os testes, e os de ponta a ponta do site e do app, importam a API compilada. Mudança de schema é uma migração do MikroORM em `src/database/migrations/`, listada em `src/database/orm.ts`; um teste confere que as entidades batem com o que as migrações criam. |
-| `apps/desktop`, `apps/engine` | `npm test` | O app de computador importa o `dist/` compilado do motor (o Node não remove tipos dentro de `node_modules`); os scripts dele o compilam antes. Os testes do próprio motor rodam o `.ts` direto, então os imports dele nomeiam o arquivo `.ts`. O teste de ponta a ponta do app também roda a API compilada. |
+| `apps/desktop`, `apps/engine` | `npm test` | O app de computador importa o `dist/` compilado do motor (o Node não remove tipos dentro de `node_modules`) e compila os preloads e os `ui/*.ts` em `.cjs` e `.js` ao lado deles (resultado no `.gitignore`: edite o `.ts`). O `npm run build` faz as duas coisas, e os scripts dele o rodam antes. Os testes do próprio motor rodam o `.ts` direto, então os imports dele nomeiam o arquivo `.ts`. O teste de ponta a ponta do app também roda a API compilada. |
 
 O CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda todos na `main`. A imagem da API só é publicada depois que o CI passa.
 
