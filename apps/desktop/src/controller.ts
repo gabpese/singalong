@@ -5,8 +5,8 @@ import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { assemble, refreshWorker } from '@singalong/engine/assemble';
-import { paths, readState, workerCommand } from '@singalong/engine/engine';
+import { assemble, type AssembleOptions, refreshWorker } from '@singalong/engine/assemble';
+import { type EngineState, paths, readState, workerCommand } from '@singalong/engine/engine';
 import { verifyEngine } from '@singalong/engine/verify';
 import type { AgentStatus, BrowserId, Microphone, OpenRoom, OwnerStats, ServerStats, Snapshot, UpdateInfo, YoutubeStatus } from '../ui/bridge.ts';
 import { libraryStats } from './library-stats.ts';
@@ -128,9 +128,10 @@ export interface ControllerOptions {
   version?: string;
   fetchImpl?: typeof fetch;
   spawnImpl?: typeof spawn;
-  assembleImpl?: typeof assemble;
+  /** Assembles the engine; the controller reads only the engine chosen and why. */
+  assembleImpl?: (options: AssembleOptions) => Promise<Pick<EngineState, 'engine' | 'engine_reason' | 'fallback_reason'>>;
   refreshWorkerImpl?: typeof refreshWorker;
-  verifyImpl?: typeof verifyEngine;
+  verifyImpl?: (root: string) => Promise<{ ok: boolean; checks: { name: string; ok: boolean; detail: string }[] }>;
   detectBrowser?: () => Promise<BrowserId>;
   /** Called by init(): Electron's vault only works once the app is ready. */
   openVault?: () => Promise<Vault>;

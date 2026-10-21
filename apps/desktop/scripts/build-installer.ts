@@ -1,27 +1,29 @@
-// Gera o instalador do app: apps/desktop/dist/ (+ o arquivo de atualização automática, latest*.yml). Cada sistema se gera no próprio sistema
-// (o DMG só no macOS; no CI há um job por sistema):
-//   npm run dist                      → o instalador do sistema em que você está
-//   npm run dist -- --platform=linux  → AppImage (win | mac | linux; o nome do arquivo é fixo por sistema, veja src/installers.ts)
-//   npm run dist:dir                  → só a pasta descompactada (rápido, para testar)
-//   SINGALONG_DIST=pasta              → gera em outra pasta (os testes de atualização usam para ter duas versões lado a lado)
-// Windows: sem certificado configurado sai sem assinar (o SmartScreen avisa); com CSC_LINK + CSC_KEY_PASSWORD, ou com o Azure Trusted Signing,
-// sai assinado e carimbado (scripts/signing.mjs). SINGALONG_REQUIRE_SIGNING=1 falha sem certificado.
-// macOS: sai com assinatura "ad-hoc" (o Apple Silicon só abre programas assinados; sem conta Apple Developer não há como notarizar).
+// Makes the app's installer: apps/desktop/dist/ (plus the automatic update's file, latest*.yml). Each system's is made on that
+// system (the DMG only on macOS; CI has one job per system):
+//   npm run dist                      → the installer of the system you are on
+//   npm run dist -- --platform=linux  → AppImage (win | mac | linux; the file's name is fixed per system, see src/installers.ts)
+//   npm run dist:dir                  → only the unpacked folder (fast, for testing)
+//   SINGALONG_DIST=folder             → makes it in another folder (the update tests use it to keep two versions side by side)
+// Windows: without a certificate configured it comes out unsigned (SmartScreen warns); with CSC_LINK + CSC_KEY_PASSWORD, or with
+// Azure Trusted Signing, it comes out signed and time-stamped (scripts/signing.ts). SINGALONG_REQUIRE_SIGNING=1 fails without one.
+// macOS: it comes out with an "ad-hoc" signature (Apple Silicon only opens signed programs; without an Apple Developer account
+// there is no way to notarize).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync, execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { Arch, build, Platform } from 'electron-builder';
 import { INSTALLERS } from '../src/installers.ts';
-import { resolveSigning } from './signing.mjs';
-import { judge, readSignature } from './verify-signature.mjs';
+import { resolveSigning } from './signing.ts';
+import { judge, readSignature } from './verify-signature.ts';
 
 // the engine's dist/ and the window's compiled scripts and preloads go into the installer
 execSync('npm run build', { cwd: new URL('..', import.meta.url), stdio: 'inherit' });
 
+type System = 'win' | 'mac' | 'linux';
 const dirOnly = process.argv.includes('--dir');
-const HOST = { win32: 'win', darwin: 'mac', linux: 'linux' };
+const HOST: Record<string, System> = { win32: 'win', darwin: 'mac', linux: 'linux' };
 const chosen = process.argv.find((arg) => arg.startsWith('--platform='))?.split('=')[1] ?? HOST[process.platform];
-if (!['win', 'mac', 'linux'].includes(chosen)) {
+if (chosen !== 'win' && chosen !== 'mac' && chosen !== 'linux') {
   console.error('Sistema desconhecido. Use --platform=win, --platform=mac ou --platform=linux.');
   process.exit(2);
 }
@@ -40,10 +42,10 @@ const target = TARGETS[chosen];
 const signing = chosen === 'win' ? resolveSigning(process.env) : null;
 if (signing) {
   console.log(`Assinatura: ${signing.summary}`);
-  if (signing.mode === 'none') process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'; // nunca "descobre" um certificado do computador por conta própria
+  if (signing.mode === 'none') process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'; // never "discovers" a certificate of the computer on its own
 }
 
-// a assinatura ad-hoc do Mac não usa segredo nenhum; sem isto o electron-builder a pula nos builds de pull request e o app sairia sem assinatura
+// the Mac's ad-hoc signature uses no secret; without this electron-builder skips it on pull request builds and the app would come out unsigned
 if (chosen === 'mac') process.env.CSC_FOR_PULL_REQUEST = 'true';
 
 const output = process.env.SINGALONG_DIST || 'dist';
@@ -52,26 +54,26 @@ const result = await build({
   publish: 'never',
   config: {
     directories: { output, buildResources: 'build' },
-    // o endereço verdadeiro vem do servidor (APP_DOWNLOAD_URL) na hora de atualizar; aqui só faz o latest.yml existir
+    // the real address comes from the server (APP_DOWNLOAD_URL) at update time; here it only makes latest.yml exist
     publish: [{ provider: 'generic', url: 'https://invalid.example/updates/' }],
     ...(signing ? { win: signing.win } : {}),
   },
 });
 console.log(result.join('\n'));
 
-// conferência: o que devia sair certo saiu certo
+// the check: what should come out right came out right
 let failed = false;
-const problem = (text) => {
+const problem = (text: string) => {
   console.error(`  ✗ ${text}`);
   failed = true;
 };
 
 if (chosen === 'win') {
-  // o que devia sair assinado saiu assinado (e nada sai assinado sem querer)
+  // what should come out signed came out signed (and nothing comes out signed by accident)
   const files = dirOnly ? [join(output, 'win-unpacked', 'singalong_karaoke.exe')] : result.filter((file) => file.toLowerCase().endsWith('.exe'));
   for (const file of files) {
     const report = await readSignature(file);
-    const problems = judge(report, { expectUnsigned: signing.mode === 'none' });
+    const problems = judge(report, { expectUnsigned: signing?.mode === 'none' });
     console.log(`  ${file}: ${report.status}${report.subject ? `, ${report.subject}` : ''}${problems.length ? ` ✗ ${problems.join('; ')}` : ' ✓'}`);
     if (problems.length) failed = true;
   }
@@ -91,7 +93,7 @@ if (chosen === 'win') {
     console.log(`  ${file}: ${Math.round(size / 1024 / 1024)} MB${failed ? '' : ' ✓'}`);
   }
   if (chosen === 'mac') {
-    // o Apple Silicon encerra qualquer programa sem assinatura: a ad-hoc tem de estar válida
+    // Apple Silicon kills any unsigned program: the ad-hoc signature must be valid
     const folder = join(output, 'mac-arm64');
     const name = existsSync(folder) ? readdirSync(folder).find((entry) => entry.endsWith('.app')) : null;
     if (!name) {
@@ -102,7 +104,8 @@ if (chosen === 'win') {
         execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'pipe' });
         console.log(`  ${app}: assinatura ad-hoc válida ✓`);
       } catch (error) {
-        problem(`a assinatura de ${app} não confere: ${String(error.stderr ?? error.message).trim()}`);
+        const failure = error as Error & { stderr?: Buffer };
+        problem(`a assinatura de ${app} não confere: ${String(failure.stderr ?? failure.message).trim()}`);
       }
     }
   }
