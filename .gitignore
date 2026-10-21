@@ -11,3 +11,5 @@ apps/desktop/dist-*/
 brag-output*
 .agents*
 skills-lock.json
+apps/desktop/ui/*.js
+apps/desktop/src/*.cjs

@@ -5,17 +5,17 @@
   "productName": "Singalong Karaoke",
   "description": "Singalong Karaoke: a interface do computador do dono (pareia, monta o motor, inicia a sessão e o agente)",
   "type": "module",
-  "main": "src/main.js",
+  "main": "src/main.ts",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "build:engine": "node scripts/build-engine.mjs",
-    "prestart": "npm run build:engine",
+    "build": "node scripts/build-engine.mjs && tsc -p . && tsc -p tsconfig.renderer.json",
+    "prestart": "npm run build",
     "start": "electron .",
-    "pretest": "npm run build:engine",
+    "pretest": "npm run build",
     "test": "node --test --test-timeout=60000 \"test/*.test.js\"",
-    "pretest:e2e": "npm run build:engine",
+    "pretest:e2e": "npm run build",
     "test:e2e": "node --test \"e2e/*.e2e.js\"",
     "dist": "node scripts/build-installer.mjs",
     "dist:dir": "node scripts/build-installer.mjs --dir",
@@ -24,9 +24,11 @@
     "dist:linux": "node scripts/build-installer.mjs --platform=linux"
   },
   "devDependencies": {
+    "@types/node": "^24.19.2",
     "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
     "playwright-core": "^1.50.0",
-    "electron-builder": "^26.15.3"
+    "typescript": "7.0.2"
   },
   "dependencies": {
     "@singalong/engine": "file:../engine",
@@ -48,6 +50,8 @@
       "ui/**",
       "package.json",
       "!**/*.map",
+      "!src/*.cts",
+      "!ui/*.ts",
       "!node_modules/@singalong/engine/src/**",
       "!node_modules/@singalong/engine/tsconfig.json"
     ],

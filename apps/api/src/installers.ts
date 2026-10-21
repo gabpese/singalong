@@ -1,6 +1,6 @@
 // The app's installers, one per system, with FIXED names: the landing page offers the visitor's system (and lists the others),
 // building each link from the base the administrator publishes (APP_DOWNLOAD_URL or the admin page's app version: the folder
-// `…/releases/latest/download/`). The names are the app's own (apps/desktop/src/installers.js) and electron-builder's; an app
+// `…/releases/latest/download/`). The names are the app's own (apps/desktop/src/installers.ts) and electron-builder's; an app
 // test checks that the three agree.
 import type { Download } from './protocol.ts';
 

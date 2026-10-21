@@ -1,20 +1,22 @@
 // Gera o instalador do app: apps/desktop/dist/ (+ o arquivo de atualização automática, latest*.yml). Cada sistema se gera no próprio sistema
 // (o DMG só no macOS; no CI há um job por sistema):
 //   npm run dist                      → o instalador do sistema em que você está
-//   npm run dist -- --platform=linux  → AppImage (win | mac | linux; o nome do arquivo é fixo por sistema, veja src/installers.js)
+//   npm run dist -- --platform=linux  → AppImage (win | mac | linux; o nome do arquivo é fixo por sistema, veja src/installers.ts)
 //   npm run dist:dir                  → só a pasta descompactada (rápido, para testar)
 //   SINGALONG_DIST=pasta              → gera em outra pasta (os testes de atualização usam para ter duas versões lado a lado)
 // Windows: sem certificado configurado sai sem assinar (o SmartScreen avisa); com CSC_LINK + CSC_KEY_PASSWORD, ou com o Azure Trusted Signing,
 // sai assinado e carimbado (scripts/signing.mjs). SINGALONG_REQUIRE_SIGNING=1 falha sem certificado.
 // macOS: sai com assinatura "ad-hoc" (o Apple Silicon só abre programas assinados; sem conta Apple Developer não há como notarizar).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { Arch, build, Platform } from 'electron-builder';
-import { INSTALLERS } from '../src/installers.js';
+import { INSTALLERS } from '../src/installers.ts';
 import { resolveSigning } from './signing.mjs';
 import { judge, readSignature } from './verify-signature.mjs';
-import './build-engine.mjs'; // the engine's dist/ goes into the installer
+
+// the engine's dist/ and the window's compiled scripts and preloads go into the installer
+execSync('npm run build', { cwd: new URL('..', import.meta.url), stdio: 'inherit' });
 
 const dirOnly = process.argv.includes('--dir');
 const HOST = { win32: 'win', darwin: 'mac', linux: 'linux' };

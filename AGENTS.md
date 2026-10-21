@@ -11,7 +11,7 @@ Singalong is a self-hosted collaborative karaoke: phones queue songs in a Room, 
 | `apps/api` | Rooms, queue, WebSocket state, media files, the agent API | Node 24, NestJS on Fastify and MikroORM over SQLite ([ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.md)), Redis; compiled by `tsc` into `dist/` |
 | `apps/web` | Landing page, Room (phone), TV, Stage | React + Vite, TypeScript |
 | `apps/worker` | Download, vocal separation, lyrics alignment, MP4 export | Python 3.11, PyTorch |
-| `apps/desktop` | The owner's installable app (tray, embedded TV and host pages) | Electron |
+| `apps/desktop` | The owner's installable app (tray, embedded TV and host pages) | Electron; the main process runs its TypeScript directly, the preloads and the window compile ([ADR 0020](docs/adr/0020-desktop-main-process-runs-typescript.md)) |
 | `apps/engine` | Assembles the worker's runtime on the user's computer | Node, TypeScript run directly; `dist/` only for the desktop app ([ADR 0019](docs/adr/0019-engine-runs-typescript-and-compiles-for-the-app.md)) |
 | `deploy/` | The cloud VM: Caddy, compose file, `deploy.sh` | Docker Compose |
 | `docs/` | Architecture, infrastructure, ADRs, roadmap, PRD, TRD, PLAN, brand | |
@@ -29,7 +29,7 @@ Singalong is a self-hosted collaborative karaoke: phones queue songs in a Room, 
 - **An architectural decision**: read [docs/adr/](docs/adr/). Changing one means a new ADR that supersedes the old. The ordered architecture work is in the [ROADMAP](docs/ROADMAP.md).
 - **What the API sends or takes** (the Room's state, a WebSocket message, an HTTP answer the pages read): change its type in `apps/api/src/protocol.ts`. The web imports it as a type through `apps/web/src/lib/types.ts`, so its compiler shows every page the change reaches.
 - **A tool or dependency**: the repository keeps one version per language: TypeScript 7, Node 24, Python 3.11. TypeScript 7 ships no compiler API, so pick tools that run through `tsc` or Node itself; the Nest CLI, ts-node and ts-morph would need TypeScript 6 beside it ([ADR 0017](docs/adr/0017-api-on-nestjs-with-mikroorm.md)).
-- **The app version**: it lives in `apps/desktop/package.json` (and its lock), `apps/desktop/src/controller.js` (`APP_VERSION`) and `apps/worker/singalong_worker/version.py`. Bump the three together; a test checks.
+- **The app version**: it lives in `apps/desktop/package.json` (and its lock), `apps/desktop/src/controller.ts` (`APP_VERSION`) and `apps/worker/singalong_worker/version.py`. Bump the three together; a test checks.
 - **Anything that costs money** (a paid API, a paid service): ask the owner first. The project runs at zero cost ([ADR 0001](docs/adr/0001-zero-cost-while-non-profit.md)).
 
 ## Checks
@@ -41,7 +41,7 @@ The commands are the `scripts` in each `package.json`. What they do not tell you
 | `apps/web` | `npm test`, `npm run build`, `npm run e2e` | The e2e server serves `dist/`: build before e2e. It runs the compiled API, so `npm run build` in `apps/api` first. Its rooms start with the intermission off; tests that need it turn it on. The unit tests run `src/lib` and `src/i18n` straight in Node, so imports there name the `.ts` file. |
 | `apps/worker` | `python -I -m unittest discover -s tests -t .` | Needs only `numpy langdetect websockets yt-dlp` (no PyTorch). |
 | `apps/api` | `npm test` | It builds `dist/` first: the tests, and the web and desktop e2e, import the compiled API. A schema change is a MikroORM migration in `src/database/migrations/`, listed in `src/database/orm.ts`; a test checks that the entities match what the migrations build. |
-| `apps/desktop`, `apps/engine` | `npm test` | The desktop app imports the engine's compiled `dist/` (Node strips no types under `node_modules`); its scripts build it first. The engine's own tests run its `.ts` directly, so its imports name the `.ts` file. The desktop e2e runs the compiled API too. |
+| `apps/desktop`, `apps/engine` | `npm test` | The desktop app imports the engine's compiled `dist/` (Node strips no types under `node_modules`), and compiles its preloads and `ui/*.ts` into `.cjs` and `.js` beside them (gitignored output: edit the `.ts`). `npm run build` does both, and its scripts run it first. The engine's own tests run its `.ts` directly, so its imports name the `.ts` file. The desktop e2e runs the compiled API too. |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of them on `main`. The API image is published only after CI passes.
 

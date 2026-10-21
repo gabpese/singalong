@@ -55,9 +55,9 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
 
 O teste empacotou arquivos `.ts` com o electron-builder e os rodou no Electron 44 (Node 24.21, com remoção de tipos). O `.ts` do próprio app rodou, empacotado também, mas um `.ts` dentro do `node_modules`, onde o app empacotado guarda o motor, foi recusado. Então o código do motor é TypeScript que o Node roda direto (os testes, o `node src/cli.ts` e o job do CI com o motor de verdade), e o `tsc` gera o `dist/` só para o app de computador, que o importa pelos `exports` do pacote ([ADR 0019](adr/0019-engine-runs-typescript-and-compiles-for-the-app.pt-BR.md)). O app de computador o compila antes de subir, testar ou empacotar, e o instalador leva só o `dist/` e o `manifest.json` dele.
 
-### 5. O app de computador
+### 5. O app de computador (feito)
 
-O teste mostra que o processo principal pode rodar `.ts` direto, empacotado também. Os scripts de preload rodam com sandbox e as telas (`ui/`) rodam num navegador, então nenhum dos dois roda `.ts` sem build. Este passo decide como os dois compilam.
+O processo principal roda o próprio `.ts` direto, empacotado também, e o `tsc` só confere os tipos dele. Os preloads (`.cts`) e os scripts da janela (`ui/*.ts`) compilam com o `tsc`, cada um ao lado do seu fonte, então o app carrega os mesmos caminhos de antes ([ADR 0020](adr/0020-desktop-main-process-runs-typescript.pt-BR.md)). O `ui/bridge.ts` tipa o contrato entre a janela e o processo principal: o snapshot, as abas e cada ação com o seu argumento e a sua resposta. O `npm run build` compila o motor e a janela antes de o app abrir, testar ou empacotar.
 
 ### 6. Os testes
 

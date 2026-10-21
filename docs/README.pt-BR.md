@@ -35,6 +35,7 @@ Cada ADR registra uma decisão e o porquê dela. Para mudar uma decisão, escrev
 - [0014. CSS próprio a partir de tokens, sem Tailwind nem kit de componentes](adr/0014-own-css-with-tokens.pt-BR.md)
 - [0015. O repositório é escrito em inglês, com traduções em português](adr/0015-english-first-repository.pt-BR.md)
 - [0016. Sem framework completo: Fastify, React com Vite e Electron](adr/0016-no-full-stack-framework.pt-BR.md) (a parte da API foi substituída pelo 0017)
-- [0017. A API migra para NestJS sobre o Fastify, com MikroORM sobre o SQLite](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md) (o contrato do WebSocket foi substituído pelo 0018, e o build do motor pelo 0019)
+- [0017. A API migra para NestJS sobre o Fastify, com MikroORM sobre o SQLite](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md) (o contrato do WebSocket foi substituído pelo 0018, o build do motor pelo 0019 e o do app de computador pelo 0020)
 - [0018. O WebSocket da Sala é um gateway do Nest](adr/0018-room-websocket-on-a-nest-gateway.pt-BR.md)
 - [0019. O motor roda o próprio TypeScript, e compila só para o app empacotado](adr/0019-engine-runs-typescript-and-compiles-for-the-app.pt-BR.md)
+- [0020. O processo principal do app de computador roda o próprio TypeScript, e só os preloads e a janela compilam](adr/0020-desktop-main-process-runs-typescript.pt-BR.md)

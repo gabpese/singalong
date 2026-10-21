@@ -1,7 +1,7 @@
 // As opções de placa de vídeo da janela: NVIDIA e AMD quando servem, a GPU da Apple só como opção beta, e a CPU sempre.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { engineInUse, gpuChoices, isAccelerated, kindOf, machineLine, offeredGpu } from '../ui/gpu.js';
+import { engineInUse, gpuChoices, isAccelerated, kindOf, machineLine, offeredGpu } from '../ui/gpu.ts';
 
 const nvidia = { name: 'NVIDIA GeForce RTX 3060', driver: '552.22', vram_mb: 12288, compute: '8.6', vendor: 'nvidia', engine: 'cu121' };
 const amd = { name: 'AMD Radeon RX 7900 XTX', driver: 'amdgpu', vram_mb: 24560, compute: 'gfx1100', vendor: 'amd', engine: 'rocm6.2', access: true };

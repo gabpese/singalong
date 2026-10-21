@@ -55,9 +55,9 @@ Each step is one pull request (step 3 is several), merged with a merge commit. O
 
 The spike packaged `.ts` files with electron-builder and ran them in Electron 44 (Node 24.21, types stripped). The app's own `.ts` ran, packaged too, but a `.ts` under `node_modules`, where the packaged app keeps the engine, was refused. So the engine's source is TypeScript that Node runs directly (its tests, `node src/cli.ts` and the real-engine CI job), and `tsc` builds `dist/` only for the desktop app, which imports it through the package's `exports` ([ADR 0019](adr/0019-engine-runs-typescript-and-compiles-for-the-app.md)). The desktop app builds it before it starts, tests or packages, and the installer carries only its `dist/` and `manifest.json`.
 
-### 5. The desktop app
+### 5. The desktop app (done)
 
-The spike shows that the main process can run `.ts` directly, packaged too. The preload scripts run sandboxed and the screens (`ui/`) run in a browser, so neither runs `.ts` without a build. This step decides how those two compile.
+The main process runs its `.ts` directly, packaged too, and `tsc` only checks its types. The preloads (`.cts`) and the window's scripts (`ui/*.ts`) compile with `tsc`, each beside its source, so the app loads the same paths as before ([ADR 0020](adr/0020-desktop-main-process-runs-typescript.md)). `ui/bridge.ts` types the contract between the window and the main process: the snapshot, the tabs and every action with its argument and answer. `npm run build` builds the engine and the window before the app starts, tests or packages.
 
 ### 6. The tests
 

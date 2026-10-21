@@ -106,7 +106,7 @@ function renderPreview() {
   const latest = $('rel-latest').value.trim();
   const minimum = $('rel-min').value.trim();
   const notes = $('rel-notes').value.trim() || '(sem mensagem)';
-  // os mesmos textos que o app mostra (apps/desktop/ui/app.js)
+  // os mesmos textos que o app mostra (apps/desktop/ui/app.ts)
   $('prev-title').textContent = `Há uma versão nova: ${latest || '—'}`;
   $('prev-notes').textContent = notes;
   $('prev-required-box').hidden = !minimum;
