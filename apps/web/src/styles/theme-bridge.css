@@ -1,19 +1,19 @@
 /*
- * Singalong — tokens de design (tema "casa de karaokê à noite").
+ * Singalong — design tokens (the "neighborhood poster at night" theme, docs/BRAND.md).
  *
- * Um só lugar para as decisões visuais. As referências do projeto, e o que cada uma pediu:
- *   - taste-skill (devDependency, skill "redesign-existing-projects"): UMA cor de destaque, sem gradiente roxo/azul de "cara de IA", sem
- *     brilho neon, sombras tingidas, fundo escuro tingido (nunca preto puro), fonte com personalidade, cartões só quando a elevação
- *     explica a hierarquia, rótulos em frase (nada de caixa-alta em todo lugar) e botões sem pílula.
- *   - awesome-design-md (devDependency): a atmosfera de Spotify e Warp, escuros quentes com uma única cor de marca, funcional.
- *   - cult-ui: só o que serve de cada padrão (superfícies em camadas), em CSS puro. Tailwind ficou de fora de propósito: não é ele
- *     que tira a "cara de IA" (os kits de componentes dele são hoje a marca mais comum dela) e migrar 700 linhas de CSS só traria risco.
+ * One place for the visual decisions. The project's references, and what each one asked for:
+ *   - taste-skill (devDependency, the "redesign-existing-projects" skill): ONE accent color, no purple/blue "AI-made" gradient, no
+ *     neon glow, tinted shadows, a tinted dark background (never pure black), a font with personality, cards only when elevation
+ *     explains the hierarchy, sentence-case labels (no all-caps everywhere) and buttons that are not pills.
+ *   - awesome-design-md (devDependency): the atmosphere of Spotify and Warp, warm darks with a single brand color, functional.
+ *   - cult-ui: only what serves from each pattern (layered surfaces), in plain CSS. Tailwind was left out on purpose: it is not what
+ *     takes away the "AI-made" look (its component kits are today that look's most common mark) and migrating the site's CSS would only bring risk.
  *
- * O app instalável (apps/desktop/ui) usa uma cópia deste arquivo; mudou um, mude o outro (um teste confere).
+ * The installable app (apps/desktop/ui) uses a copy of this file; change one, change the other (a test checks).
  */
 
 :root {
-  /* ---------- neutros: a noite de uma sala e o papel de um cartaz (uma só família, quente) ---------- */
+  /* ---------- neutrals: the night of a room and the paper of a poster (one family, warm) ---------- */
   --ds-bg: #16110f;
   --ds-bg-raised: #1d1713;
   --ds-surface: #251d18;
@@ -21,30 +21,30 @@
   --ds-line: rgba(240, 228, 205, 0.1);
   --ds-line-strong: rgba(240, 228, 205, 0.2);
   --ds-text: #f0e4cd;
-  --ds-text-dim: #b3a794; /* 7:1 sobre a noite */
+  --ds-text-dim: #b3a794; /* 7:1 on the night */
   --ds-paper: #f0e4cd;
-  --ds-paper-ink: #16110f; /* texto sobre o papel */
-  --ds-paper-dim: #5b4b3c; /* texto secundário sobre o papel (6:1) */
+  --ds-paper-ink: #16110f; /* text on the paper */
+  --ds-paper-dim: #5b4b3c; /* secondary text on the paper (6:1) */
 
-  /* ---------- a tinta de destaque (vermelho de letreiro): ação e estado ativo. Duas intensidades do mesmo vermelho, por
-     contraste: o profundo (#d62828) para preencher (botões, abas ativas), com texto claro por cima; o aceso (#ff6b6b) para
-     texto e traço sobre o fundo escuro; e o escuro (#b91c1c) quando o fundo é o papel ---------- */
+  /* ---------- the accent ink (sign red): action and the active state. Two strengths of the same red, for
+     contrast: the deep one (#d62828) to fill (buttons, active tabs), with light text on top; the lit one (#ff6b6b) for
+     text and strokes on the dark background; and the dark one (#b91c1c) when the background is the paper ---------- */
   --ds-accent-rgb: 214, 40, 40;
   --ds-accent: rgb(var(--ds-accent-rgb));
   --ds-accent-hi: #e53935;
-  --ds-accent-text: #ff6b6b; /* 6,7:1 sobre a noite, 4,9:1 sobre os cartões mais claros */
-  --ds-accent-ink: #fff8ee; /* texto sobre o vermelho (4,7:1) */
-  --ds-accent-on-paper: #b91c1c; /* o vermelho sobre o papel (5:1) */
-  --ds-mustard: #e8a933; /* tinta de apoio: logotipo, cartazes, fitas. Nunca botão nem estado */
+  --ds-accent-text: #ff6b6b; /* 6.7:1 on the night, 4.9:1 on the lightest cards */
+  --ds-accent-ink: #fff8ee; /* text on the red (4.7:1) */
+  --ds-accent-on-paper: #b91c1c; /* the red on the paper (5:1) */
+  --ds-mustard: #e8a933; /* the support ink: the logo, posters, tapes. Never a button or a state */
 
-  /* ---------- semânticas (só para dizer o que é, nunca decoração) ---------- */
-  --ds-gold: #e8c35a; /* "os dois" no dueto */
+  /* ---------- semantic colors (only to say what something is, never decoration) ---------- */
+  --ds-gold: #e8c35a; /* "both" in a duet */
   --ds-ok: #6fcf9f;
   --ds-warn: #e5a63c;
   --ds-bad: #ff7d8c;
   --ds-busy: #8fb0f0;
 
-  /* nomes antigos, apontando para o mesmo lugar (o CSS do site ainda os usa) */
+  /* old names, pointing to the same place (the site's CSS still uses them) */
   --ds-pink: var(--ds-accent);
   --ds-pink-hi: var(--ds-accent-hi);
   --ds-pink-ink: var(--ds-accent-ink);
@@ -56,7 +56,7 @@
   --ds-edge: var(--ds-line);
   --ds-edge-hi: var(--ds-line-strong);
 
-  /* ---------- espaçamento (a única escala permitida) ---------- */
+  /* ---------- spacing (the only scale allowed) ---------- */
   --ds-s1: 4px;
   --ds-s2: 8px;
   --ds-s3: 12px;
@@ -66,29 +66,29 @@
   --ds-s7: 48px;
   --ds-s8: 64px;
 
-  /* ---------- cantos: 12 a 20, mais fechados por dentro e mais suaves nos contêineres ---------- */
+  /* ---------- corners: 12 to 20, tighter inside and softer on the containers ---------- */
   --ds-r-sm: 12px;
   --ds-r-md: 16px;
   --ds-r-lg: 20px;
-  --ds-r-pill: 12px; /* botões e rótulos não são pílulas */
+  --ds-r-pill: 12px; /* buttons and labels are not pills */
 
-  /* ---------- profundidade: sombras tingidas do tom do fundo, luz de cima ---------- */
+  /* ---------- depth: shadows tinted with the background's tone, light from above ---------- */
   --ds-shadow-1: 0 1px 0 rgba(255, 236, 220, 0.04) inset, 0 6px 18px -8px rgba(12, 6, 3, 0.7);
   --ds-shadow-2: 0 1px 0 rgba(255, 236, 220, 0.06) inset, 0 2px 4px rgba(12, 6, 3, 0.4), 0 22px 44px -16px rgba(12, 6, 3, 0.8);
   --ds-glow-pink: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 10px 22px -10px rgba(var(--ds-accent-rgb), 0.7);
   --ds-glow-cyan: 0 0 0 1px rgba(var(--ds-accent-rgb), 0.55);
   --ds-blur: none;
 
-  /* ---------- tipografia: duas famílias, hospedadas no próprio app ---------- */
+  /* ---------- type: two families, hosted in the app itself ---------- */
   --ds-font-display: 'Bricolage Grotesque Variable', 'Segoe UI Variable Display', system-ui, sans-serif;
   --ds-font-ui: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  /* ---------- movimento ---------- */
+  /* ---------- motion ---------- */
   --ds-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ds-fast: 0.16s;
 }
 
-/* grão fixo por cima de tudo: quebra a planura digital do fundo (não captura cliques) */
+/* a fixed grain over everything: it breaks the digital flatness of the background (it does not catch clicks) */
 body::after {
   content: '';
   position: fixed;
@@ -105,7 +105,7 @@ body::after {
   letter-spacing: -0.02em;
 }
 
-/* indicador "ao vivo" */
+/* the "live" indicator */
 .live-dot {
   display: inline-block;
   width: 0.5em;

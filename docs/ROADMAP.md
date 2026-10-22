@@ -75,6 +75,7 @@ The remaining `*.mjs` and `*.test.js` files become `.ts`, in one pull request pe
 - Sweep what will not migrate in small pull requests of their own: the Python worker, the TSX components, the CSS and the shell scripts.
   - **The Python worker: done.** Its comments, docstrings, test names and Dockerfile are in English. What the owner reads stays in Portuguese: the log lines (the desktop app shows them), the command line's help and the error messages a job shows.
   - **The TSX components: done.** The web's comments are in English, with the four `.ts` files the TypeScript pass had left in Portuguese (`tv/controller.ts`, `room/useRoomConnection.ts`, `tv/applause-sound.ts`, `ui/useInterlude.ts`). On-screen labels quoted in a comment ("Adicionar música") stay as the screen shows them.
+  - **The CSS: done.** The site's and the desktop app's stylesheets are in English, the two copies of `theme-bridge.css` still identical. Comments that still described the old "Cyber-Club" look (neon pink, cyan, a glass card, a black outline on duets) now describe what the code draws.
 - UI text stays in the i18n catalogs, with Portuguese as the product's default.
 
 ## Infrastructure when the project earns money

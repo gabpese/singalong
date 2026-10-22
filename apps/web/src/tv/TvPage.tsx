@@ -111,7 +111,7 @@ function useLocalMediaNotice(room: RoomState | null): string {
   return accessMessage(status, elapsed);
 }
 
-/** Duet: who sings in each color (green, red, and yellow when both sing). */
+/** Duet: who sings in each color (turquoise, violet, and yellow when both sing). */
 function DuetLegend({ first, second }: { first: string; second: string }) {
   return (
     <p className="duet-legend" aria-label={t('tvp.duetAria')}>

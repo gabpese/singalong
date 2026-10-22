@@ -1,5 +1,5 @@
-/* Estética "Cyber-Club / Dark Arcade", igual à do site: os tokens vêm do theme-bridge.css (cópia do apps/web). Rosa-neon = ação,
-   ciano = estado ativo. Só existe o tema escuro. */
+/* The same look as the site's: the tokens come from theme-bridge.css (a copy of apps/web's). --action (buttons) and --accent (the
+   active state) are both the sign red, through the old --ds-pink and --ds-cyan names. There is only the dark theme. */
 :root {
   --bg: var(--ds-bg);
   --card: var(--ds-surface);
@@ -63,7 +63,7 @@ progress { width: 100%; height: 14px; accent-color: var(--accent); }
 section.center { align-items: center; text-align: center; padding-top: 80px; }
 section.center #engine-progress { width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px; }
 
-/* abas */
+/* tabs */
 .tabs { display: flex; align-items: center; gap: 6px; padding: 0 24px; border-bottom: 1px solid var(--border); }
 .tab { border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: 10px 16px; color: var(--muted); }
 .tab:hover:not(:disabled) { border-color: var(--border); color: var(--text); }
@@ -72,10 +72,10 @@ section.center #engine-progress { width: min(420px, 100%); display: flex; flex-d
 #tab-room { font-size: 13px; margin-left: 8px; }
 #tab-fullscreen { margin-left: 4px; }
 
-/* tela de início: a imagem ocupa todo o lado esquerdo */
+/* the start screen: the picture takes up the whole left side */
 .welcome { flex-direction: row; gap: 0; height: 100%; }
 .welcome-art { flex: 1 1 64%; position: relative; display: grid; place-items: center; background: var(--bg); overflow: hidden; }
-/* a marca colada como um cartaz: papel com fita e a frase da marca */
+/* the brand stuck up like a poster: paper with tape and the brand's phrase */
 .welcome-sheet { position: relative; width: min(62%, 380px); padding: 28px 28px 22px; background: var(--ds-paper); color: var(--ds-paper-ink); border-radius: 4px; transform: rotate(-2deg); box-shadow: 0 22px 34px -14px rgba(8, 4, 2, .75); }
 .welcome-sheet::before { content: ''; position: absolute; top: -12px; left: 50%; width: 110px; height: 30px; background: rgba(232, 169, 51, .88); transform: translateX(-50%) rotate(3deg); }
 .welcome-tag { margin: 18px 0 0; font-family: var(--ds-font-display); font-weight: 800; font-size: 34px; line-height: .95; letter-spacing: -.04em; color: var(--ds-accent-on-paper); }
@@ -91,7 +91,7 @@ section.center #engine-progress { width: min(420px, 100%); display: flex; flex-d
 .welcome-foot .token-note { color: var(--warn); margin: 0; }
 @media (max-width: 820px) { .welcome { flex-direction: column; height: auto; } .welcome-art { flex: none; height: 200px; } .welcome-form { max-width: none; } }
 
-/* espera */
+/* waiting */
 .overlay { position: fixed; inset: 0; z-index: 10; background: rgba(4, 5, 9, 0.72); display: flex; align-items: center; justify-content: center; }
 .wait-box { background: var(--ds-surface-2); box-shadow: var(--ds-shadow-2); border-radius: var(--ds-r-lg); padding: 28px 34px; text-align: center; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .wait-box h2 { justify-content: center; margin: 0; }
@@ -100,13 +100,13 @@ section.center #engine-progress { width: min(420px, 100%); display: flex; flex-d
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 
-/* engrenagem (ícone settings.svg como máscara: acompanha a cor do tema) */
+/* the gear (the settings.svg icon as a mask: it follows the theme's color) */
 header { position: relative; }
 .gear { margin-left: auto; padding: 6px 8px; border: 0; background: transparent; display: inline-flex; }
 .gear-icon { width: 24px; height: 24px; display: block; background: var(--muted); -webkit-mask: url(settings.svg) center / contain no-repeat; mask: url(settings.svg) center / contain no-repeat; }
 .gear:hover .gear-icon { background: var(--accent); }
 
-/* sub-abas da sala */
+/* the Room's sub-tabs */
 .count { font-size: 11px; background: var(--accent); color: var(--accent-text); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
 .count:empty { display: none; }
 .subtabs { display: flex; align-items: center; gap: 6px; padding: 6px 24px; border-bottom: 1px solid var(--border); background: var(--ds-bg-raised); }
@@ -118,12 +118,12 @@ header { position: relative; }
 .subtab { padding: 6px 14px; border-radius: 8px; font-size: 14px; }
 .subtab.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 700; }
 
-/* criando sala */
+/* creating a Room */
 button .spinner.small, .spinner.small { width: 14px; height: 14px; border-width: 2px; display: inline-block; vertical-align: -2px; margin-right: 8px; }
 .list li.loading { color: var(--muted); }
 .list li.loading .spinner { margin-right: 0; }
 
-/* configurações */
+/* settings */
 .settings-head { display: flex; align-items: center; gap: 14px; }
 .settings-head h2 { margin: 0; font-size: 20px; }
 .card h3 { font-size: 15px; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
@@ -139,7 +139,7 @@ details.advanced label { margin-top: 8px; }
 .setup-field { display: grid; gap: 6px; font-weight: 600; }
 .setup-box .row { justify-content: flex-end; }
 
-/* estatísticas do dono */
+/* the Owner's statistics */
 .stats-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .stats-head h2 { margin: 0; }
 .stats-controls { display: flex; align-items: center; gap: 8px; }

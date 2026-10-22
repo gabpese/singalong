@@ -75,6 +75,7 @@ Os `*.mjs` e `*.test.js` que restam viram `.ts`, num pull request por app. O `ts
 - Traduzir o que não vai migrar em pull requests pequenos e próprios: o worker em Python, os componentes TSX, o CSS e os scripts de shell.
   - **O worker em Python: feito.** Os comentários, as docstrings, os nomes de teste e o Dockerfile estão em inglês. O que o dono lê continua em português: as linhas de log (o app do desktop as mostra), a ajuda da linha de comando e as mensagens de erro que um job mostra.
   - **Os componentes TSX: feito.** Os comentários do site estão em inglês, junto com os quatro arquivos `.ts` que a passagem para TypeScript tinha deixado em português (`tv/controller.ts`, `room/useRoomConnection.ts`, `tv/applause-sound.ts`, `ui/useInterlude.ts`). Os rótulos da tela citados num comentário ("Adicionar música") ficam como a tela os mostra.
+  - **O CSS: feito.** As folhas de estilo do site e do app do desktop estão em inglês, com as duas cópias do `theme-bridge.css` ainda idênticas. Os comentários que ainda descreviam o visual antigo "Cyber-Club" (rosa-neon, ciano, cartão de vidro, contorno preto no dueto) agora descrevem o que o código desenha.
 - O texto da interface continua nos catálogos de idioma, com o português como padrão do produto.
 
 ## Infraestrutura quando o projeto gerar receita

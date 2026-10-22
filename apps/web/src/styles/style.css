@@ -2,8 +2,8 @@
 @import '@fontsource-variable/bricolage-grotesque/wght.css';
 @import './theme-bridge.css';
 
-/* Singalong — um único CSS para as três telas: entrada, controle (celular) e TV. Estética "Cyber-Club / Dark Arcade": os tokens
-   moram no theme-bridge.css e os nomes de sempre (--bg, --accent...) apontam para eles. Rosa-neon = ação; ciano = estado ativo. */
+/* Singalong — one CSS for the three screens: the home page, the controls (phone) and the TV. The tokens live in theme-bridge.css
+   and the usual names (--bg, --accent...) point to them. --action (buttons) and --accent (the active state) are both the sign red. */
 :root {
   --bg: var(--ds-bg);
   --bg-2: rgba(255, 255, 255, 0.04);
@@ -14,7 +14,7 @@
   --dim: var(--ds-text-dim);
   --accent: var(--ds-cyan);
   --accent-ink: var(--ds-accent-ink);
-  --accent-text: var(--ds-accent-text); /* o vermelho como texto ou ícone sobre o escuro */
+  --accent-text: var(--ds-accent-text); /* the red as text or an icon on the dark */
   --action: var(--ds-pink);
   --action-ink: var(--ds-pink-ink);
   --ok: var(--ds-ok);
@@ -22,13 +22,13 @@
   --bad: var(--ds-bad);
   --busy: var(--ds-busy);
   --radius: var(--ds-r-md);
-  --tap: 44px; /* altura mínima de um alvo de toque */
+  --tap: 44px; /* the minimum height of a touch target */
   --tabbar-h: 62px;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-/* o atributo `hidden` tem que vencer qualquer `display` definido em classes (flex, grid...) */
+/* the `hidden` attribute has to win over any `display` set in classes (flex, grid...) */
 [hidden] { display: none !important; }
 html, body { margin: 0; min-height: 100%; }
 body {
@@ -42,7 +42,7 @@ h1, h2 { margin: 0 0 .5rem; line-height: 1.2; font-family: var(--ds-font-display
 h2 { font-size: 1.05rem; }
 a { color: var(--accent-text); }
 
-/* ---------- controles ---------- */
+/* ---------- controls ---------- */
 button, select, input[type=text], input[type=search], textarea {
   background: var(--panel-2);
   color: var(--fg);
@@ -60,7 +60,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
 button:disabled { opacity: .4; cursor: default; }
 button:hover:not(:disabled) { border-color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* a ação primária é rosa-neon, em pílula (uma só por tela) */
+/* the primary action: filled with the red, with a glow under it (only one per screen) */
 button.primary, a.button.primary { background: var(--action); color: var(--action-ink); border-color: transparent; border-radius: var(--ds-r-pill); font-weight: 800; letter-spacing: .02em; box-shadow: var(--ds-glow-pink); }
 button.primary:hover:not(:disabled) { filter: brightness(1.08); border-color: transparent; transform: translateY(-1px); }
 button.ghost { background: transparent; }
@@ -93,7 +93,7 @@ input[type=range] { accent-color: var(--accent); }
 .count { color: var(--dim); font-weight: 400; }
 .thumb { width: 64px; height: 36px; object-fit: cover; border-radius: 6px; background: var(--bg); flex: 0 0 auto; }
 
-/* ---------- entrada (a Home): o cartaz da festa, o cartão de entrar e o de baixar o app ---------- */
+/* ---------- the home page: the party's poster, the join card and the download card ---------- */
 .home { min-height: 100dvh; display: grid; align-content: start; gap: var(--ds-s7); width: 100%; max-width: 1200px; margin: 0 auto; padding: var(--ds-s5) var(--ds-s5) var(--ds-s8); }
 .home-top { display: flex; align-items: center; justify-content: flex-end; gap: var(--ds-s4); }
 .home-hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); gap: var(--ds-s7); align-items: center; }
@@ -108,7 +108,7 @@ input[type=range] { accent-color: var(--accent); }
 .mode-card h2 { margin: 0; font-size: clamp(1.8rem, 3.6vw, 2.8rem); font-weight: 800; line-height: 1; letter-spacing: -.03em; }
 .mode-card .hint { font-size: 1rem; max-width: 36ch; line-height: 1.45; text-wrap: pretty; }
 .mode-action { margin-top: auto; padding-top: var(--ds-s5); display: grid; gap: var(--ds-s3); }
-/* a festa é o cartaz: papel com grão, borda irregular, fita e uma retícula de pontos */
+/* the party is the poster: grainy paper, a ragged edge, tape and a halftone of dots */
 .mode-card.mode-host { position: relative; overflow: hidden; min-height: 360px; border-radius: 3px; background: var(--ds-paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .12  0 0 0 0 .08  0 0 0 0 .05  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); color: var(--ds-paper-ink); clip-path: polygon(0 1%,3% 0,12% .8%,24% 0,40% .7%,58% 0,73% .6%,88% 0,100% .9%,99.4% 22%,100% 48%,99.3% 73%,100% 99%,90% 100%,76% 99.3%,55% 100%,38% 99.2%,20% 100%,7% 99.4%,0 100%,.6% 74%,0 50%,.7% 26%); padding: var(--ds-s7) var(--ds-s6) var(--ds-s6); }
 .mode-host::before { content: ''; position: absolute; top: 12px; left: 36px; width: 110px; height: 30px; background: rgba(232, 169, 51, .88); transform: rotate(-6deg); }
 .mode-host::after { content: ''; position: absolute; right: -50px; bottom: -50px; width: 300px; height: 300px; background: radial-gradient(var(--ds-accent) 38%, transparent 40%) 0 0 / 18px 18px; -webkit-mask: radial-gradient(circle at 30% 30%, transparent 16%, #000 70%); mask: radial-gradient(circle at 30% 30%, transparent 16%, #000 70%); pointer-events: none; }
@@ -122,7 +122,7 @@ input[type=range] { accent-color: var(--accent); }
 .mode-card button.big { min-height: 56px; font-size: 1.1rem; }
 .mode-join .join-form { display: grid; gap: var(--ds-s2); }
 .mode-join .join-code { text-transform: uppercase; letter-spacing: .28em; font-family: var(--ds-font-display); font-weight: 700; font-size: 1.5rem; text-align: center; min-height: 56px; border-radius: var(--ds-r-sm); background: var(--ds-bg); }
-.mode-join .join-code::placeholder { letter-spacing: normal; text-transform: none; font-family: var(--ds-font-ui); font-weight: 400; font-size: 1rem; } /* o exemplo inteiro cabe no campo */
+.mode-join .join-code::placeholder { letter-spacing: normal; text-transform: none; font-family: var(--ds-font-ui); font-weight: 400; font-size: 1rem; } /* the whole example fits in the field */
 .mode-join button[type=submit] { min-height: 52px; font-weight: 700; font-size: 1.02rem; background: var(--ds-surface-2); }
 .mode-join button[type=submit]:hover { border-color: var(--accent); }
 .mode-download { gap: var(--ds-s2); padding: var(--ds-s5); }
@@ -132,7 +132,7 @@ input[type=range] { accent-color: var(--accent); }
 .home .download-row { display: flex; align-items: center; gap: var(--ds-s2); }
 .home .download-row .button { flex: 1 1 auto; }
 .home .download-others { margin: var(--ds-s2) 0 0; color: var(--dim); font-size: .9rem; font-weight: 600; }
-/* a dica ao lado do botão: abre com o mouse, o foco ou um toque */
+/* the tip beside the button: opens on hover, focus or a tap */
 .info-tip { position: relative; flex: 0 0 auto; }
 .info-tip-btn { width: 28px; height: 28px; min-height: 0; padding: 0; border-radius: 50%; font-weight: 700; font-style: italic; font-family: Georgia, serif; line-height: 1; color: var(--dim); }
 .info-tip-btn:hover, .info-tip-btn:focus-visible { color: var(--fg); border-color: var(--accent); }
@@ -147,7 +147,7 @@ input[type=range] { accent-color: var(--accent); }
   .mode-card.mode-host { min-height: 0; padding: var(--ds-s6) var(--ds-s5) var(--ds-s5); }
 }
 
-/* ---------- sala (celular) ---------- */
+/* ---------- Room (phone) ---------- */
 .topbar {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -161,8 +161,8 @@ input[type=range] { accent-color: var(--accent); }
 .tv-status { margin: 2px 0 0; color: var(--dim); font-size: .82rem; }
 .tv-status.on { color: var(--ok); }
 
-/* a barra lateral da sala: atalhos e ajustes sempre à vista, só ícones (o texto vai no tooltip). Em tela larga é uma coluna à
-   esquerda; no celular, uma faixa logo abaixo do topo. */
+/* the Room's side rail: shortcuts and settings always in view, icons only (the text goes in the tooltip). On a wide screen it is a
+   column on the left; on the phone, a strip right below the top bar. */
 .room-rail {
   display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 6px 10px;
   padding: 8px 16px; border-bottom: 1px solid var(--line);
@@ -182,17 +182,17 @@ input[type=range] { accent-color: var(--accent); }
 .rail-switch .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--fg); transition: transform .15s; }
 .rail-switch.on .sw { background: var(--accent); }
 .rail-switch.on .sw::after { transform: translateX(13px); background: var(--accent-ink); }
-.rail-pop { flex: 1 0 100%; order: 10; } /* no celular o volume vem depois dos botões, numa linha só dele */
+.rail-pop { flex: 1 0 100%; order: 10; } /* on the phone the volume comes after the buttons, on a row of its own */
 .rail-pop:empty { display: none; }
 .rail-pop .pop-tip { display: none; margin: 0 0 8px; color: var(--dim); font-size: .82rem; line-height: 1.35; }
 @media (min-width: 960px) {
   .rail-item.has-pop:hover .rail-pop, .rail-item.has-pop:has(:focus-visible) .rail-pop { opacity: 1; pointer-events: auto; }
-  .rail-item.voice-on .rail-switch[data-tip]::after { display: none; } /* a explicação vai dentro do balão do volume */
+  .rail-item.voice-on .rail-switch[data-tip]::after { display: none; } /* the explanation goes inside the volume's bubble */
   .rail-pop .pop-tip { display: block; }
-  .rail-pop::before { content: ''; position: absolute; right: 100%; top: 0; bottom: 0; width: 16px; } /* a ponte para o mouse não perder o hover no caminho */
+  .rail-pop::before { content: ''; position: absolute; right: 100%; top: 0; bottom: 0; width: 16px; } /* the bridge so the mouse does not lose the hover on the way */
 }
 .rail-pop .backing-row { margin: 0; }
-/* tooltip: só onde há mouse e espaço (no celular o aviso do toast faz esse papel) */
+/* tooltip: only where there is a mouse and room (on the phone the toast notice does this job) */
 @media (hover: hover) and (min-width: 960px) {
   .rail-btn[data-tip]::after, .rail-switch[data-tip]::after {
     content: attr(data-tip); position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); z-index: 40;
@@ -236,7 +236,7 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
 .controls-row.offset { margin-top: 8px; }
 .offset-value { font-variant-numeric: tabular-nums; min-width: 4em; }
 
-/* tom: a nota em que a pessoa canta, em destaque, e embaixo "Mais grave" / "Mais agudo" lado a lado */
+/* key: the note the person sings in, highlighted, and below it "Mais grave" / "Mais agudo" side by side */
 .pitch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ds-s2); width: 100%; margin-top: var(--ds-s2); }
 .pitch-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--ds-s2); min-width: 0; min-height: 48px; padding: var(--ds-s2) var(--ds-s3); border-radius: var(--ds-r-pill); font-weight: 700; }
 .pitch-btn .icon { width: 1.1em; height: 1.1em; vertical-align: 0; }
@@ -252,7 +252,7 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
 .pitch.static { display: block; width: auto; margin-top: 0; }
 .pitch.static .pitch-value { background: transparent; border-color: transparent; padding: 0; justify-items: start; }
 .actions .pitch { flex: 1 0 100%; order: 9; }
-/* na barra da prévia o espaço é curto: os botões viram só o ícone (o texto fica para o leitor de tela) e a nota fica entre eles */
+/* in the preview bar room is short: the buttons become just the icon (the text stays for the screen reader) and the note sits between them */
 .preview-controls .pitch { flex: 1 0 100%; order: 5; margin-top: 0; grid-template-columns: auto minmax(0, 1fr) auto; }
 .preview-controls .pitch-value { grid-column: 2; grid-row: 1; padding: var(--ds-s1) var(--ds-s2); }
 .preview-controls .pitch-meter { display: none; }
@@ -285,7 +285,7 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
 .chip.is-next { color: var(--accent-text); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* adicionar música */
+/* adding a song */
 .add form { display: grid; gap: 12px; }
 .results { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
 .result-row { display: flex; gap: 8px; align-items: stretch; }
@@ -302,7 +302,7 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
 .video-frame a { font-size: .85rem; }
 .inline-preview:empty { display: none; }
 
-/* prévia do instrumental, fixa acima das abas */
+/* the instrumental's preview, fixed above the tabs */
 .preview-bar {
   position: fixed; left: 0; right: 0; z-index: 25;
   bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
@@ -318,7 +318,7 @@ body.has-preview .room-page { padding-bottom: calc(var(--tabbar-h) + 150px + env
 .preview-controls input[type=range] { flex: 1; min-width: 60px; }
 .preview-controls button { padding: 4px 12px; min-width: var(--tap); }
 
-/* barra de abas (celular) */
+/* the tab bar (phone) */
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   display: flex; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
@@ -347,7 +347,7 @@ body.has-preview .toast { bottom: calc(var(--tabbar-h) + 150px + env(safe-area-i
 /* ---------- TV ---------- */
 body.tv { overflow: hidden; height: 100vh; }
 .tv-stage {
-  --queue-w: clamp(270px, 25vw, 440px); /* largura da lista de cantores ao lado da letra */
+  --queue-w: clamp(270px, 25vw, 440px); /* the width of the singers' list beside the lyrics */
   position: relative; height: 100vh; display: grid; grid-template-rows: auto 1fr auto;
   padding: 20px 32px 14px; gap: 14px; background: var(--bg);
 }
@@ -355,8 +355,8 @@ body.tv { overflow: hidden; height: 100vh; }
 .singer { display: grid; gap: 2px; min-width: 0; }
 .singer .label { color: var(--dim); font-size: clamp(.75rem, 1.1vw, 1rem); letter-spacing: .12em; }
 .singer .who { color: var(--ds-paper); font-family: var(--ds-font-display); font-size: clamp(1.5rem, 3.2vw, 3rem); line-height: 1.1; display: flex; align-items: center; gap: .14em; min-width: 0; font-weight: 900; text-shadow: .035em .03em 0 rgba(var(--ds-accent-rgb), .6); }
-/* só o texto do nome ganha o "…": os bichinhos ao lado não podem ser cortados */
-.who-name { min-width: 0; overflow: hidden; line-height: 1.18; padding-bottom: .04em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; } /* um dueto com nomes longos quebra em duas linhas em vez de virar "…" */
+/* only the name's text gets the "…": the creatures beside it cannot be cut */
+.who-name { min-width: 0; overflow: hidden; line-height: 1.18; padding-bottom: .04em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; } /* a duet with long names wraps onto two lines instead of becoming "…" */
 .singer .what { color: var(--fg); font-size: clamp(.95rem, 1.6vw, 1.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .singer .key { color: var(--dim); font-size: clamp(.8rem, 1.2vw, 1.1rem); }
 .singer.is-next { padding-left: 24px; border-left: 2px solid var(--line); }
@@ -371,12 +371,12 @@ body.tv { overflow: hidden; height: 100vh; }
 .tv-progress { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .tv-progress > div { height: 100%; width: 0; background: var(--accent); box-shadow: 0 0 14px rgba(var(--ds-accent-rgb), .6); border-radius: 3px; transition: width .3s linear; }
 
-/* corpo da TV: a letra e, ao lado, a fila (atual + próximas 5) */
+/* the TV's body: the lyrics and, beside them, the Queue (current + next 5) */
 .tv-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--queue-w); gap: 28px; min-height: 0; }
 .tv-stage:not(.has-queue) .tv-body { grid-template-columns: minmax(0, 1fr); }
 .tv-side { align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 14px; min-height: 0; overflow: hidden; }
 .tv-body > * { min-height: 0; }
-/* o QR code da sala fica ao lado de quem está cantando (a coluna da direita é só da fila) */
+/* the Room's QR code sits beside whoever is singing (the right column belongs to the Queue alone) */
 .tv-now { display: flex; align-items: center; gap: clamp(12px, 1.6vw, 24px); min-width: 0; }
 .tv-now .singer { flex: 1 1 auto; }
 .tv-join { flex: 0 0 auto; display: grid; justify-items: center; gap: 4px; text-align: center; }
@@ -398,21 +398,21 @@ body.tv { overflow: hidden; height: 100vh; }
 .tv-queue small { color: var(--dim); font-size: clamp(.8rem, 1.15vw, 1.05rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv-queue li.more { justify-content: center; background: transparent; color: var(--dim); font-size: clamp(.85rem, 1.2vw, 1.1rem); }
 
-/* a letra passa dentro de um cartão de vidro (glassmorphism): o fundo da tela continua o mesmo, e o cartão escurece e desfoca
-   o que está atrás para qualquer cor de letra (turquesa, violeta, amarelo, branco) ficar legível */
+/* the lyrics run inside a raised card: the screen's background stays the same, and the card's solid dark keeps every
+   lyrics color (the red, turquoise, violet, yellow, cream) legible */
 .lyrics {
   display: flex; flex-direction: column; justify-content: center; align-items: center;
   gap: 1.4vh; text-align: center; padding: 3vh 3vw; margin: 1vh 1vw; overflow: hidden; border-radius: var(--ds-r-lg);
   background: var(--ds-bg-raised);
   border: 1px solid var(--ds-line-strong); position: relative; box-shadow: var(--ds-shadow-2);
 }
-/* tipografia de display, pesada, para ler de longe */
+/* display type, heavy, to read from afar */
 .line { flex: 0 0 auto; margin: 0; min-height: 1.3em; line-height: 1.2; font-family: var(--ds-font-display); font-weight: 800; letter-spacing: -.025em; text-wrap: balance; }
-/* o que já passou perde força; o que vem fica num branco sutil */
+/* what has passed loses strength; what is coming stays a subtle white */
 .prev { font-size: calc(clamp(1.1rem, 2.4vw, 2.2rem) * var(--lyrics-scale, 1) * var(--fit, 1)); color: var(--fg); opacity: .3; }
 .current { font-size: calc(clamp(2.1rem, 5vw, 5rem) * var(--lyrics-scale, 1) * var(--fit, 1)); color: var(--fg); }
-/* cada palavra tem o próprio preenchimento (--p): a ordem de leitura não depende da quebra de linha. O wipe corre da esquerda para a
-   direita, do rosa ao ciano, e a ponta do preenchimento é a parte mais clara */
+/* each word has its own fill (--p): the reading order does not depend on the line break. The wipe runs from left to
+   right: the sung part in the lit red, the rest in the text color */
 .current .w {
   --p: 0%;
   display: inline-block;
@@ -421,7 +421,7 @@ body.tv { overflow: hidden; height: 100vh; }
   background-clip: text;
   color: transparent;
 }
-/* aviso de pausa longa: "--------------" que vai sumindo até a próxima linha começar */
+/* the long-pause notice: a "--------------" that fades away until the next line starts */
 .current .gap-dashes { color: var(--accent-text); letter-spacing: .12em; font-weight: 800; }
 .next { font-size: calc(clamp(1.3rem, 3.2vw, 3rem) * var(--lyrics-scale, 1) * var(--fit, 1)); color: rgba(255, 255, 255, .64); }
 .next2 { font-size: calc(clamp(1.1rem, 2.4vw, 2.2rem) * var(--lyrics-scale, 1) * var(--fit, 1)); color: rgba(255, 255, 255, .46); }
@@ -433,7 +433,7 @@ body.tv { overflow: hidden; height: 100vh; }
   text-align: center; padding: var(--ds-s5); overflow: hidden;
 }
 .idle[hidden], .unlock[hidden] { display: none; }
-/* com a fila visível, a tela de espera deixa a lista à mostra (quem está esperando precisa vê-la) */
+/* with the Queue visible, the waiting screen leaves the list in view (whoever is waiting needs to see it) */
 .tv-stage.has-queue .idle { right: calc(var(--queue-w) + 32px + 28px); }
 .idle-lead { font-size: clamp(1rem, 1.9vw, 1.5rem); margin: 0; color: var(--dim); }
 .idle-lead strong { color: var(--accent-text); letter-spacing: .15em; font-size: 1.15em; }
@@ -441,7 +441,7 @@ body.tv { overflow: hidden; height: 100vh; }
 .qr svg { display: block; width: 100%; height: auto; }
 .idle-msg { font-size: clamp(1rem, 1.6vw, 1.4rem); color: var(--fg); margin: 0; }
 
-/* sala de espera: um cartaz de bairro colado na parede, com o QR code no centro e os celulares que entram em quadrados de cantos suaves */
+/* the waiting room: a neighborhood poster stuck on the wall, with the QR code in the center and the phones that join in soft-cornered squares */
 .lobby { position: relative; width: min(740px, 100%); max-height: 100%; transform: rotate(-.7deg); filter: drop-shadow(0 20px 28px rgba(8, 4, 2, .65)); color: var(--ds-paper-ink); }
 .lobby-sheet { position: relative; overflow: hidden; display: grid; justify-items: center; gap: var(--ds-s2); padding: clamp(12px, 2.2vh, 30px) clamp(20px, 4vw, 52px); background: var(--ds-paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .12  0 0 0 0 .08  0 0 0 0 .05  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); clip-path: polygon(0 1%,3% 0,12% .8%,24% 0,40% .7%,58% 0,73% .6%,88% 0,100% .9%,99.4% 22%,100% 48%,99.3% 73%,100% 99%,90% 100%,76% 99.3%,55% 100%,38% 99.2%,20% 100%,7% 99.4%,0 100%,.6% 74%,0 50%,.7% 26%); }
 .lobby-sheet > * { position: relative; min-width: 0; }
@@ -494,17 +494,17 @@ body.tv { overflow: hidden; height: 100vh; }
   .tv-meta { grid-column: 1; justify-self: start; }
 }
 
-/* adicionar: busca por artista + nome, e o link como alternativa */
+/* adding: a search by artist + name, and the link as an alternative */
 .wide { width: 100%; }
 .link-box { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; }
 .link-box > summary { cursor: pointer; color: var(--dim); font-size: .9rem; }
 .link-box[open] > summary { margin-bottom: 8px; }
 
-/* filtro da biblioteca */
+/* the library's filter */
 .filter { margin: 4px 0 12px; }
 .empty-box { display: grid; gap: 8px; justify-items: start; padding: 8px 2px; }
 
-/* ---------- ícones (SVG em máscara: herdam a cor do texto) ---------- */
+/* ---------- icons (SVG as a mask: they take the text's color) ---------- */
 .icon {
   display: inline-block; flex: 0 0 auto; width: 1.15em; height: 1.15em; vertical-align: -0.2em;
   background-color: currentColor;
@@ -527,18 +527,18 @@ body.tv { overflow: hidden; height: 100vh; }
 .i-sound { --icon: url('/icons/sound.svg'); }
 .i-shuffle { --icon: url('/icons/shuffle.svg'); }
 .i-melody { --icon: url('/icons/melody.svg'); }
-/* botão só com ícone (o nome fica no aria-label e no title) */
+/* an icon-only button (the name goes in the aria-label and the title) */
 .icon-btn { display: inline-grid; place-items: center; padding: 4px 14px; min-width: var(--tap); }
 .icon-btn .icon { width: 1.25em; height: 1.25em; vertical-align: 0; }
 .pitch .icon-btn .icon, .preview-controls .pitch .icon { width: 1em; height: 1em; }
-/* botão com ícone + texto */
+/* a button with an icon + text */
 .has-icon { display: inline-flex; align-items: center; justify-content: center; gap: .5em; }
 .has-icon .icon { width: 1.2em; height: 1.2em; vertical-align: 0; }
 h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .15em; }
 .tv-status .icon { width: 1em; height: 1em; vertical-align: -.15em; }
 .muted .icon, .now-singer .icon { width: 1em; height: 1em; vertical-align: -.17em; }
 
-/* --- pontuação pelo microfone --- */
+/* --- scoring through the microphone --- */
 .score-hud { display: grid; align-content: center; gap: 2px; padding: 10px 16px; width: 170px; background: color-mix(in srgb, var(--panel) 85%, transparent); border: 1px solid var(--line); border-radius: var(--radius); }
 .score-hud[hidden], .score-final[hidden] { display: none; }
 .beta-tag { display: inline-block; margin-left: .35em; padding: 0 .45em; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: 999px; color: var(--accent-text); font-size: .65em; font-weight: 700; letter-spacing: .08em; line-height: 1.5; vertical-align: .15em; cursor: help; }
@@ -561,13 +561,13 @@ h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .1
   margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--line);
 }
 .export-label { color: var(--dim); font-size: .8rem; }
-/* tom e botão formam um controle só: o seletor encosta no botão */
+/* the key and the button form one control: the picker leans against the button */
 .export-controls { display: inline-flex; margin-left: auto; }
 .export-controls select, .export-controls button { min-height: 36px; padding: 4px 12px; font-size: .88rem; }
 .export-controls select { border-radius: 10px 0 0 10px; border-right: 0; padding-right: 6px; }
 .export-controls button { border-radius: 0 10px 10px 0; white-space: nowrap; }
 
-/* aviso "já temos esta música" (Jukebox) */
+/* the "we already have this song" notice (Jukebox) */
 .jukebox-dialog {
   background: var(--ds-glass-strong); color: var(--fg); border: 1px solid var(--ds-edge-hi); border-radius: var(--ds-r-lg); box-shadow: var(--ds-shadow-2);
   padding: 0; width: min(520px, calc(100vw - 24px)); max-height: min(85vh, 640px); overflow: auto;
@@ -596,38 +596,38 @@ h1 .icon { width: .95em; height: .95em; vertical-align: -.08em; margin-right: .1
 .library li .info { min-width: 110px; }
 .jukebox-option .video-title { font-style: italic; overflow-wrap: anywhere; }
 
-/* confirmação do artista e do nome depois de escolher o vídeo */
+/* confirming the artist and the name after choosing the video */
 .confirm-box { display: grid; gap: 8px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .confirm-box h3 { margin: 0; font-size: 1rem; }
 .confirm-box .hint { margin: 0; }
 .confirm-box .row { align-items: end; }
 
-/* barra de posição arrastável (só o anfitrião) */
+/* the draggable position bar (the Host only) */
 input[type=range].seek { flex: 1; min-width: 0; height: 28px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
 input[type=range].seek::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
 input[type=range].seek::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
 input[type=range].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--accent); }
 input[type=range].seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); }
 
-/* nível das vozes de apoio: uma linha própria, com a barra no estilo da de posição */
+/* the backing vocals' level: a row of its own, with the bar styled like the position one */
 .backing-row { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .backing-row .seek { flex: 1; }
 .backing-value { min-width: 3em; text-align: right; font-variant-numeric: tabular-nums; color: var(--dim); font-size: .9rem; }
 .queue-item .backing-row { margin-top: 0; }
 
-/* o botão de buscar não pode encostar nos campos de artista e música */
+/* the search button cannot touch the artist and song fields */
 .search-block { display: flex; flex-direction: column; gap: 12px; }
 .search-block[hidden] { display: none; }
 .required { color: var(--accent-text); margin-left: 2px; }
 
-/* palco: a tela de canto do celular (letra grande no ritmo da TV) */
+/* Stage: the phone's singing screen (big lyrics in time with the TV) */
 body.stage { background: var(--bg); }
-.stage-page { min-height: 100dvh; display: flex; flex-direction: column; gap: 10px; /* o cartão da letra fica centrado no que sobra, com ou sem os avisos de dueto */ padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); }
+.stage-page { min-height: 100dvh; display: flex; flex-direction: column; gap: 10px; /* the lyrics card sits centered in what is left, with or without the duet notices */ padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); }
 .stage-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .stage-where { margin: 0; color: var(--dim); font-size: .85rem; }
 .stage-song { margin: 2px 0; font-size: 1.25rem; line-height: 1.2; }
 .stage-artist { margin: 0; color: var(--dim); font-size: .95rem; }
-.stage-lyrics { flex: 0 1 auto; min-height: 0; padding: 28px 16px; margin: auto 0; border-radius: 22px; } /* a altura do conteúdo, centrada no espaço livre */
+.stage-lyrics { flex: 0 1 auto; min-height: 0; padding: 28px 16px; margin: auto 0; border-radius: 22px; } /* the content's height, centered in the free space */
 .stage-lyrics .prev { font-size: calc(clamp(1rem, 4.4vw, 1.5rem) * var(--lyrics-scale, 1) * var(--fit, 1)); }
 .stage-lyrics .current { font-size: calc(clamp(1.9rem, 9vw, 3.2rem) * var(--lyrics-scale, 1) * var(--fit, 1)); }
 .stage-lyrics .next { font-size: calc(clamp(1.15rem, 5.4vw, 1.9rem) * var(--lyrics-scale, 1) * var(--fit, 1)); }
@@ -636,33 +636,33 @@ body.stage { background: var(--bg); }
 .stage-end { display: grid; gap: 4px; color: var(--fg); font-size: 1.2rem; }
 .stage-end small { color: var(--dim); font-size: .85rem; }
 
-/* voz do microfone nas caixas: aviso antes de ligar e o volume */
+/* the microphone's voice in the speakers: the notice before turning it on, and the volume */
 .voice-dialog .jukebox-body p { margin: 0; line-height: 1.45; }
 .voice-tips { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; color: var(--dim); }
 
-/* dueto: turquesa para um cantor, violeta para o outro e amarelo (a cor de sempre) quando cantam juntos. Pares escolhidos para
-   se distinguirem em todos os tipos de daltonismo (testados por simulação), sem azul nem rosa. A cor nunca é a única pista:
-   cada parte tem também uma forma (círculo, quadrado, losango). A letra ganha um contorno PRETO, que a deixa legível. */
+/* duet: turquoise for one singer, violet for the other and yellow (the usual color) when they sing together. Pairs chosen to
+   stay distinct under every kind of color blindness (tested by simulation), with no blue or pink. Color is never the only cue:
+   each part also has a shape (circle, square, diamond). */
 [data-part] { --part: var(--ds-gold); }
 [data-part="a"] { --part: #10B8C8; --shape: '●'; }
 [data-part="b"] { --part: #8B5CF6; --shape: '■'; }
 [data-part="both"] { --part: var(--ds-gold); --shape: '◆'; }
-/* No dueto a letra enche com a cor de quem canta; quem dá o contraste é o cartão de vidro atrás dela (.lyrics), então o
-   preenchimento fica inteiro, sem contorno. */
+/* In a duet the lyrics fill with the color of whoever is singing; the contrast comes from the card behind them (.lyrics), so the
+   fill stays whole, without an outline. */
 .current[data-part] .w {
   background: linear-gradient(90deg, var(--part) var(--p), var(--fg) var(--p));
   -webkit-background-clip: text; background-clip: text; font-weight: 800;
 }
-/* as linhas que ainda vêm e a legenda: a forma e a cor de quem canta */
+/* the lines still to come and the legend: the shape and color of whoever sings */
 .line[data-part]:not(.current):not(:empty)::before,
 .duet-legend span::before {
   content: var(--shape, '●'); margin-right: .4em; font-size: .8em; color: var(--part);
 }
 .duet-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 1.2vh 0 0; font-size: clamp(.8rem, 1.4vw, 1.1rem); color: var(--dim); }
-.stage-legend { font-size: .9rem; margin: 0 0 auto; } /* a legenda fica colada no cartão da letra, os dois centrados juntos */
+.stage-legend { font-size: .9rem; margin: 0 0 auto; } /* the legend sits right against the lyrics card, the two centered together */
 .stage-lyrics:has(+ .stage-legend) { margin-bottom: 0; }
 
-/* dueto: convidar, o convite recebido e a dupla na fila */
+/* duet: inviting, the invitation received and the pair in the Queue */
 .duet-row { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .duet-note { margin: 4px 0 0; color: var(--dim); font-size: .9rem; }
 .duet-note.ok { color: var(--ok, #6fe3a0); }
@@ -672,7 +672,7 @@ body.stage { background: var(--bg); }
 .people { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .people button { width: 100%; text-align: left; }
 
-/* o convite aparece em qualquer tela: preso ao topo da sala, sobre o palco e sobre a TV */
+/* the invitation shows on any screen: pinned to the top of the Room, over the Stage and over the TV */
 .invites { position: sticky; top: 0; z-index: 60; padding: 8px 12px 0; display: grid; gap: 10px; }
 .invite { border-color: var(--accent); box-shadow: 0 8px 28px #000a; }
 .stage-page .invites { position: static; padding: 0; }
@@ -680,7 +680,7 @@ body.stage { background: var(--bg); }
 .tv-invites { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 70; width: min(640px, 92vw); }
 .tv-invites .invites { position: static; padding: 0; }
 
-/* ---------- sala: alternar entre Sala e TV ---------- */
+/* ---------- Room: switching between the "Sala" and "TV" views ---------- */
 .view-switch { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); }
 .view-switch button { min-height: 36px; padding: 4px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--dim); }
 .view-switch button.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
@@ -691,25 +691,25 @@ body.stage { background: var(--bg); }
 .tv-viewer .tv-queue { max-height: none; }
 .tv-viewer .singer .who { font-size: clamp(1.3rem, 6vw, 2rem); }
 .tv-viewer .lyrics { position: static; }
-/* idioma: três bandeiras pequenas; a escolhida fica acesa, as outras apagadas */
+/* language: three small flags; the chosen one is lit, the others dimmed */
 .language-switch { display: inline-flex; flex: 0 0 auto; gap: 2px; padding: 3px; border-radius: 10px; background: var(--panel-2); }
 .language-switch button { display: grid; place-items: center; min-height: 0; width: 34px; height: 30px; padding: 5px; border: 0; border-radius: 7px; background: transparent; opacity: .45; filter: saturate(.6); transition: opacity var(--ds-fast), filter var(--ds-fast); }
 .language-switch button:hover:not(:disabled) { opacity: .85; filter: none; transform: none; }
 .language-switch button.on { opacity: 1; filter: none; background: rgba(240, 228, 205, .12); }
 .language-switch svg { display: block; width: 24px; height: 16px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); }
 
-/* ---------- acessibilidade ---------- */
+/* ---------- accessibility ---------- */
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .skip-link { position: absolute; left: 8px; top: -60px; z-index: 100; padding: 10px 14px; border-radius: 10px; background: var(--action); color: var(--action-ink); font-weight: 600; text-decoration: none; }
 .skip-link:focus { top: 8px; }
 .lyrics-size { display: inline-flex; gap: 6px; }
 .lyrics-size button { min-height: 36px; min-width: 40px; padding: 4px 10px; font-weight: 700; }
 .tv-queue .is-current small { color: #c9c9dc; }
-/* quem pede menos movimento não vê transições nem animações */
+/* whoever asks for less motion sees no transitions or animations */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
-/* quem pede mais contraste ganha textos secundários e bordas mais fortes */
+/* whoever asks for more contrast gets stronger secondary text and borders */
 @media (prefers-contrast: more) {
   :root { --dim: #c4c4da; --line: #6a6a92; }
   .prev, .next2 { opacity: 1; }
@@ -718,7 +718,7 @@ body.stage { background: var(--bg); }
 .latency-field { margin-top: 10px; } .latency-field input[type=range] { width: 100%; }
 .mic-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; } .mic-list .check { align-items: center; }
 
-/* ---------- reações dos celulares ---------- */
+/* ---------- the phones' Reactions ---------- */
 .reaction-bar { display: flex; justify-content: space-between; gap: 6px; }
 .reaction-bar button { flex: 1; min-height: var(--tap); padding: 4px 0; font-size: 1.5rem; line-height: 1; transition: transform .12s; }
 .reaction-bar button.pop { transform: scale(1.25); }
@@ -732,17 +732,17 @@ body.stage { background: var(--bg); }
   100% { transform: translateY(-85vh) scale(1); opacity: 0; }
 }
 
-/* a faixa de baixo da TV: o guia de melodia (se ligado) e a pontuação, lado a lado e dentro do layout (nada flutua sobre o QR code) */
+/* the TV's bottom strip: the melody guide (if on) and the Score, side by side and inside the layout (nothing floats over the QR code) */
 .tv-stage.has-lower { grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .tv-lower { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: stretch; }
 .tv-lower .pitch-guide { height: clamp(90px, 20vh, 240px); }
 .tv-lower .score-hud { grid-column: 2; }
-/* sem o guia, a pontuação vira uma tira baixa, à direita */
+/* without the guide, the Score becomes a low strip on the right */
 .tv-lower:not(:has(.pitch-guide)) .score-hud { grid-auto-flow: column; align-items: baseline; gap: 18px; width: auto; padding: 8px 18px; }
 .tv-lower:not(:has(.pitch-guide)) .score-hud strong { font-size: 1.8rem; }
 .pitch-guide { display: block; width: 100%; border-radius: 18px; background: var(--ds-bg-raised); border: 1px solid var(--ds-edge-hi); }
 
-/* a divisão da letra do dueto */
+/* how the duet's lyrics are split */
 .parts-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
 .parts-list li { display: grid; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); }
 .parts-list li.empty-line { opacity: .6; }
@@ -750,9 +750,9 @@ body.stage { background: var(--bg); }
 .parts-choices { display: flex; gap: 6px; flex-wrap: wrap; }
 .part-btn { min-height: 36px; padding: 4px 12px; border: 2px solid var(--part); color: var(--fg); background: transparent; }
 .part-btn::before { content: var(--shape) ' '; color: var(--part); }
-.part-btn.on { background: color-mix(in srgb, var(--part) 30%, var(--bg-2)); color: var(--fg); font-weight: 700; box-shadow: inset 0 0 0 2px var(--part); } /* o escolhido: fundo da cor e borda mais grossa (a forma ao lado também diz qual é) */
+.part-btn.on { background: color-mix(in srgb, var(--part) 30%, var(--bg-2)); color: var(--fg); font-weight: 700; box-shadow: inset 0 0 0 2px var(--part); } /* the chosen one: the color as background and a thicker border (the shape beside it also says which one) */
 
-/* ---------- marca: o logotipo e a placa "AO VIVO" ---------- */
+/* ---------- brand: the logo and the "AO VIVO" sign ---------- */
 .logo { position: relative; display: inline-block; font-family: var(--ds-font-display); font-weight: 800; letter-spacing: -.045em; line-height: 1; white-space: nowrap; padding-right: 1.02em; color: var(--ds-paper); }
 .logo-word { text-shadow: .028em .022em 0 var(--ds-accent); }
 .logo.on-paper { color: var(--ds-paper-ink); }
@@ -768,10 +768,10 @@ body.stage { background: var(--bg); }
 @media (prefers-reduced-motion: reduce) { .logo-sign, .logo-sign .flick { animation: none; } }
 .topbar-mark { width: 1.5em; height: 1.5em; vertical-align: -.32em; margin-right: .3em; border-radius: 22%; }
 
-/* ---------- marca: a TV como cartaz ---------- */
+/* ---------- brand: the TV as a poster ---------- */
 .lyrics > * { position: relative; z-index: 1; }
 .lyrics::after { content: ''; position: absolute; right: 0; bottom: 0; width: 200px; height: 200px; background: radial-gradient(var(--ds-accent) 38%, transparent 40%) 0 0 / 14px 14px; -webkit-mask: radial-gradient(circle at 30% 30%, transparent 20%, #000 75%); mask: radial-gradient(circle at 30% 30%, transparent 20%, #000 75%); opacity: .22; pointer-events: none; }
-/* a fila é um bilhete de papel colado ao lado do cartaz */
+/* the Queue is a paper note stuck beside the poster */
 .tv-queue::before { content: ''; position: absolute; top: 5px; left: 50%; width: 92px; height: 20px; background: rgba(232, 169, 51, .9); transform: translateX(-50%) rotate(-3deg); }
 .tv-queue h2 { color: var(--ds-paper-dim); }
 .tv-queue li { background: rgba(22, 17, 15, .07); }
@@ -782,21 +782,21 @@ body.stage { background: var(--bg); }
 .tv-queue .is-current strong, .tv-queue .is-current small { color: var(--ds-accent-ink); }
 .tv-queue .is-current .mark { background: var(--ds-paper-ink); color: var(--ds-paper); }
 
-/* ---------- marca: os bichinhos de quem canta (um, ou os dois do dueto, um encostado no outro) ---------- */
-/* o bicho ocupa só o miolo do desenho: a caixa é maior que a letra e as margens negativas devolvem o espaço. No escuro ele ganha um
-   contorno creme de adesivo (alguns tons de bicho são escuros e sumiriam); no papel, a sombra de carimbo */
+/* ---------- brand: the creatures of whoever is singing (one, or both in a duet, one leaning on the other) ---------- */
+/* the creature takes up only the middle of the drawing: the box is bigger than the letters and the negative margins give the space back. On
+   the dark it gets a cream sticker outline (some creature tones are dark and would vanish); on the paper, a rubber-stamp shadow */
 .singer-blobs { display: inline-flex; flex: 0 0 auto; vertical-align: middle; margin: -.42em -.26em -.42em -.32em; }
 .singer-blobs .blob { display: block; width: 1.9em; height: 1.9em; overflow: visible; filter: drop-shadow(1.5px 0 0 var(--ds-paper)) drop-shadow(-1.5px 0 0 var(--ds-paper)) drop-shadow(0 1.5px 0 var(--ds-paper)) drop-shadow(0 -1.5px 0 var(--ds-paper)); }
-.singer-blobs.duo .blob + .blob { margin-left: -.42em; } /* lado a lado, só encostando (alguns bichos enchem o quadro inteiro) */
-/* ao lado do nome grande da TV: a caixa do bicho na altura da linha, sem margem vertical negativa (nada passa da linha) */
+.singer-blobs.duo .blob + .blob { margin-left: -.42em; } /* side by side, just touching (some creatures fill the whole frame) */
+/* beside the TV's big name: the creature's box at the line's height, with no negative vertical margin (nothing goes past the line) */
 .singer .who .singer-blobs { margin: -.1em -.16em -.1em -.22em; }
 .singer .who .singer-blobs .blob { width: 1.45em; height: 1.45em; }
 .singer .who .singer-blobs.duo .blob + .blob { margin-left: -.36em; }
 .tv-queue .singer-blobs { font-size: clamp(1rem, 1.6vw, 1.5rem); margin: -.3em -.25em; }
 .tv-queue .singer-blobs .blob { filter: drop-shadow(2px 2px 0 rgba(22, 17, 15, .8)); }
 
-/* ---------- intervalo entre músicas na TV: aplausos e subida ao palco (cenas de cartaz com os bichinhos da sala) ---------- */
-/* --dur é a duração da fase e --late o quanto dela já tinha passado quando a cena apareceu (as animações começam dali) */
+/* ---------- the Intermission on the TV: Applause and Taking the stage (poster scenes with the Room's creatures) ---------- */
+/* --dur is the phase's length and --late how much of it had already passed when the scene appeared (the animations start from there) */
 .interlude { position: absolute; inset: 0; z-index: 4; overflow: hidden; display: grid; background: var(--bg); color: var(--ds-paper); animation: interlude-in .5s ease-out both; }
 @keyframes interlude-in { from { opacity: 0; } }
 .interlude-kicker { margin: 0; font-family: var(--ds-font-display); font-weight: 800; font-size: clamp(1.2rem, 2.6vw, 2.4rem); letter-spacing: -.02em; color: var(--ds-accent-on-paper); }
@@ -806,7 +806,7 @@ body.stage { background: var(--bg); }
 .interlude-song { margin: 0; font-size: clamp(1rem, 2vw, 1.8rem); color: var(--ds-paper-dim); }
 .interlude-hint { margin: 0; text-align: center; color: var(--dim); font-size: clamp(1rem, 1.8vw, 1.6rem); }
 
-/* aplausos: focos de luz balançando, confete, o cartaz de quem cantou (com a nota carimbada) e a plateia pulando */
+/* Applause: swaying spotlights, confetti, the poster of whoever sang (with the Score stamped on it) and the audience jumping */
 .interlude.applause { place-items: center; }
 .beams { position: absolute; inset: -20% -20% 0; transform-origin: 50% 100%; background: conic-gradient(from 200deg at 50% 100%, transparent 0 10deg, rgba(var(--ds-accent-rgb), .2) 10deg 22deg, transparent 22deg 40deg, rgba(232, 169, 51, .16) 40deg 50deg, transparent 50deg 70deg, rgba(240, 228, 205, .1) 70deg 80deg, transparent 80deg); animation: beams-sway 5s ease-in-out infinite alternate; }
 @keyframes beams-sway { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
@@ -829,7 +829,7 @@ body.stage { background: var(--bg); }
 .confetti .c2 { background: var(--ds-paper); }
 @keyframes confetti-fall { to { transform: translateY(116vh) rotate(var(--spin)); } }
 
-/* subida ao palco: quem vem e a contagem no alto; embaixo, o bichinho sai do camarim, sobe a escada e chega ao microfone */
+/* Taking the stage: who is next and the countdown at the top; below, the creature leaves the dressing room, climbs the stairs and reaches the microphone */
 .interlude.stage-up { grid-template-rows: auto minmax(0, 1fr) auto; gap: 1.5vh; padding: 3vh 4vw; }
 .stage-up-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 3vw; }
 .stage-up .interlude-kicker { color: var(--accent-text); }
@@ -847,7 +847,7 @@ body.stage { background: var(--bg); }
 .door-leaf { position: absolute; inset: 0; background: #6b2a1d; transform-origin: 0 50%; animation: door-open var(--dur) linear var(--late) both; }
 @keyframes door-open { 0% { transform: scaleX(1); } 6%, 100% { transform: scaleX(.12); } }
 .scene .floor { position: absolute; left: 0; bottom: 0; width: 36%; height: 22%; background: #2a211c; border-top: .5cqh solid rgba(240, 228, 205, .18); }
-/* cinco degraus do chão (22% da cena) até o palco (46%) */
+/* five steps from the floor (22% of the scene) up to the stage (46%) */
 .scene .stairs { position: absolute; left: 36%; bottom: 0; width: 22%; height: 46%; background: linear-gradient(#4a3a31, #33271f); clip-path: polygon(0 100%, 0 41.74%, 20% 41.74%, 20% 31.3%, 40% 31.3%, 40% 20.87%, 60% 20.87%, 60% 10.43%, 80% 10.43%, 80% 0, 100% 0, 100% 100%); }
 .scene .platform { position: absolute; left: 58%; right: 0; bottom: 0; height: 46%; background: repeating-linear-gradient(90deg, #8f1d1d 0 3cqw, #771616 3cqw 6cqw); border-top: 1.2cqh solid var(--ds-paper); }
 .scene .mic-stand { position: absolute; z-index: 2; left: 80%; bottom: 46%; width: .7cqw; height: 22%; background: #cfc3ad; }
@@ -857,7 +857,7 @@ body.stage { background: var(--bg); }
 .walker.w1 { z-index: 1; animation-name: walk-path-2; }
 .walker-bob { display: block; animation: walk-bob .42s ease-in-out infinite alternate; }
 .walker .singer-blobs { display: block; margin: 0; }
-.walker .singer-blobs .blob { width: 14cqw; height: 14cqw; margin-bottom: -3.2cqw; } /* o bicho fica no miolo do desenho: a margem de baixo some, e ele pisa no chão */
+.walker .singer-blobs .blob { width: 14cqw; height: 14cqw; margin-bottom: -3.2cqw; } /* the creature sits in the middle of the drawing: the bottom margin goes away, and it stands on the floor */
 @keyframes walk-bob { to { transform: translateY(-1.8cqh); } }
 @keyframes walk-path {
   0%, 5% { left: 6.5%; bottom: 22%; opacity: 0; }
@@ -882,7 +882,7 @@ body.stage { background: var(--bg); }
   80%, 100% { left: 56%; bottom: 46%; opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  /* sem passeio: a cena já mostra quem vem no palco, com a luz acesa */
+  /* no walk: the scene already shows who is next on the stage, with the light on */
   .walker { animation: none; left: 66%; bottom: 46%; }
   .walker.w1 { left: 56%; }
   .scene .spot { animation: none; opacity: 1; }
@@ -890,7 +890,7 @@ body.stage { background: var(--bg); }
   .confetti, .beams { display: none; }
 }
 
-/* ---------- intervalo entre músicas no celular: o aviso na música tocando e o chamado no palco do cantor ---------- */
+/* ---------- the Intermission on the phone: the notice on the playing song and the call on the singer's Stage ---------- */
 .interlude-banner { display: flex; align-items: center; gap: var(--ds-s3); margin: 0 0 var(--ds-s3); padding: var(--ds-s3); border-radius: var(--ds-r-sm); background: var(--ds-paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .12  0 0 0 0 .08  0 0 0 0 .05  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); color: var(--ds-paper-ink); }
 .interlude-banner .singer-blobs { font-size: 1.4rem; margin: -.3em -.1em -.3em -.2em; }
 .interlude-banner .singer-blobs .blob { filter: drop-shadow(2px 2px 0 rgba(22, 17, 15, .8)); }
