@@ -67,7 +67,7 @@ Os `*.mjs` e `*.test.js` que restam viram `.ts`, num pull request por app. O `ts
 - **O site: feito.** Os testes de unidade, os testes do Playwright (agora com nomes em inglês), o `e2e/server.ts` e os configs do Vite e do Playwright. O `tsconfig.node.json` os confere, ao lado do `tsconfig.json` das páginas. O servidor dos testes de ponta a ponta sobe a API pelo `dist/` compilado, que ele importa sem tipos.
 - **A API: feito.** Os testes (agora com nomes em inglês) e o `scripts/copy-assets.ts` são `.ts` sem conferência de tipos, porque os testes importam o `dist/` compilado, que não leva tipos. O script da página do administrador (`src/admin/page/admin.ts`) compila com o `tsconfig.admin.json` (os tipos do navegador) direto no `dist/`, e lê o estado pelo tipo `AdminState` do `protocol.ts`; o `copy-assets.ts` copia só o HTML e o CSS da página.
 
-## Código em inglês
+## Código em inglês (feito)
 
 **Obrigatório.** O repositório é primeiro em inglês ([ADR 0015](adr/0015-english-first-repository.pt-BR.md)), mas muitos arquivos antigos ainda têm comentários e nomes de teste em português.
 
@@ -77,7 +77,7 @@ Os `*.mjs` e `*.test.js` que restam viram `.ts`, num pull request por app. O `ts
   - **Os componentes TSX: feito.** Os comentários do site estão em inglês, junto com os quatro arquivos `.ts` que a passagem para TypeScript tinha deixado em português (`tv/controller.ts`, `room/useRoomConnection.ts`, `tv/applause-sound.ts`, `ui/useInterlude.ts`). Os rótulos da tela citados num comentário ("Adicionar música") ficam como a tela os mostra.
   - **O CSS: feito.** As folhas de estilo do site e do app do desktop estão em inglês, com as duas cópias do `theme-bridge.css` ainda idênticas. Os comentários que ainda descreviam o visual antigo "Cyber-Club" (rosa-neon, ciano, cartão de vidro, contorno preto no dueto) agora descrevem o que o código desenha.
   - **Os scripts de shell e a configuração: feito.** Os comentários dos scripts de deploy, dos arquivos do compose, do `deploy/.env.example`, do Caddyfile, do Dockerfile da API e dos workflows estão em inglês. O que o dono lê continua em português: as mensagens dos scripts e os nomes dos jobs do CI.
-  - **Falta: o `deploy/README.md`**, ainda só em português. Ele vira uma doc em inglês com um `README.pt-BR.md` ao lado.
+  - **O `deploy/README.md`: feito.** O guia de hospedagem está em inglês, com o `README.pt-BR.md` ao lado.
 - O texto da interface continua nos catálogos de idioma, com o português como padrão do produto.
 
 ## Infraestrutura quando o projeto gerar receita

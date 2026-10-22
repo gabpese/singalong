@@ -308,7 +308,7 @@ YouTube errors become messages in Portuguese; "Tentar de novo" (try again) only 
 
 - **CI** (`.github/workflows/ci.yml`): on every push and pull request it runs the API tests, the front-end tests (TypeScript, unit, build and end-to-end with Playwright) and the worker tests, and checks that the images build.
 - **CD** (`.github/workflows/deploy.yml`): after a green CI on `main`, it publishes the API image to the GitHub Container Registry (amd64 and arm64) and, if enabled, updates the VM over SSH.
-- **Free hosting with HTTPS** to open the app from any computer without your PC being on: see [`deploy/README.md`](deploy/README.md) (in Portuguese).
+- **Free hosting with HTTPS** to open the app from any computer without your PC being on: see [`deploy/README.md`](deploy/README.md).
 
 ## Tests
 
