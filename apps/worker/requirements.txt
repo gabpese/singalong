@@ -2,7 +2,7 @@ yt-dlp[default]
 demucs==4.0.1
 soundfile
 redis>=5
-websockets>=12  # só o login do YouTube do agente (protocolo de depuração do navegador)
+websockets>=12  # only the agent's YouTube login (the browser's debugging protocol)
 stable-ts
 langdetect
 librosa

@@ -73,6 +73,7 @@ Os `*.mjs` e `*.test.js` que restam viram `.ts`, num pull request por app. O `ts
 
 - Traduzir os comentários e os nomes de teste de um arquivo na mesma passada que o migra para TypeScript (acima), para mexer em cada arquivo uma vez só.
 - Traduzir o que não vai migrar em pull requests pequenos e próprios: o worker em Python, os componentes TSX, o CSS e os scripts de shell.
+  - **O worker em Python: feito.** Os comentários, as docstrings, os nomes de teste e o Dockerfile estão em inglês. O que o dono lê continua em português: as linhas de log (o app do desktop as mostra), a ajuda da linha de comando e as mensagens de erro que um job mostra.
 - O texto da interface continua nos catálogos de idioma, com o português como padrão do produto.
 
 ## Infraestrutura quando o projeto gerar receita

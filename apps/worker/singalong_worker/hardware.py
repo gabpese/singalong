@@ -1,10 +1,11 @@
-"""Verificação do hardware: escolhe o motor (GPU NVIDIA com CUDA 12.1, GPU AMD com ROCm 6.2, GPU da Apple pelo Metal ou CPU) e
-confere se a GPU funciona de verdade.
+"""The hardware check: picks the engine (an NVIDIA GPU with CUDA 12.1, an AMD GPU with ROCm 6.2, Apple's GPU through Metal, or the
+CPU) and checks that the GPU really works.
 
-Usa só a biblioteca padrão: roda antes de o torch existir (o instalador decide qual torch baixar) e de novo depois, dentro do
-motor instalado, com `gpu_selftest` (uma convolução pequena na GPU). Qualquer falha cai para a CPU, com o motivo.
+It uses only the standard library: it runs before torch exists (the installer decides which torch to download) and again after,
+inside the installed engine, with `gpu_selftest` (a small convolution on the GPU). Any failure falls back to the CPU, with the reason.
 
-Motores: "cu121" (NVIDIA), "rocm6.2" (AMD, só Linux), "mps" (Apple Silicon, opcional: o automático no Mac continua sendo a CPU) e "cpu"."""
+Engines: "cu121" (NVIDIA), "rocm6.2" (AMD, Linux only), "mps" (Apple Silicon, optional: the automatic choice on a Mac is still the
+CPU) and "cpu"."""
 import json
 import os
 import platform
@@ -15,13 +16,13 @@ from pathlib import Path
 
 ACCELERATED = ("cu121", "rocm6.2", "mps")
 
-# Driver mínimo do CUDA 12.1 (Windows 527.41, Linux 525.60). Abaixo disso o torch cu121 não enxerga a GPU.
+# The minimum CUDA 12.1 driver (Windows 527.41, Linux 525.60). Below it, the cu121 torch does not see the GPU.
 MIN_DRIVER = (527, 41)
-# Capacidade de computação que o torch 2.5.1/cu121 traz kernels (Maxwell sm_50 até Ada/Hopper sm_90). A Blackwell (RTX 50, 12.0) fica de fora.
+# The compute capabilities torch 2.5.1/cu121 ships kernels for (Maxwell sm_50 to Ada/Hopper sm_90). Blackwell (RTX 50, 12.0) is left out.
 SUPPORTED_COMPUTE = ((5, 0), (9, 0))
-MIN_VRAM_MB = 3000  # o Demucs precisa de ~3 GB para separar uma música sem estourar
-# Arquiteturas AMD para as quais o torch 2.5.1/rocm6.2 traz kernels (Instinct gfx900-gfx942, RDNA2 gfx1030, RDNA3 gfx1100-1102).
-# Outras (RX 6600, RX 7600...) só funcionam com um truque de variável de ambiente que não é oficial: ficam na CPU, com o motivo.
+MIN_VRAM_MB = 3000  # Demucs needs ~3 GB to separate a song without running out
+# The AMD architectures torch 2.5.1/rocm6.2 ships kernels for (Instinct gfx900-gfx942, RDNA2 gfx1030, RDNA3 gfx1100-1102).
+# Others (RX 6600, RX 7600...) only work with an unofficial environment variable trick: they stay on the CPU, with the reason.
 SUPPORTED_GFX = ("gfx900", "gfx906", "gfx908", "gfx90a", "gfx942", "gfx1030", "gfx1100", "gfx1101", "gfx1102")
 
 
@@ -44,7 +45,7 @@ def _numbers(text: str) -> tuple[int, ...]:
 
 
 def nvidia_gpus(run=subprocess.run) -> list[dict]:
-    """As placas NVIDIA vistas pelo nvidia-smi (vazio se não há placa ou driver)."""
+    """The NVIDIA cards nvidia-smi sees (empty if there is no card or driver)."""
     exe = shutil.which("nvidia-smi")
     if not exe:
         fallback = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "nvidia-smi.exe")
@@ -72,16 +73,16 @@ def _read(path: Path) -> str | None:
 
 
 def _gfx_id(target_version: int) -> str | None:
-    """O `gfx_target_version` do kfd (decimal: 110000, 100300, 90010...) como o nome da arquitetura (gfx1100, gfx1030, gfx90a)."""
+    """kfd's `gfx_target_version` (decimal: 110000, 100300, 90010...) as the architecture's name (gfx1100, gfx1030, gfx90a)."""
     if target_version <= 0:
-        return None  # nó do processador, não de uma GPU
+        return None  # the processor's node, not a GPU's
     major, minor, step = target_version // 10000, (target_version // 100) % 100, target_version % 100
     return f"gfx{major}{minor:x}{step:x}"
 
 
 def amd_gpus(sysfs: Path = Path("/sys"), kfd: Path = Path("/dev/kfd")) -> list[dict]:
-    """As placas AMD vistas pelo kernel do Linux (sem ferramentas: lê o /sys, que existe com o driver amdgpu). Só no Linux.
-    `compute` é a arquitetura (gfx1100...); `access` diz se este usuário pode usar o /dev/kfd (precisa dos grupos render e video)."""
+    """The AMD cards the Linux kernel sees (no tools: it reads /sys, which exists with the amdgpu driver). Linux only.
+    `compute` is the architecture (gfx1100...); `access` says whether this user may use /dev/kfd (it needs the render and video groups)."""
     if platform.system() != "Linux":
         return []
     archs = []
@@ -111,12 +112,12 @@ def amd_gpus(sysfs: Path = Path("/sys"), kfd: Path = Path("/dev/kfd")) -> list[d
 
 
 def apple_gpus(run=subprocess.run, env=os.environ) -> list[dict]:
-    """A GPU do Apple Silicon (memória unificada: a "VRAM" é a memória do Mac). Só no macOS com chip da Apple, e **desligada**.
+    """Apple Silicon's GPU (unified memory: the "VRAM" is the Mac's memory). Only on macOS with an Apple chip, and **turned off**.
 
-    Medido no macOS do CI (Metal de verdade, torch 2.5.1): o autoteste pequeno passa, mas o Demucs falha ao separar uma música com
-    "NotImplementedError: Output channels > 65536 not supported at the MPS device" (o desvio PYTORCH_ENABLE_MPS_FALLBACK não cobre esse caso).
-    Sem ganho (e com a separação refeita na CPU a cada música), a opção não é oferecida. `SINGALONG_APPLE_GPU=1` a liga, para quem quiser
-    medir de novo com outra versão do torch (o job do CI faz essa medição a cada mudança)."""
+    Measured on the CI's macOS (real Metal, torch 2.5.1): the small self-test passes, but Demucs fails to separate a song with
+    "NotImplementedError: Output channels > 65536 not supported at the MPS device" (the PYTORCH_ENABLE_MPS_FALLBACK detour does not cover it).
+    With no gain (and the separation redone on the CPU for every song), the option is not offered. `SINGALONG_APPLE_GPU=1` turns it on, for whoever
+    wants to measure again with another torch version (the CI job takes this measurement on every change)."""
     if env.get("SINGALONG_APPLE_GPU") != "1":
         return []
     if platform.system() != "Darwin" or platform.machine() != "arm64":
@@ -145,9 +146,9 @@ def _ram_mb() -> int | None:
 
 
 def choose_engine(gpus: list[dict], force_cpu: bool = False) -> dict:
-    """Decide o motor: {"engine": "cu121"|"rocm6.2"|"cpu", "reason": ..., "gpu": {...}|None}. A decisão é só pelas especificações;
-    o teste de verdade (`gpu_selftest`) confirma depois de instalar e pode devolver para a CPU. A GPU da Apple (mps) nunca é escolhida
-    sozinha: aparece nas opções, mas o automático no Mac é a CPU (ela está desligada: veja `apple_gpus`)."""
+    """Decides the engine: {"engine": "cu121"|"rocm6.2"|"cpu", "reason": ..., "gpu": {...}|None}. The decision goes by the specs only;
+    the real test (`gpu_selftest`) confirms it after installing and may send it back to the CPU. Apple's GPU (mps) is never picked
+    by itself: it shows among the options, but the automatic choice on a Mac is the CPU (it is turned off: see `apple_gpus`)."""
     if force_cpu:
         return {"engine": "cpu", "reason": "CPU forçada nas configurações", "gpu": None}
     nvidia = [g for g in gpus if g.get("vendor", "nvidia") == "nvidia"]
@@ -176,7 +177,7 @@ def choose_engine(gpus: list[dict], force_cpu: bool = False) -> dict:
 
 
 def _choose_amd(amd: list[dict]) -> dict:
-    """A placa AMD pelo ROCm 6.2 (só Linux): precisa de uma arquitetura com kernels no torch, de memória e de acesso ao /dev/kfd."""
+    """The AMD card through ROCm 6.2 (Linux only): it needs an architecture with kernels in torch, memory and access to /dev/kfd."""
     gpu = max(amd, key=lambda g: g["vram_mb"])
     if gpu.get("compute") not in SUPPORTED_GFX:
         arch = gpu.get("compute") or "desconhecida"
@@ -189,7 +190,7 @@ def _choose_amd(amd: list[dict]) -> dict:
 
 
 def probe(force_cpu: bool = False, run=subprocess.run) -> dict:
-    """O retrato do computador + o motor recomendado (vai no heartbeat e na tela de configurações)."""
+    """The computer's snapshot + the recommended engine (sent in the heartbeat and shown on the settings screen)."""
     gpus = nvidia_gpus(run) + amd_gpus() + apple_gpus(run)
     return {
         "os": f"{platform.system()} {platform.release()}",
@@ -205,7 +206,7 @@ _summary_cache: dict | None = None
 
 
 def summary() -> dict:
-    """O resumo que o agente manda ao servidor no heartbeat (calculado uma vez por execução; sem nomes de usuário nem caminhos)."""
+    """The summary the agent sends to the server in the heartbeat (computed once per run; no user names or paths)."""
     global _summary_cache
     if _summary_cache is None:
         data = probe()
@@ -216,9 +217,9 @@ def summary() -> dict:
 
 
 def gpu_selftest(engine: str = "cu121") -> dict:
-    """Roda DENTRO do motor instalado: confere de verdade se a GPU calcula (uma convolução pequena). Nunca levanta exceção:
-    devolve {"ok": bool, "device": "cuda"|"mps"|"cpu", "detail": ...}. `engine` diz qual GPU esperar: cu121 (NVIDIA), rocm6.2 (AMD, que
-    no torch também se chama "cuda") ou mps (Apple, que ainda precisa calcular a FFT que o Demucs usa)."""
+    """Runs INSIDE the installed engine: really checks that the GPU computes (a small convolution). It never raises:
+    returns {"ok": bool, "device": "cuda"|"mps"|"cpu", "detail": ...}. `engine` says which GPU to expect: cu121 (NVIDIA), rocm6.2 (AMD, which
+    torch also calls "cuda") or mps (Apple, which must also compute the FFT Demucs uses)."""
     try:
         import torch
     except ImportError as exc:
@@ -249,7 +250,7 @@ def gpu_selftest(engine: str = "cu121") -> dict:
 
 
 def _selftest_mps(torch) -> dict:
-    """A GPU da Apple: o Metal está disponível, uma convolução calcula e a FFT com números complexos (que o Demucs usa) também."""
+    """Apple's GPU: Metal is available, a convolution computes, and so does the FFT with complex numbers (which Demucs uses)."""
     try:
         if not (torch.backends.mps.is_built() and torch.backends.mps.is_available()):
             return {"ok": False, "device": "cpu", "detail": "o torch não enxerga a GPU da Apple (Metal)"}
@@ -265,7 +266,7 @@ def _selftest_mps(torch) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`python -m singalong_worker.hardware [--selftest] [--cpu]` → JSON no stdout."""
+    """`python -m singalong_worker.hardware [--selftest] [--cpu]` → JSON on stdout."""
     args = sys.argv[1:] if argv is None else argv
     data = probe(force_cpu="--cpu" in args)
     if "--selftest" in args:

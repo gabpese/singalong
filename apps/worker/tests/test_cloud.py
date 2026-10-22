@@ -1,4 +1,4 @@
-"""Envio das músicas para a nuvem (modo híbrido): só quando o servidor autoriza, o meta.json por último, sem repetir o que não mudou."""
+"""Uploading the songs to the cloud (hybrid mode): only when the server allows it, meta.json last, nothing unchanged sent again."""
 import io
 import json
 import tempfile
@@ -23,7 +23,7 @@ class Reply(io.BytesIO):
 
 
 class Server:
-    """Um servidor de mentira: responde /me, /cloud/missing e guarda o que chega em /cloud/<id>/<arquivo>."""
+    """A fake server: answers /me and /cloud/missing, and keeps what reaches /cloud/<id>/<file>."""
 
     def __init__(self, cloud=True, missing=None, fail=None):
         self.cloud, self.missing, self.fail = cloud, missing, fail
@@ -94,7 +94,7 @@ class CloudTests(unittest.TestCase):
         names = [name for _, name, _ in server.puts]
         self.assertEqual(names, ["instrumental.mp3", "lyrics.json", "melody.json", "backing.mp3", "meta.json"])
         self.assertEqual(server.puts[0][2], b"ID3instrumental")
-        self.assertNotIn("vocals.mp3", names)  # a voz isolada nunca sobe
+        self.assertNotIn("vocals.mp3", names)  # the isolated vocals never go up
 
     def test_optional_files_are_skipped_when_missing(self):
         seed(self.storage, melody=False)
@@ -118,7 +118,7 @@ class CloudTests(unittest.TestCase):
         self.assertEqual([n for _, n, _ in server.puts[before:]], ["lyrics.json"])
 
     def test_a_song_that_is_not_ready_is_not_sent(self):
-        write(self.storage, f"cache/{SONG}/instrumental.mp3", b"ID3x")  # falta a letra e o meta
+        write(self.storage, f"cache/{SONG}/instrumental.mp3", b"ID3x")  # the lyrics and the meta are missing
         server = Server()
         backend = self.backend(server)
         backend.refresh_cloud()
@@ -187,9 +187,9 @@ class CloudTests(unittest.TestCase):
         server = Server(fail=blocked)
         backend = self.backend(server)
         backend.refresh_cloud()
-        self.assertFalse(backend.cloud_sync(SONG))  # recusada: não levanta erro, só desiste
+        self.assertFalse(backend.cloud_sync(SONG))  # refused: raises no error, just gives up
         server.fail = None
-        self.assertFalse(backend.cloud_sync(SONG))  # e não tenta de novo nesta execução
+        self.assertFalse(backend.cloud_sync(SONG))  # and does not try again in this run
         self.assertEqual(server.puts, [])
 
     def test_the_serve_loop_does_the_backfill_then_each_queued_song_and_survives_a_failure(self):

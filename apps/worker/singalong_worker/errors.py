@@ -1,9 +1,9 @@
-"""Falhas do processamento traduzidas para o que a pessoa entende e para o que fazer a respeito.
+"""Processing failures translated into what the person understands and what to do about them.
 
-`retry` diz o que vale a pena depois da falha:
-  - "auto"   falha transitória (rede, limite de pedidos do YouTube): o worker tenta de novo sozinho, com espera;
-  - "manual" pode dar certo se a pessoa (ou quem administra) resolver algo antes: aparece "Tentar de novo";
-  - "never"  não adianta repetir (vídeo privado, removido...): só resta escolher outro vídeo.
+`retry` says what is worth doing after the failure:
+  - "auto"   a transient failure (network, YouTube's request limit): the worker tries again by itself, after a wait;
+  - "manual" may work if the person (or whoever runs the server) fixes something first: a "Try again" button shows up;
+  - "never"  repeating is useless (a private or removed video...): the only way out is another video.
 """
 import errno
 import subprocess
@@ -13,7 +13,7 @@ AUTO, MANUAL, NEVER = "auto", "manual", "never"
 
 
 class JobError(Exception):
-    """Falha já traduzida: `code` (estável, para a tela), `message` (para a pessoa) e `retry`."""
+    """A failure already translated: `code` (stable, for the screen), `message` (for the person) and `retry`."""
 
     def __init__(self, code: str, message: str, retry: str = MANUAL):
         super().__init__(message)
@@ -27,10 +27,10 @@ class _Rule:
     code: str
     retry: str
     message: str
-    patterns: tuple[str, ...]  # trechos (minúsculos) que identificam a falha no texto do erro
+    patterns: tuple[str, ...]  # lowercase snippets that identify the failure in the error's text
 
 
-# A ordem importa: a primeira regra que casa vence. Os textos vêm do yt-dlp, do ffmpeg e do Demucs.
+# The order matters: the first rule that matches wins. The texts come from yt-dlp, ffmpeg and Demucs.
 _RULES = (
     _Rule("cookies", MANUAL,
           "O YouTube pediu para confirmar que não sou um robô e a conta do agente não resolveu. "
@@ -73,7 +73,7 @@ _RULES = (
 
 
 def classify(exc: BaseException) -> JobError:
-    """Traduz qualquer exceção do processamento em um JobError (devolve o mesmo se já for um)."""
+    """Translates any processing exception into a JobError (returns the same one if it already is one)."""
     if isinstance(exc, JobError):
         return exc
     if isinstance(exc, OSError) and exc.errno == errno.ENOSPC:
@@ -90,7 +90,7 @@ def classify(exc: BaseException) -> JobError:
 
 
 def format_duration(seconds: float) -> str:
-    """'3 min 20 s', '1 h 05 min' — para as mensagens de limite."""
+    """'3 min 20 s', '1 h 05 min': for the limit messages."""
     total = int(round(seconds))
     hours, rest = divmod(total, 3600)
     minutes, secs = divmod(rest, 60)

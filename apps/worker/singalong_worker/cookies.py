@@ -1,19 +1,20 @@
-"""Cookies do YouTube: quando usar a conta e de onde vêm.
+"""YouTube cookies: when to use the account and where they come from.
 
-Política (decidida no TRD, seção 8): o download tenta **sem cookie primeiro**, pela internet do próprio usuário, e usa a conta
-**só quando o YouTube pedir** (login, confirmação de "não sou um robô", restrição de idade, 403). Assim a conta fica pouco
-exposta (o yt-dlp avisa que usar uma conta com ele pode levá-la a ser restringida). Escolhas, por `YTDLP_COOKIES_POLICY`:
+Policy (decided in the TRD, section 8): the download tries **without a cookie first**, over the user's own connection, and
+uses the account **only when YouTube asks** (a login, a "not a robot" check, an age restriction, a 403). That keeps the
+account barely exposed (yt-dlp warns that using an account with it can get the account restricted). The choices, set by
+`YTDLP_COOKIES_POLICY`:
 
-  when-asked  (padrão) sem cookie primeiro; com cookie só quando o YouTube pedir login;
-  always      sempre com a conta (mais risco para ela);
-  never       nunca usa cookies.
+  when-asked  (default) no cookie first; the cookie only when YouTube asks for a login;
+  always      always with the account (more risk to it);
+  never       never uses cookies.
 
-De onde vêm os cookies (a primeira fonte que existir):
-  1. `YTDLP_COOKIES`          um arquivo cookies.txt (formato Netscape);
-  2. `YTDLP_COOKIES_BROWSER`  o navegador, pelo recurso nativo do yt-dlp (`firefox`, `chrome:Perfil`...). No Windows, o Chrome e o
-                              Edge criptografam os cookies de um jeito que o yt-dlp costuma não conseguir ler: prefira o login abaixo;
-  3. o arquivo do login do agente (`--youtube-login`, em youtube_login.py), em `AGENT_DATA_DIR` (padrão ~/.singalong).
-Os cookies nunca saem deste computador.
+Where the cookies come from (the first source that exists):
+  1. `YTDLP_COOKIES`          a cookies.txt file (Netscape format);
+  2. `YTDLP_COOKIES_BROWSER`  the browser, through yt-dlp's own feature (`firefox`, `chrome:Profile`...). On Windows, Chrome and
+                              Edge encrypt cookies in a way yt-dlp often cannot read: prefer the login below;
+  3. the agent's login file (`--youtube-login`, in youtube_login.py), in `AGENT_DATA_DIR` (default ~/.singalong).
+The cookies never leave this computer.
 """
 import logging
 import os
@@ -28,14 +29,14 @@ from .errors import classify
 log = logging.getLogger("worker.cookies")
 
 MODES = ("when-asked", "always", "never")
-# falhas em que vale tentar de novo com a conta: pedido de login/robô, restrição de idade e o 403 do download
+# failures worth retrying with the account: a login/robot request, an age restriction and the download's 403
 LOGIN_CODES = frozenset({"cookies", "age", "forbidden"})
 LOGIN_FILE_NAME = "youtube_cookies.txt"
 
 
 @dataclass(frozen=True)
 class CookieSource:
-    """De onde vêm os cookies: um arquivo (cookies.txt) ou um navegador (spec do yt-dlp: "firefox" ou "chrome:Perfil")."""
+    """Where the cookies come from: a file (cookies.txt) or a browser (a yt-dlp spec: "firefox" or "chrome:Profile")."""
 
     file: Path | None = None
     browser: str | None = None
@@ -51,7 +52,7 @@ class CookiePolicy:
 
 
 def data_dir(env=os.environ) -> Path:
-    """A pasta do agente (perfil do navegador do login e o cookies.txt dele)."""
+    """The agent's folder (the login's browser profile and its cookies.txt)."""
     return Path(env.get("AGENT_DATA_DIR") or Path.home() / ".singalong")
 
 
@@ -60,7 +61,7 @@ def login_cookie_file(env=os.environ) -> Path:
 
 
 def load_policy(env=os.environ) -> CookiePolicy:
-    """A política e a fonte de cookies, pelas variáveis de ambiente."""
+    """The cookie policy and source, from the environment variables."""
     mode = (env.get("YTDLP_COOKIES_POLICY") or "when-asked").strip().lower()
     if mode not in MODES:
         log.warning("YTDLP_COOKIES_POLICY=%r inválida (use %s): usando when-asked", mode, ", ".join(MODES))
@@ -79,7 +80,7 @@ def load_policy(env=os.environ) -> CookiePolicy:
 
 
 def as_policy(value: Any) -> CookiePolicy:
-    """Aceita uma política, um caminho de cookies.txt (explícito: sempre usa) ou None (sem cookies)."""
+    """Accepts a policy, a cookies.txt path (explicit: always used) or None (no cookies)."""
     if isinstance(value, CookiePolicy):
         return value
     if value:
@@ -88,23 +89,23 @@ def as_policy(value: Any) -> CookiePolicy:
 
 
 def ytdlp_options(source: CookieSource, workdir: Path) -> dict:
-    """As opções do yt-dlp para usar esta fonte de cookies."""
+    """yt-dlp's options to use this cookie source."""
     if source.browser:
         parts = [part or None for part in source.browser.split(":", 1)]
         return {"cookiesfrombrowser": tuple(parts)}
-    # o yt-dlp regrava o arquivo ao fechar: usa uma cópia para o original poder ser somente leitura
+    # yt-dlp rewrites the file when it closes: use a copy, so the original can be read-only
     copy = workdir / "cookies.txt"
     shutil.copyfile(source.file, copy)
     return {"cookiefile": str(copy)}
 
 
 def needs_login(exc: BaseException) -> bool:
-    """O YouTube recusou por falta de login (e não por culpa do vídeo)?"""
+    """Did YouTube refuse for lack of a login (and not because of the video)?"""
     return classify(exc).code in LOGIN_CODES
 
 
 def run_with_policy(policy: CookiePolicy, attempt: Callable[[dict], Any], workdir: Path) -> Any:
-    """Roda `attempt(opções_de_cookie)` conforme a política: sem cookie primeiro e, se o YouTube pedir login, com a conta."""
+    """Runs `attempt(cookie_options)` by the policy: no cookie first and, if YouTube asks for a login, with the account."""
     if policy.mode == "never" or policy.source is None:
         return attempt({})
     if policy.mode == "always":
@@ -119,13 +120,13 @@ def run_with_policy(policy: CookiePolicy, attempt: Callable[[dict], Any], workdi
 
 
 def write_netscape(path: Path, cookies: list[dict]) -> int:
-    """Grava cookies (no formato do protocolo de depuração do Chrome/Edge) como cookies.txt do yt-dlp. Devolve quantos."""
+    """Writes cookies (in the Chrome/Edge debugging protocol's format) as yt-dlp's cookies.txt. Returns how many."""
     lines = ["# Netscape HTTP Cookie File", "# Gerado pelo agente do Singalong. Não compartilhe: dá acesso à conta."]
     for c in cookies:
         domain = str(c["domain"])
         if c.get("httpOnly"):
             domain = f"#HttpOnly_{domain}"
-        expires = int(c["expires"]) if float(c.get("expires", -1)) > 0 else 0  # cookie de sessão = 0
+        expires = int(c["expires"]) if float(c.get("expires", -1)) > 0 else 0  # a session cookie = 0
         lines.append("\t".join([
             domain, "TRUE" if str(c["domain"]).startswith(".") else "FALSE", c.get("path", "/") or "/",
             "TRUE" if c.get("secure") else "FALSE", str(expires), str(c["name"]), str(c["value"]),
@@ -133,7 +134,7 @@ def write_netscape(path: Path, cookies: list[dict]) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     try:
-        os.chmod(path, 0o600)  # só o dono lê (no Windows vale a permissão da pasta do usuário)
+        os.chmod(path, 0o600)  # only the owner reads it (on Windows the user folder's permission applies)
     except OSError:
         pass
     return len(cookies)

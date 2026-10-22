@@ -1,8 +1,8 @@
-"""Tom (tonalidade) da música.
+"""The song's key.
 
-Método clássico: o perfil de notas (croma) do instrumental é comparado com os 24 perfis de tonalidade
-(12 maiores + 12 menores) de Krumhansl-Kessler; vence a maior correlação. É uma ESTIMATIVA: tonalidades relativas
-(Dó maior / Lá menor) usam as mesmas notas e podem ser confundidas, por isso devolvemos também a alternativa e a margem.
+The classic method: the instrumental's note profile (chroma) is compared with the 24 Krumhansl-Kessler key profiles
+(12 major + 12 minor); the highest correlation wins. It is an ESTIMATE: relative keys (C major / A minor) use the same
+notes and can be confused, so we also return the alternative and the margin.
 """
 import logging
 import math
@@ -11,7 +11,7 @@ log = logging.getLogger("worker.key")
 
 NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-# Perfis de Krumhansl-Kessler: quão "estável" é cada grau da escala (índice 0 = tônica)
+# Krumhansl-Kessler profiles: how "stable" each scale degree is (index 0 = tonic)
 MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
 MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
 
@@ -25,16 +25,16 @@ def _pearson(a: list[float], b: list[float]) -> float:
 
 
 def best_key(chroma: list[float]) -> dict:
-    """Tonalidade mais provável para um perfil de croma de 12 valores (índice 0 = Dó).
+    """The most likely key for a 12-value chroma profile (index 0 = C).
 
-    Devolve {tonic (0..11), mode ('major'|'minor'), name, score, margin, alt}:
-    score = correlação da melhor tonalidade; margin = vantagem sobre a segunda; alt = a segunda colocada.
+    Returns {tonic (0..11), mode ('major'|'minor'), name, score, margin, alt}:
+    score = the best key's correlation; margin = its lead over the second; alt = the runner-up.
     """
     if len(chroma) != 12 or not any(chroma):
         raise ValueError("o perfil de croma precisa ter 12 valores e não ser vazio")
     scores = []
     for tonic in range(12):
-        rotated = chroma[tonic:] + chroma[:tonic]  # a nota candidata a tônica vai para o índice 0
+        rotated = chroma[tonic:] + chroma[:tonic]  # the candidate tonic goes to index 0
         scores.append((_pearson(rotated, MAJOR_PROFILE), tonic, "major"))
         scores.append((_pearson(rotated, MINOR_PROFILE), tonic, "minor"))
     scores.sort(reverse=True)
@@ -50,12 +50,12 @@ def best_key(chroma: list[float]) -> dict:
 
 
 def chroma_profile(path, seconds: int = 240) -> list[float]:
-    """Perfil de croma médio do áudio (12 valores), com a afinação do arquivo compensada."""
-    import librosa  # import tardio: a parte matemática acima não precisa dele
+    """The audio's mean chroma profile (12 values), compensating for the file's tuning."""
+    import librosa  # a late import: the math above does not need it
 
     y, sr = librosa.load(str(path), sr=22050, mono=True, duration=seconds)
-    y = librosa.effects.harmonic(y, margin=4)  # tira percussão e ruído, que borram o croma
-    tuning = librosa.estimate_tuning(y=y, sr=sr)  # gravações levemente fora de A=440 Hz
+    y = librosa.effects.harmonic(y, margin=4)  # removes percussion and noise, which blur the chroma
+    tuning = librosa.estimate_tuning(y=y, sr=sr)  # recordings slightly off A=440 Hz
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr, tuning=tuning)
     return [float(v) for v in chroma.mean(axis=1)]
 
@@ -65,7 +65,7 @@ def detect_key(path) -> dict:
 
 
 def backfill(storage) -> int:
-    """Calcula o tom das músicas já no cache que ainda não têm (processadas antes deste recurso)."""
+    """Computes the key of the cached songs that lack one (processed before this feature)."""
     import json
     import tempfile
     from pathlib import Path
@@ -82,7 +82,7 @@ def backfill(storage) -> int:
             with tempfile.TemporaryDirectory(prefix="singalong-key-") as tmp:
                 audio = Path(tmp) / "instrumental.mp3"
                 audio.write_bytes(storage.read(f"{base}/instrumental.mp3"))
-                key = detect_key(audio)  # a parte demorada fica fora da trava do meta.json
+                key = detect_key(audio)  # the slow part stays outside the meta.json lock
             update_meta(storage, base.split("/")[1], lambda m: m.setdefault("key", key))
             done += 1
             log.info("tom de %s: %s %s", base, key["name"], key["mode"])

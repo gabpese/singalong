@@ -1,6 +1,6 @@
-"""Busca de vídeos no YouTube (yt-dlp), atendida por uma thread do worker.
+"""YouTube video search (yt-dlp), served by a worker thread.
 
-O transporte (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.ts.
+The transport (Redis or HTTP) is in backend.py; the contract with the API is in apps/api/src/jobs.ts.
 """
 import logging
 import tempfile
@@ -15,11 +15,11 @@ MAX_RESULTS = 8
 
 
 def search_youtube(query: str, cookies: "CookiePolicy | Path | None" = None, limit: int = MAX_RESULTS) -> list[dict]:
-    """Resultados da busca, sem baixar nada (extract_flat): id, título, canal e duração.
+    """Search results, without downloading anything (extract_flat): id, title, channel and duration.
 
-    `cookies`: a política de cookies (cookies.py): sem cookie primeiro e, se o YouTube pedir login, com a conta.
+    `cookies`: the cookie policy (cookies.py): no cookie first and, if YouTube asks for a login, with the account.
     """
-    import yt_dlp  # import tardio, como no pipeline
+    import yt_dlp  # a late import, as in the pipeline
 
     def attempt(cookie_opts: dict) -> list[dict]:
         opts = {"quiet": True, "no_warnings": True, "skip_download": True, "extract_flat": True, "socket_timeout": 15, **cookie_opts}
@@ -32,7 +32,7 @@ def search_youtube(query: str, cookies: "CookiePolicy | Path | None" = None, lim
 
 
 def parse_entries(entries: list) -> list[dict]:
-    """Normaliza as entradas do yt-dlp; descarta o que não é um vídeo com ID de 11 caracteres."""
+    """Normalizes yt-dlp's entries; drops whatever is not a video with an 11-character ID."""
     results = []
     for entry in entries:
         video_id = (entry or {}).get("id") or ""
@@ -50,8 +50,8 @@ def parse_entries(entries: list) -> list[dict]:
 
 
 def serve(backend, cookies: Path | None, stop: threading.Event) -> None:
-    """Loop da thread de busca: atende pedidos enquanto `stop` não for sinalizado."""
-    from .backend import AuthError, BackendUnavailable  # import tardio, como o resto do transporte
+    """The search thread's loop: answers requests until `stop` is set."""
+    from .backend import AuthError, BackendUnavailable  # a late import, like the rest of the transport
 
     while not stop.is_set():
         try:
@@ -69,5 +69,5 @@ def serve(backend, cookies: Path | None, stop: threading.Event) -> None:
         except AuthError:
             log.error("o servidor recusou o token do agente; a busca parou")
             stop.wait(30)
-        except (ValueError, KeyError) as exc:  # pedido malformado: descarta
+        except (ValueError, KeyError) as exc:  # a malformed request: drop it
             log.warning("pedido de busca inválido: %s", exc)

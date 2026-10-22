@@ -1,29 +1,29 @@
 FROM python:3.11-slim
 
-# TORCH_INDEX: cpu (padrão) ou cu121 para GPU NVIDIA
+# TORCH_INDEX: cpu (default) or cu121 for an NVIDIA GPU
 ARG TORCH_INDEX=cpu
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# torch/torchaudio fixados: torchaudio >= 2.9 exige torchcodec e quebra o demucs 4.0.1
+# torch/torchaudio pinned: torchaudio >= 2.9 requires torchcodec and breaks demucs 4.0.1
 RUN pip install --no-cache-dir torch==2.5.1 torchaudio==2.5.1 \
     --index-url https://download.pytorch.org/whl/${TORCH_INDEX}
 
-# runtime JS exigido pelo yt-dlp para resolver os desafios do YouTube (EJS)
+# the JS runtime yt-dlp requires to solve YouTube's challenges (EJS)
 COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# separa a voz isolada em principal x vozes de apoio (modelos "karaokê" do UVR, MDX-Net). `--no-deps` porque o pacote puxa
-# o diffq (só dos modelos Demucs), que precisa de compilador; o resto é o que os modelos MDX-Net usam. O modelo (~53 MB)
-# baixa na primeira vez para o volume /models.
-# ATENÇÃO com o torch: o onnx2torch exige o torchvision, e o torchvision mais novo puxaria o torch 2.14 (com CUDA 13, +4 GB),
-# que quebra o Demucs. Por isso o torchvision compatível com o torch 2.5.1 entra antes, pelo mesmo índice, e a última linha
-# FALHA o build se alguma coisa mudar a versão do torch.
+# splits the isolated vocals into lead x backing vocals (UVR's "karaoke" models, MDX-Net). `--no-deps` because the package
+# pulls diffq (for the Demucs models only), which needs a compiler; the rest is what the MDX-Net models use. The model
+# (~53 MB) downloads into the /models volume the first time.
+# MIND torch: onnx2torch requires torchvision, and the newest torchvision would pull torch 2.14 (with CUDA 13, +4 GB), which
+# breaks Demucs. So the torchvision that matches torch 2.5.1 goes in first, from the same index, and the last line FAILS the
+# build if anything changes the torch version.
 RUN pip install --no-cache-dir --no-deps torchvision==0.20.1 --index-url https://download.pytorch.org/whl/${TORCH_INDEX} \
     && pip install --no-cache-dir --no-deps audio-separator==0.47.0 \
     && pip install --no-cache-dir onnxruntime==1.31.0 onnx2torch==1.5.15 ml_collections==1.1.0 rotary-embedding-torch==0.9.1 \

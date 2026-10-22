@@ -12,7 +12,7 @@ from .storage import LocalStorage
 
 
 def _import(args) -> int:
-    """Importa um arquivo ou um link de fonte aberta e, se o agente está configurado, publica a música no catálogo da nuvem."""
+    """Imports a file or a link from an open source and, if the agent is configured, publishes the song to the cloud catalog."""
     from .errors import JobError
     from .importer import import_song
 
@@ -46,7 +46,7 @@ def _import(args) -> int:
 
 
 def _publish_import(storage, video_id: str) -> None:
-    """Com AGENT_URL e AGENT_TOKEN, a música entra já no catálogo da nuvem (o agente em execução não precisa reiniciar)."""
+    """With AGENT_URL and AGENT_TOKEN, the song goes straight into the cloud catalog (the running agent needs no restart)."""
     url, token = os.environ.get("AGENT_URL"), os.environ.get("AGENT_TOKEN")
     if not (url and token):
         print("(sem AGENT_URL/AGENT_TOKEN: a música fica só na biblioteca local; o agente a publica quando iniciar)")
@@ -138,7 +138,7 @@ def _create_room(args) -> int:
         return 2
     backend = HttpBackend(args.agent_url, token, args.agent_name)
     try:
-        backend.connect(keep_name=True)  # retoma a sessão do agente em execução, sem trocar o apelido dela (ou inicia uma)
+        backend.connect(keep_name=True)  # resumes the running agent's session without changing its nickname (or starts one)
         room = backend.create_room()
     except (AuthError, Rejected) as exc:
         print(f"erro: {exc}")
@@ -146,7 +146,7 @@ def _create_room(args) -> int:
     except BackendUnavailable as exc:
         print(f"erro: não consegui falar com o servidor ({exc})")
         return 4
-    # os links são para o NAVEGADOR: em Docker o servidor se chama http://api:3000 por dentro e http://localhost:3000 por fora
+    # the links are for the BROWSER: in Docker the server is http://api:3000 inside and http://localhost:3000 outside
     base = (args.public_url or args.agent_url).rstrip("/")
     print(json.dumps({"code": room["code"], "host_token": room["host_token"]}))
     print(f"TV:        {base}/tv.html?room={room['code']}")
@@ -207,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.create_room:
         return _create_room(args)
     if args.consume:
-        from .consumer import run  # importa só aqui: o modo CLI não precisa do cliente Redis
+        from .consumer import run  # imported only here: the CLI mode does not need the Redis client
 
         return run()
     if not args.url:

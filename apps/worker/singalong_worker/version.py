@@ -1,4 +1,4 @@
-"""Versão do app (agente): um número só, lido pelo agente, pelo heartbeat e pelo instalador (MAIOR.MENOR.CORREÇÃO)."""
+"""The app's (agent's) version: one number, read by the agent, the heartbeat and the installer (MAJOR.MINOR.PATCH)."""
 import json
 import os
 import re
@@ -11,7 +11,7 @@ _VERSION_RE = re.compile(r"^v?(\d{1,6})\.(\d{1,6})\.(\d{1,6})(?:[-+][0-9A-Za-z.-
 
 
 def current_version() -> str:
-    """A versão deste app; SINGALONG_AGENT_VERSION sobrescreve (testes e builds de teste)."""
+    """This app's version; SINGALONG_AGENT_VERSION overrides it (tests and test builds)."""
     return os.environ.get("SINGALONG_AGENT_VERSION") or __version__
 
 
@@ -21,14 +21,14 @@ def parse(value) -> tuple[int, int, int] | None:
 
 
 def is_older(a, b) -> bool:
-    """True se a < b (False quando alguma das duas não é uma versão)."""
+    """True if a < b (False when either one is not a version)."""
     x, y = parse(a), parse(b)
     return bool(x and y and x < y)
 
 
 def check_update(server_url: str, current: str | None = None, timeout: float = 10) -> dict | None:
-    """Pergunta ao servidor se há versão nova (endpoint aberto, antes mesmo de parear). Devolve
-    { status: ok|update_available|update_required|unknown, latest, minimum, notes, url } ou None se não deu para consultar."""
+    """Asks the server whether there is a new version (an open endpoint, even before pairing). Returns
+    { status: ok|update_available|update_required|unknown, latest, minimum, notes, url }, or None if it could not ask."""
     current = current or current_version()
     url = f"{server_url.rstrip('/')}/agent/v1/version?{urllib.parse.urlencode({'current': current})}"
     try:

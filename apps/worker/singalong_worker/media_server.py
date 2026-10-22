@@ -1,12 +1,12 @@
-"""Servidor local de mídia do agente: serve as músicas que estão no computador do dono para o navegador da TV.
+"""The agent's local media server: serves the songs on the owner's computer to the TV's browser.
 
-A página do karaokê vem da nuvem (https://...) e carrega o áudio e a letra de `http://127.0.0.1:<porta>/<token>/cache/<id>/<arquivo>`.
-O navegador (Chrome/Edge) pede ao usuário a permissão de "Acesso à rede local" na primeira vez; com ela, o que o player
-usa funciona: fetch, <audio crossOrigin>, Web Audio e o salto no áudio (pedidos Range). Ver TRD, seção 5.
+The karaoke page comes from the cloud (https://...) and loads the audio and the lyrics from `http://127.0.0.1:<port>/<token>/cache/<id>/<file>`.
+The browser (Chrome/Edge) asks the user for the "Local network access" permission the first time; with it, what the player
+uses works: fetch, <audio crossOrigin>, Web Audio and seeking in the audio (Range requests). See TRD, section 5.
 
-Segurança: só serve uma lista fixa de arquivos (nunca a voz isolada, o source.json nem o meta.json), com o identificador da
-música validado; o caminho tem um token aleatório por execução; só responde com CORS à origem da página (a da nuvem); só GET,
-HEAD e OPTIONS; sem listagem de pastas. Escuta em 127.0.0.1 (só este computador).
+Security: it serves only a fixed list of files (never the isolated vocals, source.json or meta.json), with the song's id
+validated; the path carries a random token per run; it answers with CORS only to the page's origin (the cloud's); only GET,
+HEAD and OPTIONS; no folder listing. It listens on 127.0.0.1 (this computer only).
 """
 import logging
 import re
@@ -26,13 +26,13 @@ BAD_NAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 
 def download_name(raw: str | None) -> str | None:
-    """O nome sugerido para baixar (?download=...), sem caracteres que os sistemas de arquivos não aceitam; None se vazio."""
+    """The suggested download name (?download=...), without characters that file systems refuse; None if empty."""
     name = re.sub(r"\s+", " ", BAD_NAME_CHARS.sub(" ", raw or "")).strip()[:120]
     return name or None
 
 
 def parse_range(header: str | None, size: int) -> tuple[int, int] | None | str:
-    """O intervalo pedido: (início, fim) incluindo o fim; None se não há Range; "invalid" se não dá para atender (416)."""
+    """The requested range: (start, end) including the end; None if there is no Range; "invalid" if it cannot be served (416)."""
     if not header:
         return None
     match = re.fullmatch(r"bytes=(\d*)-(\d*)", header.strip())
@@ -41,7 +41,7 @@ def parse_range(header: str | None, size: int) -> tuple[int, int] | None | str:
     if match.group(1):
         start = int(match.group(1))
         end = int(match.group(2)) if match.group(2) else size - 1
-    else:  # "bytes=-N": os últimos N bytes
+    else:  # "bytes=-N": the last N bytes
         length = int(match.group(2))
         if length == 0:
             return "invalid"
@@ -65,7 +65,7 @@ class MediaServer:
         return f"http://127.0.0.1:{self.port}/{self.token}"
 
     def start(self) -> str:
-        """Sobe o servidor numa thread e devolve o endereço (com o token) que o navegador deve usar."""
+        """Starts the server on a thread and returns the address (with the token) the browser must use."""
         server = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -108,10 +108,10 @@ class MediaServer:
 
     # --- CORS ---
     def _cors(self, handler) -> dict | None:
-        """Os cabeçalhos CORS para a origem do pedido; None se a origem não é a da página (então o pedido é recusado)."""
+        """The CORS headers for the request's origin; None if the origin is not the page's (so the request is refused)."""
         origin = handler.headers.get("Origin")
         if origin is None:
-            return {}  # navegação direta ou <audio> sem CORS: não há origem a conferir
+            return {}  # direct navigation or <audio> without CORS: no origin to check
         if origin.rstrip("/") not in self.allowed:
             return None
         return {
@@ -138,9 +138,9 @@ class MediaServer:
             "Access-Control-Max-Age": "600",
         })
 
-    # --- rotas ---
+    # --- routes ---
     def _locate(self, raw_path: str) -> Path | str | None:
-        """O arquivo pedido, "ping" para a sonda, ou None (não existe / não é permitido)."""
+        """The requested file, "ping" for the probe, or None (does not exist / not allowed)."""
         parts = [unquote(p) for p in urlsplit(raw_path).path.split("/")[1:]]
         if not parts or parts[0] != self.token:
             return None
@@ -168,7 +168,7 @@ class MediaServer:
         headers = {**cors, "Content-Type": CONTENT_TYPES.get(target.suffix, "application/octet-stream"), "Accept-Ranges": "bytes",
                    "Cache-Control": "no-cache", "Cross-Origin-Resource-Policy": "cross-origin"}
         name = download_name((parse_qs(urlsplit(handler.path).query).get("download") or [None])[0])
-        if name:  # a página está em outra origem: o atributo `download` não vale, então o próprio servidor manda baixar
+        if name:  # the page is on another origin: the `download` attribute does not apply, so the server itself asks for the download
             headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(name)}"
         if byte_range == "invalid":
             return self._reply(handler, 416, {**cors, "Content-Range": f"bytes */{size}"})
@@ -196,4 +196,4 @@ class MediaServer:
                     handler.wfile.write(chunk)
                     remaining -= len(chunk)
         except (BrokenPipeError, ConnectionResetError):
-            pass  # o navegador fechou (saltou no áudio, trocou de música): normal
+            pass  # the browser closed it (seeked in the audio, changed songs): normal

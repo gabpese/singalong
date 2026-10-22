@@ -1,9 +1,9 @@
-"""Exporta a música como vídeo MP4 de karaokê: instrumental + letra que se preenche palavra a palavra.
+"""Exports the song as a karaoke MP4 video: the instrumental + lyrics that fill word by word.
 
-A letra vira uma legenda ASS (efeito de karaokê \\kf, com os tempos reais de cada palavra quando existem) queimada por
-cima de um fundo liso; o tom é trocado, se pedido, com o filtro rubberband do ffmpeg.
+The lyrics become an ASS subtitle (the \\kf karaoke effect, with each word's real timings when they exist) burned over a
+plain background; the key changes, if asked, with ffmpeg's rubberband filter.
 
-O transporte dos pedidos (Redis ou HTTP) está em backend.py; o contrato com a API em apps/api/src/jobs.ts.
+The requests' transport (Redis or HTTP) is in backend.py; the contract with the API is in apps/api/src/jobs.ts.
 """
 import json
 import logging
@@ -19,13 +19,13 @@ from .storage import LocalStorage
 log = logging.getLogger("worker.export")
 
 WIDTH, HEIGHT, FPS = 1280, 720, 25
-LEAD = 1.5  # a linha aparece 1,5 s antes de ser cantada
-HOLD = 0.8  # ...e fica 0,8 s depois
+LEAD = 1.5  # the line shows up 1.5 s before it is sung
+HOLD = 0.8  # ...and stays 0.8 s after
 TITLE_SECONDS = 6.0
-LONG_LINE = 70  # linhas com mais caracteres que isso usam fonte menor (senão ocupam três linhas e encostam na próxima)
+LONG_LINE = 70  # lines longer than this use a smaller font (otherwise they take three lines and touch the next one)
 FFMPEG_TIMEOUT = 900
 
-# ASS: cores em &HAABBGGRR. No karaokê o texto vai de SecondaryColour (ainda não cantado) a PrimaryColour (cantado).
+# ASS: colors in &HAABBGGRR. In karaoke the text goes from SecondaryColour (not sung yet) to PrimaryColour (sung).
 HEADER = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {WIDTH}
@@ -50,12 +50,12 @@ def ass_time(seconds: float) -> str:
 
 
 def _clean(text: str) -> str:
-    """Texto seguro para o ASS: sem chaves (tags), barras nem quebras de linha."""
+    """Text safe for ASS: no braces (tags), backslashes or line breaks."""
     return " ".join(text.replace("{", "(").replace("}", ")").replace("\\", "/").split())
 
 
 def word_times(cue: dict) -> list[tuple[float, float]]:
-    """Início e fim de cada palavra da linha: os tempos reais (`words`) ou uma estimativa pelo tamanho de cada palavra."""
+    """Each word's start and end in the line: the real timings (`words`) or an estimate from each word's length."""
     words = cue["text"].split()
     real = cue.get("words")
     if real and len(real) == len(words):
@@ -72,7 +72,7 @@ def word_times(cue: dict) -> list[tuple[float, float]]:
 
 
 def karaoke_text(cue: dict, appear: float) -> str:
-    """Texto da linha com os tempos de preenchimento (centissegundos) a partir do instante `appear` em que ela aparece."""
+    """The line's text with the fill timings (centiseconds), from the moment `appear` when it shows up."""
     words = _clean(cue["text"]).split()
     times = word_times({**cue, "text": " ".join(words)})
     parts, cursor = [], appear
@@ -81,7 +81,7 @@ def karaoke_text(cue: dict, appear: float) -> str:
         if wait > 0:
             parts.append(f"{{\\k{wait}}}")
             cursor += wait / 100
-        # cada palavra se preenche até o início da seguinte (ou até o próprio fim, na última): sem buracos no efeito
+        # each word fills until the next one starts (or until its own end, for the last): no gaps in the effect
         end = times[i + 1][0] if i + 1 < len(words) else times[i][1]
         fill = max(round((end - cursor) * 100), 1)
         cursor += fill / 100
@@ -90,7 +90,7 @@ def karaoke_text(cue: dict, appear: float) -> str:
 
 
 def build_ass(cues: list[dict], title: str, artist: str | None, duration: float) -> str:
-    """Legenda ASS: cartão de título no começo, a linha atual em karaokê e a próxima, em cinza, logo abaixo."""
+    """The ASS subtitle: a title card at the start, the current line in karaoke and the next one, in gray, right below."""
     cues = [c for c in cues if c.get("text", "").strip()]
     events = []
     card = _clean(title)
@@ -128,8 +128,8 @@ _rubberband: bool | None = None
 
 
 def has_rubberband() -> bool:
-    """O ffmpeg tem o filtro rubberband (a troca de tom de melhor qualidade)? Os builds do Windows e do Linux têm; os estáticos do
-    macOS não. Se o ffmpeg nem roda aqui, assume que sim (o erro de verdade aparece ao exportar). A resposta é guardada."""
+    """Does ffmpeg have the rubberband filter (the best quality key change)? The Windows and Linux builds do; the static macOS
+    ones do not. If ffmpeg does not even run here, assume it does (the real error shows up when exporting). The answer is cached."""
     global _rubberband
     if _rubberband is None:
         try:
@@ -141,22 +141,23 @@ def has_rubberband() -> bool:
 
 
 def pitch_filter(pitch: int, rubberband: bool | None = None) -> list[str]:
-    """Filtro de áudio do ffmpeg para trocar o tom sem mudar a duração (a letra continua no tempo).
+    """The ffmpeg audio filter that changes the key without changing the duration (the lyrics stay in time).
 
-    Com o rubberband é o filtro dele; sem ele (ffmpeg do macOS) vale a troca clássica: muda a taxa de amostragem (o tom sobe ou desce
-    junto com a velocidade) e o atempo devolve a velocidade. Fica um pouco menos natural, mas serve para o vídeo do karaokê.
+    With rubberband it is rubberband's filter; without it (macOS's ffmpeg) the classic change applies: it changes the sample rate
+    (the pitch rises or falls along with the speed) and atempo restores the speed. It sounds a bit less natural, but it does for
+    the karaoke video.
     """
     if not pitch:
         return []
     factor = 2 ** (pitch / 12)
     if rubberband if rubberband is not None else has_rubberband():
         return ["-af", f"rubberband=pitch={factor:.6f}"]
-    # a entrada é normalizada para 44,1 kHz primeiro: o asetrate precisa saber a taxa de origem; o atempo aceita de 0,5 a 100 (±12 semitons cabem)
+    # the input is normalized to 44.1 kHz first: asetrate needs to know the source rate; atempo accepts 0.5 to 100 (±12 semitones fit)
     return ["-af", f"aresample=44100,asetrate={round(44100 * factor)},aresample=44100,atempo={1 / factor:.6f}"]
 
 
 def ffmpeg_command(ass: Path, audio: Path, out: Path, pitch: int, title: str, artist: str | None) -> list[str]:
-    # o filtro `ass` interpreta o caminho: precisa de '/' e de ':' escapados
+    # the `ass` filter parses the path: '/' and ':' must be escaped
     ass_arg = str(ass).replace("\\", "/").replace(":", "\\:")
     return [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -171,7 +172,7 @@ def ffmpeg_command(ass: Path, audio: Path, out: Path, pitch: int, title: str, ar
 
 
 def export_mp4(storage: LocalStorage, video_id: str, pitch: int = 0, timeout: int = FFMPEG_TIMEOUT) -> str:
-    """Gera o MP4 no storage e devolve a chave. Falha se a música não está pronta ou o ffmpeg falha."""
+    """Makes the MP4 in storage and returns its key. Fails if the song is not ready or ffmpeg fails."""
     base = f"cache/{video_id}"
     if not all(storage.exists(f"{base}/{name}") for name in ("instrumental.mp3", "lyrics.json", "meta.json")):
         raise FileNotFoundError("a música ainda não está pronta")
@@ -195,7 +196,7 @@ def export_mp4(storage: LocalStorage, video_id: str, pitch: int = 0, timeout: in
 
 
 def serve(backend, storage: LocalStorage, stop: threading.Event) -> None:
-    """Loop da thread de exportação: atende pedidos da API um de cada vez enquanto `stop` não for sinalizado."""
+    """The export thread's loop: answers the API's requests one at a time until `stop` is set."""
     while not stop.is_set():
         try:
             request = backend.next_export(2)
@@ -206,7 +207,7 @@ def serve(backend, storage: LocalStorage, stop: threading.Event) -> None:
             started = time.monotonic()
             try:
                 export_mp4(storage, video_id, pitch)
-                backend.publish_song(video_id)  # armazenamento local: o catálogo ganha o tom que acabou de ser exportado
+                backend.publish_song(video_id)  # local storage: the catalog gains the key that was just exported
                 backend.set_export_state(video_id, pitch, "ready")
                 log.info("MP4 pronto", extra={"job": video_id, "pitch": pitch, "elapsed_s": round(time.monotonic() - started, 1)})
             except Exception as exc:  # noqa: BLE001 - o pedido termina com uma mensagem, nunca fica "processando"

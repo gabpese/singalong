@@ -1,15 +1,15 @@
-"""Importar músicas sem passar pelo YouTube: um arquivo de áudio do próprio usuário ou o link de uma fonte aberta.
+"""Importing songs without YouTube: an audio file of the user's own or a link from an open source.
 
-O pipeline só precisa de UM arquivo de áudio; baixar do YouTube é apenas a primeira etapa. Aqui o áudio vem de outro lugar e
-segue o mesmo caminho (separar a voz, resolver a letra, melodia, tom, meta). O identificador é `f-` + os 12 primeiros
-caracteres hexadecimais do SHA-256 do CONTEÚDO do áudio: o mesmo arquivo importado duas vezes cai na mesma música.
+The pipeline needs only ONE audio file; downloading from YouTube is just the first stage. Here the audio comes from elsewhere
+and follows the same path (separating the vocals, resolving the lyrics, melody, key, meta). The id is `f-` + the first 12
+hexadecimal characters of the SHA-256 of the audio's CONTENT: the same file imported twice lands on the same song.
 
-Segurança (TRD, seção 8.1):
-  - arquivo: só as extensões da lista, tamanho e duração limitados, validado pelo ffprobe (tem de ter uma faixa de áudio);
-    o servidor nunca indica um caminho: quem importa escolhe o arquivo no próprio computador;
-  - link: só os sites da lista (domínio exato ou subdomínio, nunca um nome que só TERMINA igual), sem cookies, e o yt-dlp só pode
-    usar os extratores de FAIXA ÚNICA desses sites (nada de busca, álbum, lista, YouTube nem página genérica).
-A responsabilidade pela origem do arquivo é de quem importa (uso pessoal): o app não a verifica.
+Security (TRD, section 8.1):
+  - file: only the listed extensions, limited size and duration, validated by ffprobe (it must have an audio track);
+    the server never names a path: whoever imports picks the file on their own computer;
+  - link: only the listed sites (the exact domain or a subdomain, never a name that only ENDS the same), no cookies, and yt-dlp may
+    only use those sites' SINGLE-TRACK extractors (no search, album, playlist, YouTube or generic page).
+Whoever imports is responsible for the file's origin (personal use): the app does not check it.
 """
 import hashlib
 import json
@@ -29,8 +29,8 @@ log = logging.getLogger("worker.import")
 AUDIO_EXTENSIONS = (".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus")
 DEFAULT_MAX_MB = 200
 OPEN_HOSTS = ("soundcloud.com", "bandcamp.com", "archive.org")
-# os extratores do yt-dlp que valem, casados pelo NOME deles (IE_NAME, ex.: "soundcloud", "Bandcamp", "archive.org"): só os de
-# faixa única dos sites acima. As listas, os álbuns e as buscas têm nomes com ":" ("soundcloud:playlist", "Bandcamp:album").
+# the yt-dlp extractors allowed, matched by their NAME (IE_NAME, e.g. "soundcloud", "Bandcamp", "archive.org"): only the
+# single-track ones of the sites above. Playlists, albums and searches have names with ":" ("soundcloud:playlist", "Bandcamp:album").
 OPEN_EXTRACTORS = (r"(?i)^soundcloud$", r"(?i)^bandcamp$", r"(?i)^archive\.org$")
 ID_RE = re.compile(r"^f-[0-9a-f]{12}$")
 HASH_CHUNK = 1024 * 1024
@@ -38,10 +38,10 @@ HASH_CHUNK = 1024 * 1024
 
 @dataclass
 class ImportedSong:
-    """O que o pipeline precisa de uma música que não veio do YouTube."""
+    """What the pipeline needs from a song that did not come from YouTube."""
 
     video_id: str  # "f-<12 hex>"
-    audio: Path  # áudio decodificável (wav) na pasta de trabalho
+    audio: Path  # decodable audio (wav) in the work folder
     info: dict  # video_title, track, artist, duration, subtitle_text, subtitle_error, origin
 
 
@@ -53,7 +53,7 @@ def max_bytes(env=os.environ) -> int:
 
 
 def file_id(path: Path) -> str:
-    """O identificador de uma música importada: "f-" + 12 hexadecimais do SHA-256 do conteúdo."""
+    """An imported song's id: "f-" + 12 hexadecimal characters of the content's SHA-256."""
     digest = hashlib.sha256()
     with Path(path).open("rb") as fh:
         for chunk in iter(lambda: fh.read(HASH_CHUNK), b""):
@@ -71,7 +71,7 @@ def _tag(tags: dict, *names: str) -> str | None:
 
 
 def probe_audio(path: Path, run: Callable = subprocess.run) -> dict:
-    """Pergunta ao ffprobe o que o arquivo é: { duration, title, artist, codec }. Recusa o que não é áudio legível."""
+    """Asks ffprobe what the file is: { duration, title, artist, codec }. Refuses what is not readable audio."""
     try:
         result = run(
             ["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)],
@@ -103,7 +103,7 @@ def probe_audio(path: Path, run: Callable = subprocess.run) -> dict:
 
 
 def to_wav(source: Path, dest: Path, run: Callable = subprocess.run) -> Path:
-    """Decodifica para wav (o que o Demucs lê): também prova que o arquivo toca até o fim."""
+    """Decodes to wav (what Demucs reads): this also proves the file plays to the end."""
     result = run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(source), "-vn", "-acodec", "pcm_s16le", str(dest)], capture_output=True, text=True, timeout=600)
     if result.returncode != 0 or not dest.exists():
         raise JobError("bad_audio", "Não consegui decodificar este arquivo de áudio. Ele pode estar corrompido.", NEVER)
@@ -117,7 +117,7 @@ def prepare_file(
     max_size: int | None = None,
     run: Callable = subprocess.run,
 ) -> ImportedSong:
-    """Valida o arquivo escolhido pelo usuário e o prepara (wav na pasta de trabalho). Nada é movido nem apagado."""
+    """Validates the file the user picked and prepares it (a wav in the work folder). Nothing is moved or deleted."""
     path = Path(path)
     if not path.is_file():
         raise JobError("bad_audio", f"Não encontrei o arquivo: {path}", NEVER)
@@ -139,7 +139,7 @@ def prepare_file(
         video_id=file_id(path),
         audio=wav,
         info={
-            "video_title": path.stem,  # o Jukebox também procura por ele (o nome do arquivo, sem a extensão)
+            "video_title": path.stem,  # the Jukebox also searches by it (the file's name, without the extension)
             "track": probe["title"], "artist": probe["artist"], "duration": probe["duration"],
             "subtitle_text": None, "subtitle_error": None, "origin": "file",
         },
@@ -147,10 +147,10 @@ def prepare_file(
 
 
 def host_allowed(url: str) -> str | None:
-    """O domínio permitido ("soundcloud.com"...) se o link é de uma fonte aberta da lista; None se não é.
+    """The allowed domain ("soundcloud.com"...) if the link is from a listed open source; None if not.
 
-    Só vale o domínio exato ou um subdomínio dele: "notsoundcloud.com" e "soundcloud.com.evil.example" não valem; também não
-    valem outro protocolo que não http(s), credenciais no endereço ou uma porta diferente.
+    Only the exact domain or a subdomain of it counts: "notsoundcloud.com" and "soundcloud.com.evil.example" do not; neither
+    does a protocol other than http(s), credentials in the address or a different port.
     """
     try:
         parts = urlsplit(url.strip())
@@ -176,20 +176,20 @@ def _open_error(exc: Exception) -> JobError:
 
 
 def prepare_url(url: str, workdir: Path, max_duration: float | None, ydl_factory: Callable | None = None) -> ImportedSong:
-    """Baixa a faixa de um link de fonte aberta (SoundCloud, Bandcamp, Internet Archive), sem cookies, e a prepara."""
+    """Downloads the track of a link from an open source (SoundCloud, Bandcamp, Internet Archive), without cookies, and prepares it."""
     domain = host_allowed(url)
     if not domain:
         raise JobError("not_open_source", f"Só aceito links de {', '.join(OPEN_HOSTS)} (o link de uma faixa).", NEVER)
     if ydl_factory is None:
-        import yt_dlp  # import tardio: só quem baixa precisa dele
+        import yt_dlp  # a late import: only whoever downloads needs it
 
         ydl_factory = yt_dlp.YoutubeDL
     opts = {
         "outtmpl": str(workdir / "source.%(ext)s"), "noplaylist": True, "quiet": True, "noprogress": True, "no_warnings": True,
         "format": "bestaudio/best", "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-        "allowed_extractors": list(OPEN_EXTRACTORS),  # só os de faixa única: nada de busca, lista, álbum, YouTube ou página genérica
+        "allowed_extractors": list(OPEN_EXTRACTORS),  # single-track ones only: no search, playlist, album, YouTube or generic page
         "socket_timeout": 30,
-        # nunca usa a conta do YouTube (nem outros cookies): estes sites não precisam
+        # never uses the YouTube account (or other cookies): these sites do not need them
     }
     try:
         with ydl_factory(opts) as ydl:
@@ -223,8 +223,8 @@ def prepare_url(url: str, workdir: Path, max_duration: float | None, ydl_factory
 
 
 def resolve_names(info: dict, artist: str | None, title: str | None) -> tuple[str | None, str | None]:
-    """Artista e título como o pipeline os resolve: o que foi informado > as etiquetas/metadados > o palpite pelo título."""
-    from .pipeline import guess_artist_title  # import tardio: o pipeline importa este módulo
+    """Artist and title as the pipeline resolves them: what was given > the tags/metadata > the guess from the title."""
+    from .pipeline import guess_artist_title  # a late import: the pipeline imports this module
 
     guessed_artist, guessed_title = guess_artist_title(info.get("video_title") or "")
     return (
@@ -245,12 +245,12 @@ def import_song(
     lyrics_source: str = "auto",
     **process_kwargs,
 ) -> dict:
-    """Importa UMA música (de um arquivo ou de um link de fonte aberta) e a deixa pronta na biblioteca. Devolve o meta.
+    """Imports ONE song (from a file or a link from an open source) and leaves it ready in the library. Returns the meta.
 
-    Artista e nome são obrigatórios (vêm das etiquetas do arquivo, do nome dele ou de `artist`/`title`): alimentam a busca da
-    letra e o que aparece na fila. Reimportar o mesmo arquivo devolve a música que já existe (a menos que `force`).
+    Artist and name are required (they come from the file's tags, its name or `artist`/`title`): they feed the lyrics search
+    and what shows in the queue. Importing the same file again returns the song that already exists (unless `force`).
     """
-    from .pipeline import Limits, is_ready, keys, process  # import tardio: o pipeline importa este módulo
+    from .pipeline import Limits, is_ready, keys, process  # a late import: the pipeline imports this module
 
     if bool(file) == bool(url):
         raise ValueError("Informe um arquivo OU um link para importar.")
@@ -267,7 +267,7 @@ def import_song(
         notify("importing")
         work = Path(tmp)
         imported = prepare_file(Path(file), work, limits.max_duration) if file else prepare_url(url, work, limits.max_duration)
-        # a mesma música (mesmo conteúdo) já na biblioteca: reaproveita o artista e o nome dela se não foram informados de novo
+        # the same song (the same content) already in the library: reuses its artist and name if they were not given again
         existing = json.loads(storage.read(keys(imported.video_id)["meta"])) if is_ready(storage, imported.video_id) else {}
         final_artist, final_title = resolve_names(imported.info, artist or existing.get("artist"), title or existing.get("title"))
         if not (final_artist and final_title):

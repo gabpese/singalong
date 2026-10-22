@@ -1,4 +1,4 @@
-"""Versão do app: comparação, consulta ao servidor, aviso no heartbeat e espera quando o servidor exige atualização."""
+"""The app's version: comparison, asking the server, the notice in the heartbeat and the wait when the server requires an update."""
 import io
 import json
 import os
@@ -83,7 +83,7 @@ class HeartbeatTests(unittest.TestCase):
         backend, _ = self.backend([error])
         with self.assertRaises(UpdateRequired) as ctx:
             backend.next_job(0)
-        self.assertIsInstance(ctx.exception, BackendUnavailable)  # o laço do agente já espera e tenta de novo
+        self.assertIsInstance(ctx.exception, BackendUnavailable)  # the agent's loop already waits and tries again
         self.assertIn("Atualize", str(ctx.exception))
 
 
