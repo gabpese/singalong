@@ -1,10 +1,10 @@
-// O logotipo: "singalong" em duas tintas e, ao lado, a placa "AO VIVO" das portas de estúdio (gasta, mas funcionando: pisca de leve).
-// Só entra onde a placa fica legível (a partir de uns 56 px de altura de letra); nos tamanhos pequenos vale a marca (/brand/mark.svg).
+// The logo: "singalong" in two inks and, beside it, the "AO VIVO" sign from studio doors (worn, but working: it flickers gently).
+// It only goes where the sign stays legible (from about 56 px of letter height); at small sizes the mark is used (/brand/mark.svg).
 import { t } from '../i18n/index.ts';
 
 export function Logo({ onPaper = false }: { onPaper?: boolean }) {
   const letters = [...t('brand.live')];
-  const flicker = Math.min(3, letters.length - 1); // uma letra falha mais que as outras
+  const flicker = Math.min(3, letters.length - 1); // one letter fails more than the others
   return (
     <span className={`logo${onPaper ? ' on-paper' : ''}`}>
       <span className="logo-word">singalong</span>

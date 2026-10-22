@@ -1,5 +1,5 @@
-// Nível das vozes de apoio (backing vocals) e da voz original (guia para cantar) de uma música da fila, de 0 a 100 %. Só aparece
-// nas músicas que têm o arquivo; quem escolheu a música (ou o anfitrião) arrasta, os demais só veem o valor.
+// The level of the backing vocals and of the original voice (a guide to sing along with) of a song in the Queue, from 0 to 100 %. It only shows
+// on songs that have the file; whoever chose the song (or the Host) drags it, everyone else only sees the value.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import type { QueueItem } from '../lib/types.ts';
@@ -18,7 +18,7 @@ export function BackingControl({ item }: { item: QueueItem }) {
   return <LevelControl item={item} field="backing" />;
 }
 
-/** A voz original isolada como guia para cantar (só nas músicas que têm o arquivo da voz). */
+/** The isolated original voice as a guide to sing along with (only on songs that have the voice's file). */
 export function GuideControl({ item }: { item: QueueItem }) {
   return <LevelControl item={item} field="guide" />;
 }
@@ -27,8 +27,8 @@ function LevelControl({ item, field }: { item: QueueItem; field: Field }) {
   const text = TEXTS[field];
   const current = item[field];
   const { act } = useRoom();
-  const [drag, setDrag] = useState<number | null>(null); // valor enquanto a barra está sendo arrastada
-  const [pending, setPending] = useState<number | null>(null); // o que foi enviado, até o servidor confirmar
+  const [drag, setDrag] = useState<number | null>(null); // the value while the bar is being dragged
+  const [pending, setPending] = useState<number | null>(null); // what was sent, until the server confirms it
   const slider = useRef<HTMLInputElement>(null);
   const commitRef = useRef<(level: number) => void>(() => {});
 
@@ -37,7 +37,7 @@ function LevelControl({ item, field }: { item: QueueItem; field: Field }) {
     setPending(level);
     void act('PATCH', `/queue/${item.id}`, { [field]: level }).catch(() => {});
   };
-  // o "change" nativo só dispara ao SOLTAR a barra: é aí que o nível vai para a TV
+  // the native "change" only fires on RELEASING the bar: that is when the level goes to the TV
   const editable = item.can_edit;
   useEffect(() => {
     const element = slider.current;
@@ -46,7 +46,7 @@ function LevelControl({ item, field }: { item: QueueItem; field: Field }) {
     element.addEventListener('change', onChange);
     return () => element.removeEventListener('change', onChange);
   }, [editable]);
-  // a barra mostra o que foi enviado até o servidor confirmar (ou desistir): sem pular de volta ao valor antigo
+  // the bar shows what was sent until the server confirms it (or gives up): no jumping back to the old value
   useEffect(() => {
     if (pending === null) return;
     if (current === pending) return setPending(null);
@@ -54,7 +54,7 @@ function LevelControl({ item, field }: { item: QueueItem; field: Field }) {
     return () => clearTimeout(timer);
   }, [pending, current]);
 
-  if (!text.hasFile(item)) return null; // a música não tem essa trilha separada
+  if (!text.hasFile(item)) return null; // the song does not have this track separated
   const level = drag ?? pending ?? current;
 
   if (!editable) {

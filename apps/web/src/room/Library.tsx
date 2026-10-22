@@ -1,4 +1,4 @@
-// Músicas já processadas (biblioteca), com filtro por artista e nome, para entrar na fila na hora ou baixar em MP4.
+// Songs already prepared (the library), with a filter by artist and name, to go into the Queue right away or download as MP4.
 import { useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { downloadFile, EXPORT_PITCHES, exportFileName, requestExport } from '../lib/export-mp4.ts';
@@ -14,7 +14,7 @@ function LibraryRow({ song }: { song: LibrarySong }) {
   const [exporting, setExporting] = useState(false);
   const [exportLabel, setExportLabel] = useState(t('library.exportButton'));
 
-  /** Gera o MP4 da música no tom escolhido e baixa quando estiver pronto (o worker leva alguns segundos). */
+  /** Builds the song's MP4 in the chosen key and downloads it when it is ready (the worker takes a few seconds). */
   async function exportSong() {
     setExporting(true);
     try {
@@ -35,7 +35,7 @@ function LibraryRow({ song }: { song: LibrarySong }) {
       await act('POST', '/queue', { video_id: song.video_id, name: myName, display_title: song.title ?? undefined });
       toast(t('library.added'));
     } catch {
-      // o erro já apareceu no aviso
+      // the error already showed in the notice
     }
   }
 

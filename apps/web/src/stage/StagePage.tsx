@@ -1,4 +1,4 @@
-// Palco: a tela de canto do celular. Mostra a letra no ritmo da TV (que toca a música) e devolve o cantor à sala quando acaba.
+// Stage: the phone's singing screen. It shows the lyrics in time with the TV (which plays the song) and sends the singer back to the Room when it ends.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { BetaTag } from '../ui/BetaTag';
@@ -22,7 +22,7 @@ interface Ended {
   score: number | null;
 }
 
-/** A subida ao palco no celular de quem vai cantar: o chamado e quanto falta para a música começar. */
+/** Taking the stage on the phone of whoever is about to sing: the call and how long until the song starts. */
 function StageCall({ state }: { state: RoomState }) {
   const clock = useInterlude(state.interlude);
   if (!clock) return null;
@@ -37,8 +37,8 @@ function StageCall({ state }: { state: RoomState }) {
 export function StagePage({ code }: { code: string }) {
   const [state, setState] = useState<RoomState | null>(null);
   const [ended, setEnded] = useState<Ended | null>(null);
-  const [item, setItem] = useState<QueueItem | null>(null); // a música no palco (para o título na tela)
-  const [choosing, setChoosing] = useState(false); // escolhendo quem convidar para cantar junto
+  const [item, setItem] = useState<QueueItem | null>(null); // the song on the Stage (for the title on screen)
+  const [choosing, setChoosing] = useState(false); // choosing whom to invite to sing along
   const [status, setStatus] = useState<'connecting' | 'connected' | 'reconnecting'>('connecting');
   const lyricsRefs = {
     prev: useRef<HTMLParagraphElement>(null),
@@ -51,9 +51,9 @@ export function StagePage({ code }: { code: string }) {
   reactionsRef.current = reactions.push;
   const clock = useRef(createSyncClock());
   const view = useRef<ReturnType<typeof createLyricsView> | null>(null);
-  const itemRef = useRef<number | null>(null); // a música que trouxe o cantor até aqui
+  const itemRef = useRef<number | null>(null); // the song that brought the singer here
   const itemInfo = useRef<QueueItem | null>(null);
-  const pendingLyrics = useRef<{ itemId: number; cues: LyricCue[] } | null>(null); // a letra pode chegar antes do estado da sala
+  const pendingLyrics = useRef<{ itemId: number; cues: LyricCue[] } | null>(null); // the lyrics can arrive before the Room's state
 
   const leave = useCallback(() => {
     if (itemRef.current !== null) dismissStage(code, itemRef.current);
@@ -98,14 +98,14 @@ export function StagePage({ code }: { code: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  // o estado da sala manda: quem está no palco, se a música acabou e se está tocando ou em pausa
+  // the Room's state rules: who is on the Stage, whether the song ended and whether it is playing or paused
   useEffect(() => {
     if (!state) return;
     const mine = stageItemFor(state);
     const current = splitQueue(state).current;
     if (itemRef.current === null) {
       if (mine === null) {
-        location.replace(roomUrl(code)); // não é a vez deste cantor: volta para a sala
+        location.replace(roomUrl(code)); // it is not this singer's turn: back to the Room
         return;
       }
       itemRef.current = mine;
@@ -115,15 +115,15 @@ export function StagePage({ code }: { code: string }) {
       clock.current.reset();
       clock.current.position(state.position_ms);
       const waiting = pendingLyrics.current;
-      if (waiting && waiting.itemId === mine) view.current?.setCues(waiting.cues); // a letra que a TV já mandou
+      if (waiting && waiting.itemId === mine) view.current?.setCues(waiting.cues); // the lyrics the TV already sent
     }
     if (state.current_item_id === itemRef.current) {
       itemInfo.current = current ?? itemInfo.current;
-      if (current) setItem(current); // título, cantor e ajuste da letra sempre atuais
-      view.current?.setDuet(current?.guest?.status === 'accepted', current?.parts); // dueto: a letra ganha as duas cores
+      if (current) setItem(current); // the title, the singer and the lyrics adjustment always current
+      view.current?.setDuet(current?.guest?.status === 'accepted', current?.parts); // duet: the lyrics take on the two colors
       clock.current.setPlaying(state.playback === 'playing');
       view.current?.setOffset(current?.lyric_offset ?? 0);
-      // com a música no servidor (ou na nuvem) a letra vem direto; no computador do dono só a TV a alcança e a repassa pelo servidor
+      // with the song on the server (or in the cloud) the lyrics come straight; on the Owner's computer only the TV reaches them and relays them through the server
       const lyricsUrl = current?.song.media?.lyrics;
       if (lyricsUrl && !current?.song.media?.local && !view.current?.cues.length) {
         const wanted = current?.id;
@@ -135,11 +135,11 @@ export function StagePage({ code }: { code: string }) {
           .catch(() => undefined);
       }
     } else if (!ended) {
-      // a música acabou (ou o anfitrião pulou): mostra o fim e devolve o cantor à sala
+      // the song ended (or the Host skipped it): shows the end and sends the singer back to the Room
       const score = state.scoring ? state.scoreboard.find((entry) => entry.id === itemRef.current)?.score ?? null : null;
       setEnded({ title: itemInfo.current?.title ?? t('stage.songFallback'), score });
     } else if (state.scoring && ended.score === null) {
-      // a nota pode chegar um instante depois do fim
+      // the Score can arrive a moment after the end
       const score = state.scoreboard.find((entry) => entry.id === itemRef.current)?.score ?? null;
       if (score !== null) setEnded({ ...ended, score });
     }
@@ -174,7 +174,7 @@ export function StagePage({ code }: { code: string }) {
 
       <InviteNotice state={state} onRespond={(invited, accept) => void respondInvite(code, invited, accept)} />
 
-      {/* quem canta pode chamar alguém da sala para cantar junto, mesmo com a música já tocando */}
+      {/* whoever is singing can call someone in the Room to sing along, even with the song already playing */}
       {item?.mine && (
         <div className="stage-duet">
           {item.guest?.status === 'pending' && <span className="duet-note">{t('duet.pending', { name: item.guest.name })}</span>}

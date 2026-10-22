@@ -1,5 +1,5 @@
-// A barra lateral da sala: os atalhos e os ajustes do anfitrião sempre à vista, só com ícones (o texto fica no tooltip e no
-// nome acessível). Em telas largas é uma coluna à esquerda; no celular vira uma faixa logo abaixo do topo.
+// The Room's side rail: the shortcuts and the Host's settings always in view, as icons only (the text goes in the tooltip and the
+// accessible name). On wide screens it is a column on the left; on the phone it becomes a strip right below the top bar.
 import { t } from '../i18n/index.ts';
 import { type ReactNode, useState } from 'react';
 import { hostToken } from '../lib/identity.ts';
@@ -8,10 +8,10 @@ import { Icon, type IconName } from '../ui/Icon';
 import { useRoom } from './context';
 import { VoiceDialog, VoiceVolume } from './VoiceControl';
 
-/** O app do dono já tem as abas TV e Anfitrião: lá "Abrir TV" não faz sentido. */
+/** The Owner's app already has the TV and Host tabs: "Abrir TV" makes no sense there. */
 const insideOwnerApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
 
-/** Um botão de ação (copiar, abrir): só o ícone; o texto aparece ao passar o mouse ou focar. */
+/** An action button (copy, open): only the icon; the text shows on hover or focus. */
 function RailButton({ icon, label, tip, onClick }: { icon: IconName; label: string; tip: string; onClick: () => void }) {
   return (
     <button type="button" className="rail-btn" aria-label={label} data-tip={tip} onClick={onClick}>
@@ -20,7 +20,7 @@ function RailButton({ icon, label, tip, onClick }: { icon: IconName; label: stri
   );
 }
 
-/** Um ajuste ligado/desligado (switch): o clique vale na hora e volta atrás só se o servidor recusar. */
+/** An on/off setting (a switch): the click takes effect at once and is undone only if the server refuses it. */
 function RailSwitch({ icon, label, tip, checked, onToggle, beta = false }: { icon: IconName; label: string; tip: string; checked: boolean; onToggle: (next: boolean) => void; beta?: boolean }) {
   return (
     <button type="button" role="switch" aria-checked={checked} aria-label={beta ? `${label} (${t('beta.tag')})` : label} data-tip={beta ? `${tip}. ${t('beta.note')}` : tip} className={`rail-switch${checked ? ' on' : ''}`} onClick={() => onToggle(!checked)}>
@@ -31,7 +31,7 @@ function RailSwitch({ icon, label, tip, checked, onToggle, beta = false }: { ico
   );
 }
 
-/** Ajuste do anfitrião que vai no PATCH da sala. */
+/** A Host setting that goes in the Room's PATCH. */
 function useHostField(field: 'fair' | 'scoring' | 'voice' | 'melody_bars' | 'intermission', checked: boolean, names: [string, string]) {
   const { act, toast } = useRoom();
   const [pending, setPending] = useState<boolean | null>(null);
@@ -64,7 +64,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
       toast(okMessage);
       return;
     } catch {
-      // sem permissão da área de transferência (http fora de localhost): tenta o jeito antigo
+      // no clipboard permission (http outside localhost): tries the old way
     }
     const box = document.createElement('textarea');
     box.value = text;
@@ -121,7 +121,7 @@ export function RoomRail({ state }: { state: RoomState | null }) {
               onToggle={(next) => (next ? setAsking(true) : voice.set(false))}
             />
             <div className="rail-pop">
-              {/* com a voz ligada o balão junta a explicação do interruptor e o volume (a dica em separado cobriria o volume) */}
+              {/* with the voice on, the bubble joins the switch's explanation and the volume (a separate tip would cover the volume) */}
               {voice.value && <p className="pop-tip">{t('rail.voiceTip')}</p>}
               <VoiceVolume />
             </div>

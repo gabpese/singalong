@@ -1,5 +1,5 @@
-// Aba TV da sala: quem está no celular acompanha a letra, quem canta e a fila. Só assiste: o som e o microfone são do aparelho
-// que abriu a TV como player (tv.html), então dois aparelhos nunca tocam a mesma música.
+// The Room's TV tab: whoever is on the phone follows the lyrics, who is singing and the Queue. It only watches: the sound and the microphone
+// belong to the device that opened the TV as the player (tv.html), so two devices never play the same song.
 import { useEffect, useRef } from 'react';
 import { t } from '../i18n/index.ts';
 import { createSyncClock } from '../lib/clock.ts';
@@ -31,7 +31,7 @@ export function TvViewer({ state, position, lyrics }: Props) {
   };
   const clock = useRef(createSyncClock());
   const view = useRef<ReturnType<typeof createLyricsView> | null>(null);
-  const shownFor = useRef<number | null>(null); // a música cuja letra está na tela
+  const shownFor = useRef<number | null>(null); // the song whose lyrics are on screen
 
   const { current } = state ? splitQueue(state) : { current: null };
   const next = state ? nextUp(state) : null;
@@ -55,7 +55,7 @@ export function TvViewer({ state, position, lyrics }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // música nova: limpa a letra e o relógio
+  // a new song: clears the lyrics and the clock
   useEffect(() => {
     if (shownFor.current === currentId) return;
     shownFor.current = currentId;
@@ -64,19 +64,19 @@ export function TvViewer({ state, position, lyrics }: Props) {
     if (state) clock.current.position(state.position_ms);
   }, [currentId, state]);
 
-  // andamento: tocando ou em pausa, ajuste da letra e dueto
+  // the progress: playing or paused, the lyrics adjustment and the duet
   useEffect(() => {
     clock.current.setPlaying(Boolean(current) && state?.playback === 'playing');
     view.current?.setOffset(current?.lyric_offset ?? 0);
     view.current?.setDuet(current?.guest?.status === 'accepted', current?.parts);
   }, [current, state?.playback]);
 
-  // a posição que a TV informa a cada segundo
+  // the position the TV reports every second
   useEffect(() => {
     if (currentId !== null && position.itemId === currentId) clock.current.position(position.ms);
   }, [position, currentId]);
 
-  // a letra: repassada pela TV; com a música no servidor (ou na nuvem) também dá para buscar direto
+  // the lyrics: relayed by the TV; with the song on the server (or in the cloud) they can also be fetched directly
   useEffect(() => {
     if (lyrics && lyrics.itemId === currentId) view.current?.setCues(lyrics.cues);
   }, [lyrics, currentId]);

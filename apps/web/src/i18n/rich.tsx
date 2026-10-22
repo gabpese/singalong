@@ -1,5 +1,5 @@
-// Texto traduzido com trechos em negrito: **assim** vira <strong>assim</strong> (a ordem das palavras muda de língua para língua,
-// então o destaque faz parte do texto traduzido, e não do código).
+// Translated text with bold stretches: **like this** becomes <strong>like this</strong> (word order changes from language to language,
+// so the emphasis is part of the translated text, not of the code).
 import { Fragment, type ReactNode } from 'react';
 import { t } from './index.js';
 

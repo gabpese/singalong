@@ -1,5 +1,5 @@
-// Controlador da TV: liga a sala (WebSocket) ao motor de áudio e à pontuação. Não desenha nada: avisa a tela pelo `ui`.
-// A TV toca o que a sala manda (a fila é do servidor), avisa quando a música termina e a posição para os celulares.
+// The TV's controller: connects the Room (WebSocket) to the audio engine and the scoring. It draws nothing: it tells the screen through `ui`.
+// The TV plays what the Room sends (the server owns the Queue), says when the song ends, and sends the position to the phones.
 import { t } from '../i18n/index.ts';
 import { createEngine } from '../lib/engine.ts';
 import { clampLatency, loadLatency, saveLatency, sungPosition } from '../lib/latency.ts';
@@ -15,7 +15,7 @@ import type { ClientMessage, LyricCue, QueueItem, ReactionKind, RoomState, Serve
 export interface HudState {
   visible: boolean;
   score: number;
-  /** Mensagem no lugar das notas (sem melodia, microfone negado...); vazia = mostrar "Original/Você". */
+  /** A message in place of the notes (no melody, microphone denied...); empty = show "Original/You". */
   notice: string;
   original: string;
   sung: string;
@@ -29,31 +29,31 @@ export interface FinalResult {
 
 export interface TvUi {
   setRoom(state: RoomState): void;
-  /** Aviso no rodapé; `ms` > 0 some depois desse tempo. */
+  /** A notice in the footer; with `ms` > 0 it goes away after that long. */
   notify(text: string, ms?: number): void;
   setUnlock(show: boolean): void;
   setHud(hud: HudState): void;
   setProgress(percent: number): void;
-  /** Resultado da música que acabou de terminar (some depois de 9 s). */
+  /** The result of the song that just ended (goes away after 9 s). */
   setFinal(result: FinalResult | null): void;
-  /** Uma reação dos celulares (aplauso, fogo...) para subir pela tela. */
+  /** A Reaction from the phones (applause, fire...) to float up the screen. */
   addReaction(kind: ReactionKind, name?: string): void;
-  /** O guia de melodia tem notas para desenhar (a sala o ligou e a música tem melodia)? */
+  /** Does the melody guide have notes to draw (the Room turned it on and the song has a melody)? */
   setGuideReady(ready: boolean): void;
 }
 
-/** O que o desenho do guia de melodia precisa a cada quadro. */
+/** What drawing the melody guide needs on each frame. */
 export interface GuideFrame {
   notes: MelodyNote[];
-  /** Tom escolhido (semitons): as notas da original sobem ou descem junto. */
+  /** The chosen key (semitones): the original's notes go up or down with it. */
   transpose: number;
-  /** A posição (s) da música que se ouve agora. */
+  /** The position (s) of the song being heard now. */
   position: number;
-  /** O que o microfone captou: tempo da música em que foi cantado e a nota (null = sem tom). */
+  /** What the microphone picked up: the song time at which it was sung and the note (null = no pitch). */
   trail: { t: number; midi: number | null }[];
-  /** A trilha do segundo cantor (dueto com dois microfones). */
+  /** The second singer's trail (a duet with two microphones). */
   trailB: { t: number; midi: number | null }[];
-  /** Dueto: de quem é a parte no instante `t` (tempo da música): 'a', 'b', 'both' ou null; sem dueto, null. */
+  /** Duet: whose part it is at instant `t` (song time): 'a', 'b', 'both' or null; without a duet, null. */
   partAt: ((t: number) => 'a' | 'b' | 'both' | null) | null;
 }
 
@@ -62,23 +62,23 @@ type Connection = { send(message: ClientMessage): void; close(): void };
 const FINAL_SECONDS = 9;
 
 export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HTMLElement; current: HTMLElement; next: HTMLElement; next2: HTMLElement }) {
-  let latest: RoomState | null = null; // último estado da sala
-  let latency = loadLatency(); // atraso do som e do microfone deste aparelho (veja lib/latency.ts)
-  let micsChosen = loadMics(); // microfones escolhidos nesta TV (vazio = o padrão); o primeiro também serve à pontuação
+  let latest: RoomState | null = null; // the Room's latest state
+  let latency = loadLatency(); // this device's sound and microphone delay (see lib/latency.ts)
+  let micsChosen = loadMics(); // the microphones chosen on this TV (empty = the default); the first one also serves the scoring
   let applying = false;
-  let endedFor: number | null = null; // evita avisar duas vezes que a mesma música terminou
-  let resumed = false; // só a primeira música carregada depois de abrir a página retoma de uma posição anterior
+  let endedFor: number | null = null; // avoids saying twice that the same song ended
+  let resumed = false; // only the first song loaded after the page opens resumes from an earlier position
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
   let finalTimer: ReturnType<typeof setTimeout> | undefined;
 
-  // pontuação pelo microfone (só quando o anfitrião liga e a música tem a melodia de referência)
+  // scoring through the microphone (only when the Host turns it on and the song has the reference melody)
   let mic: Awaited<ReturnType<typeof openMic>> | null = null;
   let micFailed = false;
-  // dueto com dois microfones: o segundo microfone e um pontuador por cantor (cada um conta só as linhas dele)
+  // a duet with two microphones: the second microphone and one scorer per singer (each one counts only their own lines)
   let micB: Awaited<ReturnType<typeof openMic>> | null = null;
   let scorerB: ReturnType<typeof createScorer> | null = null;
   let scorer: ReturnType<typeof createScorer> | null = null;
-  let scorerFor: number | null = null; // item que o `scorer` acompanha
+  let scorerFor: number | null = null; // the item the `scorer` follows
   let hud: HudState = { visible: false, score: 0, notice: '', original: '', sung: '' };
   let shownNotes = '';
 
@@ -90,7 +90,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
 
   function setHud(patch: Partial<HudState>) {
     const next = { ...hud, ...patch };
-    if ((Object.keys(next) as (keyof HudState)[]).every((key) => next[key] === hud[key])) return; // nada mudou: não redesenha
+    if ((Object.keys(next) as (keyof HudState)[]).every((key) => next[key] === hud[key])) return; // nothing changed: no redraw
     hud = next;
     ui.setHud(hud);
   }
@@ -103,35 +103,35 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       reportScore(itemId);
       connection.send({ type: 'ended', item_id: itemId });
     },
-    // a letra também vai para o palco dos cantores (no celular): com as músicas no computador do dono, só a TV a alcança
+    // the lyrics also go to the singers' Stage (on the phone): with the songs on the Owner's computer, only the TV reaches them
     onLyrics(itemId: number, cues: LyricCue[]) {
       connection.send({ type: 'lyrics', item_id: itemId, cues });
     },
-    // o apito (microfonia) apareceu: o motor já cortou o volume da voz; a TV avisa por alguns segundos
+    // the squeal (feedback) appeared: the engine already cut the voice's volume; the TV shows a notice for a few seconds
     onFeedback({ hz, mic, mics }: { hz: number | null; mic?: number; mics?: number }) {
       notify(mics && mics > 1 ? t('ctl.feedbackMic', { hz: hz ?? 0, n: (mic ?? 0) + 1 }) : t('ctl.feedback', { hz: hz ?? 0 }), 10000);
     },
     onError(itemId: number, message: string) {
-      // não deixa a sala travada numa música que não carrega: avisa, espera um pouco e passa para a próxima
+      // keeps the Room from getting stuck on a song that does not load: shows a notice, waits a little and moves on to the next one
       notify(t('ctl.skipping', { message }), 5000);
       setTimeout(() => {
-        if (engine.loadedId !== itemId) return; // a sala já mudou de música
+        if (engine.loadedId !== itemId) return; // the Room already moved to another song
         engine.clear();
         connection.send({ type: 'ended', item_id: itemId });
       }, 2500);
     },
   });
 
-  // --- pontuação e guia de melodia: os dois leem a melodia da música e o microfone ---
-  let melodyFor: number | null = null; // o item cuja melodia está carregada
+  // --- scoring and the melody guide: both read the song's melody and the microphone ---
+  let melodyFor: number | null = null; // the item whose melody is loaded
   let melodyData: { hop: number; midi: number[] } | null = null;
   let guideNotes: MelodyNote[] = [];
-  let guidePitch = 0; // tom escolhido da música atual
-  let partsNow: string | null | undefined = null; // a divisão da letra do dueto na música atual (pode mudar no meio dela)
-  let guideOn = false; // a sala pediu o guia de melodia
+  let guidePitch = 0; // the chosen key of the current song
+  let partsNow: string | null | undefined = null; // how the duet's lyrics are split in the current song (it can change in the middle of it)
+  let guideOn = false; // the Room asked for the melody guide
   let trail: { t: number; midi: number | null }[] = [];
   let trailB: { t: number; midi: number | null }[] = [];
-  let guideDuet = false; // a música atual é um dueto aceito (as barras ganham as cores das partes)
+  let guideDuet = false; // the current song is an accepted duet (the bars take on the parts' colors)
   let partsMemo: { cues: unknown; chosen: string | null | undefined; parts: ('a' | 'b' | 'both' | null)[] } | null = null;
 
   function stopScoring() {
@@ -162,7 +162,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
         micFailed = true;
       }
     }
-    // dueto pontuado por voz: o segundo microfone é o da voz 2 (se não abrir, a música é pontuada inteira pelo primeiro)
+    // a duet scored per voice: the second microphone is voice 2's (if it does not open, the whole song is scored by the first one)
     if (scorerB && !micB) {
       try {
         micB = await openMic(micsChosen[1]?.id);
@@ -172,7 +172,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     }
   }
 
-  /** Os pontuadores da música: um só, ou um por cantor no dueto com dois microfones (cada um conta só as linhas dele). */
+  /** The song's scorers: just one, or one per singer in a duet with two microphones (each one counts only their own lines). */
   function makeScorers(melody: { hop: number; midi: number[] }, current: QueueItem) {
     const duet = current.guest?.status === 'accepted' && micsChosen.length >= 2;
     if (!duet) {
@@ -181,13 +181,13 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     }
     const include = (me: 'a' | 'b') => (t: number) => {
       const cues = engine.cues;
-      return singsAt(cues, splitParts(cues, partsNow), t + engine.offset, me); // a letra anda `offset` s à frente da melodia (o ajuste da letra)
+      return singsAt(cues, splitParts(cues, partsNow), t + engine.offset, me); // the lyrics run `offset` s ahead of the melody (the lyrics adjustment)
     };
     scorerB = createScorer(melody, { transpose: current.pitch, include: include('b') });
     return createScorer(melody, { transpose: current.pitch, include: include('a') });
   }
 
-  /** Prepara (ou mantém) a pontuação e o guia de melodia da música atual. */
+  /** Sets up (or keeps) the scoring and the melody guide for the current song. */
   async function prepareScoring(state: RoomState, current: QueueItem | null) {
     const wantScore = Boolean(state.scoring);
     const wantGuide = Boolean(state.melody_bars);
@@ -211,7 +211,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     if (melodyFor === current.id) {
       scorer?.setTranspose(current.pitch);
       scorerB?.setTranspose(current.pitch);
-      // o anfitrião ligou ou desligou a pontuação no meio da música: a melodia já está aqui
+      // the Host turned the scoring on or off in the middle of the song: the melody is already here
       if (wantScore && !scorer && melodyData) {
         scorer = makeScorers(melodyData, current);
         scorerFor = current.id;
@@ -241,7 +241,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       const res = await fetch(melodyUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const melody = await res.json();
-      if (melodyFor !== current.id) return; // a sala já mudou de música
+      if (melodyFor !== current.id) return; // the Room already moved to another song
       melodyData = melody;
       guideNotes = melodyNotes(melody);
       if (wantScore) {
@@ -259,11 +259,11 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     setHud({ notice: wantScore && micFailed ? t('ctl.micFail') : '' });
   }
 
-  // ~10 leituras por segundo: o microfone alimenta a trilha do guia e a pontuação (a nota cantada contra a melodia no instante)
+  // ~10 readings a second: the microphone feeds the guide's trail and the scoring (the sung note against the melody at that instant)
   const scoreTimer = setInterval(() => {
     if (!mic || !engine.playing || engine.loadedId === null || engine.loadedId !== melodyFor) return;
     const { midi } = mic.read();
-    const midiB = micB ? micB.read().midi : null; // o segundo cantor (dueto com dois microfones)
+    const midiB = micB ? micB.read().midi : null; // the second singer (a duet with two microphones)
     const at = sungPosition(engine.currentTime, latency);
     if (guideOn) {
       trail = pushTrail(trail, { t: at, midi });
@@ -271,14 +271,14 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     }
     if (!scorer || engine.loadedId !== scorerFor) return;
     let live: number | null = scorer.tick(at, midi);
-    let shown = scorer; // de quem são as notas mostradas no quadro: no dueto, de quem canta agora
+    let shown = scorer; // whose notes the board shows: in a duet, whoever is singing now
     if (scorerB && micB) {
       const liveB = scorerB.tick(at, midiB);
       const cues = engine.cues;
       const parts = splitParts(cues, partsNow);
       if (singsAt(cues, parts, at + engine.offset, 'b') && !singsAt(cues, parts, at + engine.offset, 'a')) shown = scorerB;
       const values = [live, liveB].filter((value): value is number => value !== null);
-      live = values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null; // o quadro mostra a média da dupla
+      live = values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null; // the board shows the pair's average
     }
     const original = noteName(shown.reference);
     const sung = noteName(shown.sung);
@@ -290,12 +290,12 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     setHud({ score: live ?? 0 });
   }, 100);
 
-  /** Fim natural da música: manda a nota ao servidor (placar) e mostra o resultado. */
+  /** The song's natural end: sends the score to the server (the scoreboard) and shows the result. */
   function reportScore(itemId: number) {
     if (!scorer || scorerFor !== itemId) return;
     const item = latest?.queue.find((entry) => entry.id === itemId);
     if (scorerB) {
-      // dueto pontuado por voz: cada cantor tem a sua nota (só das linhas dele); a nota da música é a média das que valem
+      // a duet scored per voice: each singer has their own score (from their lines only); the song's score is the average of the ones that count
       const a = scorer.evaluated >= MIN_SCORED_FRAMES ? (scorer.score() as number) : null;
       const b = scorerB.evaluated >= MIN_SCORED_FRAMES ? (scorerB.score() as number) : null;
       const values = [a, b].filter((value): value is number => value !== null);
@@ -311,8 +311,8 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     if (scorer.evaluated < MIN_SCORED_FRAMES) return;
     const score = scorer.score() as number;
     const singer = item?.singers ?? '';
-    // depuração: descomente para ver a nota final e a tabela com todos os blocos
-    // console.log(`[pontuação] fim da música: ${score} pontos`);
+    // debugging: uncomment to see the final score and the table with every block
+    // console.log(`[scoring] end of the song: ${score} points`);
     // console.table(scorer.report());
     connection.send({ type: 'score', item_id: itemId, score });
     ui.setFinal({ score, singer, message: finalMessage(score) });
@@ -320,13 +320,13 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     finalTimer = setTimeout(() => ui.setFinal(null), FINAL_SECONDS * 1000);
   }
 
-  // --- a voz do microfone da TV nas caixas (o anfitrião liga) ---
+  // --- the voice from the TV's microphone in the speakers (the Host turns it on) ---
   let voiceOn = false;
   let voiceFailed = false;
   let voiceBusy = false;
-  let voiceKey = ''; // quais microfones estão abertos na saída
+  let voiceKey = ''; // which microphones are open on the output
 
-  /** Mantém a voz de acordo com a sala: liga/desliga o microfone e põe o volume (mudo enquanto nada toca). */
+  /** Keeps the voice in line with the Room: turns the microphone on or off and sets the volume (muted while nothing plays). */
   async function syncVoice() {
     const state = latest;
     if (!state?.voice) {
@@ -338,7 +338,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       return;
     }
     if (voiceOn && voiceKey !== micsKey(micsChosen)) {
-      // a escolha de microfones mudou: solta os atuais e abre os novos
+      // the choice of microphones changed: releases the current ones and opens the new ones
       engine.detachVoice();
       voiceOn = false;
       voiceFailed = false;
@@ -346,13 +346,13 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     if (!voiceOn && !voiceFailed && !voiceBusy) {
       voiceBusy = true;
       try {
-        const ids = micsChosen.length ? micsChosen.map((mic) => mic.id) : ['']; // sem escolha: o microfone padrão, como sempre
+        const ids = micsChosen.length ? micsChosen.map((mic) => mic.id) : ['']; // no choice: the default microphone, as always
         const streams: MediaStream[] = [];
         for (const id of ids) {
           try {
             streams.push(await openVoice(id));
           } catch {
-            // este microfone não abriu (desconectado, sem permissão): os outros seguem
+            // this microphone did not open (disconnected, no permission): the others carry on
           }
         }
         if (!streams.length) throw new Error('no microphone');
@@ -371,14 +371,14 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
   }
   const voiceTimer = setInterval(() => void syncVoice(), 400);
 
-  // --- sala ---
+  // --- Room ---
   const connection: Connection = connectRoom(code, 'tv', {
     onMessage(message: ServerMessage) {
       if (message.type === 'seek') {
         if (message.item_id !== engine.loadedId) return;
-        // sem a duração ainda (o áudio acabou de começar a carregar), não há limite para o salto para a frente
+        // with no duration yet (the audio has just started loading), there is no limit to the jump forward
         const limit = engine.duration ? engine.duration - 0.5 : Infinity;
-        const target = message.to ?? engine.currentTime + (message.seconds ?? 0); // ponto de destino ou salto relativo
+        const target = message.to ?? engine.currentTime + (message.seconds ?? 0); // a target point or a relative jump
         engine.seek(Math.min(Math.max(target, 0), limit));
         connection.send({ type: 'position', item_id: engine.loadedId, ms: Math.round(engine.heardTime * 1000) });
         return;
@@ -406,7 +406,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
       await engine.play();
       ui.setUnlock(false);
     } catch {
-      ui.setUnlock(true); // o navegador exige um clique antes de tocar áudio
+      ui.setUnlock(true); // the browser requires a click before playing audio
     }
   }
 
@@ -418,7 +418,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     }
   }
 
-  /** Aplica o estado mais recente da sala; se chegar outro enquanto carrega, repete até alcançá-lo. */
+  /** Applies the Room's latest state; if another one arrives while loading, repeats until it catches up. */
   async function apply() {
     if (applying) return;
     applying = true;
@@ -436,7 +436,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
           if (engine.loadedId !== current.id) {
             endedFor = null;
             await engine.load(current);
-            // TV recarregada no meio da música: retoma de onde o servidor sabe que estava (a posição é reportada a cada 2 s)
+            // the TV reloaded in the middle of a song: resumes from where the server knows it was (the position is reported every 2 s)
             if (!resumed && state.position_ms > 2000) engine.seek(state.position_ms / 1000);
             resumed = true;
           } else {
@@ -457,13 +457,13 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     }
   }
 
-  // barra de progresso da música
+  // the song's progress bar
   const progressTimer = setInterval(() => {
     const duration = engine.duration;
     ui.setProgress(engine.loadedId !== null && duration ? Math.min(100, (engine.currentTime / duration) * 100) : 0);
   }, 250);
 
-  // posição da música para os celulares (barra de progresso e a letra do palco, que anda sozinha entre uma mensagem e outra)
+  // the song's position for the phones (the progress bar and the Stage's lyrics, which run on their own between one message and the next)
   const positionTimer = setInterval(() => {
     if (engine.playing && engine.loadedId !== null) {
       connection.send({ type: 'position', item_id: engine.loadedId, ms: Math.round(engine.heardTime * 1000) });
@@ -478,29 +478,29 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     get mics() {
       return micsChosen;
     },
-    /** O quadro do guia de melodia: as notas, o tom, a posição que se ouve e o que foi cantado há pouco. */
+    /** The melody guide's board: the notes, the key, the position being heard and what was sung a moment ago. */
     guideFrame(): GuideFrame {
       let partAt: GuideFrame['partAt'] = null;
       if (guideDuet) {
         const cues = engine.cues;
         if (!partsMemo || partsMemo.cues !== cues || partsMemo.chosen !== partsNow) partsMemo = { cues, chosen: partsNow, parts: splitParts(cues, partsNow) };
         const { parts } = partsMemo;
-        partAt = (t: number) => partAtTime(cues, parts, t + engine.offset); // a letra anda `offset` s à frente da melodia
+        partAt = (t: number) => partAtTime(cues, parts, t + engine.offset); // the lyrics run `offset` s ahead of the melody
       }
       return { notes: guideNotes, transpose: guidePitch, position: engine.heardTime, trail, trailB, partAt };
     },
     get voiceFilter() {
       return engine.voiceFilter;
     },
-    /** Reduzir o ruído e o eco da voz (filtro de graves e portão de ruído): fica guardado nesta TV. */
+    /** Reduce the voice's noise and echo (a low-cut filter and a noise gate): kept on this TV. */
     setVoiceFilter(on: boolean) {
       engine.setVoiceFilter(saveVoiceFilter(on));
       return engine.voiceFilter;
     },
-    /** Escolhe os microfones da saída (e da pontuação, o primeiro); a voz reabre sozinha com a nova escolha. */
+    /** Chooses the output's microphones (and the scoring's, the first one); the voice reopens on its own with the new choice. */
     setMics(next: { id: string; label: string }[]) {
       micsChosen = saveMics(next);
-      stopScoring(); // a pontuação reabre o microfone com o primeiro da lista
+      stopScoring(); // the scoring reopens the microphone with the first one on the list
       void apply();
       void syncVoice();
       return micsChosen;
@@ -508,7 +508,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     get latency() {
       return latency;
     },
-    /** Guarda e aplica o atraso da saída (letra) e da entrada (pontuação), em ms. */
+    /** Saves and applies the output's delay (lyrics) and the input's (scoring), in ms. */
     setLatency(next: { output: number; input: number }) {
       latency = saveLatency({ output: clampLatency(next.output), input: clampLatency(next.input) });
       engine.setOutputLatency(latency.output);
@@ -517,7 +517,7 @@ export function createTvController(code: string, ui: TvUi, lyricsEls: { prev: HT
     get state() {
       return latest;
     },
-    /** Clique em "ativar o som": o navegador só libera o áudio depois de um gesto. */
+    /** A click on "turn on the sound": the browser only allows audio after a gesture. */
     async unlock() {
       await engine.unlock();
       await startPlayback();

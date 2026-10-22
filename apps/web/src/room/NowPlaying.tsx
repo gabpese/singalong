@@ -1,4 +1,4 @@
-// Card "Tocando agora": a música, quem canta, a barra de progresso e os controles do anfitrião.
+// The "Tocando agora" card: the song, who is singing, the progress bar and the Host's controls.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { getLanguage, t } from '../i18n/index.ts';
 import { describeLyricsSource } from '../lib/lyrics-sync.ts';
@@ -18,7 +18,7 @@ import type { Position } from './useRoomConnection';
 
 const OFFSET_STEPS = [-0.5, -0.1, 0.1, 0.5];
 
-/** "Próximo: Bia — Título" (e "(preparando…)" se ainda não está pronta). */
+/** "Próximo: Bia — Título" (and "(preparando…)" if it is not ready yet). */
 export function NextSinger({ state }: { state: RoomState }) {
   const next = nextUp(state);
   if (!next) return null;
@@ -31,19 +31,19 @@ export function NextSinger({ state }: { state: RoomState }) {
 }
 
 /**
- * Barra de progresso da música. Para o anfitrião ela é um player: arrastar muda a posição (a TV vai para esse ponto ao
- * soltar). Os demais só acompanham.
+ * The song's progress bar. For the Host it is a player: dragging changes the position (the TV goes to that point on
+ * release). Everyone else only follows along.
  */
 function Progress({ state, current, position }: { state: RoomState; current: QueueItem; position: Position }) {
   const { act, isHost } = useRoom();
   const [, tick] = useState(0);
-  const [drag, setDrag] = useState<number | null>(null); // segundo para onde a barra está sendo arrastada
-  const [hold, setHold] = useState<{ seconds: number; until: number } | null>(null); // mantém o destino até a TV informar a nova posição
+  const [drag, setDrag] = useState<number | null>(null); // the second the bar is being dragged to
+  const [hold, setHold] = useState<{ seconds: number; until: number } | null>(null); // keeps the target until the TV reports the new position
   const slider = useRef<HTMLInputElement>(null);
   const commitRef = useRef<(seconds: number) => void>(() => {});
 
   useEffect(() => {
-    const timer = setInterval(() => tick((n) => n + 1), 500); // a barra anda sozinha entre uma posição da TV e a outra
+    const timer = setInterval(() => tick((n) => n + 1), 500); // the bar runs on its own between one position from the TV and the next
     return () => clearInterval(timer);
   }, []);
 
@@ -58,7 +58,7 @@ function Progress({ state, current, position }: { state: RoomState; current: Que
     setHold({ seconds, until: performance.now() + 1500 });
     void act('POST', '/player/seek', { to: seconds }).catch(() => {});
   };
-  // o "change" nativo só dispara ao SOLTAR a barra (ou ao confirmar pelo teclado): é aí que a TV muda de posição
+  // the native "change" only fires on RELEASING the bar (or on confirming with the keyboard): that is when the TV changes position
   useEffect(() => {
     const element = slider.current;
     if (!element) return;

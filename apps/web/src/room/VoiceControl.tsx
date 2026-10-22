@@ -1,4 +1,4 @@
-// A voz do microfone da TV nas caixas de som: o anfitrião liga (com um aviso sobre microfones direcionais) e ajusta o volume.
+// The voice from the TV's microphone in the speakers: the Host turns it on (with a notice about directional microphones) and sets the volume.
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { tRich } from '../i18n/rich';
@@ -6,7 +6,7 @@ import { useRoom } from './context';
 
 const PENDING_MS = 1500;
 
-/** Volume da voz (0 a 100 %): só o anfitrião vê, e só com a voz ligada. O valor vai para a TV ao SOLTAR a barra. */
+/** The voice's volume (0 to 100 %): only the Host sees it, and only with the voice on. The value goes to the TV on RELEASING the bar. */
 export function VoiceVolume() {
   const { act, state, isHost } = useRoom();
   const [drag, setDrag] = useState<number | null>(null);
@@ -61,7 +61,7 @@ export function VoiceVolume() {
   );
 }
 
-/** O aviso antes de ligar a voz: microfone aberto perto da caixa de som faz aquele apito (microfonia). */
+/** The notice before turning the voice on: an open microphone near the speaker makes that squeal (feedback). */
 export function VoiceDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {

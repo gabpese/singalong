@@ -1,5 +1,5 @@
-// Tom da música: dois botões ("Mais grave" e "Mais agudo") e, no meio, a nota em que a pessoa vai cantar, em destaque. Quem não pode
-// editar só vê a nota. O mesmo seletor serve à fila, à música tocando e à prévia.
+// The song's key: two buttons ("Mais grave" and "Mais agudo") and, between them, the note the person will sing in, highlighted. Whoever cannot
+// edit only sees the note. The same picker serves the Queue, the playing song and the preview.
 import { t } from '../i18n/index.ts';
 import { noteSummary } from '../lib/music.ts';
 import type { QueueItem, SongKey } from '../lib/types.ts';
@@ -9,7 +9,7 @@ import { useRoom } from './context';
 const RANGE = 6;
 export const clampPitch = (value: number) => Math.max(-RANGE, Math.min(RANGE, value));
 
-/** A régua do ajuste: o centro é o tom original e os degraus acendem para o lado em que o tom foi movido. */
+/** The adjustment's ruler: the center is the original key and the steps light up toward the side the key was moved to. */
 function Meter({ pitch }: { pitch: number }) {
   const steps = Array.from({ length: RANGE * 2 + 1 }, (_, i) => i - RANGE);
   return (
@@ -25,7 +25,7 @@ function Meter({ pitch }: { pitch: number }) {
 interface PickerProps {
   pitch: number;
   songKey: SongKey | null;
-  /** Sem `onChange` o seletor só mostra o tom (quem não pode editar). */
+  /** Without `onChange` the picker only shows the key (for whoever cannot edit it). */
   onChange?: (pitch: number) => void;
 }
 

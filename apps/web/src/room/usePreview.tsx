@@ -1,4 +1,4 @@
-// Prévia do instrumental no celular, com troca de tom: o estado, a ligação com o player de áudio e a barra na tela.
+// The instrumental's preview on the phone, with a key change: the state, the link to the audio player and the bar on screen.
 import { t } from '../i18n/index.ts';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { keySummary } from '../lib/music.ts';
@@ -23,7 +23,7 @@ export function usePreview(state: RoomState | null, act: Act) {
   const [item, setItem] = useState<PreviewItem | null>(null);
   const [pitch, setPitch] = useState(0);
   const [hint, setHint] = useState('');
-  // o player e as respostas assíncronas leem estes valores: refs evitam ler um estado já velho
+  // the player and the asynchronous answers read these values: refs avoid reading a stale state
   const itemRef = useRef<PreviewItem | null>(null);
   const pitchRef = useRef(0);
   itemRef.current = item;
@@ -58,7 +58,7 @@ export function usePreview(state: RoomState | null, act: Act) {
       changePitch(queueItem.pitch);
       setHint(t('preview.loading'));
       try {
-        if (!(await player.load(queueItem.song.media!.instrumental))) return; // outra prévia foi pedida
+        if (!(await player.load(queueItem.song.media!.instrumental))) return; // another preview was requested
         await player.play();
         setHint(
           queueItem.can_edit
@@ -91,14 +91,14 @@ export function usePreview(state: RoomState | null, act: Act) {
     rerender();
   }, [player]);
 
-  // posição e botão de tocar/pausar acompanham o áudio
+  // the position and the play/pause button follow the audio
   useEffect(() => {
     if (!item) return;
     const timer = setInterval(rerender, 400);
     return () => clearInterval(timer);
   }, [item]);
 
-  /** Mantém a prévia coerente com a fila: fecha se o item saiu ou começou a tocar na TV; acompanha o tom. */
+  /** Keeps the preview in line with the Queue: closes if the item left or started playing on the TV; follows the key. */
   useEffect(() => {
     const current = itemRef.current;
     if (!current || !state) return;
@@ -107,10 +107,10 @@ export function usePreview(state: RoomState | null, act: Act) {
     if (queued.can_edit !== current.can_edit || queued.song.key !== current.key) {
       setItem({ ...current, can_edit: queued.can_edit, key: queued.song.key });
     }
-    if (queued.can_edit && queued.pitch !== pitchRef.current) changePitch(queued.pitch); // o tom foi mudado por outro controle
+    if (queued.can_edit && queued.pitch !== pitchRef.current) changePitch(queued.pitch); // the key was changed by another control
   }, [state, close, changePitch]);
 
-  // a barra de prévia ocupa espaço no rodapé: o CSS reserva essa área enquanto ela está aberta
+  // the preview bar takes up room in the footer: the CSS reserves that area while it is open
   useEffect(() => {
     document.body.classList.toggle('has-preview', Boolean(item));
     return () => document.body.classList.remove('has-preview');
@@ -121,7 +121,7 @@ export function usePreview(state: RoomState | null, act: Act) {
 
 export type PreviewControls = ReturnType<typeof usePreview>;
 
-/** Barra fixa com a prévia: tocar/pausar, posição, tom e fechar. */
+/** The fixed bar with the preview: play/pause, position, key and close. */
 export function PreviewBar({ preview }: { preview: PreviewControls }) {
   const { player, item, pitch, hint, close, stepPitch, togglePlay } = preview;
   const dragging = useRef(false);

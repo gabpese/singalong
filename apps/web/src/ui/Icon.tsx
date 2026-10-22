@@ -1,6 +1,6 @@
-/** Ícone SVG da interface (public/icons/*.svg), desenhado como máscara: herda a cor do texto ao redor. */
+/** An interface SVG icon (public/icons/*.svg), drawn as a mask: it takes the color of the surrounding text. */
 export type IconName = 'singing' | 'add-song' | 'musics' | 'link' | 'host' | 'display' | 'search' | 'minus' | 'plus' | 'pause' | 'resume' | 'next-song' | 'mic' | 'sound' | 'shuffle' | 'melody' | 'stage';
 
 export function Icon({ name }: { name: IconName }) {
-  return <span className={`icon i-${name}`} aria-hidden="true" />; // decorativo: o texto ao lado já diz o que é
+  return <span className={`icon i-${name}`} aria-hidden="true" />; // decorative: the text beside it already says what it is
 }

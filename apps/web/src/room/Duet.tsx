@@ -1,5 +1,5 @@
-// Dueto: convidar alguém da sala para cantar junto, responder a um convite e ver com quem a música vai ser cantada.
-// Os componentes de convite e de aviso não dependem do contexto da sala: servem à sala, ao palco e à TV.
+// Duet: inviting someone in the Room to sing along, answering an invitation and seeing who the song will be sung with.
+// The invitation and notice components do not depend on the Room's context: they serve the Room, the Stage and the TV.
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { tRich } from '../i18n/rich';
@@ -10,7 +10,7 @@ import { useRoom } from './context';
 
 type Person = { pid: string; name: string };
 
-/** Quem está na sala agora (menos eu), para escolher o convidado. */
+/** Who is in the Room now (except me), to choose the invited partner. */
 export function InviteDialog({ people, mePid, onInvite, onClose }: { people: Person[]; mePid: string | null; onInvite: (person: Person) => Promise<void>; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const others = people.filter((person) => person.pid !== mePid);
@@ -27,7 +27,7 @@ export function InviteDialog({ people, mePid, onInvite, onClose }: { people: Per
       await onInvite(person);
       onClose();
     } catch {
-      setBusy(false); // o erro já foi avisado
+      setBusy(false); // the error was already shown
     }
   }
 
@@ -69,7 +69,7 @@ export function InviteDialog({ people, mePid, onInvite, onClose }: { people: Per
   );
 }
 
-/** Na linha da música (da fila ou da que está tocando): convidar, ver o convite enviado ou o dueto confirmado. */
+/** On the song's row (in the Queue or the one playing): invite, see the invitation sent or the confirmed duet. */
 export function DuetControl({ item }: { item: QueueItem }) {
   const { act, state, toast } = useRoom();
   const [choosing, setChoosing] = useState(false);
@@ -125,13 +125,13 @@ export function DuetControl({ item }: { item: QueueItem }) {
 }
 
 /**
- * O aviso de convite, na tela em que a pessoa estiver (fila, adicionar, Jukebox, palco, TV): aceitar ou recusar. É só a tela:
- * quem chama diz o que fazer com a resposta.
+ * The invitation notice, on whatever screen the person is on (Queue, add, Jukebox, Stage, TV): accept or decline. It is only the screen:
+ * the caller says what to do with the answer.
  */
 export function InviteNotice({ state, onRespond }: { state: RoomState | null; onRespond: (item: QueueItem, accept: boolean) => void }) {
   const invites = (state?.queue ?? []).filter((item) => item.invite_for_me);
   const seen = useRef(0);
-  // um convite novo faz o celular vibrar (quando o aparelho deixa), para a pessoa perceber mesmo olhando outra coisa
+  // a new invitation makes the phone vibrate (when the device allows it), so the person notices even while looking at something else
   useEffect(() => {
     if (invites.length > seen.current) navigator.vibrate?.([200, 100, 200]);
     seen.current = invites.length;
@@ -162,7 +162,7 @@ export function InviteNotice({ state, onRespond }: { state: RoomState | null; on
   );
 }
 
-/** Responde a um convite fora do contexto da sala (palco e TV): chama a API; o estado novo chega pelo WebSocket. */
+/** Answers an invitation outside the Room's context (Stage and TV): calls the API; the new state arrives through the WebSocket. */
 export async function respondInvite(code: string, item: QueueItem, accept: boolean): Promise<void> {
   try {
     await api('POST', `/api/rooms/${code}/queue/${item.id}/invite/respond`, { accept }, code);
@@ -171,7 +171,7 @@ export async function respondInvite(code: string, item: QueueItem, accept: boole
   }
 }
 
-/** O aviso na sala: dentro do contexto, com as ações da própria sala. */
+/** The notice in the Room: inside the context, with the Room's own actions. */
 export function InviteBanner() {
   const { act, state } = useRoom();
   return (

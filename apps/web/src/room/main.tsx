@@ -7,7 +7,7 @@ const code: string | null = parseRoomCode(location.search);
 if (!code) {
   location.replace('/');
 } else {
-  // link de anfitrião (#host=TOKEN): guarda o token e tira da barra de endereço
+  // the Host link (#host=TOKEN): keeps the token and takes it out of the address bar
   const fromLink: string | null = parseHostHash(location.hash);
   if (fromLink) {
     setHostToken(code, fromLink);

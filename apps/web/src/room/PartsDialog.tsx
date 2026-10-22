@@ -1,5 +1,5 @@
-// A divisão da letra do dueto: quem canta cada linha (voz 1, voz 2 ou os dois juntos). Começa pela divisão que a música já tem
-// (a escolhida pelos cantores ou a automática) e, ao salvar, vale para a música em qualquer sala.
+// How the duet's lyrics are split: who sings each line (voice 1, voice 2 or both together). It starts from the split the song already has
+// (the one the singers chose or the automatic one) and, on saving, it holds for the song in any Room.
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { decodeParts, encodeParts, splitParts } from '../lib/duet.ts';
@@ -45,7 +45,7 @@ export function PartsDialog({ item, onClose }: { item: QueueItem; onClose: () =>
       toast(t(value === null ? 'parts.reset' : 'parts.saved'));
       onClose();
     } catch {
-      setBusy(false); // o erro já foi avisado
+      setBusy(false); // the error was already shown
     }
   }
 

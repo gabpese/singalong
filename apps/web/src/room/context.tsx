@@ -1,25 +1,25 @@
-// Contexto da sala (celular): o código, o estado, as ações e os avisos, compartilhados pelos componentes.
+// The Room's context (phone): the code, the state, the actions and the notices, shared by the components.
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/identity.ts';
 import type { ApiError, LyricCue, QueueItem, ReactionKind, RoomState } from '../lib/types.ts';
 
 export type Tab = 'queue' | 'add' | 'library';
-/** As duas telas da sala: a sala (fila, adicionar, músicas) e a TV (a letra e a fila, só para assistir). */
+/** The Room's two views: the Room (Queue, add, songs) and the TV (the lyrics and the Queue, only to watch). */
 export type View = 'room' | 'tv';
 
 export interface RoomContextValue {
   code: string;
   state: RoomState | null;
   isHost: boolean;
-  /** Ação na sala; o estado devolvido já atualiza a tela (o WebSocket confirma para todos). Lança em caso de erro (já avisado). */
+  /** An action in the Room; the returned state updates the screen at once (the WebSocket confirms it for everyone). Throws on an error (already shown). */
   act: (method: string, path: string, body?: unknown) => Promise<any>;
   toast: (text: string, isError?: boolean) => void;
-  /** Nome que vai na fila: o digitado, ou "Alguém". */
+  /** The name that goes in the Queue: the one typed, or "Alguém". */
   myName: string;
   showTab: (tab: Tab) => void;
-  /** Manda uma reação (aplauso, fogo...) para a TV. */
+  /** Sends a Reaction (applause, fire...) to the TV. */
   react: (kind: ReactionKind) => void;
-  /** A letra de uma música da fila (do servidor ou, no computador do dono, a que a TV repassou); null se não está ao alcance. */
+  /** The lyrics of a song in the Queue (from the server or, on the Owner's computer, the ones the TV relayed); null if out of reach. */
   loadCues: (item: QueueItem) => Promise<LyricCue[] | null>;
 }
 
@@ -33,7 +33,7 @@ export function useRoom(): RoomContextValue {
 
 export const RoomProvider = RoomContext.Provider;
 
-/** Aviso passageiro no rodapé (`<p class="toast show">`); some depois de 3,5 s. */
+/** A passing notice in the footer (`<p class="toast show">`); goes away after 3.5 s. */
 export function useToast() {
   const [toast, setToast] = useState({ text: '', isError: false, show: false });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -46,7 +46,7 @@ export function useToast() {
   return { toast, show };
 }
 
-/** Faz uma ação na sala e atualiza o estado com a resposta; erros viram aviso e são relançados. */
+/** Does an action in the Room and updates the state with the answer; errors become a notice and are rethrown. */
 export function useAct(code: string, setState: (state: RoomState) => void, toast: (text: string, isError?: boolean) => void) {
   return useMemo(
     () => async (method: string, path: string, body?: unknown) => {

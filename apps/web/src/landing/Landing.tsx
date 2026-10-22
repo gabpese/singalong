@@ -1,5 +1,5 @@
-// Página inicial: a imagem (TV, notebook e celular) de um lado e as ações do outro, como a tela de boas-vindas do app do dono:
-// criar uma sala (e abrir a TV), entrar numa sala pelo código e baixar o app.
+// The home page: the picture (TV, laptop and phone) on one side and the actions on the other, like the Owner's app welcome screen:
+// create a Room (and open the TV), join a Room by its code and download the app.
 import { type FormEvent, useEffect, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { api, setHostToken } from '../lib/identity.ts';
@@ -16,7 +16,7 @@ const NO_CONFIG: HomeConfig = { app_download_url: null, app_latest_version: null
 
 const systemName = (system: System) => t(`home.system.${system}`);
 
-/** Uma dica ao lado de um botão: abre com o mouse em cima, com o foco do teclado ou com um toque (no celular não existe "mouse em cima"). */
+/** A tip beside a button: opens on hover, on keyboard focus or on a tap (a phone has no "hover"). */
 function InfoTip({ id, label, text }: { id: string; label: string; text: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -40,7 +40,7 @@ function InfoTip({ id, label, text }: { id: string; label: string; text: string 
   );
 }
 
-/** O botão de baixar o instalador de um sistema (abre numa aba nova; o arquivo vem do GitHub, não daqui). O Mac leva a dica do Intel ao lado. */
+/** The button that downloads one system's installer (opens in a new tab; the file comes from GitHub, not from here). The Mac one has the Intel tip beside it. */
 function DownloadButton({ item }: { item: Download }) {
   return (
     <div className="download-row">
@@ -53,9 +53,9 @@ function DownloadButton({ item }: { item: Download }) {
 }
 
 /**
- * O bloco do app: um botão por sistema, o do visitante primeiro (detectado pelo navegador) e os outros logo abaixo, sempre à vista. O botão do Mac
- * tem ao lado a dica de que Macs Intel não são suportados (o navegador não distingue Intel de Apple Silicon). Celular e tablet recebem também a
- * explicação. Sem endereço configurado, nada aparece.
+ * The app's block: one button per system, the visitor's first (detected by the browser) and the others right below, always in view. The Mac
+ * button has beside it the tip that Intel Macs are not supported (the browser cannot tell Intel from Apple Silicon). Phones and tablets also get
+ * the explanation. With no address configured, nothing shows.
  */
 function DownloadApp({ config }: { config: HomeConfig }) {
   if (!config.app_downloads.length) return null;
@@ -99,14 +99,14 @@ export function Landing() {
           app_downloads: Array.isArray(data.app_downloads) ? data.app_downloads : [],
         }),
       )
-      .catch(() => undefined); // sem a configuração, a página só não mostra o botão de baixar
+      .catch(() => undefined); // without the setting, the page simply leaves out the download button
   }, []);
 
   async function createRoom() {
     try {
       const { code: roomCode, host_token: token } = await api<CreatedRoom>('POST', '/api/rooms');
       setHostToken(roomCode, token);
-      // aberta dentro do clique para o navegador não bloquear a aba da TV; na sala há um botão "Abrir TV" se bloquear
+      // opened inside the click so the browser does not block the TV's tab; the Room has an "Abrir TV" button if it does
       window.open(`tv.html?room=${roomCode}`, '_blank');
       location.href = `room.html?room=${roomCode}`;
     } catch (err) {

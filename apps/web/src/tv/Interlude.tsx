@@ -1,9 +1,9 @@
-// O intervalo entre músicas na TV, em duas cenas de cartaz feitas com os bichinhos da sala (nenhum vídeo):
-//  - aplausos: a plateia (os bichinhos de quem está na sala) pula, cai confete e quem acabou de cantar é ovacionado; com a
-//    pontuação ligada, a nota aparece grande no meio;
-//  - subida ao palco: o bichinho de quem vem a seguir (os dois, num dueto) sai do camarim, sobe a escada e chega ao microfone,
-//    enquanto a contagem regressiva diz quando a música começa. A TV já deixou o áudio carregado.
-// As animações duram o mesmo que a fase (`total_ms`) e começam de onde a fase está, para uma TV que entra no meio do intervalo.
+// The Intermission on the TV, in two poster scenes made with the Room's creatures (no video):
+//  - Applause: the audience (the creatures of the people in the Room) jumps, confetti falls and whoever just sang is cheered; with
+//    scoring on, the Score shows big in the middle;
+//  - Taking the stage: the creature of whoever is next (both of them, in a duet) leaves the dressing room, climbs the stairs and
+//    reaches the microphone, while the countdown says when the song starts. The TV has already loaded the audio.
+// The animations last as long as the phase (`total_ms`) and start from where the phase is, for a TV that joins in the middle of the Intermission.
 import { Blobatar } from '@blobatar/react';
 import { happy, love, surprised, wink } from 'blobatar/expression';
 import 'blobatar/motion.css';
@@ -15,12 +15,12 @@ import { SingerBlobs } from '../ui/SingerBlobs';
 import { useInterlude } from '../ui/useInterlude';
 import { playApplause } from './applause-sound';
 
-const CROWD_SIZE = 14; // a plateia completa com bichinhos genéricos quando a sala tem pouca gente
+const CROWD_SIZE = 14; // the audience is filled out with generic creatures when the Room has few people
 const CROWD_FACES = [happy, love, surprised, wink];
 const CONFETTI = 46;
-const APPLAUSE_SOUND_SECONDS = 9; // as palmas morrem antes de a fase acabar
+const APPLAUSE_SOUND_SECONDS = 9; // the clapping dies out before the phase ends
 
-/** Número "aleatório" fixo por posição: a mesma plateia e o mesmo confete em toda TV, sem pular de lugar a cada desenho. */
+/** A "random" number fixed per position: the same audience and the same confetti on every TV, without jumping around on each draw. */
 const seeded = (index: number, salt: number) => {
   const x = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
   return x - Math.floor(x);
@@ -63,8 +63,8 @@ function Confetti() {
 }
 
 function ApplauseScene({ phase, elapsedMs, people, scoring }: { phase: InterludeState; elapsedMs: number; people: RoomState['people']; scoring: boolean }) {
-  const [late] = useState(elapsedMs); // fixo: o atraso das animações não pode mudar a cada desenho do relógio
-  // as palmas tocam uma vez por música aplaudida (do ponto em que a fase está, se a TV entrou no meio)
+  const [late] = useState(elapsedMs); // fixed: the animations' delay cannot change on each draw of the clock
+  // the clapping plays once per applauded song (from the point the phase is at, if the TV joined in the middle)
   useEffect(() => playApplause(Math.min(APPLAUSE_SOUND_SECONDS, (phase.total_ms - elapsedMs) / 1000)), [phase.item_id]); // eslint-disable-line react-hooks/exhaustive-deps
   const showScore = scoring && phase.score !== null;
   return (
@@ -93,7 +93,7 @@ function ApplauseScene({ phase, elapsedMs, people, scoring }: { phase: Interlude
 }
 
 function StageScene({ phase, elapsedMs, seconds }: { phase: InterludeState; elapsedMs: number; seconds: number }) {
-  const [late] = useState(elapsedMs); // fixo: o atraso das animações não pode mudar a cada desenho do relógio
+  const [late] = useState(elapsedMs); // fixed: the animations' delay cannot change on each draw of the clock
   const duet = phase.guest?.status === 'accepted';
   const walkers = duet ? [{ added_by: phase.added_by, guest: null }, { added_by: phase.guest!.name, guest: null }] : [{ added_by: phase.added_by, guest: null }];
   return (
@@ -135,12 +135,12 @@ function StageScene({ phase, elapsedMs, seconds }: { phase: InterludeState; elap
   );
 }
 
-/** A cena do intervalo em andamento (ou nada, fora do intervalo). */
+/** The scene of the Intermission under way (or nothing, outside the Intermission). */
 export function Interlude({ room }: { room: RoomState | null }) {
   const phase = room?.interlude ?? null;
   const clock = useInterlude(phase);
   if (!room || !phase || !clock) return null;
-  const key = `${phase.phase}:${phase.item_id}`; // cena nova a cada fase: as animações recomeçam
+  const key = `${phase.phase}:${phase.item_id}`; // a new scene in each phase: the animations start over
   return phase.phase === 'applause' ? (
     <ApplauseScene key={key} phase={phase} elapsedMs={clock.elapsedMs} people={room.people} scoring={room.scoring} />
   ) : (

@@ -1,4 +1,4 @@
-// "Na fila": quem espera, na ordem em que vai tocar, com as ações de cada item.
+// "Na fila": who is waiting, in the order they will play, with each item's actions.
 import { t } from '../i18n/index.ts';
 import { tRich } from '../i18n/rich';
 import { api } from '../lib/identity.ts';
@@ -95,7 +95,7 @@ function QueueRow({ item, index, waiting, state, onPreview, onChooseLyrics }: It
             </button>
           </>
         ) : (
-          // quem não é anfitrião pode adiar a PRÓPRIA música em uma posição (foi ao banheiro, quer esperar mais um pouco)
+          // whoever is not the Host can move their OWN song back one place (they went to the bathroom, they want to wait a bit longer)
           item.mine && (
             <button
               type="button"

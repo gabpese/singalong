@@ -1,4 +1,4 @@
-// Controle da sala (celular): fila, o que está tocando, adicionar músicas, prévia e ações de anfitrião.
+// The Room's controls (phone): the Queue, what is playing, adding songs, the preview and the Host's actions.
 import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { api, setUserName, userName } from '../lib/identity.ts';
@@ -33,30 +33,30 @@ export function RoomPage({ code }: { code: string }) {
   const [tab, setTab] = useState<Tab>('queue');
   const [view, setView] = useState<View>(() => (new URLSearchParams(location.search).get('view') === 'tv' ? 'tv' : 'room'));
   const [name, setName] = useState<string>(() => userName());
-  // o modal do nome só na chegada (quem apaga o campo depois, para digitar outro, não leva um modal na cara)
+  // the name modal only on arrival (whoever clears the field later, to type another one, does not get a modal in their face)
   const [askName, setAskName] = useState(() => !userName().trim());
   const [library, setLibrary] = useState<LibrarySong[]>([]);
   const addSong = useRef<AddSongHandle>(null);
   const preview = usePreview(state, act);
 
   const showTab = useCallback((next: Tab) => {
-    setView('room'); // adicionar, ver a fila... sempre levam à sala
+    setView('room'); // adding, seeing the Queue... always lead to the Room page
     setTab(next);
     window.scrollTo({ top: 0 });
   }, []);
 
   const loadLibrary = useCallback(async () => {
     try {
-      setLibrary(await api<LibrarySong[]>('GET', '/api/songs', undefined, code)); // com a sala: o servidor junta o catálogo do computador do dono
+      setLibrary(await api<LibrarySong[]>('GET', '/api/songs', undefined, code)); // with the Room: the server merges in the catalog from the Owner's computer
     } catch {
-      // sem a lista: a aba "Músicas" fica vazia até a próxima tentativa
+      // without the list: the "Músicas" tab stays empty until the next attempt
     }
   }, [code]);
   useEffect(() => {
     void loadLibrary();
   }, [loadLibrary]);
 
-  /** Recarrega a biblioteca quando alguma música da fila termina de processar. */
+  /** Reloads the library when some song in the Queue finishes preparing. */
   const readyKey = state
     ? state.queue
         .filter((item) => item.song.ready)
@@ -71,7 +71,7 @@ export function RoomPage({ code }: { code: string }) {
     void loadLibrary();
   }, [readyKey, loadLibrary]);
 
-  /** A letra de uma música: do servidor; no computador do dono só a da música que toca (a TV a repassa pelo servidor). */
+  /** A song's lyrics: from the server; on the Owner's computer only the playing song's (the TV relays them through the server). */
   const loadCues = useCallback(
     async (item: QueueItem): Promise<LyricCue[] | null> => {
       const media = item.song.media;
@@ -107,15 +107,15 @@ export function RoomPage({ code }: { code: string }) {
   useEffect(() => {
     document.title = `Singalong — Sala ${code}`;
   }, [code]);
-  // o nome da pessoa vai para a sala (a lista de quem está aqui, usada nos convites de dueto); de novo quando ela o muda
+  // the person's name goes to the Room (the list of who is here, used in the duet invitations); again whenever they change it
   useEffect(() => {
     if (status === 'connected') send({ type: 'hello', name });
   }, [name, status, send]);
-  // chegou a vez da minha música: o cantor vai da sala para o palco (e volta quando ela acaba)
+  // my song's turn has come: the singer goes from the Room page to the Stage (and back when it ends)
   useEffect(() => {
     if (stageItemFor(state, (itemId: number) => stageDismissed(code, itemId)) !== null) location.replace(`/stage.html?room=${code}`);
   }, [state, code]);
-  // gancho de diagnóstico (testes no navegador)
+  // a diagnostics hook (the browser tests)
   useEffect(() => {
     window.room = { get state() { return state; }, preview: preview.player, get previewPitch() { return preview.pitch; } };
   });
@@ -129,7 +129,7 @@ export function RoomPage({ code }: { code: string }) {
     return t('room.added.new');
   }
 
-  /** Música do Jukebox escolhida no aviso do painel de adicionar: entra na fila na hora (já está pronta). */
+  /** A Jukebox song chosen in the add panel's notice: it goes into the Queue right away (it is already ready). */
   async function addLibrarySong(song: LibrarySong) {
     await act('POST', '/queue', { video_id: song.video_id, name: myName, display_title: song.title ?? undefined });
     void loadLibrary();

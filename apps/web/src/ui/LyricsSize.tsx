@@ -1,4 +1,4 @@
-// Botões A− e A+ para o tamanho da letra (TV, palco e aba TV da sala).
+// The A− and A+ buttons for the lyrics' size (TV, Stage and the Room's TV tab).
 import { useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { changeLyricsScale, getLyricsScale, LYRICS_SCALES } from '../lib/accessibility.ts';
