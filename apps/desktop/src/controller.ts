@@ -574,9 +574,11 @@ export function createController({
   }
 
   async function pollSession() {
-    if (!agentProcess) return;
+    const child = agentProcess;
+    if (!child) return;
     try {
       const me = await api<{ session: AgentStatus['session']; cloud?: boolean }>('GET', '/me', { timeout: 8000 });
+      if (agentProcess !== child) return; // the agent left (or restarted) while the answer came: its state is newer
       const wasOnline = state.agent.status === 'online';
       state.agent = me.session ? { status: 'online', session: me.session, error: null, cloud: Boolean(me.cloud) } : { status: 'starting', session: null, error: null };
       if (!wasOnline && me.session) {
@@ -584,6 +586,7 @@ export function createController({
         log(`Sessão "${me.session.display_name}" ativa.`);
       }
     } catch (error) {
+      if (agentProcess !== child) return;
       const failure = error as UserError;
       state.agent = { status: failure.code === 'unauthorized' ? 'auth_error' : 'offline', session: null, error: failure.message };
     }

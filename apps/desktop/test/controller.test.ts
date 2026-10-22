@@ -18,6 +18,7 @@ const calls: { method: string | undefined; url: string; auth: string | null; bod
 let sessionOpen = false;
 let roomFail = false;
 let cloudOn = false;
+let meDelayMs = 0;
 let versionAnswer: Record<string, unknown> = { status: 'ok', current: APP_VERSION };
 
 before(async () => {
@@ -32,7 +33,7 @@ before(async () => {
       if (url === '/agent/v1/pair/request') return body.includes('no-service') ? json(503, { error: 'email_disabled', message: 'Este servidor não envia códigos por e-mail.' }) : json(202, { ok: true, message: 'Se este e-mail estiver autorizado, o código chega em instantes.' });
       if (url.startsWith('/agent/v1/version')) return json(200, versionAnswer);
       if (req.headers.authorization !== 'Bearer tok-1') return json(401, { error: 'unauthorized', message: 'Dispositivo não autorizado.' });
-      if (url === '/agent/v1/me') return json(200, { cloud: cloudOn, device: { id: 'd1', name: 'PC' }, session: sessionOpen ? { id: 's1', display_name: 'Gabriel' } : null });
+      if (url === '/agent/v1/me') return setTimeout(() => json(200, { cloud: cloudOn, device: { id: 'd1', name: 'PC' }, session: sessionOpen ? { id: 's1', display_name: 'Gabriel' } : null }), meDelayMs);
       if (req.method === 'POST' && url === '/agent/v1/sessions/s1/rooms') return roomFail ? json(409, { error: 'session_ended', message: 'A sessão já terminou.' }) : json(201, { code: 'AB12', host_token: 'host-token', session_id: 's1' });
       if (req.method === 'DELETE' && url === '/agent/v1/sessions/s1') { sessionOpen = false; return res.writeHead(204).end(); }
       if (req.method === 'DELETE' && url === '/agent/v1/devices/me') return res.writeHead(204).end();
@@ -261,6 +262,19 @@ test('an agent that falls is restarted; a refused token (exit code 2) is not, an
   const count = auth.controller.snapshot().logs.length;
   await new Promise((resolve) => setTimeout(resolve, 150));
   assert.equal(auth.controller.snapshot().logs.length, count); // it did not keep trying
+});
+
+test("the server's answer about the Session that arrives after the agent left does not overwrite its state", async () => {
+  const { controller } = await ready({ mode: 'auth' });
+  meDelayMs = 500; // every poll is still waiting for its answer when the agent leaves with a refused token
+  try {
+    await controller.startAgent({ nickname: 'A' });
+    await until(() => controller.snapshot().agent.status === 'auth_error');
+    await new Promise((resolve) => setTimeout(resolve, 700)); // the polls sent while it ran answer now
+    assert.equal(controller.snapshot().agent.status, 'auth_error');
+  } finally {
+    meDelayMs = 0;
+  }
 });
 
 test("creating a Room needs the Session online and answers the TV's and the Host's links", async () => {
