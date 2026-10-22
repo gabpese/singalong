@@ -1,6 +1,6 @@
-// Os bichinhos (blobatar) de quem canta uma música: o de quem adicionou e, num dueto já aceito, também o do convidado, um encostado
-// no outro. Saem do nome da pessoa, como na sala de espera da TV, então cada um tem o mesmo bichinho em todas as telas.
-// `animate`: só onde há um por vez na tela (quem está cantando na TV); nas listas eles ficam parados (uma <img> cada, mais leve).
+// The creatures (blobatar) of whoever sings a song: the one who added it and, in an accepted duet, also the invited partner's, one leaning
+// on the other. They come from the person's name, as in the TV's waiting room, so everyone has the same creature on every screen.
+// `animate`: only where there is one at a time on screen (whoever is singing on the TV); in the lists they stay still (one <img> each, lighter).
 import { Blobatar } from '@blobatar/react';
 import type { ComponentProps } from 'react';
 import 'blobatar/motion.css';

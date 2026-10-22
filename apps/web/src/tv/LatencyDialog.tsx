@@ -1,5 +1,5 @@
-// Calibração do atraso da TV: o som demora a chegar aos ouvidos (caixa, Bluetooth, HDMI) e o microfone demora a entregar o que
-// captou. Dá para medir sozinho (estalos nas caixas, escutados pelo microfone) ou ajustar à mão.
+// The TV's delay calibration: the sound takes a while to reach the ears (speaker, Bluetooth, HDMI) and the microphone takes a while to deliver
+// what it picked up. It can measure itself (clicks in the speakers, heard by the microphone) or be adjusted by hand.
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { clampLatency, MAX_LATENCY_MS, splitRoundTrip } from '../lib/latency.ts';
@@ -25,7 +25,7 @@ export function LatencyDialog({ controller, onClose }: { controller: TvControlle
     try {
       const result = await measureRoundTrip();
       if (result.roundTripMs === null) return setStatus({ kind: 'fail' });
-      // a saída que o navegador informa (ou a que a pessoa já ajustou, se for maior); o resto da ida e volta é da entrada
+      // the output the browser reports (or the one the person already set, if larger); the rest of the round trip belongs to the input
       const next = splitRoundTrip(result.roundTripMs, Math.max(result.outputLatencyMs, latency.output));
       apply(next);
       setStatus({ kind: 'ok', text: t('lat.result', { total: result.roundTripMs, output: next.output, input: next.input }) });

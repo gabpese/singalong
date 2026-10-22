@@ -1,4 +1,4 @@
-// Microfones da TV: quais entram nas caixas junto com a música (um por cantor). O primeiro marcado também faz a pontuação.
+// The TV's microphones: which ones go into the speakers along with the song (one per singer). The first one checked also does the scoring.
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { listMicrophones, MAX_MICS } from '../lib/voice.ts';
@@ -31,7 +31,7 @@ export function MicsDialog({ controller, onClose }: { controller: TvController |
     setChosen(controller?.setMics(next) ?? next);
   }
 
-  // microfones escolhidos que não aparecem mais na lista (desconectados) continuam na lista, para poder desmarcá-los
+  // chosen microphones that no longer show in the list (disconnected) stay in the list, so they can be unchecked
   const known = devices ?? [];
   const missing = chosen.filter((mic) => !known.some((item) => item.id === mic.id));
   const rows = [...known, ...missing.map((mic) => ({ ...mic, label: `${mic.label || mic.id.slice(0, 8)}` }))];

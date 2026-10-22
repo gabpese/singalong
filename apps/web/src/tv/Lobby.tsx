@@ -1,6 +1,6 @@
-// A sala de espera da TV, um cartaz colado na parede: o QR code no centro, o código da sala e, embaixo, um bichinho (blobatar) para cada
-// celular que entrou. A lista chega pelo WebSocket da sala e muda em tempo real; vagas livres completam a fileira.
-// O blobatar sai do nome da pessoa (o mesmo nome dá sempre o mesmo bichinho) e é desenhado aqui, sem chamar nenhum servidor.
+// The TV's waiting room, a poster stuck on the wall: the QR code in the center, the Room code and, below, a creature (blobatar) for each
+// phone that joined. The list arrives through the Room's WebSocket and changes in real time; empty spots fill out the row.
+// The blobatar comes from the person's name (the same name always gives the same creature) and is drawn here, without calling any server.
 import { Blobatar } from '@blobatar/react';
 import 'blobatar/motion.css';
 import { t } from '../i18n/index.ts';
@@ -9,8 +9,8 @@ import type { RoomState } from '../lib/types.ts';
 import { Logo } from '../ui/Logo';
 import { QrCode } from './QrCode';
 
-/** Lugares desenhados: pelo menos 4 (vagas livres enquanto pouca gente entrou) e no máximo 7, que é o que cabe numa fileira do cartaz.
- * Não é limite da sala (o servidor não limita quantos celulares entram): passando de 7, o último lugar vira "+N". */
+/** The spots drawn: at least 4 (empty spots while few people have joined) and at most 7, which is what fits in one row of the poster.
+ * It is not a limit on the Room (the server does not limit how many phones join): past 7, the last spot becomes "+N". */
 const MIN_SLOTS = 4;
 const MAX_SLOTS = 7;
 

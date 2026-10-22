@@ -1,4 +1,4 @@
-// Lista de cantores da TV (a música atual e as próximas), compartilhada pela TV que toca e pela aba TV da sala.
+// The TV's list of singers (the current song and the next ones), shared by the TV that plays and the Room's TV tab.
 import { t } from '../i18n/index.ts';
 import { songChip } from '../lib/queue-view.ts';
 import type { QueueItem } from '../lib/types.ts';
@@ -23,7 +23,7 @@ function QueueRow({ item, badge, isCurrent = false }: { item: QueueItem; badge: 
   );
 }
 
-/** Lista lateral: a música atual e as próximas 5, na ordem em que vão tocar (para ceder a vez com conhecimento de causa). */
+/** The side list: the current song and the next 5, in the order they will play (so whoever yields their turn knows what they are doing). */
 export function QueueBox({ current, upcoming }: { current: QueueItem | null; upcoming: QueueItem[] }) {
   return (
     <aside className="tv-queue" hidden={!current && !upcoming.length} aria-label={t('queue.aria')}>

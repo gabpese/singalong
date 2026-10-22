@@ -1,5 +1,5 @@
-// Aviso "já temos esta música": quando o artista e o nome digitados batem com músicas prontas no Jukebox, a pessoa
-// escolhe uma delas (entra na fila na hora) ou segue a busca de outra versão no YouTube.
+// The "we already have this song" notice: when the typed artist and name match songs ready in the Jukebox, the person
+// picks one of them (it goes into the Queue right away) or goes on searching YouTube for another version.
 import { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { keySummary } from '../lib/music.ts';
@@ -11,7 +11,7 @@ interface Props {
   busy: boolean;
   onUse: (song: LibrarySong) => void;
   onSearchYoutube: () => void;
-  /** Fechou sem escolher (Esc ou clique fora): não faz nada, a pessoa volta ao formulário. */
+  /** Closed without choosing (Esc or a click outside): does nothing, the person goes back to the form. */
   onClose: () => void;
 }
 
@@ -21,7 +21,7 @@ export function JukeboxDialog({ songs, busy, onUse, onSearchYoutube, onClose }: 
   const plural = songs.length > 1;
   const chosen = songs.find((song) => song.video_id === chosenId) ?? songs[0];
 
-  // <dialog> nativo: prende o foco, fecha com Esc e escurece o resto da tela
+  // the native <dialog>: traps the focus, closes with Esc and darkens the rest of the screen
   useEffect(() => {
     const element = dialog.current;
     if (element && !element.open) element.showModal();
@@ -34,7 +34,7 @@ export function JukeboxDialog({ songs, busy, onUse, onSearchYoutube, onClose }: 
       aria-labelledby="jukebox-title"
       onClose={onClose}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose(); // clique no fundo escuro
+        if (event.target === event.currentTarget) onClose(); // a click on the dark backdrop
       }}
     >
       <div className="jukebox-body">

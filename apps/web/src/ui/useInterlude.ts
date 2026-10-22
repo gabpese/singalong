@@ -1,15 +1,15 @@
-// O relógio do intervalo entre músicas: o servidor diz quanto faltava quando mandou o estado e cada aparelho conta o resto sozinho
-// (os relógios dos aparelhos não precisam bater com o do servidor). Uma fase nova (aplausos ou subida ao palco de outra música)
-// recomeça a conta.
+// The Intermission's clock: the server says how much was left when it sent the state, and each device counts the rest on its own
+// (the devices' clocks do not need to match the server's). A new phase (the Applause, or Taking the stage for another song)
+// starts the count over.
 import { useEffect, useRef, useState } from 'react';
 import type { Interlude } from '../lib/types.ts';
 
 export interface InterludeClock {
-  /** Quanto já passou desde o começo da fase (ms), contando o que passou antes de este aparelho receber o estado. */
+  /** How much has passed since the phase began (ms), counting what passed before this device received the state. */
   elapsedMs: number;
-  /** Quanto falta (ms). */
+  /** How much is left (ms). */
   leftMs: number;
-  /** Os segundos que faltam, arredondados para cima (o número da contagem regressiva). */
+  /** The seconds left, rounded up (the countdown's number). */
   seconds: number;
 }
 

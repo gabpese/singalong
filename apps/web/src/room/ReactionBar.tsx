@@ -1,11 +1,11 @@
-// Os botões de reação do celular: um toque manda um aplauso, fogo... que sobe pela tela da TV.
+// The phone's Reaction buttons: a tap sends applause, fire... that floats up the TV's screen.
 import { useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { REACTIONS } from '../lib/reactions.ts';
 import type { ReactionKind } from '../lib/types.ts';
 
 export function ReactionBar({ onReact }: { onReact: (kind: ReactionKind) => void }) {
-  const [pop, setPop] = useState<string | null>(null); // o botão que acabou de ser tocado (um estalo visual de confirmação)
+  const [pop, setPop] = useState<string | null>(null); // the button that was just tapped (a visual pop to confirm it)
   return (
     <div className="reaction-bar" role="group" aria-label={t('react.group')}>
       {REACTIONS.map(({ kind, glyph }) => (

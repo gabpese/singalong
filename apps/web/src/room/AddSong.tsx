@@ -1,9 +1,9 @@
-// Painel "Adicionar música". A pessoa procura o vídeo como no YouTube: pelo artista, pelo nome da música ou pelos dois
-// (basta um). Antes de ir ao YouTube, confere se a música já está pronta no Jukebox. Depois de escolher o vídeo, confirma
-// o artista e o nome da música (os dois são obrigatórios: alimentam a busca da letra e o que aparece na fila).
-// O link do vídeo é uma alternativa para quem já o tem.
-// Não sabe nada de salas: quem usa passa as funções que enviam o pedido (submitNew) e que trocam a letra de um item
-// que a pede (submitLyrics).
+// The "Adicionar música" panel. The person looks for the video as on YouTube: by the artist, by the song's name or both
+// (one is enough). Before going to YouTube, it checks whether the song is already ready in the Jukebox. After choosing the
+// video, the person confirms the artist and the song's name (both are required: they feed the lyrics search and what shows
+// in the Queue). The video's link is an alternative for whoever already has it.
+// It knows nothing about Rooms: whoever uses it passes the functions that send the request (submitNew) and that change the
+// lyrics of an item that asks for them (submitLyrics).
 import { forwardRef, type FormEvent, useImperativeHandle, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { api } from '../lib/identity.ts';
@@ -13,7 +13,7 @@ import type { ApiError, LibrarySong, SearchResult } from '../lib/types.ts';
 import { Icon } from '../ui/Icon';
 import { JukeboxDialog } from './JukeboxDialog';
 
-// opções em que a pessoa cola um texto
+// the options where the person pastes a text
 const TEXT_SOURCES = ['file', 'align'];
 
 interface NewSong {
@@ -25,27 +25,27 @@ interface NewSong {
 }
 
 export interface AddSongHandle {
-  /** Abre o painel já no modo "escolher a letra" de um item da fila que não achou letra. */
+  /** Opens the panel already in "choose the lyrics" mode for an item in the Queue whose lyrics were not found. */
   chooseLyrics(videoId: string, reason: string | null, names?: { artist?: string | null; title?: string | null }): void;
 }
 
 interface Props {
   userName: string;
   onUserName: (name: string) => void;
-  /** Envia o pedido e devolve a mensagem de sucesso. */
+  /** Sends the request and returns the success message. */
   submitNew: (song: NewSong) => Promise<string>;
   submitLyrics: (videoId: string, body: Record<string, unknown>) => Promise<string>;
-  /** O painel precisa aparecer (ex.: abrir a aba "Adicionar"). */
+  /** The panel needs to show (e.g. opening the "Adicionar" tab). */
   onShow: () => void;
-  /** Músicas já prontas (o Jukebox): se o que foi digitado bate com alguma, a pessoa pode usá-la em vez de buscar no YouTube. */
+  /** Songs already ready (the Jukebox): if what was typed matches one, the person can use it instead of searching YouTube. */
   jukebox: LibrarySong[];
-  /** Coloca uma música pronta do Jukebox na fila e devolve a mensagem de sucesso. */
+  /** Puts a ready song from the Jukebox in the Queue and returns the success message. */
   onPickJukebox: (song: LibrarySong) => Promise<string>;
-  /** Código da sala: a busca no YouTube é atendida pelo agente do dono da sessão dela (sem ele, pelo worker clássico). */
+  /** The Room code: the YouTube search is answered by the agent of the Owner whose Session the Room is in (without one, by the classic worker). */
   room?: string;
 }
 
-/** Player oficial do YouTube numa moldura: para conferir se é a música certa antes de adicionar. */
+/** YouTube's official player in a frame: to check it is the right song before adding it. */
 function VideoFrame({ videoId }: { videoId: string }) {
   return (
     <div className="video-frame">
@@ -69,10 +69,10 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   { userName, onUserName, submitNew, submitLyrics, onShow, jukebox, onPickJukebox, room },
   ref,
 ) {
-  // o que a pessoa digita para PROCURAR (basta um dos dois)
+  // what the person types to SEARCH (one of the two is enough)
   const [artist, setArtist] = useState('');
   const [title, setTitle] = useState('');
-  // o que ela CONFIRMA depois de escolher o vídeo (os dois são obrigatórios)
+  // what they CONFIRM after choosing the video (both are required)
   const [confirmArtist, setConfirmArtist] = useState('');
   const [confirmTitle, setConfirmTitle] = useState('');
   const [url, setUrl] = useState('');
@@ -81,20 +81,20 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   const [linkOpen, setLinkOpen] = useState(false);
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [status, setStatusState] = useState({ text: '', isError: false });
-  const [selected, setSelected] = useState<{ id: string; label: string | null } | null>(null); // vídeo escolhido (ou colado como link)
-  const [preview, setPreview] = useState<Preview>(null); // prévia do YouTube aberta (só uma por vez)
-  const [lyricsFor, setLyricsFor] = useState<string | null>(null); // vídeo que espera a escolha da letra (item em needs_lyrics)
+  const [selected, setSelected] = useState<{ id: string; label: string | null } | null>(null); // the chosen video (or one pasted as a link)
+  const [preview, setPreview] = useState<Preview>(null); // the open YouTube preview (only one at a time)
+  const [lyricsFor, setLyricsFor] = useState<string | null>(null); // the video waiting for the lyrics choice (an item in needs_lyrics)
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [matches, setMatches] = useState<LibrarySong[] | null>(null); // versões prontas encontradas (abre o aviso)
-  const [declinedFor, setDeclinedFor] = useState(''); // busca em que a pessoa preferiu o YouTube ao Jukebox
+  const [matches, setMatches] = useState<LibrarySong[] | null>(null); // the ready versions found (opens the notice)
+  const [declinedFor, setDeclinedFor] = useState(''); // the search in which the person preferred YouTube to the Jukebox
   const nameRef = useRef<HTMLInputElement>(null);
   const artistRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   const setStatus = (message: string, isError = false) => setStatusState({ text: message, isError });
   const needsText = TEXT_SOURCES.includes(source);
-  // Confirmar artista e nome é obrigatório; só não precisa ao trocar a letra de um item já na fila (a menos que a busca online precise)
+  // Confirming the artist and the name is required; only not when changing the lyrics of an item already in the Queue (unless the online search needs them)
   const confirmRequired = !lyricsFor || source === 'lrclib';
   const showConfirm = Boolean(selected) || Boolean(lyricsFor);
   const names = () => ({ artist: confirmArtist.replace(/\s+/g, ' ').trim(), title: confirmTitle.replace(/\s+/g, ' ').trim() });
@@ -105,7 +105,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
     setUrl(videoId ? watchUrl(videoId) : '');
   }
 
-  /** Pré-preenche a confirmação: o que a pessoa digitou na busca vale mais; o que faltar vem de um palpite do título do vídeo. */
+  /** Prefills the confirmation: what the person typed in the search wins; whatever is missing comes from a guess at the video's title. */
   function fillConfirm(videoTitle: string | null) {
     const guess: { artist: string; title: string } = guessArtistTitle(videoTitle);
     setConfirmArtist(artist.trim() || guess.artist);
@@ -118,7 +118,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   }
 
   function reset() {
-    // o nome da pessoa fica (ele não é um campo deste formulário)
+    // the person's name stays (it is not a field of this form)
     setArtist('');
     setTitle('');
     setConfirmArtist('');
@@ -145,7 +145,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
       (artist.trim() ? titleRef : artistRef).current?.focus();
       return;
     }
-    // antes de ir ao YouTube: já temos essa música pronta? (não vale ao trocar a letra de um item que já está na fila)
+    // before going to YouTube: do we already have this song ready? (not when changing the lyrics of an item already in the Queue)
     if (!skipJukebox && !lyricsFor && declinedFor !== query) {
       const found: LibrarySong[] = findJukeboxMatches(jukebox, artist, title);
       if (found.length) {
@@ -176,15 +176,15 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
   }
 
   function onUrlChange(value: string) {
-    // link colado à mão: vale como seleção (se não for um link do YouTube, não há seleção)
+    // a link pasted by hand: counts as the selection (if it is not a YouTube link, there is no selection)
     setUrl(value);
     const id: string | null = extractVideoId(value);
-    if (id && !selected) fillConfirm(null); // sem título do vídeo para adivinhar: usa o que foi digitado na busca
+    if (id && !selected) fillConfirm(null); // no video title to guess from: uses what was typed in the search
     setSelected(id ? { id, label: null } : null);
     if (preview && preview.id !== id) setPreview(null);
   }
 
-  /** Sem o nome a fila fica cheia de "Alguém": antes de aceitar uma música, o nome é obrigatório. */
+  /** Without the name the Queue fills up with "Alguém": before taking a song, the name is required. */
   function nameMissing(): boolean {
     if (userName.trim()) return false;
     setStatus(t('add.s.needName'), true);
@@ -195,7 +195,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    // Enter nos campos de busca, sem vídeo escolhido ainda: busca o vídeo
+    // Enter in the search fields, with no video chosen yet: searches for the video
     if (!lyricsFor && !selected) return runSearch();
     if (nameMissing()) return;
     setSubmitting(true);
@@ -212,7 +212,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
           lyrics: lyricsPayload(),
           artist: cleanArtist,
           title: cleanTitle,
-          display_title: cleanTitle, // na fila aparece o nome que a pessoa confirmou, não o título (às vezes bagunçado) do vídeo
+          display_title: cleanTitle, // the Queue shows the name the person confirmed, not the video's (sometimes messy) title
         });
       }
       clearResults();
@@ -242,7 +242,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
     }
   }
 
-  /** "Buscar outra versão no YouTube": segue a busca e não pergunta de novo para esta mesma busca. */
+  /** "Buscar outra versão no YouTube": goes on with the search and does not ask again for this same search. */
   function searchYoutubeAnyway() {
     setDeclinedFor(buildSearchQuery(artist, title) ?? '');
     setMatches(null);
@@ -280,7 +280,7 @@ export const AddSong = forwardRef<AddSongHandle, Props>(function AddSong(
           />
         </label>
 
-        {/* a busca some quando a pessoa só está trocando a letra de uma música que já está na fila */}
+        {/* the search goes away when the person is only changing the lyrics of a song already in the Queue */}
         <div className="search-block" hidden={Boolean(lyricsFor)}>
           <div className="row">
             <label className="field">

@@ -1,5 +1,5 @@
-// O intervalo entre músicas no celular: quem está sendo aplaudido (com a nota, se houve pontuação) ou quem está subindo ao palco,
-// com a contagem regressiva. O anfitrião pode pular o intervalo ("Começar agora").
+// The Intermission on the phone: who is being applauded (with the Score, if there was scoring) or who is taking the stage,
+// with the countdown. The Host can skip the Intermission ("Começar agora").
 import { t } from '../i18n/index.ts';
 import type { RoomState } from '../lib/types.ts';
 import { SingerBlobs } from '../ui/SingerBlobs';

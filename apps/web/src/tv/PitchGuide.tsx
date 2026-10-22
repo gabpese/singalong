@@ -1,5 +1,5 @@
-// Guia de melodia: as notas da voz original como barras que andam para a esquerda, com a afinação de quem canta por cima
-// (verde = no tom, vermelho = fora). O "agora" fica a 1/4 da esquerda; o que vem aí, à direita, para a pessoa se preparar.
+// The melody guide: the original voice's notes as bars that move to the left, with the singer's pitch drawn over them
+// (green = in tune, red = off). "Now" sits 1/4 from the left; what is coming, on the right, so the person can get ready.
 import { useEffect, useRef } from 'react';
 import { t } from '../i18n/index.ts';
 import { easeRange, foldToNearestOctave, isGood, makeScale, noteAt, notesInWindow, PART_COLORS, pitchRange, SECONDS_AFTER, SECONDS_BEFORE } from '../lib/melody-guide.ts';
@@ -38,7 +38,7 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
       const scale = makeScale({ position, width, height: height - 8, range });
       const top = 4;
 
-      // uma linha fraca em cada Dó, para a pessoa se situar na altura
+      // a faint line on each C, so the person can tell how high they are
       if (range) {
         context.strokeStyle = colors.line;
         context.lineWidth = 1;
@@ -52,13 +52,13 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
         }
       }
 
-      // as notas da original
+      // the original's notes
       for (const n of visible) {
         const x1 = scale.x(n.start);
         const x2 = scale.x(n.end);
         const y = top + scale.y(n.note + transpose) - scale.barHeight / 2;
         const active = n.start <= position && position < n.end;
-        const part = partAt ? partAt((n.start + n.end) / 2) : null; // dueto: a cor de quem canta esta nota
+        const part = partAt ? partAt((n.start + n.end) / 2) : null; // duet: the color of whoever sings this note
         const base = part === 'a' ? PART_COLORS.a : part === 'b' ? PART_COLORS.b : partAt && !part ? colors.dim : colors.accent;
         const left = Math.max(0, x1);
         context.fillStyle = base;
@@ -67,7 +67,7 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
         context.roundRect(left, y, Math.max(3, x2 - left), scale.barHeight, scale.barHeight / 2);
         context.fill();
         if (active) {
-          // a nota do momento ganha um contorno claro, sem perder a cor de quem a canta
+          // the current note gets a light outline, without losing the color of whoever sings it
           context.globalAlpha = 1;
           context.strokeStyle = colors.fg;
           context.lineWidth = 2;
@@ -76,7 +76,7 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
       }
       context.globalAlpha = 1;
 
-      // o agora
+      // now
       context.strokeStyle = colors.fg;
       context.globalAlpha = 0.6;
       context.beginPath();
@@ -85,7 +85,7 @@ export function PitchGuide({ controller }: { controller: TvController | null }) 
       context.stroke();
       context.globalAlpha = 1;
 
-      // o que cada pessoa cantou (na oitava mais perto da nota da original, para aparecer junto da barra)
+      // what each person sang (in the octave closest to the original's note, so it shows next to the bar)
       const drawTrail = (points: GuideFrame['trail']) => {
         let lastReference: number | null = null;
         let previous: { x: number; y: number } | null = null;

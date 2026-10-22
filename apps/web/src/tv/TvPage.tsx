@@ -1,4 +1,4 @@
-// TV: toca o que a sala manda, mostra a letra sincronizada, quem canta, a fila e a pontuação.
+// TV: plays what the Room sends, shows the synced lyrics, who is singing, the Queue and the Score.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { changeLyricsScale } from '../lib/accessibility.ts';
@@ -29,7 +29,7 @@ declare global {
   }
 }
 
-/** O QR code da sala sempre à vista (quem chega no meio da festa entra sem pedir o código): fica ao lado de quem está cantando. */
+/** The Room's QR code always in view (whoever arrives in the middle of the party joins without asking for the code): it sits beside whoever is singing. */
 function JoinCard({ code }: { code: string }) {
   return (
     <aside className="tv-join" aria-label={t('tvp.joinAria')}>
@@ -81,8 +81,8 @@ function ScoreFinal({ final, room }: { final: FinalResult | null; room: RoomStat
 }
 
 /**
- * Músicas no computador do dono: confere se esta página alcança o servidor local de mídia (isso também provoca o aviso de
- * "Acesso à rede local" do Chrome/Edge) e devolve o texto que explica o que fazer, ou '' se está tudo certo.
+ * Songs on the Owner's computer: checks whether this page reaches the local media server (which also triggers Chrome/Edge's
+ * "Local network access" prompt) and returns the text that explains what to do, or '' if all is well.
  */
 function useLocalMediaNotice(room: RoomState | null): string {
   const base = localMediaBase(room);
@@ -111,7 +111,7 @@ function useLocalMediaNotice(room: RoomState | null): string {
   return accessMessage(status, elapsed);
 }
 
-/** Dueto: quem canta em cada cor (verde, vermelho e amarelo quando os dois cantam). */
+/** Duet: who sings in each color (green, red, and yellow when both sing). */
 function DuetLegend({ first, second }: { first: string; second: string }) {
   return (
     <p className="duet-legend" aria-label={t('tvp.duetAria')}>
@@ -132,7 +132,7 @@ export function TvPage({ code }: { code: string }) {
   const [calibrating, setCalibrating] = useState(false);
   const [choosingMics, setChoosingMics] = useState(false);
   const reactions = useReactionLayer();
-  const [guideReady, setGuideReady] = useState(false); // o guia de melodia tem notas para desenhar
+  const [guideReady, setGuideReady] = useState(false); // the melody guide has notes to draw
 
   const stageRef = useRef<HTMLElement>(null);
   const lyricsRefs = {
@@ -146,7 +146,7 @@ export function TvPage({ code }: { code: string }) {
 
   useEffect(() => {
     document.title = `Singalong — TV ${code}`;
-    // as linhas da letra pertencem ao motor de áudio (ele desenha cada palavra com o seu preenchimento): o React só as entrega
+    // the lyrics' lines belong to the audio engine (it draws each word with its fill): React only hands them over
     const controller = createTvController(
       code,
       { setRoom, notify: setNotice, setUnlock: setUnlockVisible, setHud, setProgress, setFinal, addReaction: reactions.push, setGuideReady },
@@ -158,7 +158,7 @@ export function TvPage({ code }: { code: string }) {
       },
     );
     controllerRef.current = controller;
-    // gancho de diagnóstico (testes no navegador)
+    // a diagnostics hook (the browser tests)
     window.tv = { engine: controller.engine, get state() { return controller.state; } };
     return () => controller.stop();
   }, [code]);
@@ -186,7 +186,7 @@ export function TvPage({ code }: { code: string }) {
   const { upcoming } = room ? playOrder(room) : { upcoming: [] as QueueItem[] };
   const hasQueue = Boolean(current) || upcoming.length > 0;
   const showGuide = Boolean(room?.melody_bars) && guideReady && Boolean(current);
-  const showLower = showGuide || hud.visible; // a faixa de baixo: o guia de melodia e a pontuação (ela nunca flutua sobre o resto)
+  const showLower = showGuide || hud.visible; // the bottom strip: the melody guide and the Score (it never floats over the rest)
   const nextLabel = next ? `${titleOf(next.item)}${next.preparing ? ` ${t('next.preparing')}` : ''}` : '';
 
   return (
@@ -281,10 +281,10 @@ export function TvPage({ code }: { code: string }) {
         <Lobby code={code} people={room?.people ?? []} status={next ? t('tvp.idleNext', { who: next.item.singers, title: nextLabel }) : t('tvp.idleAdd')} />
       </section>
 
-      {/* o intervalo entre músicas cobre tudo (a espera também): aplausos para quem cantou, depois a subida ao palco de quem vem */}
+      {/* the Intermission covers everything (the waiting too): Applause for whoever sang, then Taking the stage for whoever is next */}
       <Interlude room={room} />
 
-      {/* nos aplausos a nota já aparece no meio da tela: o quadro da nota final não se repete */}
+      {/* during the Applause the Score already shows in the middle of the screen: the final-score board does not repeat it */}
       <ScoreFinal final={room?.interlude ? null : final} room={room} />
       <ReactionLayer items={reactions.items} />
       {choosingMics && <MicsDialog controller={controllerRef.current} onClose={() => setChoosingMics(false)} />}

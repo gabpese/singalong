@@ -1,11 +1,11 @@
-// QR code para entrar na sala: usa PUBLIC_URL (o endereço que os celulares alcançam) ou o da própria página.
+// The QR code to join the Room: uses PUBLIC_URL (the address the phones reach) or the page's own.
 import { useEffect, useState } from 'react';
 import { t } from '../i18n/index.ts';
 import { api } from '../lib/identity.ts';
 import type { PublicConfig } from '../lib/types.ts';
 import qrcode from '../vendor/qrcode/qrcode.mjs';
 
-/** `compact`: o cartão pequeno que fica na TV enquanto toca (sem o endereço escrito). */
+/** `compact`: the small card that stays on the TV while a song plays (without the written address). */
 export function QrCode({ code, compact = false }: { code: string; compact?: boolean }) {
   const [join, setJoin] = useState<{ url: string; svg: string; localhostWarning: boolean } | null>(null);
 
@@ -21,7 +21,7 @@ export function QrCode({ code, compact = false }: { code: string; compact?: bool
           configured = true;
         }
       } catch {
-        // sem config: usa a origem da página
+        // no config: uses the page's origin
       }
       const url = `${base}/room.html?room=${code}`;
       const qr = qrcode(0, 'M');
@@ -30,7 +30,7 @@ export function QrCode({ code, compact = false }: { code: string; compact?: bool
       if (!cancelled) {
         setJoin({
           url,
-          svg: qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true }), // SVG gerado aqui, a partir da nossa URL
+          svg: qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true }), // an SVG generated here, from our URL
           localhostWarning: !configured && ['localhost', '127.0.0.1'].includes(location.hostname),
         });
       }

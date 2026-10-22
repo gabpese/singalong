@@ -1,5 +1,5 @@
-// Seletor de idioma: três bandeiras pequenas (Brasil, Estados Unidos e Espanha); a escolha fica guardada neste navegador.
-// As bandeiras são desenhos simplificados em SVG (emoji de bandeira não aparece no Windows). O nome do idioma vai no rótulo.
+// The language picker: three small flags (Brazil, the United States and Spain); the choice is kept in this browser.
+// The flags are simplified SVG drawings (flag emojis do not show on Windows). The language's name goes in the label.
 import type { ReactNode } from 'react';
 import { getLanguage, LANGUAGES, setLanguage, t } from '../i18n/index.ts';
 

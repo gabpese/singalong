@@ -1,5 +1,5 @@
-// A primeira coisa ao entrar na sala: quem é você? O nome aparece na fila, nos convites de dueto e na pontuação, então o
-// modal não fecha sem ele (depois a pessoa ainda pode trocá-lo na aba "Adicionar").
+// The first thing on joining the Room: who are you? The name shows in the Queue, in the duet invitations and in the scoring, so the
+// modal does not close without it (later the person can still change it in the "Adicionar" tab).
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { t } from '../i18n/index.ts';
 
@@ -22,7 +22,7 @@ export function NameDialog({ code, onName }: { code: string; onName: (name: stri
       ref={dialog}
       className="jukebox-dialog name-dialog"
       aria-labelledby="name-title"
-      onCancel={(event) => event.preventDefault()} // Esc não fecha: o nome é obrigatório
+      onCancel={(event) => event.preventDefault()} // Esc does not close it: the name is required
     >
       <form className="jukebox-body" onSubmit={submit}>
         <h2 id="name-title">{t('name.welcome', { code })}</h2>

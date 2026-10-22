@@ -1,4 +1,4 @@
-// Topo da sala (código e estado da TV) e a barra de abas. Os atalhos e ajustes ficam na barra lateral (RoomRail).
+// The Room's top bar (the code and the TV's state) and the tab bar. The shortcuts and settings sit in the side rail (RoomRail).
 import { useEffect, useRef } from 'react';
 import type { RoomState } from '../lib/types.ts';
 import { t } from '../i18n/index.ts';
@@ -21,7 +21,7 @@ function tvStatusText(state: RoomState | null, status: ConnectionStatus) {
 export function TopBar({ state, status, view, onView }: { state: RoomState | null; status: ConnectionStatus; view: View; onView: (view: View) => void }) {
   const { code } = useRoom();
   const header = useRef<HTMLElement>(null);
-  // a barra lateral fica logo abaixo do topo, qualquer que seja a altura dele (idioma, estado da TV...): o topo diz a sua medida
+  // the side rail sits right below the top bar, whatever its height (the language, the TV's state...): the top bar reports its size
   useEffect(() => {
     const element = header.current;
     if (!element) return undefined;

@@ -1,4 +1,4 @@
-// Reações que sobem pela tela (TV, aba TV da sala e palco): cada uma sobe e some sozinha. Só decoração: o leitor de tela não as lê.
+// Reactions that float up the screen (TV, the Room's TV tab and Stage): each one rises and goes away on its own. Decoration only: screen readers skip them.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { addFloating, glyphOf, REACTION_LIFETIME_MS } from '../lib/reactions.ts';
 import type { ReactionKind } from '../lib/types.ts';
@@ -7,7 +7,7 @@ export interface FloatingReaction {
   id: number;
   kind: ReactionKind;
   name?: string;
-  /** Posição horizontal (% da largura). */
+  /** The horizontal position (% of the width). */
   x: number;
 }
 
