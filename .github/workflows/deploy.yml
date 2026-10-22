@@ -1,7 +1,7 @@
 name: Deploy
 
-# Depois que o CI passa na main: publica a imagem da API no GitHub Container Registry (amd64 e arm64) e, se o deploy estiver
-# ligado (variável DEPLOY_ENABLED = true), atualiza a VM por SSH. Também pode ser disparado à mão na aba Actions.
+# After CI passes on main: publishes the API image to the GitHub Container Registry (amd64 and arm64) and, if deploying is
+# on (the DEPLOY_ENABLED variable = true), updates the VM by SSH. It can also be started by hand in the Actions tab.
 on:
   workflow_run:
     workflows: [CI]
@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 
-# uma entrega por vez: duas ao mesmo tempo pisariam uma na outra
+# one delivery at a time: two at once would step on each other
 concurrency:
   group: deploy
   cancel-in-progress: false
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # a versão exata que o CI aprovou (e não o que estiver na ponta da main agora)
+          # the exact version CI approved (not whatever is at the tip of main now)
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - id: vars
         run: |
@@ -43,7 +43,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # o front-end é construído uma vez, na arquitetura do runner; só as dependências do servidor são montadas por arquitetura
+      # the front end is built once, on the runner's architecture; only the server's dependencies are assembled per architecture
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -59,7 +59,7 @@ jobs:
   deploy:
     name: Atualizar a VM
     needs: publish
-    # só depois que a VM existir e os segredos estiverem cadastrados (deploy/README.md): ligue a variável DEPLOY_ENABLED
+    # only after the VM exists and the secrets are registered (deploy/README.md): turn on the DEPLOY_ENABLED variable
     if: vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:

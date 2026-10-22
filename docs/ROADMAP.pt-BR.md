@@ -76,6 +76,8 @@ Os `*.mjs` e `*.test.js` que restam viram `.ts`, num pull request por app. O `ts
   - **O worker em Python: feito.** Os comentários, as docstrings, os nomes de teste e o Dockerfile estão em inglês. O que o dono lê continua em português: as linhas de log (o app do desktop as mostra), a ajuda da linha de comando e as mensagens de erro que um job mostra.
   - **Os componentes TSX: feito.** Os comentários do site estão em inglês, junto com os quatro arquivos `.ts` que a passagem para TypeScript tinha deixado em português (`tv/controller.ts`, `room/useRoomConnection.ts`, `tv/applause-sound.ts`, `ui/useInterlude.ts`). Os rótulos da tela citados num comentário ("Adicionar música") ficam como a tela os mostra.
   - **O CSS: feito.** As folhas de estilo do site e do app do desktop estão em inglês, com as duas cópias do `theme-bridge.css` ainda idênticas. Os comentários que ainda descreviam o visual antigo "Cyber-Club" (rosa-neon, ciano, cartão de vidro, contorno preto no dueto) agora descrevem o que o código desenha.
+  - **Os scripts de shell e a configuração: feito.** Os comentários dos scripts de deploy, dos arquivos do compose, do `deploy/.env.example`, do Caddyfile, do Dockerfile da API e dos workflows estão em inglês. O que o dono lê continua em português: as mensagens dos scripts e os nomes dos jobs do CI.
+  - **Falta: o `deploy/README.md`**, ainda só em português. Ele vira uma doc em inglês com um `README.pt-BR.md` ao lado.
 - O texto da interface continua nos catálogos de idioma, com o português como padrão do produto.
 
 ## Infraestrutura quando o projeto gerar receita

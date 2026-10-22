@@ -1,7 +1,7 @@
-# Produção numa VM sempre ligada: API + Redis + Caddy (HTTPS automático). SEM worker: as músicas novas são processadas no PC de
-# casa; aqui só se toca a biblioteca que foi copiada para ./storage (veja deploy/README.md).
+# Production on an always-on VM: API + Redis + Caddy (automatic HTTPS). NO worker: new songs are prepared on the Owner's
+# computer; here only the songs in ./storage are played (see deploy/README.md).
 #
-# Uso (na VM, em /opt/singalong):  docker compose -f docker-compose.prod.yml --env-file .env up -d
+# Usage (on the VM, in /opt/singalong):  docker compose -f docker-compose.prod.yml --env-file .env up -d
 services:
   caddy:
     image: caddy:2-alpine
@@ -13,7 +13,7 @@ services:
       SITE_ADDRESS: "${SITE_ADDRESS:?defina SITE_ADDRESS no .env}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data # os certificados ficam aqui: não apague, senão o Let's Encrypt limita as emissões
+      - caddy-data:/data # the certificates live here: do not delete it, or Let's Encrypt rate-limits the issuing
       - caddy-config:/config
     depends_on:
       api:
@@ -32,43 +32,43 @@ services:
       retries: 10
 
   api:
-    # construída pelo GitHub Actions (.github/workflows/deploy.yml) para amd64 e arm64
+    # built by GitHub Actions (.github/workflows/deploy.yml) for amd64 and arm64
     image: ghcr.io/${GHCR_OWNER:-gabpese}/singalong-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     expose:
-      - "3000" # só o Caddy chega aqui; nada da API fica exposto direto na internet
+      - "3000" # only Caddy reaches this; nothing of the API is exposed straight to the internet
     environment:
       REDIS_URL: redis://redis:6379/0
       STORAGE_ROOT: /storage
       DB_PATH: /data/singalong.db
-      # o QR code da TV aponta para este endereço
+      # the TV's QR code points to this address
       PUBLIC_URL: https://${SITE_ADDRESS}
-      # sem worker para refazer músicas apagadas: a limpeza do cache fica desligada
+      # no worker to rebuild deleted songs: the cache cleanup stays off
       CACHE_MAX_GB: "0"
-      # segredo do administrador: liga o pareamento do agente local (/agent/v1); vazio = desligado
+      # the administrator's secret: turns on the local agent's pairing (/agent/v1); empty = off
       ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
-      # atrás do Caddy: o IP de quem chama vem no X-Forwarded-For (limites de pedidos por IP)
+      # behind Caddy: the caller's IP comes in X-Forwarded-For (for the per-IP request limits)
       TRUST_PROXY: "1"
-      # aviso de atualização do app instalado: a versão mais recente, a mínima aceita, o que mudou e onde baixar (vazio = não avisa)
+      # the installed app's update notice: the latest version, the minimum accepted, what changed and where to download it (empty = no notice)
       APP_LATEST_VERSION: "${APP_LATEST_VERSION:-}"
       APP_MIN_VERSION: "${APP_MIN_VERSION:-}"
       APP_NOTES: "${APP_NOTES:-}"
       APP_DOWNLOAD_URL: "${APP_DOWNLOAD_URL:-}"
-      # intervalo entre músicas (segundos): os aplausos depois de cada música e a subida ao palco do próximo cantor (0 desliga a fase)
+      # the Intermission (seconds): the Applause after each song and Taking the stage for the next singer (0 turns the phase off)
       INTERMISSION_APPLAUSE_SECONDS: "${INTERMISSION_APPLAUSE_SECONDS:-15}"
       INTERMISSION_STAGE_SECONDS: "${INTERMISSION_STAGE_SECONDS:-15}"
-      # o endereço SECRETO da página do administrador (sem ele a página não existe); gere com: openssl rand -hex 16
+      # the SECRET address of the administrator's page (without it the page does not exist); generate it with: openssl rand -hex 16
       ADMIN_PATH: "${ADMIN_PATH:-}"
-      # código de pareamento por e-mail (opcional): quem estiver em PAIR_ALLOWED_EMAILS pede o código no app e recebe por e-mail
+      # pairing code by e-mail (optional): whoever is in PAIR_ALLOWED_EMAILS asks for the code in the app and gets it by e-mail
       PAIR_ALLOWED_EMAILS: "${PAIR_ALLOWED_EMAILS:-}"
-      # modo híbrido: os computadores pareados com estes e-mails enviam as músicas deles para a nuvem sozinhos
+      # hybrid mode: the computers paired with these e-mails send their songs to the cloud on their own
       ENABLED_TO_SEND_TO_CLOUD: "${ENABLED_TO_SEND_TO_CLOUD:-}"
       BREVO_API_KEY: "${BREVO_API_KEY:-}"
       MAIL_FROM: "${MAIL_FROM:-}"
       MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Singalong}"
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
-      - ./storage:/storage # precisa ser gravável pelo usuário 1000 (o /readyz grava um arquivo de teste); veja o README
+      - ./storage:/storage # must be writable by user 1000 (/readyz writes a test file); see the README
       - api-data:/data
     depends_on:
       redis:

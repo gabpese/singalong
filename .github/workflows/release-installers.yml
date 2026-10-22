@@ -1,8 +1,8 @@
 name: Instaladores de Linux e macOS
 
-# Gera o AppImage (Linux) e o DMG (macOS Apple Silicon) e os anexa à release do GitHub. Roda só quando você manda:
-# Actions → "Instaladores de Linux e macOS" → Run workflow, com a tag da release (ex.: v1.3.0).
-# O instalador do Windows continua sendo gerado e publicado por você (npm run dist), com ou sem assinatura.
+# Builds the AppImage (Linux) and the DMG (macOS Apple Silicon) and attaches them to the GitHub release. Runs only when you say so:
+# Actions → "Instaladores de Linux e macOS" → Run workflow, with the release's tag (e.g. v1.3.0).
+# The Windows installer is still built and published by you (npm run dist:win), signed or not.
 on:
   workflow_dispatch:
     inputs:
