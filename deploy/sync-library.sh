@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Copia a biblioteca de músicas já processadas do seu PC para a VM (rode no Git Bash, na raiz do projeto):
-#   deploy/sync-library.sh ubuntu@IP_DA_VM [caminho/da/chave.pem]
+# Copies the library of songs already prepared from your PC to the VM (run it in Git Bash, at the project's root):
+#   deploy/sync-library.sh ubuntu@VM_IP [path/to/key.pem]
 #
-# Só vai o que a nuvem precisa para TOCAR as músicas: o instrumental, a letra, a melodia, as vozes de apoio, o meta e os
-# vídeos MP4 já gerados. Ficam de fora a voz isolada (vocals.mp3) e o source.json, que só o worker usa.
-# As músicas são direitos autorais de terceiros: isto vai por SSH para a SUA VM, nunca para o GitHub.
+# Only what the cloud needs to PLAY the songs goes: the instrumental, the lyrics, the melody, the backing vocals, the meta and the
+# MP4 videos already made. The isolated voice (vocals.mp3) and source.json, which only the worker uses, stay behind.
+# The songs are third parties' copyright: this goes by SSH to YOUR VM, never to GitHub.
 set -euo pipefail
 
 TARGET=${1:?uso: deploy/sync-library.sh usuario@host [chave.pem]}

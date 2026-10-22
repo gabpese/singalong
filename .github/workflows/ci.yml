@@ -6,7 +6,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# uma execução nova da mesma branch cancela a anterior (economiza minutos e evita resultado velho)
+# a new run on the same branch cancels the previous one (it saves minutes and avoids a stale result)
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -18,7 +18,7 @@ jobs:
   api:
     name: API (testes)
     runs-on: ubuntu-latest
-    # um Redis de verdade para os testes de integração dos jobs do agente (streams, scripts Lua, long-poll)
+    # a real Redis for the integration tests of the agent's jobs (streams, Lua scripts, long-poll)
     services:
       redis:
         image: redis:7-alpine
@@ -98,9 +98,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      # os testes não precisam do torch, do Demucs nem do Whisper: só destes dois
-      # websockets: o teste do login do YouTube (cliente do protocolo de depuração) roda contra um servidor WebSocket de verdade
-      # yt-dlp: um teste confere os nomes dos extratores permitidos na importação contra a lista real dele
+      # the tests need neither torch, Demucs nor Whisper, only these packages:
+      # websockets: the YouTube login's test (a client of the debugging protocol) runs against a real WebSocket server
+      # yt-dlp: a test checks the extractor names the import allows against its real list
       - run: pip install numpy langdetect websockets yt-dlp
       - run: python -I -m unittest discover -s tests -t .
 
@@ -109,7 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest] # o instalador é de Windows: lá roda o tar.exe de verdade; macos-latest é Apple Silicon
+        os: [ubuntu-latest, windows-latest, macos-latest] # the installer is for Windows: the real tar.exe runs there; macos-latest is Apple Silicon
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -125,14 +125,14 @@ jobs:
       # the tests run the .ts sources straight in Node; the desktop app builds dist/ for itself (apps/desktop/scripts/build-engine.ts)
       - run: npm test
 
-  # a prova do motor com tudo de verdade: baixa os componentes oficiais (confere o SHA-256 de cada um), instala o torch de CPU
-  # e os pacotes, e roda a verificação (ffmpeg com os filtros do karaokê, deno, python e todas as bibliotecas)
+  # the proof of the engine with everything real: downloads the official components (checks each one's SHA-256), installs the CPU torch
+  # and the packages, and runs the verification (ffmpeg with the karaoke's filters, deno, python and every library)
   engine-real:
     name: Motor real (baixa e monta, em CPU, no ${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest] # macos-latest é Apple Silicon (arm64)
+        os: [ubuntu-latest, macos-latest] # macos-latest is Apple Silicon (arm64)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -144,8 +144,8 @@ jobs:
         run: node apps/engine/src/cli.ts assemble --dir "$RUNNER_TEMP/motor" --engine cpu
       - name: Verificar o motor
         run: node apps/engine/src/cli.ts verify --dir "$RUNNER_TEMP/motor"
-      # a GPU da Apple (opcional, em beta): o executor pode não ter GPU. Se o Metal funcionar o motor fica "mps"; se não, TEM de voltar para a
-      # CPU e dizer por quê (esse caminho de volta é o que protege quem escolhe a opção). Qualquer outro resultado é falha.
+      # the Apple GPU (optional, in beta): the runner may have no GPU. If Metal works the engine is "mps"; if not, it HAS to fall back to the
+      # CPU and say why (that fallback is what protects whoever picks the option). Any other result is a failure.
       - name: Pedir a GPU da Apple (cai para a CPU se não houver Metal)
         if: runner.os == 'macOS'
         run: |
@@ -157,7 +157,7 @@ jobs:
             console.log(s.engine === "mps" ? "O Metal funciona neste executor: motor mps." : "Sem Metal neste executor: voltou para a CPU (" + s.fallback_reason + ").");
             process.exit(ok ? 0 : 1);
           '
-      # a medição que faltava: o MESMO Demucs na CPU e no Metal, com 30 s de áudio. Só informa (não falha): o resultado vai para o resumo do job.
+      # the missing measurement: the SAME Demucs on the CPU and on Metal, with 30 s of audio. It only reports (it does not fail): the result goes to the job's summary.
       - name: Medir a separação na CPU e no Metal
         if: runner.os == 'macOS'
         run: |
@@ -165,7 +165,7 @@ jobs:
           export PATH="$MOTOR/bin:$PATH" PYTORCH_ENABLE_MPS_FALLBACK=1 TORCH_HOME="$MOTOR/models" PYTHONNOUSERSITE=1
           cd "$RUNNER_TEMP"
           ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=330:duration=30" -f lavfi -i "anoisesrc=d=30:c=pink:a=0.2" -filter_complex "amix=inputs=2,aformat=channel_layouts=stereo" -ar 44100 bench.wav
-          # aquecimento: baixa o modelo (htdemucs) com um trecho curto, para o download não entrar na conta de nenhum dos dois
+          # warm-up: downloads the model (htdemucs) with a short clip, so the download counts for neither of the two
           ffmpeg -y -loglevel error -f lavfi -i "sine=frequency=330:duration=3" -ac 2 -ar 44100 warm.wav
           "$MOTOR/python/bin/python3" -m demucs --two-stems=vocals -n htdemucs -d cpu -o bench-warm warm.wav > bench-warm.log 2>&1 || true
           for device in cpu mps; do
@@ -195,7 +195,7 @@ jobs:
       - run: npm ci
       # npm test builds first (npm run build): it type-checks the main process and compiles the window and the preloads
       - run: npm test
-      # a janela de verdade (Electron) falando com a API de verdade e o worker de verdade
+      # the real window (Electron) talking to the real API and the real worker
       - name: Garantir o binário do Electron
         if: runner.os == 'Windows'
         run: node node_modules/electron/install.js
@@ -233,9 +233,9 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      # Assinatura do instalador. Com os segredos WINDOWS_CERT_PFX_BASE64 e WINDOWS_CERT_PASSWORD (e, se quiser, a variável WINDOWS_PUBLISHER)
-      # ele sai assinado de verdade e o build FALHA se a assinatura não funcionar. Sem eles, o CI assina com um certificado de TESTE
-      # descartável (autoassinado), só para provar que o caminho da assinatura funciona (o Windows não confia nele: é esperado).
+      # The installer's signing. With the WINDOWS_CERT_PFX_BASE64 and WINDOWS_CERT_PASSWORD secrets (and, optionally, the WINDOWS_PUBLISHER variable)
+      # it comes out really signed and the build FAILS if the signing does not work. Without them, CI signs with a throwaway TEST
+      # certificate (self-signed), only to prove the signing path works (Windows does not trust it: that is expected).
       - name: Preparar a assinatura
         shell: pwsh
         env:
@@ -260,7 +260,7 @@ jobs:
             "CSC_KEY_PASSWORD=$password" >> $env:GITHUB_ENV
             'assinatura: certificado de TESTE descartável (o Windows não confia nele)'
           }
-      # o instalador NÃO é guardado nem publicado (fica só na máquina do dono): aqui só se confere que ele é gerado (e assinado)
+      # the installer is NOT kept or published (it stays only on the Owner's machine): this only checks that it is built (and signed)
       - run: npm run dist
       - name: Conferir o arquivo gerado
         shell: pwsh
@@ -272,8 +272,8 @@ jobs:
       - name: Conferir a assinatura
         run: node scripts/verify-signature.ts dist/singalong_karaoke.exe
 
-  # o AppImage (Linux) e o DMG (macOS Apple Silicon) são gerados de verdade; o build confere o nome fixo, o tamanho, o executável do Linux
-  # e a assinatura ad-hoc do app do Mac (o Apple Silicon encerra programa sem assinatura). Nada é guardado nem publicado.
+  # the AppImage (Linux) and the DMG (macOS Apple Silicon) are really built; the build checks the fixed name, the size, the Linux executable
+  # and the Mac app's ad-hoc signature (Apple Silicon shuts down an unsigned program). Nothing is kept or published.
   installer-unix:
     name: Instalador do ${{ matrix.system }} (gera, sem publicar)
     strategy:
@@ -304,7 +304,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      # o contexto é a raiz: a primeira etapa constrói o front-end e a API serve o resultado
+      # the context is the root: the first stage builds the front end and the API serves the result
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -317,7 +317,7 @@ jobs:
     name: Imagem do worker (build, só na main)
     runs-on: ubuntu-latest
     needs: [worker]
-    # leva vários minutos (torch, Demucs): só quando a main muda ou sob demanda
+    # takes several minutes (torch, Demucs): only when main changes or on demand
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4

@@ -1,5 +1,5 @@
-# Contexto de build: raiz do repositório. A primeira etapa constrói o front-end (JS estático, igual para qualquer arquitetura) sempre na
-# máquina que está construindo; a API serve o resultado. Assim a imagem sai para amd64 e arm64 sem compilar o front-end sob emulação.
+# Build context: the repository's root. The first stage builds the front end (static JS, the same for any architecture) always on the
+# machine doing the build; the API serves the result. So the image comes out for amd64 and arm64 without building the front end under emulation.
 FROM --platform=$BUILDPLATFORM node:24-slim AS web
 WORKDIR /web
 COPY apps/web/package.json apps/web/package-lock.json ./
@@ -33,7 +33,7 @@ ENV NODE_ENV=production \
     STORAGE_ROOT=/storage \
     PUBLIC_DIR=/app/public
 
-# pasta do SQLite com o dono certo: um volume novo herda o dono desta pasta
+# the SQLite folder with the right owner: a new volume inherits this folder's owner
 RUN mkdir -p /data && chown node:node /data
 
 USER node

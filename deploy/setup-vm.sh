@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Prepara uma VM Ubuntu nova (ex.: Oracle Cloud) para rodar o Singalong. Rode UMA vez, na VM, como o usuário padrão (ubuntu):
+# Prepares a new Ubuntu VM (e.g. Oracle Cloud) to run Singalong. Run it ONCE, on the VM, as the default user (ubuntu):
 #   curl -fsSL https://raw.githubusercontent.com/gabpese/singalong/main/deploy/setup-vm.sh | bash
-# É seguro rodar de novo: cada passo confere se já foi feito.
+# It is safe to run again: each step checks whether it was already done.
 set -euo pipefail
 
 APP_DIR=/opt/singalong
@@ -16,7 +16,7 @@ sudo usermod -aG docker "$USER"
 echo "== 2/5 Pastas"
 sudo mkdir -p "$APP_DIR/storage/cache"
 sudo chown -R "$USER":"$USER" "$APP_DIR"
-# a API roda como o usuário 1000 do container (node) e grava um arquivo de teste na pasta de músicas
+# the API runs as the container's user 1000 (node) and writes a test file in the songs folder
 sudo chown -R 1000:1000 "$APP_DIR/storage"
 
 echo "== 3/5 Memória extra (swap de 2 GB: a VM gratuita pequena tem só 1 GB)"
@@ -29,8 +29,8 @@ if ! swapon --show | grep -q '/swapfile'; then
 fi
 
 echo "== 4/5 Firewall da VM (portas 80 e 443)"
-# As imagens Ubuntu da Oracle vêm com regras de iptables que bloqueiam tudo além do SSH. A porta também precisa estar
-# liberada na "Security List" da rede, no painel da Oracle (veja o README).
+# Oracle's Ubuntu images come with iptables rules that block everything but SSH. The port also has to be
+# opened in the network's "Security List", in Oracle's console (see the README).
 if command -v iptables >/dev/null 2>&1; then
   for port in 80 443; do
     sudo iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null \

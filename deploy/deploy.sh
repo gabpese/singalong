@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Publica a versão mais recente da API na VM (o GitHub Actions chama este script por SSH depois de cada merge na main;
-# você também pode rodar à mão). Roda em /opt/singalong.
+# Publishes the latest version of the API on the VM (GitHub Actions calls this script by SSH after CI passes on main when the
+# DEPLOY_ENABLED variable is on; otherwise, run it by hand). Runs in /opt/singalong.
 set -euo pipefail
 cd "$(dirname "$0")"
 
