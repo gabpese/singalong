@@ -37,7 +37,7 @@ Uma VM Ubuntu no plano Always Free da Oracle Cloud roda o [`deploy/docker-compos
 
 O servidor não consegue preparar músicas: o YouTube bloqueia downloads vindos de IPs de nuvem (medido: 0 de 8 vídeos). As músicas novas vêm dos apps instaláveis dos Donos; o servidor só serve de ponto de encontro, guarda as Salas e entrega as músicas já preparadas.
 
-Passo a passo da instalação: [`deploy/README.md`](../deploy/README.md).
+Passo a passo da instalação: [`deploy/README.pt-BR.md`](../deploy/README.pt-BR.md).
 
 ### 2. Hospedado em casa
 

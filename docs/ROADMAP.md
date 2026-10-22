@@ -67,7 +67,7 @@ The remaining `*.mjs` and `*.test.js` files become `.ts`, in one pull request pe
 - **The web: done.** The unit tests, the Playwright tests (now with English names), `e2e/server.ts` and the Vite and Playwright configs. `tsconfig.node.json` checks them, beside the pages' own `tsconfig.json`. The e2e server starts the API from its compiled `dist/`, which it imports untyped.
 - **The API: done.** Its tests (now with English names) and `scripts/copy-assets.ts` are `.ts` without a type check, because the tests import the compiled `dist/`, which carries no types. The admin page's script (`src/admin/page/admin.ts`) compiles with `tsconfig.admin.json` (the browser's types) straight into `dist/`, and reads its state through the `AdminState` type in `protocol.ts`; `copy-assets.ts` copies only the page's HTML and CSS.
 
-## Code in English
+## Code in English (done)
 
 **Required.** The repository is English-first ([ADR 0015](adr/0015-english-first-repository.md)), but many older files still carry Portuguese comments and test names.
 
@@ -77,7 +77,7 @@ The remaining `*.mjs` and `*.test.js` files become `.ts`, in one pull request pe
   - **The TSX components: done.** The web's comments are in English, with the four `.ts` files the TypeScript pass had left in Portuguese (`tv/controller.ts`, `room/useRoomConnection.ts`, `tv/applause-sound.ts`, `ui/useInterlude.ts`). On-screen labels quoted in a comment ("Adicionar música") stay as the screen shows them.
   - **The CSS: done.** The site's and the desktop app's stylesheets are in English, the two copies of `theme-bridge.css` still identical. Comments that still described the old "Cyber-Club" look (neon pink, cyan, a glass card, a black outline on duets) now describe what the code draws.
   - **The shell scripts and the configuration: done.** The comments of the deploy scripts, the compose files, `deploy/.env.example`, the Caddyfile, the API's Dockerfile and the workflows are in English. What the owner reads stays in Portuguese: the scripts' messages and the CI's job names.
-  - **Left: `deploy/README.md`**, still only in Portuguese. It becomes an English doc with a `README.pt-BR.md` beside it.
+  - **`deploy/README.md`: done.** The hosting guide is in English, with `README.pt-BR.md` beside it.
 - UI text stays in the i18n catalogs, with Portuguese as the product's default.
 
 ## Infrastructure when the project earns money

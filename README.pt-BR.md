@@ -313,7 +313,7 @@ Erros do YouTube viram mensagens em português; "Tentar de novo" só aparece qua
 
 - **CI** (`.github/workflows/ci.yml`): a cada push e pull request roda os testes da API, do front-end (TypeScript, unitários, build e ponta a ponta com Playwright) e do worker, e confere que as imagens constroem.
 - **CD** (`.github/workflows/deploy.yml`): depois do CI verde na `main`, publica a imagem da API no GitHub Container Registry (amd64 e arm64) e, se ligado, atualiza a VM por SSH.
-- **Hospedagem gratuita com HTTPS** para acessar de qualquer computador, sem o seu PC ligado: veja [`deploy/README.md`](deploy/README.md).
+- **Hospedagem gratuita com HTTPS** para acessar de qualquer computador, sem o seu PC ligado: veja [`deploy/README.pt-BR.md`](deploy/README.pt-BR.md).
 
 ## Testes
 
