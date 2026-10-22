@@ -28,7 +28,7 @@ Cada passo é um pull request (o passo 3 são vários), aceito com merge commit.
 - No Linux sem Secret Service, o `safeStorage` usa uma chave fixa: guardar o token e mostrar no app um aviso permanente de que ali ele não está protegido.
 - Um programa rodando como o mesmo usuário ainda consegue pedir ao sistema que decifre o token, então revogar o aparelho continua sendo a resposta para um computador comprometido.
 
-### 3. A API em NestJS e MikroORM
+### 3. A API em NestJS e MikroORM (feito)
 
 [ADR 0017](adr/0017-api-on-nestjs-with-mikroorm.pt-BR.md). A API vai para a VM depois de cada pull request aceito. Até o passo 3 terminar, uma migração mantém toda tabela e coluna que a imagem anterior usa (ela cria tabelas e colunas, ou aperta uma restrição que os dados já cumprem), então a imagem anterior continua rodando sobre um banco já migrado.
 

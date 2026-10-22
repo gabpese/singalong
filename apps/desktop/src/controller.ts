@@ -11,7 +11,7 @@ import { verifyEngine } from '@singalong/engine/verify';
 import type { AgentStatus, BrowserId, Microphone, OpenRoom, OwnerStats, ServerStats, Snapshot, UpdateInfo, YoutubeStatus } from '../ui/bridge.ts';
 import { libraryStats } from './library-stats.ts';
 
-export const APP_VERSION = '1.4.2'; // must match package.json and singalong_worker/version.py (a test checks)
+export const APP_VERSION = '1.4.3'; // must match package.json and singalong_worker/version.py (a test checks)
 const MAX_LOGS = 300;
 const POLL_MS = 5000;
 
